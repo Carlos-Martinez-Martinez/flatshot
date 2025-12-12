@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flatshot"
+version = "1.0.0"
+description = "Product Image Shadow Tool - Procesador de imágenes para e-commerce"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "Proprietary"}
+authors = [
+    {name = "FlatShot Team"}
+]
+dependencies = [
+    "PyQt6>=6.4.0",
+    "Pillow>=9.5.0",
+    "numpy>=1.24.0",
+    "pydantic>=2.0.0",
+    "qtawesome>=1.3.0",
+]
+
+[project.scripts]
+flatshot = "flatshot.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

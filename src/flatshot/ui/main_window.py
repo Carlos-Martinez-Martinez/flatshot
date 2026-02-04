@@ -1954,14 +1954,22 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(0)
         self.lbl_progress_status.hide()
             
-    def _on_export_finished(self, success: bool):
+    def _on_export_finished(self, success: bool, processed: int = 0, total: int = 0, duration: float = 0.0):
         """Called when single-folder export finishes."""
         self._reset_export_ui()
         
         if success:
-            QMessageBox.information(self, "Proceso completado", "Proceso completado con éxito")
+            QMessageBox.information(
+                self,
+                "Proceso completado",
+                f"Proceso completado con éxito\n{processed}/{total} imágenes en {duration:.1f}s"
+            )
         else:
-            QMessageBox.warning(self, "Cancelado", "El proceso fue detenido.")
+            QMessageBox.warning(
+                self,
+                "Proceso incompleto",
+                f"Se detuvo o falló el proceso\n{processed}/{total} imágenes en {duration:.1f}s"
+            )
             
     # ========== DIALOGS ==========
     

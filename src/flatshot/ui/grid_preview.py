@@ -287,7 +287,6 @@ class GridPreviewWidget(QWidget):
         self._chunk_timer.stop()
         self._update_timer.stop()
         self._render_generation += 1
-        self._active_workers.clear()
         
         if not self.folder_path:
             self._images = []

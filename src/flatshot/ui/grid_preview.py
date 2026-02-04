@@ -5,11 +5,10 @@ Displays multiple image previews in a grid layout with lazy loading.
 from pathlib import Path
 from typing import List, Optional
 from PyQt6.QtWidgets import (
-    QWidget, QGridLayout, QVBoxLayout, QLabel, QScrollArea,
-    QSizePolicy, QFrame, QApplication
+    QWidget, QVBoxLayout, QLabel, QScrollArea, QSizePolicy, QFrame
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QSize, QRunnable, QThreadPool, QObject
-from PyQt6.QtGui import QPixmap, QImage, QPainter, QColor
+from PyQt6.QtGui import QPixmap, QImage
 from PIL import Image
 
 from flatshot.core.engine import ShadowEngine
@@ -246,9 +245,11 @@ class GridPreviewWidget(QWidget):
     
     def _clear_tiles(self):
         """Remove all tiles from the grid."""
-        for tile in self._tiles:
-            self.grid_layout.removeWidget(tile)
-            tile.deleteLater()
+        while self.grid_layout.count():
+            item = self.grid_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
         self._tiles.clear()
     
     def _create_tiles_for_images(self):
@@ -292,6 +293,7 @@ class GridPreviewWidget(QWidget):
             self._images = []
             self._clear_tiles()
             self.info_label.setText("Selecciona una carpeta para ver previews")
+            self.folder_empty.emit()
             return
         
         folder = Path(self.folder_path)
@@ -430,4 +432,14 @@ class GridPreviewWidget(QWidget):
     def refresh(self):
         """Force refresh all previews."""
         self._schedule_update()
+
+    def closeEvent(self, event):
+        """Stop background workers/timers cleanly on widget teardown."""
+        self._chunk_timer.stop()
+        self._update_timer.stop()
+        self._render_generation += 1  # Invalidate pending callbacks.
+        self._active_workers.clear()
+        self._pool.clear()
+        self._pool.waitForDone(1000)
+        super().closeEvent(event)
 

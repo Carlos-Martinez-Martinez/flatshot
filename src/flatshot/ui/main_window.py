@@ -6,6 +6,7 @@ import os
 import json
 import tempfile
 import logging
+import subprocess
 import traceback
 import io
 from pathlib import Path
@@ -2144,7 +2145,7 @@ class MainWindow(QMainWindow):
         btn_layout = QHBoxLayout()
         
         btn_open_folder = QPushButton("Abrir carpeta de logs")
-        btn_open_folder.clicked.connect(lambda: os.startfile(str(log_path.parent)))
+        btn_open_folder.clicked.connect(lambda: self._open_folder_in_explorer(log_path.parent))
         btn_layout.addWidget(btn_open_folder)
         
         btn_layout.addStretch()
@@ -2156,6 +2157,20 @@ class MainWindow(QMainWindow):
         layout.addLayout(btn_layout)
         
         dialog.exec()
+
+    def _open_folder_in_explorer(self, folder: Path):
+        """Open folder in system file explorer in a cross-platform way."""
+        try:
+            folder_str = str(folder)
+            if sys.platform.startswith("win"):
+                os.startfile(folder_str)
+            elif sys.platform == "darwin":
+                subprocess.run(["open", folder_str], check=False)
+            else:
+                subprocess.run(["xdg-open", folder_str], check=False)
+        except Exception as e:
+            self._show_feedback("No se pudo abrir la carpeta de logs")
+            self._log_error(f"[open-folder-error] {folder}: {e}")
             
     # ========== WINDOW EVENTS ==========
     

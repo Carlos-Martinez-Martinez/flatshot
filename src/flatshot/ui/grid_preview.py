@@ -8,12 +8,89 @@ from PyQt6.QtWidgets import (
     QWidget, QGridLayout, QVBoxLayout, QLabel, QScrollArea,
     QSizePolicy, QFrame, QApplication
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QSize
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QSize, QRunnable, QThreadPool, QObject
 from PyQt6.QtGui import QPixmap, QImage, QPainter, QColor
 from PIL import Image
 
 from flatshot.core.engine import ShadowEngine
 from flatshot.core.models import ShadowSettings, CurveData
+
+
+def _render_tile_preview(
+    image_path: str,
+    settings_dict: dict,
+    curve_dict: dict,
+    preview_size: tuple[int, int],
+):
+    """Render a grid tile preview off the UI thread."""
+    settings = ShadowSettings(**settings_dict)
+    curve_data = CurveData(**curve_dict) if curve_dict else None
+
+    with Image.open(image_path) as pil_img:
+        pil_img = pil_img.convert("RGBA")
+
+        processed_pil = ShadowEngine.aplicar_efectos(
+            pil_img,
+            settings,
+            preview_size,
+            scale_factor=0.1,
+            curve_data=curve_data,
+            is_preview=True,
+        )
+
+        def _to_rgb_payload(pil_image: Image.Image):
+            if pil_image.mode == "RGBA":
+                bg = Image.new("RGB", pil_image.size, (230, 230, 230))
+                bg.paste(pil_image, (0, 0), mask=pil_image)
+                pil_image = bg
+            pil_image = pil_image.convert("RGB")
+            return pil_image.width, pil_image.height, pil_image.tobytes("raw", "RGB")
+
+        processed_payload = _to_rgb_payload(processed_pil)
+
+        small_orig = pil_img.copy()
+        small_orig.thumbnail((preview_size[0], preview_size[1]))
+        original_payload = _to_rgb_payload(small_orig)
+
+    return processed_payload, original_payload
+
+
+class TileRenderSignals(QObject):
+    finished = pyqtSignal(int, int, object)  # tile_index, generation, payload
+    error = pyqtSignal(int, int, str)        # tile_index, generation, error
+
+
+class TileRenderWorker(QRunnable):
+    def __init__(
+        self,
+        tile_index: int,
+        generation: int,
+        image_path: str,
+        settings_dict: dict,
+        curve_dict: dict,
+        preview_size: tuple[int, int],
+    ):
+        super().__init__()
+        self.tile_index = tile_index
+        self.generation = generation
+        self.image_path = image_path
+        self.settings_dict = settings_dict
+        self.curve_dict = curve_dict
+        self.preview_size = preview_size
+        self.signals = TileRenderSignals()
+        self.setAutoDelete(False)
+
+    def run(self):
+        try:
+            payload = _render_tile_preview(
+                self.image_path,
+                self.settings_dict,
+                self.curve_dict,
+                self.preview_size,
+            )
+            self.signals.finished.emit(self.tile_index, self.generation, payload)
+        except Exception as exc:
+            self.signals.error.emit(self.tile_index, self.generation, str(exc))
 
 
 class PreviewTile(QFrame):
@@ -122,6 +199,11 @@ class GridPreviewWidget(QWidget):
         self.curve_data: Optional[CurveData] = None
         self._tiles: List[PreviewTile] = []
         self._images: List[Path] = []
+        self._render_generation = 0
+        self._completed_tiles = 0
+        self._active_workers = set()
+        self._pool = QThreadPool()
+        self._pool.setMaxThreadCount(2)
         
         # Chunked loading
         self._current_chunk = 0
@@ -203,6 +285,8 @@ class GridPreviewWidget(QWidget):
         # Cancel any ongoing processing
         self._chunk_timer.stop()
         self._update_timer.stop()
+        self._render_generation += 1
+        self._active_workers.clear()
         
         if not self.folder_path:
             self._images = []
@@ -234,6 +318,8 @@ class GridPreviewWidget(QWidget):
             if not self._images:
                 self.info_label.setText("No se encontraron imágenes PNG")
             return
+        self._render_generation += 1
+        self._completed_tiles = 0
         
         # Reset all tiles to pending state
         for i, tile in enumerate(self._tiles):
@@ -253,41 +339,35 @@ class GridPreviewWidget(QWidget):
         end = min(start + self._chunk_size, len(self._images))
         
         if start >= len(self._images):
-            # All done
-            self.info_label.setText(f"Mostrando {len(self._images)} imágenes")
+            if self._completed_tiles >= len(self._images):
+                self.info_label.setText(f"Mostrando {len(self._images)} imágenes")
             return
         
         preview_size = (150, 200)
+        generation = self._render_generation
+        settings_dict = self.settings.model_dump()
+        curve_dict = self.curve_data.model_dump() if self.curve_data else None
         
         for i in range(start, end):
             if i >= len(self._tiles):
                 break
-            
-            tile = self._tiles[i]
-            img_path = self._images[i]
-            
-            try:
-                with Image.open(img_path) as pil_img:
-                    pil_img = pil_img.convert("RGBA")
-                    
-                    # Generate processed preview
-                    processed_pil = ShadowEngine.aplicar_efectos(
-                        pil_img, self.settings, preview_size,
-                        scale_factor=0.1, curve_data=self.curve_data, is_preview=True
-                    )
-                    
-                    # Convert to QPixmap
-                    processed_qpixmap = self._pil_to_qpixmap(processed_pil)
-                    
-                    # Create original preview
-                    small_orig = pil_img.copy()
-                    small_orig.thumbnail((preview_size[0], preview_size[1]))
-                    original_qpixmap = self._pil_to_qpixmap(small_orig)
-                    
-                    tile.set_image(str(img_path), processed_qpixmap, original_qpixmap)
-                    
-            except Exception as e:
-                tile.name_label.setText(f"Error: {str(e)[:15]}")
+
+            worker = TileRenderWorker(
+                tile_index=i,
+                generation=generation,
+                image_path=str(self._images[i]),
+                settings_dict=settings_dict,
+                curve_dict=curve_dict,
+                preview_size=preview_size,
+            )
+            self._active_workers.add(worker)
+            worker.signals.finished.connect(
+                lambda tile_idx, gen, payload, w=worker: self._on_tile_rendered(w, tile_idx, gen, payload)
+            )
+            worker.signals.error.connect(
+                lambda tile_idx, gen, msg, w=worker: self._on_tile_error(w, tile_idx, gen, msg)
+            )
+            self._pool.start(worker)
         
         # Update progress
         processed = min(end, len(self._images))
@@ -296,10 +376,43 @@ class GridPreviewWidget(QWidget):
         self._current_chunk += 1
         if end < len(self._images):
             self.info_label.setText(f"Procesando... {processed}/{len(self._images)}")
-            self._chunk_timer.start(50)  # Small delay between chunks
-        else:
-            # All done - show final count
+            self._chunk_timer.start(20)
+        elif self._completed_tiles >= len(self._images):
             self.info_label.setText(f"Mostrando {len(self._images)} imágenes")
+
+    def _on_tile_rendered(self, worker: TileRenderWorker, tile_index: int, generation: int, payload):
+        self._active_workers.discard(worker)
+        if generation != self._render_generation:
+            return
+        if tile_index < 0 or tile_index >= len(self._tiles) or tile_index >= len(self._images):
+            return
+
+        processed_payload, original_payload = payload
+        processed_qpixmap = self._payload_to_qpixmap(processed_payload)
+        original_qpixmap = self._payload_to_qpixmap(original_payload)
+        self._tiles[tile_index].set_image(str(self._images[tile_index]), processed_qpixmap, original_qpixmap)
+
+        self._completed_tiles += 1
+        if self._completed_tiles >= len(self._images):
+            self.info_label.setText(f"Mostrando {len(self._images)} imágenes")
+        else:
+            self.info_label.setText(f"Generando... {self._completed_tiles}/{len(self._images)}")
+
+    def _on_tile_error(self, worker: TileRenderWorker, tile_index: int, generation: int, message: str):
+        self._active_workers.discard(worker)
+        if generation != self._render_generation:
+            return
+        if 0 <= tile_index < len(self._tiles):
+            self._tiles[tile_index].name_label.setText(f"Error: {message[:15]}")
+
+        self._completed_tiles += 1
+        if self._completed_tiles >= len(self._images):
+            self.info_label.setText(f"Mostrando {len(self._images)} imágenes")
+
+    def _payload_to_qpixmap(self, payload) -> QPixmap:
+        width, height, data = payload
+        qim = QImage(data, width, height, width * 3, QImage.Format.Format_RGB888)
+        return QPixmap.fromImage(qim.copy())
     
     def _pil_to_qpixmap(self, pil_image: Image.Image) -> QPixmap:
         """Convert PIL Image to QPixmap."""

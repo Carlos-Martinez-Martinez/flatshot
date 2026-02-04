@@ -2,8 +2,10 @@
 Export Worker for FlatShot
 Handles batch image processing with multiprocessing.
 """
+import os
+import threading
 from pathlib import Path
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
 from time import time
 from PyQt6.QtCore import QThread, pyqtSignal
 from PIL import Image
@@ -98,6 +100,8 @@ class ExportWorker(QThread):
         self.is_running = True
         self.executor = None
         self.start_time = None
+        self._pause_event = threading.Event()
+        self._pause_event.set()
 
     def run(self):
         self.start_time = time()
@@ -148,26 +152,55 @@ class ExportWorker(QThread):
         completed_count = 0
         error_count = 0
         
-        with ProcessPoolExecutor() as executor:
+        max_workers = max(1, (os.cpu_count() or 2) - 1)
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
             self.executor = executor
-            futures = [executor.submit(process_single_image, task) for task in tasks]
-            
-            for future in as_completed(futures):
-                if not self.is_running:
-                    self.executor.shutdown(wait=False, cancel_futures=True)
+            pending_tasks = iter(tasks)
+            in_flight = set()
+
+            # Prime the worker pool.
+            for _ in range(min(max_workers, total)):
+                try:
+                    in_flight.add(executor.submit(process_single_image, next(pending_tasks)))
+                except StopIteration:
                     break
-                    
-                success, msg = future.result()
-                
-                if success:
-                    self.image_completed.emit(msg, True)
-                else:
-                    error_count += 1
-                    self.log_updated.emit(f"Error: {msg}")
-                    self.image_completed.emit(msg.split(':')[0], False)
-                    
-                completed_count += 1
-                self.progress_updated.emit(int((completed_count / total) * 100))
+
+            while in_flight and self.is_running:
+                # Cooperative pause: stop consuming results and stop submitting new work.
+                self._pause_event.wait()
+                if not self.is_running:
+                    break
+
+                done, _ = wait(in_flight, timeout=0.2, return_when=FIRST_COMPLETED)
+                if not done:
+                    continue
+
+                for future in done:
+                    in_flight.discard(future)
+                    try:
+                        success, msg = future.result()
+                    except Exception as exc:
+                        success, msg = False, f"Worker error: {exc}"
+
+                    if success:
+                        self.image_completed.emit(msg, True)
+                    else:
+                        error_count += 1
+                        self.log_updated.emit(f"Error: {msg}")
+                        self.image_completed.emit(msg.split(':')[0], False)
+
+                    completed_count += 1
+                    self.progress_updated.emit(int((completed_count / total) * 100))
+
+                    # Keep pool busy only while not paused.
+                    if self.is_running and self._pause_event.is_set():
+                        try:
+                            in_flight.add(executor.submit(process_single_image, next(pending_tasks)))
+                        except StopIteration:
+                            pass
+
+            if not self.is_running:
+                self.executor.shutdown(wait=False, cancel_futures=True)
 
         duration = time() - self.start_time
         self.finished_process.emit(
@@ -180,3 +213,12 @@ class ExportWorker(QThread):
     def stop(self):
         """Stop the export process."""
         self.is_running = False
+        self._pause_event.set()
+
+    def pause(self):
+        """Pause dispatching/consuming new image tasks."""
+        self._pause_event.clear()
+
+    def resume(self):
+        """Resume image processing after a pause."""
+        self._pause_event.set()

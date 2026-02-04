@@ -140,12 +140,16 @@ class QueueWorker(QThread):
         self.queue_finished.emit(completed, errors, total_images)
     
     def pause(self):
-        """Pause the queue after current job completes."""
+        """Pause queue progression and current export worker when possible."""
         self.is_paused = True
-    
+        if self.current_worker:
+            self.current_worker.pause()
+
     def resume(self):
-        """Resume a paused queue."""
+        """Resume queue progression and current export worker."""
         self.is_paused = False
+        if self.current_worker:
+            self.current_worker.resume()
     
     def stop(self):
         """Stop the queue and current job."""

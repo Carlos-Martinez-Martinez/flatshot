@@ -88,7 +88,8 @@ class PreviewWorker(QRunnable):
         self.scale_ratio = scale_ratio
         self.quality_level = quality_level
         self.signals = PreviewWorkerSignals()
-        self.setAutoDelete(True)
+        # Keep worker alive until signals are delivered in main thread.
+        self.setAutoDelete(False)
     
     def run(self):
         """Execute render in background thread."""
@@ -138,6 +139,7 @@ class MainWindow(QMainWindow):
         self._preview_pending = False
         self.preview_pool = QThreadPool()
         self.preview_pool.setMaxThreadCount(2)
+        self._active_preview_workers = set()
         self.current_base_pil = None  # Cached downsampled PIL for fast preview
         self.current_orig_pixmap = None  # Cached QPixmap for comparison
         # Log where we will write
@@ -157,7 +159,11 @@ class MainWindow(QMainWindow):
         self.queue_worker = None
         
         # Load configuration
-        self.presets = ConfigManager.load_presets()
+        self.presets = ConfigManager.get_flat_presets_from_categorized(
+            ConfigManager.load_categorized_presets()
+        )
+        if not self.presets:
+            self.presets = ConfigManager.load_presets()
         if not self.presets:
             self.presets = self._get_default_presets()
             
@@ -173,15 +179,17 @@ class MainWindow(QMainWindow):
         # Build UI
         self._init_menu()
         self._init_ui()
+        self._setup_history_tracking()
         
         # Initial state
         # Restore session if available
-        self._restore_session()
+        restored = self._restore_session()
         
-        if self.combo_presets.count() > 0:
+        if not restored and self.combo_presets.count() > 0:
             self._apply_preset_from_combo()
-        else:
+        elif not restored:
             self._schedule_preview()
+        self._push_history()
     
     def _normalize_scale(self, scale: float) -> float:
         """Clamp the incoming UI scale to a safe range."""
@@ -251,7 +259,7 @@ class MainWindow(QMainWindow):
         
         mock2_shortcut = QAction(self)
         mock2_shortcut.setShortcut("2")
-        mock2_shortcut.triggered.connect(lambda: self._set_mock_color("med"))
+        mock2_shortcut.triggered.connect(lambda: self._set_mock_color("medium"))
         self.addAction(mock2_shortcut)
         
         mock3_shortcut = QAction(self)
@@ -833,7 +841,7 @@ class MainWindow(QMainWindow):
         
         # Predefined mockup buttons
         self.mock_buttons = {}
-        for i, (text, mock_id) in enumerate([("Clara", "light"), ("Media", "med"), ("Oscura", "dark")]):
+        for i, (text, mock_id) in enumerate([("Clara", "light"), ("Media", "medium"), ("Oscura", "dark")]):
             btn = QPushButton(text)
             btn.setCheckable(True)
             btn.setProperty("class", f"segment-{'left' if i == 0 else 'right' if i == 2 else 'middle'}")
@@ -1146,7 +1154,26 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", str(e))
             
     def _save_presets_to_disk(self):
+        # Keep legacy file for backward compatibility.
         ConfigManager.save_presets(self.presets)
+
+        # Keep categorized presets in sync so CLI and GUI see the same data.
+        categorized = ConfigManager.load_categorized_presets()
+        category_names = set()
+        for category in categorized.categories.values():
+            for preset_name in list(category.presets.keys()):
+                category_names.add(preset_name)
+                if preset_name in self.presets:
+                    category.presets[preset_name] = self.presets[preset_name]
+                else:
+                    del category.presets[preset_name]
+
+        categorized.uncategorized = {
+            name: settings
+            for name, settings in self.presets.items()
+            if name not in category_names
+        }
+        ConfigManager.save_categorized_presets(categorized)
         
     def _get_shadow_settings(self) -> ShadowSettings:
         return ShadowSettings(
@@ -1206,13 +1233,30 @@ class MainWindow(QMainWindow):
                 self.preview_scale_ratio,
                 quality_level=1
             )
-            worker.signals.finished.connect(self._update_preview)
-            worker.signals.error.connect(self._on_preview_error)
+            self._active_preview_workers.add(worker)
+            worker.signals.finished.connect(
+                lambda qim, quality, w=worker: self._on_preview_worker_finished(w, qim, quality)
+            )
+            worker.signals.error.connect(
+                lambda message, w=worker: self._on_preview_worker_error(w, message)
+            )
             self.preview_pool.start(worker)
 
         except Exception as e:
             self._log_error(f"[preview-start-error] {e}")
             traceback.print_exc()
+
+    def _on_preview_worker_finished(self, worker: PreviewWorker, qim: QImage, quality: int = 1):
+        self._release_preview_worker(worker)
+        self._update_preview(qim, quality)
+
+    def _on_preview_worker_error(self, worker: PreviewWorker, message: str):
+        self._release_preview_worker(worker)
+        self._on_preview_error(message)
+
+    def _release_preview_worker(self, worker: PreviewWorker):
+        if worker in self._active_preview_workers:
+            self._active_preview_workers.remove(worker)
         
     def _update_preview(self, qim: QImage, quality: int = 1):
         try:
@@ -1241,17 +1285,6 @@ class MainWindow(QMainWindow):
             self._preview_pending = False
             self.preview_timer.start(10)
     
-    def _on_preview_finished(self):
-        # Clear reference when thread completes
-        self.preview_thread = None
-        if self._preview_pending:
-            self._preview_pending = False
-            self.preview_timer.start(10)
-    
-    def _cleanup_preview_thread(self):
-        """Stop any running preview thread to avoid Qt aborts."""
-        self.preview_thread = None
-
     @staticmethod
     def _setup_logger():
         """Ensure logger writes both to file and stdout."""
@@ -1283,14 +1316,6 @@ class MainWindow(QMainWindow):
         logger = self._setup_logger()
         logger.error(message)
 
-    def closeEvent(self, event):
-        """Ensure background preview threads are stopped before closing."""
-        try:
-            self.preview_pool.clear()
-        except Exception:
-            pass
-        super().closeEvent(event)
-        
     def _on_angle_changed(self, angle: int):
         self.angle_spinbox.blockSignals(True)
         self.angle_spinbox.setValue(angle)
@@ -1301,6 +1326,8 @@ class MainWindow(QMainWindow):
         self.light_angle.setAngle(value)
         
     def _set_mock_color(self, mock_id: str):
+        if mock_id == "med":
+            mock_id = "medium"
         self.current_mock = mock_id
         # Clear cache to force re-generation for the mockup
         self.current_base_pil = None
@@ -1311,8 +1338,6 @@ class MainWindow(QMainWindow):
         try:
             logger = self._setup_logger()
             logger.info(f"[drop] {path}")
-            if self.preview_thread and self.preview_thread.isRunning():
-                self.preview_thread.requestInterruption()
             # Validate file before full load to avoid crashes on corrupt files
             with Image.open(path) as img_check:
                 img_check.verify()
@@ -1976,6 +2001,36 @@ class MainWindow(QMainWindow):
         """Push current settings to history stack."""
         settings = self._get_shadow_settings()
         self.history_manager.push(settings)
+
+    def _schedule_history_push(self):
+        if not hasattr(self, "_history_timer"):
+            return
+        self._history_timer.start(350)
+
+    def _setup_history_tracking(self):
+        """Register change hooks for undo/redo snapshots."""
+        self._history_timer = QTimer(self)
+        self._history_timer.setSingleShot(True)
+        self._history_timer.timeout.connect(self._push_history)
+
+        sliders = [
+            self.sl_distance,
+            self.sl_blur,
+            self.sl_spread,
+            self.sl_fusion,
+            self.sl_contact_blur,
+            self.sl_contraction,
+            self.sl_opacity,
+            self.sl_noise,
+            self.sl_padding,
+        ]
+        for control in sliders:
+            control.slider.sliderReleased.connect(self._schedule_history_push)
+            control.spinbox.editingFinished.connect(self._schedule_history_push)
+
+        self.light_angle.angleChanged.connect(self._schedule_history_push)
+        self.angle_spinbox.editingFinished.connect(self._schedule_history_push)
+        self.chk_adaptive.toggled.connect(self._schedule_history_push)
     
     def _action_undo(self):
         """Undo to previous settings state."""
@@ -2046,8 +2101,8 @@ class MainWindow(QMainWindow):
     
     def _show_log_viewer(self):
         """Show dialog with today's activity log."""
-        log_path = self.logger.get_today_log_path()
-        entries = self.logger.get_recent_entries(100)
+        log_path = self.log_manager.get_today_log_path()
+        entries = self.log_manager.get_recent_entries(100)
         
         dialog = QDialog(self)
         dialog.setWindowTitle("Registro de actividad")
@@ -2111,8 +2166,12 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
             
     def closeEvent(self, event):
-        """Save session state before closing."""
+        """Save session state before closing and stop background preview tasks."""
         try:
+            self.preview_timer.stop()
+            self.preview_pool.clear()
+            self.preview_pool.waitForDone(1500)
+
             # Gather session data
             session_data = {
                 'geometry': self.saveGeometry().toBase64().data().decode(),
@@ -2138,15 +2197,15 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             self.log_manager.error(f"Error saving session: {e}")
-            
-        event.accept()
+        
+        super().closeEvent(event)
 
-    def _restore_session(self):
+    def _restore_session(self) -> bool:
         """Restore application state from saved session."""
         try:
             data = self.session_manager.load_session()
             if not data:
-                return
+                return False
                 
             # Restore geometry and state
             if 'geometry' in data:
@@ -2173,18 +2232,16 @@ class MainWindow(QMainWindow):
                     
             # Restore mock
             if 'current_mock' in data:
-                self.current_mock = data['current_mock']
-                # Update mock buttons UI
-                if hasattr(self, 'btn_mock_light'):
-                    self.btn_mock_light.setProperty("active", self.current_mock == 'light')
-                    self.btn_mock_medium.setProperty("active", self.current_mock == 'medium')
-                    self.btn_mock_dark.setProperty("active", self.current_mock == 'dark')
-                    self.btn_mock_light.style().unpolish(self.btn_mock_light)
-                    self.btn_mock_light.style().polish(self.btn_mock_light)
-                    self.btn_mock_medium.style().unpolish(self.btn_mock_medium)
-                    self.btn_mock_medium.style().polish(self.btn_mock_medium)
-                    self.btn_mock_dark.style().unpolish(self.btn_mock_dark)
-                    self.btn_mock_dark.style().polish(self.btn_mock_dark)
+                saved_mock = data['current_mock']
+                if saved_mock == 'med':
+                    saved_mock = 'medium'
+                if saved_mock in self.mockups:
+                    self.current_mock = saved_mock
+                    if saved_mock in self.mock_buttons:
+                        self.mock_buttons[saved_mock].setChecked(True)
+                else:
+                    self.current_mock = 'dark'
+                    self.mock_buttons['dark'].setChecked(True)
             
             # Restore export config
             if 'export_config' in data:
@@ -2198,7 +2255,14 @@ class MainWindow(QMainWindow):
                     self.custom_output_path = Path(exp['custom_output_path'])
                     if hasattr(self, 'lbl_custom_dest'):
                         self.lbl_custom_dest.setText(str(self.custom_output_path))
+            
+            if 'shadow_settings' in data:
+                self._apply_settings(ShadowSettings(**data['shadow_settings']))
+            else:
+                self._schedule_preview()
+            return True
                         
         except Exception as e:
             self.log_manager.error(f"Error restoring session: {e}")
+        return False
 

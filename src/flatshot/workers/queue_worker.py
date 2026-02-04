@@ -93,15 +93,19 @@ class QueueWorker(QThread):
             )
             
             # Connect signals
-            processed = [0]  # Use list to allow modification in closure
+            processed_ok = [0]   # Use list to allow modification in closure
+            processed_err = [0]
             
             def on_progress(p):
                 job.progress = p
                 self.job_progress.emit(index, p)
             
             def on_image_completed(name, success):
-                processed[0] += 1
-                job.processed_images = processed[0]
+                if success:
+                    processed_ok[0] += 1
+                else:
+                    processed_err[0] += 1
+                job.processed_images = processed_ok[0]
             
             def on_error(msg):
                 self.log_message.emit(msg)
@@ -117,18 +121,18 @@ class QueueWorker(QThread):
             
             if not self.is_running:
                 job.status = "cancelled"
-                self.logger.log_export_cancelled(folder_path.name, processed[0], job.total_images)
-            elif processed[0] == job.total_images:
+                self.logger.log_export_cancelled(folder_path.name, processed_ok[0], job.total_images)
+            elif processed_err[0] == 0 and processed_ok[0] == job.total_images:
                 job.status = "completed"
                 completed += 1
-                self.logger.log_export_complete(folder_path.name, processed[0], job.total_images, duration)
+                self.logger.log_export_complete(folder_path.name, processed_ok[0], job.total_images, duration)
             else:
                 job.status = "error"
-                job.error_message = f"Processed {processed[0]}/{job.total_images}"
+                job.error_message = f"Procesadas OK: {processed_ok[0]} / Errores: {processed_err[0]} / Total: {job.total_images}"
                 errors += 1
             
-            total_images += processed[0]
-            self.job_completed.emit(index, job.status == "completed", processed[0], job.total_images, duration)
+            total_images += processed_ok[0]
+            self.job_completed.emit(index, job.status == "completed", processed_ok[0], job.total_images, duration)
             
             self.current_worker = None
         

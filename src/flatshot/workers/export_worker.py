@@ -123,8 +123,11 @@ class ExportWorker(QThread):
         self.settings.transparent_bg = self.export_config.transparent_bg
         self.settings.bg_color = self.export_config.bg_color
         
-        output_folder = self.input_folder / folder_name
-        output_folder.mkdir(exist_ok=True)
+        if self.export_config.output_destination == 'custom' and self.export_config.custom_output_path:
+            output_folder = Path(self.export_config.custom_output_path)
+        else:
+            output_folder = self.input_folder / folder_name
+        output_folder.mkdir(parents=True, exist_ok=True)
 
         # Convert Pydantic models to dicts for pickle serialization
         settings_dict = self.settings.model_dump()

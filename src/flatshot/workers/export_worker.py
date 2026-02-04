@@ -135,7 +135,13 @@ class ExportWorker(QThread):
             output_folder = Path(self.export_config.custom_output_path)
         else:
             output_folder = self.input_folder / folder_name
-        output_folder.mkdir(parents=True, exist_ok=True)
+        try:
+            output_folder.mkdir(parents=True, exist_ok=True)
+        except Exception as exc:
+            self.log_updated.emit(f"No se pudo crear carpeta de salida '{output_folder}': {exc}")
+            duration = time() - self.start_time
+            self.finished_process.emit(False, 0, total, duration)
+            return
 
         # Convert Pydantic models to dicts for pickle serialization
         settings_dict = self.settings.model_dump()

@@ -47,11 +47,11 @@ class JobItem(BaseModel):
 class PresetCategory(BaseModel):
     """Category containing multiple presets."""
     name: str
-    presets: Dict[str, dict] = {}  # preset_name -> ShadowSettings.dict()
+    presets: Dict[str, dict] = Field(default_factory=dict)  # preset_name -> ShadowSettings.dict()
     locked: bool = False  # If true, presets cannot be modified
 
 class CategorizedPresets(BaseModel):
     """Root structure for categorized presets."""
-    categories: Dict[str, PresetCategory] = {}
+    categories: Dict[str, PresetCategory] = Field(default_factory=dict)
     # For backward compatibility, uncategorized presets go here
-    uncategorized: Dict[str, dict] = {}
+    uncategorized: Dict[str, dict] = Field(default_factory=dict)

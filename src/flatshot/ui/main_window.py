@@ -1148,7 +1148,7 @@ class MainWindow(QMainWindow):
         return defaults
     
     def _save_app_settings(self):
-        self.app_settings['scale_curve'] = self.scale_curve.dict()
+        self.app_settings['scale_curve'] = self.scale_curve.model_dump()
         try:
             with open(self.settings_file, 'w') as f:
                 json.dump(self.app_settings, f, indent=4)
@@ -1231,7 +1231,7 @@ class MainWindow(QMainWindow):
                 self.current_base_pil,
                 self.preview_size,
                 self._get_shadow_settings().model_dump(),
-                self.scale_curve.dict(),
+                self.scale_curve.model_dump(),
                 self.preview_scale_ratio,
                 quality_level=1
             )
@@ -1530,14 +1530,18 @@ class MainWindow(QMainWindow):
     def _action_save_current(self):
         current_name = self.combo_presets.currentText()
         if current_name:
-            self.presets[current_name] = self._get_shadow_settings().dict()
+            self.presets[current_name] = self._get_shadow_settings().model_dump()
             self._save_presets_to_disk()
             self._show_feedback("Preset guardado")
             
     def _action_create_new(self):
         name, ok = QInputDialog.getText(self, "Nuevo Preset", "Nombre del preset:")
+        name = name.strip() if ok and name else ""
         if ok and name:
-            self.presets[name] = self._get_shadow_settings().dict()
+            if name in self.presets:
+                self._show_feedback("Ese preset ya existe")
+                return
+            self.presets[name] = self._get_shadow_settings().model_dump()
             self._save_presets_to_disk()
             self.combo_presets.addItem(name)
             self.combo_presets.setCurrentText(name)
@@ -1546,7 +1550,11 @@ class MainWindow(QMainWindow):
     def _action_rename(self):
         old_name = self.combo_presets.currentText()
         new_name, ok = QInputDialog.getText(self, "Renombrar preset", "Nuevo nombre:", text=old_name)
+        new_name = new_name.strip() if ok and new_name else ""
         if ok and new_name:
+            if new_name != old_name and new_name in self.presets:
+                self._show_feedback("Ya existe un preset con ese nombre")
+                return
             self.presets[new_name] = self.presets.pop(old_name)
             self._save_presets_to_disk()
             self.combo_presets.setItemText(self.combo_presets.currentIndex(), new_name)
@@ -1871,6 +1879,7 @@ class MainWindow(QMainWindow):
                 self.scale_curve
             )
             self.worker.progress_updated.connect(self.progress_bar.setValue)
+            self.worker.log_updated.connect(self._log_error)
             self.worker.finished_process.connect(self._on_export_finished)
             self.lbl_progress_status.setText(f"Procesando: {self.selected_folders[0].name}")
             self.worker.start()
@@ -1906,6 +1915,7 @@ class MainWindow(QMainWindow):
     
     def _on_queue_finished(self, completed: int, errors: int, total_images: int):
         """Called when all queue jobs are finished."""
+        self.queue_worker = None
         self._reset_export_ui()
         
         if errors == 0:
@@ -1921,7 +1931,7 @@ class MainWindow(QMainWindow):
         
     def _toggle_pause(self):
         """Toggle pause/resume state of the export queue."""
-        if not hasattr(self, 'queue_worker') or not self.queue_worker:
+        if not hasattr(self, 'queue_worker') or not self.queue_worker or not self.queue_worker.isRunning():
             return
             
         if self.queue_worker.is_paused:
@@ -1960,6 +1970,7 @@ class MainWindow(QMainWindow):
             
     def _on_export_finished(self, success: bool, processed: int = 0, total: int = 0, duration: float = 0.0):
         """Called when single-folder export finishes."""
+        self.worker = None
         self._reset_export_ui()
         
         if success:
@@ -2000,7 +2011,7 @@ class MainWindow(QMainWindow):
     def _open_scale_calibrator(self):
         current_padding = self.sl_padding.value()
         folder = self.selected_folders[0] if self.selected_folders else None
-        dlg = CurveEditorDialog(self.scale_curve.dict(), folder, current_padding, self)
+        dlg = CurveEditorDialog(self.scale_curve.model_dump(), folder, current_padding, self)
         if dlg.exec():
             new_curve_dict = dlg.get_current_curve()
             self.scale_curve = CurveData(**new_curve_dict)

@@ -984,6 +984,38 @@ class MainWindow(QMainWindow):
             self.grid_folder_combo.show()
         
         self.grid_folder_combo.blockSignals(False)
+
+    def _sync_grid_preview_with_folders(self, preferred_index=None):
+        """Keep right-side grid preview in sync with selected folders."""
+        if not hasattr(self, 'grid_preview'):
+            return
+
+        previous_index = self.grid_folder_combo.currentIndex() if hasattr(self, 'grid_folder_combo') else -1
+        self._update_grid_folder_combo()
+
+        if not self.selected_folders:
+            # Clear gallery when there are no folders selected.
+            self.grid_preview.set_folder("")
+            self.grid_info_label.setText("Selecciona carpeta para previsualizar")
+            return
+
+        if preferred_index is None:
+            preferred_index = previous_index
+        if preferred_index is None or preferred_index < 0:
+            preferred_index = 0
+
+        target_index = min(max(int(preferred_index), 0), len(self.selected_folders) - 1)
+
+        if len(self.selected_folders) > 1 and hasattr(self, 'grid_folder_combo'):
+            self.grid_folder_combo.blockSignals(True)
+            self.grid_folder_combo.setCurrentIndex(target_index)
+            self.grid_folder_combo.blockSignals(False)
+
+        folder = self.selected_folders[target_index]
+        self.grid_preview.set_folder(str(folder))
+        settings = self._get_shadow_settings()
+        self.grid_preview.set_settings(settings, self.scale_curve)
+        self.grid_info_label.setText(f"📂 {folder.name}")
     
     def _on_grid_folder_empty(self):
         """Handle empty folder - reset canvas to show placeholder."""
@@ -1524,16 +1556,6 @@ class MainWindow(QMainWindow):
         self._save_app_settings()
         
         self._update_folder_ui()
-        # Update grid folder combo
-        self._update_grid_folder_combo()
-        # Load first folder (or the only one) into grid
-        if hasattr(self, 'grid_preview') and self.selected_folders:
-            # If single folder, load it. If multiple, combo handles it
-            if len(self.selected_folders) == 1:
-                self.grid_preview.set_folder(str(self.selected_folders[0]))
-                settings = self._get_shadow_settings()
-                self.grid_preview.set_settings(settings, self.scale_curve)
-                self.grid_info_label.setText(f"📂 {self.selected_folders[0].name}")
     
     def _add_to_recent_folders(self, folder: str):
         """Add a folder to the recent folders list (max 10)."""
@@ -1623,6 +1645,8 @@ class MainWindow(QMainWindow):
         else:
             self.btn_process.setText(" PROCESAR IMÁGENES")
         # Keep details button text/icon unchanged
+        
+        self._sync_grid_preview_with_folders()
     
     def _on_dest_custom_toggled(self, checked: bool):
         """Handle custom destination radio button toggle."""

@@ -105,12 +105,16 @@ class ExportWorker(QThread):
 
     def run(self):
         self.start_time = time()
-        
-        # Find all PNG images
-        images = [f for f in self.input_folder.iterdir() 
-                  if f.is_file() and f.suffix.lower() == '.png']
-        total = len(images)
-        
+        try:
+            # Find all PNG images
+            images = [f for f in self.input_folder.iterdir()
+                      if f.is_file() and f.suffix.lower() == '.png']
+            total = len(images)
+        except Exception as exc:
+            self.log_updated.emit(f"Error al leer carpeta '{self.input_folder}': {exc}")
+            self.finished_process.emit(False, 0, 0, 0.0)
+            return
+
         if total == 0:
             self.finished_process.emit(True, 0, 0, 0.0)
             return

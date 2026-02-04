@@ -158,6 +158,7 @@ class MainWindow(QMainWindow):
         
         # Queue worker reference
         self.queue_worker = None
+        self.worker = None
         
         # Load configuration
         self.presets = ConfigManager.get_flat_presets_from_categorized(
@@ -1572,6 +1573,9 @@ class MainWindow(QMainWindow):
     def _add_folder_to_list(self, folder: str):
         """Add a folder to the selected list and recent history."""
         folder_path = Path(folder)
+        if not folder_path.exists() or not folder_path.is_dir():
+            self._show_feedback("La carpeta seleccionada no existe")
+            return
         # Don't add duplicates
         if folder_path not in self.selected_folders:
             self.selected_folders.append(folder_path)
@@ -2191,6 +2195,13 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         """Save session state before closing and stop background preview tasks."""
         try:
+            if self.queue_worker and self.queue_worker.isRunning():
+                self.queue_worker.stop()
+                self.queue_worker.wait(3000)
+            if self.worker and self.worker.isRunning():
+                self.worker.stop()
+                self.worker.wait(3000)
+
             self.preview_timer.stop()
             self.preview_pool.clear()
             self.preview_pool.waitForDone(1500)

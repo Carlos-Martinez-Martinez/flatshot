@@ -159,6 +159,7 @@ class MainWindow(QMainWindow):
         # Queue worker reference
         self.queue_worker = None
         self.worker = None
+        self._last_export_destinations = []
         
         # Load configuration
         self.presets = ConfigManager.get_flat_presets_from_categorized(
@@ -1857,6 +1858,18 @@ class MainWindow(QMainWindow):
             self.btn_pause.hide()
         
         # Build export config
+        use_custom_dest = self.rb_dest_custom.isChecked()
+        custom_output = str(self.custom_output_path) if self.custom_output_path else None
+        if use_custom_dest and not custom_output:
+            QMessageBox.warning(
+                self,
+                "Destino no configurado",
+                "Has seleccionado destino personalizado, pero no hay carpeta elegida.\n"
+                "Selecciona una carpeta de destino o cambia a subcarpeta en origen."
+            )
+            self._reset_export_ui()
+            return
+
         export_config = ExportConfig(
             output_folder_name=self.app_settings.get('output_folder_name', '_SALIDA_PRO'),
             suffix=self.app_settings.get('suffix', '_PRO'),
@@ -1866,9 +1879,17 @@ class MainWindow(QMainWindow):
             output_width=self.app_settings.get('output_width', 1800),
             output_height=self.app_settings.get('output_height', 2400),
             naming_template=self.app_settings.get('naming_template', '{original}{suffix}'),
-            output_destination='custom' if self.rb_dest_custom.isChecked() else 'subfolder',
-            custom_output_path=str(self.custom_output_path) if self.custom_output_path else None
+            output_destination='custom' if use_custom_dest else 'subfolder',
+            custom_output_path=custom_output
         )
+
+        if export_config.output_destination == 'custom':
+            self._last_export_destinations = [str(Path(export_config.custom_output_path))]
+        else:
+            self._last_export_destinations = [
+                str(Path(folder) / export_config.output_folder_name)
+                for folder in self.selected_folders
+            ]
         
         # Single folder - use simple ExportWorker
         if len(self.selected_folders) == 1:
@@ -1881,6 +1902,7 @@ class MainWindow(QMainWindow):
             self.worker.progress_updated.connect(self.progress_bar.setValue)
             self.worker.log_updated.connect(self._log_error)
             self.worker.finished_process.connect(self._on_export_finished)
+            self.worker.finished.connect(self._on_single_worker_thread_finished)
             self.lbl_progress_status.setText(f"Procesando: {self.selected_folders[0].name}")
             self.worker.start()
         else:
@@ -1899,6 +1921,7 @@ class MainWindow(QMainWindow):
             self.queue_worker.job_started.connect(self._on_queue_job_started)
             self.queue_worker.job_progress.connect(self._on_queue_job_progress)
             self.queue_worker.queue_finished.connect(self._on_queue_finished)
+            self.queue_worker.finished.connect(self._on_queue_worker_thread_finished)
             self.queue_worker.start()
     
     def _on_queue_job_started(self, index: int, folder_path: str):
@@ -1915,18 +1938,21 @@ class MainWindow(QMainWindow):
     
     def _on_queue_finished(self, completed: int, errors: int, total_images: int):
         """Called when all queue jobs are finished."""
-        self.queue_worker = None
         self._reset_export_ui()
+        destination_info = "\n".join(self._last_export_destinations[:3])
+        if len(self._last_export_destinations) > 3:
+            destination_info += f"\n... (+{len(self._last_export_destinations)-3} destinos)"
+        destination_block = f"\n\nDestino(s):\n{destination_info}" if destination_info else ""
         
         if errors == 0:
             QMessageBox.information(
                 self, "Cola completada",
-                f"✓ {completed} carpetas procesadas\n{total_images} imágenes exportadas"
+                f"✓ {completed} carpetas procesadas\n{total_images} imágenes exportadas{destination_block}"
             )
         else:
             QMessageBox.warning(
                 self, "Cola completada con errores",
-                f"✓ {completed} carpetas completadas\n✗ {errors} carpetas con errores"
+                f"✓ {completed} carpetas completadas\n✗ {errors} carpetas con errores{destination_block}"
             )
         
     def _toggle_pause(self):
@@ -1970,21 +1996,29 @@ class MainWindow(QMainWindow):
             
     def _on_export_finished(self, success: bool, processed: int = 0, total: int = 0, duration: float = 0.0):
         """Called when single-folder export finishes."""
-        self.worker = None
         self._reset_export_ui()
+        destination = self._last_export_destinations[0] if self._last_export_destinations else "(desconocido)"
         
         if success:
             QMessageBox.information(
                 self,
                 "Proceso completado",
-                f"Proceso completado con éxito\n{processed}/{total} imágenes en {duration:.1f}s"
+                f"Proceso completado con éxito\n{processed}/{total} imágenes en {duration:.1f}s\n\nDestino:\n{destination}"
             )
         else:
             QMessageBox.warning(
                 self,
                 "Proceso incompleto",
-                f"Se detuvo o falló el proceso\n{processed}/{total} imágenes en {duration:.1f}s"
+                f"Se detuvo o falló el proceso\n{processed}/{total} imágenes en {duration:.1f}s\n\nDestino:\n{destination}"
             )
+
+    def _on_single_worker_thread_finished(self):
+        """Release single-folder worker only after QThread has fully stopped."""
+        self.worker = None
+
+    def _on_queue_worker_thread_finished(self):
+        """Release queue worker only after QThread has fully stopped."""
+        self.queue_worker = None
             
     # ========== DIALOGS ==========
     

@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
     QProgressBar, QGroupBox, QComboBox, QFrame, QSpinBox, QInputDialog,
     QMessageBox, QSizePolicy, QFileDialog, QApplication, QCheckBox,
     QScrollArea, QSplitter, QToolButton, QButtonGroup, QDialog, QStackedWidget,
-    QMenu, QRadioButton
+    QMenu, QRadioButton, QListWidget, QListWidgetItem
 )
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QSize
 from PyQt6.QtGui import QPixmap, QImage, QPainter, QColor, QPainterPath, QAction, QIcon, QFont
@@ -193,6 +193,8 @@ class MainWindow(QMainWindow):
         elif not restored:
             self._schedule_preview()
         self._push_history()
+        # Always start maximized for better workspace visibility.
+        QTimer.singleShot(0, self.showMaximized)
     
     def _normalize_scale(self, scale: float) -> float:
         """Clamp the incoming UI scale to a safe range."""
@@ -989,12 +991,63 @@ class MainWindow(QMainWindow):
             # Hide combo for single or no folder
             self.grid_folder_combo.hide()
         else:
+            display_names = self._build_folder_display_names(self.selected_folders)
             # Show combo and populate with folder names
             for folder in self.selected_folders:
-                self.grid_folder_combo.addItem(f"📁 {folder.name}")
+                self.grid_folder_combo.addItem(f"📁 {display_names.get(str(folder), folder.name)}")
             self.grid_folder_combo.show()
         
         self.grid_folder_combo.blockSignals(False)
+
+    def _build_folder_display_names(self, folders: list[Path]) -> dict[str, str]:
+        """
+        Build human-friendly folder labels.
+        If repeated names exist, append the minimal unique parent suffix.
+        """
+        if not folders:
+            return {}
+
+        by_name = {}
+        for folder in folders:
+            by_name.setdefault(folder.name, []).append(folder)
+
+        result = {}
+        for name, paths in by_name.items():
+            if len(paths) == 1:
+                result[str(paths[0])] = name
+                continue
+
+            parent_parts = {}
+            for path in paths:
+                parts = [p for p in path.parent.parts if p]
+                parent_parts[str(path)] = parts
+
+            max_depth = max((len(parts) for parts in parent_parts.values()), default=0)
+            chosen = {}
+
+            for depth in range(1, max_depth + 1):
+                buckets = {}
+                for path in paths:
+                    pkey = str(path)
+                    parts = parent_parts[pkey]
+                    suffix = "\\".join(parts[-depth:]) if parts else "(raíz)"
+                    buckets.setdefault(suffix, []).append(pkey)
+
+                for suffix, keys in buckets.items():
+                    if len(keys) == 1 and keys[0] not in chosen:
+                        chosen[keys[0]] = suffix
+
+                if len(chosen) == len(paths):
+                    break
+
+            for path in paths:
+                pkey = str(path)
+                suffix = chosen.get(pkey)
+                if not suffix:
+                    suffix = str(path.parent)
+                result[pkey] = f"{name}  ·  …\\{suffix}"
+
+        return result
 
     def _sync_grid_preview_with_folders(self, preferred_index=None):
         """Keep right-side grid preview in sync with selected folders."""
@@ -1739,6 +1792,7 @@ class MainWindow(QMainWindow):
             }
         """, self.ui_scale))
         layout.addWidget(list_widget)
+        display_names = self._build_folder_display_names(self.selected_folders)
 
         def _add_folder_item(folder):
             img_count = len(list(folder.glob("*.png")))
@@ -1747,7 +1801,7 @@ class MainWindow(QMainWindow):
             row_layout.setContentsMargins(self._px(8), self._px(4), self._px(8), self._px(4))
             row_layout.setSpacing(self._px(6))
 
-            lbl = QLabel(f"📁 {folder.name}")
+            lbl = QLabel(f"📁 {display_names.get(str(folder), folder.name)}")
             lbl.setToolTip(str(folder))
             count_lbl = QLabel(f"{img_count} imágenes")
             count_lbl.setStyleSheet(scale_stylesheet("color: #888; font-size: 10px;", self.ui_scale))
@@ -1939,20 +1993,26 @@ class MainWindow(QMainWindow):
     def _on_queue_finished(self, completed: int, errors: int, total_images: int):
         """Called when all queue jobs are finished."""
         self._reset_export_ui()
-        destination_info = "\n".join(self._last_export_destinations[:3])
-        if len(self._last_export_destinations) > 3:
-            destination_info += f"\n... (+{len(self._last_export_destinations)-3} destinos)"
-        destination_block = f"\n\nDestino(s):\n{destination_info}" if destination_info else ""
-        
+
         if errors == 0:
-            QMessageBox.information(
-                self, "Cola completada",
-                f"✓ {completed} carpetas procesadas\n{total_images} imágenes exportadas{destination_block}"
+            self._show_export_result_dialog(
+                title="Cola completada",
+                success=True,
+                summary_lines=[
+                    f"✓ {completed} carpetas procesadas",
+                    f"{total_images} imágenes exportadas",
+                ],
+                destinations=self._last_export_destinations,
             )
         else:
-            QMessageBox.warning(
-                self, "Cola completada con errores",
-                f"✓ {completed} carpetas completadas\n✗ {errors} carpetas con errores{destination_block}"
+            self._show_export_result_dialog(
+                title="Cola completada con errores",
+                success=False,
+                summary_lines=[
+                    f"✓ {completed} carpetas completadas",
+                    f"✗ {errors} carpetas con errores",
+                ],
+                destinations=self._last_export_destinations,
             )
         
     def _toggle_pause(self):
@@ -1997,19 +2057,26 @@ class MainWindow(QMainWindow):
     def _on_export_finished(self, success: bool, processed: int = 0, total: int = 0, duration: float = 0.0):
         """Called when single-folder export finishes."""
         self._reset_export_ui()
-        destination = self._last_export_destinations[0] if self._last_export_destinations else "(desconocido)"
-        
+
         if success:
-            QMessageBox.information(
-                self,
-                "Proceso completado",
-                f"Proceso completado con éxito\n{processed}/{total} imágenes en {duration:.1f}s\n\nDestino:\n{destination}"
+            self._show_export_result_dialog(
+                title="Proceso completado",
+                success=True,
+                summary_lines=[
+                    "Proceso completado con éxito",
+                    f"{processed}/{total} imágenes en {duration:.1f}s",
+                ],
+                destinations=self._last_export_destinations,
             )
         else:
-            QMessageBox.warning(
-                self,
-                "Proceso incompleto",
-                f"Se detuvo o falló el proceso\n{processed}/{total} imágenes en {duration:.1f}s\n\nDestino:\n{destination}"
+            self._show_export_result_dialog(
+                title="Proceso incompleto",
+                success=False,
+                summary_lines=[
+                    "Se detuvo o falló el proceso",
+                    f"{processed}/{total} imágenes en {duration:.1f}s",
+                ],
+                destinations=self._last_export_destinations,
             )
 
     def _on_single_worker_thread_finished(self):
@@ -2220,7 +2287,11 @@ class MainWindow(QMainWindow):
         try:
             folder_str = str(folder)
             if sys.platform.startswith("win"):
-                os.startfile(folder_str)
+                # Open Explorer explicitly maximized.
+                subprocess.Popen(
+                    f'start "" /max explorer "{folder_str}"',
+                    shell=True
+                )
             elif sys.platform == "darwin":
                 subprocess.run(["open", folder_str], check=False)
             else:
@@ -2228,6 +2299,97 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self._show_feedback("No se pudo abrir la carpeta de logs")
             self._log_error(f"[open-folder-error] {folder}: {e}")
+
+    def _show_export_result_dialog(self, title: str, success: bool, summary_lines: list[str], destinations: list[str]):
+        """Show a richer export summary dialog with destination shortcuts."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.setMinimumSize(self._px(640), self._px(420))
+        dialog.setStyleSheet("QDialog { background-color: #1E1E1E; }")
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(self._px(16), self._px(14), self._px(16), self._px(14))
+        layout.setSpacing(self._px(10))
+
+        icon_name = 'fa5s.check-circle' if success else 'fa5s.exclamation-triangle'
+        icon_color = '#4CAF50' if success else '#F44336'
+        header_row = QHBoxLayout()
+        icon_label = QLabel()
+        icon_label.setPixmap(qta.icon(icon_name, color=icon_color).pixmap(self._px(22), self._px(22)))
+        header_row.addWidget(icon_label)
+
+        header_title = QLabel(title)
+        header_title.setStyleSheet(scale_stylesheet("font-size: 16px; font-weight: 700; color: #E8E8E8;", self.ui_scale))
+        header_row.addWidget(header_title, 1)
+        layout.addLayout(header_row)
+
+        for line in summary_lines:
+            summary_label = QLabel(line)
+            summary_label.setStyleSheet(scale_stylesheet("color: #AAB2BF; font-size: 12px;", self.ui_scale))
+            layout.addWidget(summary_label)
+
+        layout.addWidget(QLabel("Destino(s) de exportación:"))
+        dest_list = QListWidget()
+        dest_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        dest_list.setStyleSheet(scale_stylesheet("""
+            QListWidget {
+                background-color: #181A1F;
+                border: 1px solid #3A3A3A;
+                border-radius: 6px;
+                font-size: 11px;
+            }
+            QListWidget::item {
+                padding: 6px;
+                border-bottom: 1px solid #2A2A2A;
+            }
+            QListWidget::item:selected {
+                background-color: #2A3A4A;
+            }
+        """, self.ui_scale))
+
+        valid_destinations = []
+        for dest in destinations:
+            if not dest:
+                continue
+            valid_destinations.append(dest)
+            item = QListWidgetItem(dest)
+            item.setToolTip(dest)
+            dest_list.addItem(item)
+
+        if not valid_destinations:
+            item = QListWidgetItem("(No se registró ruta de destino)")
+            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
+            dest_list.addItem(item)
+        else:
+            dest_list.setCurrentRow(0)
+
+        layout.addWidget(dest_list, 1)
+        hint_lbl = QLabel("Selecciona una ruta y pulsa 'Abrir carpeta'")
+        hint_lbl.setStyleSheet(scale_stylesheet("color: #777; font-size: 10px;", self.ui_scale))
+        layout.addWidget(hint_lbl)
+
+        btn_row = QHBoxLayout()
+        btn_open_selected = QPushButton("Abrir carpeta")
+        btn_open_selected.setEnabled(bool(valid_destinations))
+        btn_row.addWidget(btn_open_selected)
+
+        btn_row.addStretch()
+        btn_close = QPushButton("Cerrar")
+        btn_row.addWidget(btn_close)
+        layout.addLayout(btn_row)
+
+        def _open_selected():
+            row = dest_list.currentRow()
+            if row < 0:
+                row = 0
+            if 0 <= row < len(valid_destinations):
+                self._open_folder_in_explorer(Path(valid_destinations[row]))
+
+        btn_open_selected.clicked.connect(_open_selected)
+        dest_list.itemDoubleClicked.connect(lambda _: _open_selected())
+        btn_close.clicked.connect(dialog.accept)
+
+        dialog.exec()
             
     # ========== WINDOW EVENTS ==========
     

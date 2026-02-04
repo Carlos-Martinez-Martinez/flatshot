@@ -11,6 +11,7 @@ class ShadowSettings(BaseModel):
     noise: int = 2
     padding: int = 10
     contact_blur: int = 10
+    contraction: int = 0
     adaptive_zoom: bool = True
     transparent_bg: bool = False
     bg_color: Tuple[int, int, int] = (230, 230, 230)

@@ -42,19 +42,19 @@ import qtawesome as qta
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
-def _render_preview_task(image_bytes: bytes, target_size, settings_dict: dict, curve_dict: dict, scale_ratio: float):
+def _render_preview_task(pil_img: Image.Image, target_size, settings_dict: dict, curve_dict: dict, scale_ratio: float, is_preview: bool = True):
     """Render preview off the UI thread; safe for ThreadPoolExecutor."""
     from flatshot.core.engine import ShadowEngine
     from flatshot.core.models import ShadowSettings, CurveData
-    img = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
     settings = ShadowSettings(**settings_dict)
     curve = CurveData(**curve_dict)
     final_pil = ShadowEngine.aplicar_efectos(
-        img,
+        pil_img,
         settings,
         target_size,
         scale_factor=scale_ratio,
         curve_data=curve,
+        is_preview=is_preview
     )
     if final_pil.mode == "RGBA":
         bg = Image.new("RGB", final_pil.size, (230, 230, 230))
@@ -78,29 +78,30 @@ class PreviewWorkerSignals(QObject):
 class PreviewWorker(QRunnable):
     """Worker to render preview in background thread."""
     
-    def __init__(self, image_bytes: bytes, target_size, settings_dict: dict, 
+    def __init__(self, pil_img: Image.Image, target_size, settings_dict: dict, 
                  curve_dict: dict, scale_ratio: float, quality_level: int):
         super().__init__()
-        self.image_bytes = image_bytes
+        self.pil_img = pil_img
         self.target_size = target_size
         self.settings_dict = settings_dict
         self.curve_dict = curve_dict
         self.scale_ratio = scale_ratio
         self.quality_level = quality_level
         self.signals = PreviewWorkerSignals()
-        self.setAutoDelete(False)  # Don't auto-delete, signals need to survive
+        self.setAutoDelete(True)
     
     def run(self):
         """Execute render in background thread."""
         try:
             width, height, im_data = _render_preview_task(
-                self.image_bytes,
+                self.pil_img,
                 self.target_size,
                 self.settings_dict,
                 self.curve_dict,
                 self.scale_ratio
             )
             qim = QImage(im_data, width, height, width * 3, QImage.Format.Format_RGB888).copy()
+            # The signal will be queued to the main thread
             self.signals.finished.emit(qim, self.quality_level)
         except Exception as e:
             self.signals.error.emit(str(e))
@@ -134,10 +135,11 @@ class MainWindow(QMainWindow):
         self.mockups = self._generate_mockups()
         self.current_mock = 'dark'
         self.current_qimage = None
-        self.preview_thread = None  # legacy, kept for API compatibility
         self._preview_pending = False
-        self.preview_executor = None
-        self.preview_future = None
+        self.preview_pool = QThreadPool()
+        self.preview_pool.setMaxThreadCount(2)
+        self.current_base_pil = None  # Cached downsampled PIL for fast preview
+        self.current_orig_pixmap = None  # Cached QPixmap for comparison
         # Log where we will write
         self._setup_logger().info(f"[init] log at {self.LOG_FILE}")
         
@@ -548,6 +550,17 @@ class MainWindow(QMainWindow):
         self.sl_contact_blur.valueChanged.connect(self._schedule_preview)
         layout.addWidget(self.sl_contact_blur)
         
+        self.sl_contraction = SmartSlider(
+            "Contracción", 0, 5, 0, "px",
+            "<b>Contracción de silueta (Contract)</b><br><br>"
+            "Reduce el tamaño de la silueta original de la prenda.<br><br>"
+            "Ideal para eliminar halos de color (residuales del fondo original)<br>"
+            "que pueden aparecer en los bordes. 1-2px suele ser suficiente.",
+            scale=self.ui_scale
+        )
+        self.sl_contraction.valueChanged.connect(self._schedule_preview)
+        layout.addWidget(self.sl_contraction)
+        
         return group
     
     def _create_finishing_section(self) -> QGroupBox:
@@ -922,9 +935,14 @@ class MainWindow(QMainWindow):
         try:
             pil_img = Image.open(path).convert("RGBA")
             pil_img.load()
-            pil_img = pil_img.copy()
+            pil_img = pil_img.copy()  # Detach from underlying file
             self.mockups['custom_drop'] = pil_img
             self.current_mock = 'custom_drop'
+            
+            # Clear caches to force recalculation for the new image
+            self.current_base_pil = None
+            self.current_orig_pixmap = None
+            self._update_current_assets(pil_img)
             
             # Show and select the custom image button
             self.btn_custom.show()
@@ -983,7 +1001,7 @@ class MainWindow(QMainWindow):
     def _generate_mockups(self) -> dict:
         """Generate T-shirt shaped mockup images for preview."""
         mocks = {}
-        colors = {'light': (245, 245, 245, 255), 'med': (120, 120, 125, 255), 'dark': (35, 35, 40, 255)}
+        colors = {'light': (245, 245, 245, 255), 'medium': (120, 120, 125, 255), 'dark': (35, 35, 40, 255)}
         size = 800
         
         for key, col in colors.items():
@@ -1011,11 +1029,43 @@ class MainWindow(QMainWindow):
             painter.drawPath(path)
             painter.end()
             
-            buffer = img.bits().asstring(img.sizeInBytes())
-            pil_img = Image.frombuffer("RGBA", (size, size), buffer, "raw", "BGRA", 0, 1)
-            mocks[key] = pil_img.crop(pil_img.getbbox())
+            # Use bits().asstring() safely by copying to a bytes object immediately
+            buffer = bytes(img.bits().asstring(img.sizeInBytes()))
+            # Create PIL image from the copied bytes
+            pil_img = Image.frombytes("RGBA", (size, size), buffer, "raw", "BGRA", 0, 1)
+            # Crop and copy to be absolutely safe
+            mocks[key] = pil_img.crop(pil_img.getbbox()).copy()
             
         return mocks
+
+    def _update_current_assets(self, pil_img: Image.Image):
+        """Pre-calculate and cache assets for the current image to ensure zero-lag UI."""
+        # 1. Cache a "working" version (max 2000px) for all UI processing
+        max_w = 2000
+        if pil_img.width > max_w:
+            ratio = max_w / pil_img.width
+            self.current_base_pil = pil_img.resize((max_w, int(pil_img.height * ratio)), Image.Resampling.BILINEAR)
+        else:
+            self.current_base_pil = pil_img.copy()
+
+        # 2. Cache the "original" pixmap for A/B comparison (composite on gray)
+        if pil_img.mode == 'RGBA':
+            bg = Image.new("RGB", pil_img.size, (230, 230, 230))
+            bg.paste(pil_img, (0, 0), mask=pil_img)
+            comp_img = bg
+        else:
+            comp_img = pil_img.convert("RGB")
+        
+        # Scale for display efficiency
+        disp_w = 1200
+        if comp_img.width > disp_w:
+            ratio = disp_w / comp_img.width
+            comp_img = comp_img.resize((disp_w, int(comp_img.height * ratio)), Image.Resampling.BILINEAR)
+            
+        data = comp_img.tobytes("raw", "RGB")
+        qim = QImage(data, comp_img.width, comp_img.height, comp_img.width * 3, QImage.Format.Format_RGB888).copy()
+        self.current_orig_pixmap = QPixmap.fromImage(qim)
+        self.canvas.setOriginalImage(self.current_orig_pixmap)
     
     def _get_default_presets(self) -> dict:
         return {
@@ -1077,6 +1127,7 @@ class MainWindow(QMainWindow):
             noise=self.sl_noise.value(),
             padding=self.sl_padding.value(),
             contact_blur=self.sl_contact_blur.value(),
+            contraction=self.sl_contraction.value(),
             adaptive_zoom=self.chk_adaptive.isChecked()
         )
     
@@ -1085,7 +1136,7 @@ class MainWindow(QMainWindow):
     def _schedule_preview(self, *args):
         """Schedule debounced preview update."""
         self._preview_pending = True
-        self.preview_timer.start(150)
+        self.preview_timer.start(200)
         # Also update grid preview with current settings
         if hasattr(self, 'grid_preview'):
             settings = self._get_shadow_settings()
@@ -1094,58 +1145,44 @@ class MainWindow(QMainWindow):
     def _schedule_canvas_only_preview(self, *args):
         """Schedule preview update for canvas only (not grid)."""
         self._preview_pending = True
-        self.preview_timer.start(150)
+        self.preview_timer.start(200)
     
     def _start_preview_thread(self):
+        """Start an asynchronous preview render using cached assets."""
         try:
-            self._preview_pending = False
             if self.current_mock not in self.mockups:
                 return
 
-            # Store original for A/B comparison
-            pil_orig = self.mockups[self.current_mock]
-            if pil_orig.mode == 'RGBA':
-                # Composite on gray background for display
-                bg = Image.new("RGB", pil_orig.size, (230, 230, 230))
-                bg.paste(pil_orig, (0, 0), mask=pil_orig)
-                orig_data = bg.tobytes("raw", "RGB")
-                orig_qim = QImage(orig_data, bg.width, bg.height, bg.width * 3, QImage.Format.Format_RGB888).copy()
-            else:
-                pil_rgb = pil_orig.convert("RGB")
-                orig_data = pil_rgb.tobytes("raw", "RGB")
-                orig_qim = QImage(orig_data, pil_rgb.width, pil_rgb.height, pil_rgb.width * 3, QImage.Format.Format_RGB888).copy()
-            self.canvas.setOriginalImage(QPixmap.fromImage(orig_qim))
-                
-            settings = self._get_shadow_settings()
-            # Render synchronously to avoid thread/COM issues
-            final_pil = ShadowEngine.aplicar_efectos(
-                self.mockups[self.current_mock],
-                settings,
+            # Debounce: if already working, mark as pending and skip
+            if self.preview_pool.activeThreadCount() > 0:
+                self._preview_pending = True
+                return
+
+            self._preview_pending = False
+            
+            # Use cached assets if available, otherwise initialize them (one-time)
+            if self.current_base_pil is None:
+                self._update_current_assets(self.mockups[self.current_mock])
+            
+            # Prepare worker with the cached assets.
+            # Passing the PIL image directly; ShadowEngine will handle copying/scaling.
+            worker = PreviewWorker(
+                self.current_base_pil,
                 self.preview_size,
-                scale_factor=self.preview_scale_ratio,
-                curve_data=self.scale_curve,
+                self._get_shadow_settings().model_dump(),
+                self.scale_curve.dict(),
+                self.preview_scale_ratio,
+                quality_level=1
             )
-            if final_pil.mode == 'RGBA':
-                bg = Image.new("RGB", final_pil.size, (230, 230, 230))
-                bg.paste(final_pil, (0, 0), mask=final_pil)
-                final_for_display = bg
-            else:
-                final_for_display = final_pil
-            im_data = final_for_display.convert("RGB").tobytes("raw", "RGB")
-            qim = QImage(
-                im_data,
-                final_for_display.width,
-                final_for_display.height,
-                final_for_display.width * 3,
-                QImage.Format.Format_RGB888,
-            ).copy()
-            self._update_preview(qim)
-        except Exception as ex:
-            tb = "".join(traceback.format_exception(ex))
-            self._log_error(f"[start-preview-error] {tb}")
+            worker.signals.finished.connect(self._update_preview)
+            worker.signals.error.connect(self._on_preview_error)
+            self.preview_pool.start(worker)
+
+        except Exception as e:
+            self._log_error(f"[preview-start-error] {e}")
             traceback.print_exc()
         
-    def _update_preview(self, qim: QImage):
+    def _update_preview(self, qim: QImage, quality: int = 1):
         try:
             self.current_qimage = qim
             pixmap = QPixmap.fromImage(qim)
@@ -1153,33 +1190,14 @@ class MainWindow(QMainWindow):
         except Exception as ex:
             self._log_error(f"[update-preview-error] {ex}")
             traceback.print_exc()
-
-    def _on_preview_future_done(self, future):
-        try:
-            if future.cancelled():
-                return
-            result = future.result()
-            def apply_result(res=result):
-                try:
-                    width, height, im_data = res
-                    qim_local = QImage(im_data, width, height, QImage.Format.Format_RGB888).copy()
-                    self._update_preview(qim_local)
-                except Exception as ex_inner:
-                    tb_inner = "".join(traceback.format_exception(ex_inner))
-                    self._log_error(f"[preview-apply-error] {tb_inner}")
-                    traceback.print_exc()
-            QTimer.singleShot(0, apply_result)
-        except Exception as ex:
-            tb = "".join(traceback.format_exception(ex))
-            self._log_error(f"[preview-future-error] {tb}")
-            traceback.print_exc()
         finally:
+            # Check if another preview was requested while we were busy
             if self._preview_pending:
                 self._preview_pending = False
                 self.preview_timer.start(10)
+
     
     def _on_preview_error(self, message: str):
-        self.preview_thread = None
         formatted = f"[preview-error] {message}"
         self._log_error(formatted)
         QMessageBox.warning(
@@ -1187,7 +1205,6 @@ class MainWindow(QMainWindow):
             "Error de previsualización",
             f"No se pudo generar la vista previa:\n{message}\n\nSe registró en:\n{self.LOG_FILE}",
         )
-        # If a new preview was requested while this finished, fire it now
         if self._preview_pending:
             self._preview_pending = False
             self.preview_timer.start(10)
@@ -1237,7 +1254,7 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         """Ensure background preview threads are stopped before closing."""
         try:
-            self.preview_executor.shutdown(cancel_futures=True, wait=False)
+            self.preview_pool.clear()
         except Exception:
             pass
         super().closeEvent(event)
@@ -1253,6 +1270,9 @@ class MainWindow(QMainWindow):
         
     def _set_mock_color(self, mock_id: str):
         self.current_mock = mock_id
+        # Clear cache to force re-generation for the mockup
+        self.current_base_pil = None
+        self.current_orig_pixmap = None
         self._schedule_preview()
         
     def _on_image_dropped(self, path: str):
@@ -1275,6 +1295,12 @@ class MainWindow(QMainWindow):
             self.btn_custom.setChecked(True)
             
             self.current_mock = 'custom_drop'
+            
+            # Update assets and schedule
+            self.current_base_pil = None
+            self.current_orig_pixmap = None
+            self._update_current_assets(pil_img)
+            
             self._schedule_preview()
             self._show_feedback(f"Imagen cargada")
         except Exception as e:
@@ -1293,6 +1319,7 @@ class MainWindow(QMainWindow):
         self.sl_opacity.setValue(30)
         self.sl_noise.setValue(0)
         self.sl_padding.setValue(10)
+        self.sl_contraction.setValue(0)
         self.chk_adaptive.setChecked(True)
         
         # Reset scale curve to new optimal defaults
@@ -1437,6 +1464,7 @@ class MainWindow(QMainWindow):
             self.sl_noise.setValue(d.get('noise', 0))
             self.sl_padding.setValue(d.get('padding', 10))
             self.sl_contact_blur.setValue(d.get('contact_blur', 10))
+            self.sl_contraction.setValue(d.get('contraction', 0))
             self.chk_adaptive.setChecked(d.get('adaptive_zoom', True))
             self._schedule_preview()
             
@@ -1959,6 +1987,7 @@ class MainWindow(QMainWindow):
         self.sl_noise.slider.blockSignals(True)
         self.sl_padding.slider.blockSignals(True)
         self.sl_contact_blur.slider.blockSignals(True)
+        self.sl_contraction.slider.blockSignals(True)
         self.chk_adaptive.blockSignals(True)
         
         self.light_angle.setAngle(settings.angle)
@@ -1971,6 +2000,7 @@ class MainWindow(QMainWindow):
         self.sl_noise.setValue(settings.noise)
         self.sl_padding.setValue(settings.padding)
         self.sl_contact_blur.setValue(settings.contact_blur)
+        self.sl_contraction.setValue(settings.contraction)
         self.chk_adaptive.setChecked(settings.adaptive_zoom)
         
         # Restore signals
@@ -1983,6 +2013,7 @@ class MainWindow(QMainWindow):
         self.sl_noise.slider.blockSignals(False)
         self.sl_padding.slider.blockSignals(False)
         self.sl_contact_blur.slider.blockSignals(False)
+        self.sl_contraction.slider.blockSignals(False)
         self.chk_adaptive.blockSignals(False)
         
         self._schedule_preview()

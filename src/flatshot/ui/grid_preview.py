@@ -125,7 +125,8 @@ class GridPreviewWidget(QWidget):
         
         # Chunked loading
         self._current_chunk = 0
-        self._chunk_size = 4  # Process 4 images at a time
+        # Keep chunks small to avoid blocking the UI thread with heavy settings.
+        self._chunk_size = 1
         self._chunk_timer = QTimer()
         self._chunk_timer.setSingleShot(True)
         self._chunk_timer.timeout.connect(self._process_next_chunk)
@@ -272,7 +273,7 @@ class GridPreviewWidget(QWidget):
                     # Generate processed preview
                     processed_pil = ShadowEngine.aplicar_efectos(
                         pil_img, self.settings, preview_size,
-                        scale_factor=0.1, curve_data=self.curve_data
+                        scale_factor=0.1, curve_data=self.curve_data, is_preview=True
                     )
                     
                     # Convert to QPixmap

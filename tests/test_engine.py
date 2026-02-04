@@ -152,3 +152,16 @@ class TestAplicarEfectos:
         
         assert result is not None
         assert isinstance(result, Image.Image)
+
+    def test_aplicar_efectos_with_contraction_preview(self, sample_image, default_settings, default_curve):
+        """Preview mode should support contraction without errors."""
+        default_settings.contraction = 5
+        target_size = (300, 400)
+
+        result = ShadowEngine.aplicar_efectos(
+            sample_image, default_settings, target_size,
+            scale_factor=0.25, curve_data=default_curve, is_preview=True
+        )
+
+        assert result.size == target_size
+        assert isinstance(result, Image.Image)

@@ -99,7 +99,37 @@ class ShadowEngine:
         return cx, cy
 
     @staticmethod
-    def aplicar_efectos(original_rgba: Image.Image, settings: ShadowSettings, target_size: Tuple[int, int], scale_factor: float = 1.0, curve_data: Optional[CurveData] = None) -> Image.Image:
+    def _odd_kernel(size: int, minimum: int = 1) -> int:
+        """Normalize kernel size to an odd integer."""
+        kernel = max(int(round(size)), minimum)
+        if kernel % 2 == 0:
+            kernel += 1
+        return kernel
+
+    @staticmethod
+    def _apply_min_filter(mask: Image.Image, kernel_size: int, max_pass_kernel: int = 0) -> Image.Image:
+        """
+        Apply MinFilter with optional decomposition in smaller passes.
+        This keeps preview responsive when large kernels are requested.
+        """
+        kernel = ShadowEngine._odd_kernel(kernel_size, minimum=3)
+        pass_kernel = ShadowEngine._odd_kernel(max_pass_kernel, minimum=3) if max_pass_kernel else 0
+
+        if not pass_kernel or kernel <= pass_kernel:
+            return mask.filter(ImageFilter.MinFilter(size=kernel))
+
+        filtered = mask
+        remaining = kernel
+        while remaining > pass_kernel:
+            filtered = filtered.filter(ImageFilter.MinFilter(size=pass_kernel))
+            remaining -= (pass_kernel - 1)
+
+        if remaining > 1:
+            filtered = filtered.filter(ImageFilter.MinFilter(size=remaining))
+        return filtered
+
+    @staticmethod
+    def aplicar_efectos(original_rgba: Image.Image, settings: ShadowSettings, target_size: Tuple[int, int], scale_factor: float = 1.0, curve_data: Optional[CurveData] = None, is_preview: bool = False) -> Image.Image:
         canvas_w, canvas_h = target_size
         padding_pct = settings.padding / 100.0
         safe_w = int(canvas_w * (1.0 - padding_pct))
@@ -155,7 +185,64 @@ class ShadowEngine:
             new_h = int(original_trimmed.height * ratio)
 
         if original_trimmed.width == 0: return Image.new("RGB", target_size, (230,230,230))
-        subject_resized = original_trimmed.resize((new_w, new_h), Image.Resampling.BICUBIC)
+        
+        # Prepare subject for processing
+        # Working at a reasonable resolution ensures speed and quality
+        # In preview mode we use a smaller resolution for better interactivity
+        max_work_w = 1200 if is_preview else 2000
+        if original_trimmed.width > max_work_w:
+            w_ratio = max_work_w / original_trimmed.width
+            subject_working = original_trimmed.resize(
+                (max_work_w, int(original_trimmed.height * w_ratio)), 
+                Image.Resampling.BILINEAR
+            )
+        else:
+            subject_working = original_trimmed.copy()
+
+        # Apply silhouette contraction (erode alpha channel)
+        if settings.contraction > 0:
+            # Scale the kernel relative to the current working subject width vs preview width
+            scaling_to_working = subject_working.width / max(new_w, 1)
+            
+            # FAST PREVIEW PATH: 
+            # If the kernel is very large or we are in preview, we can downsample 
+            # the alpha channel even more to speed up the filter, then upscale it back.
+            if is_preview:
+                # Downsample alpha for lightning fast filtering
+                alpha_full = subject_working.split()[-1]
+                preview_filter_w = min(600, alpha_full.width)
+                ds_ratio = preview_filter_w / max(alpha_full.width, 1)
+                ds_h = max(1, int(alpha_full.height * ds_ratio))
+
+                if preview_filter_w != alpha_full.width:
+                    alpha_ds = alpha_full.resize((preview_filter_w, ds_h), Image.Resampling.NEAREST)
+                else:
+                    alpha_ds = alpha_full
+                
+                # Adjust kernel for downsampled resolution
+                k_size = int(round(settings.contraction * 2 * (preview_filter_w / max(new_w, 1)) + 1))
+                k_size = ShadowEngine._odd_kernel(k_size, minimum=3)
+                # Safety cap to prevent hangs on extreme scales
+                k_size = min(k_size, 51)
+                
+                alpha_contracted_ds = ShadowEngine._apply_min_filter(alpha_ds, k_size, max_pass_kernel=21)
+                if alpha_contracted_ds.size != alpha_full.size:
+                    # Upscale back to work resolution with BILINEAR to keep edges smooth
+                    alpha_contracted = alpha_contracted_ds.resize(alpha_full.size, Image.Resampling.BILINEAR)
+                else:
+                    alpha_contracted = alpha_contracted_ds
+            else:
+                # High quality path for export
+                k_size = int(round(settings.contraction * 2 * scaling_to_working + 1))
+                k_size = ShadowEngine._odd_kernel(k_size, minimum=3)
+                k_size = min(k_size, 101)
+                
+                alpha = subject_working.split()[-1]
+                alpha_contracted = ShadowEngine._apply_min_filter(alpha, k_size, max_pass_kernel=31)
+            
+            subject_working.putalpha(alpha_contracted)
+
+        subject_resized = subject_working.resize((new_w, new_h), Image.Resampling.BICUBIC)
         
         cx, cy = ShadowEngine._calcular_centro_masa(subject_resized)
         opt_y = int(canvas_h * 0.015) 

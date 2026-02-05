@@ -5,7 +5,8 @@ import math
 import numpy as np
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QSlider, QSpinBox,
-    QFrame, QPushButton, QSizePolicy, QGraphicsDropShadowEffect, QToolButton
+    QFrame, QPushButton, QSizePolicy, QGraphicsDropShadowEffect, QToolButton,
+    QButtonGroup
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QRectF, QTimer, QEvent, QSize
 from PyQt6.QtGui import (
@@ -14,6 +15,7 @@ from PyQt6.QtGui import (
 )
 from PIL import Image
 import qtawesome as qta
+from flatshot.ui.styles import COLORS
 
 
 class SmartSlider(QWidget):
@@ -41,13 +43,13 @@ class SmartSlider(QWidget):
         
     def _setup_ui(self, label: str, min_val: int, max_val: int, default: int, tooltip: str):
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, self._px(1), 0, self._px(1))
-        layout.setSpacing(self._px(5))
+        layout.setContentsMargins(0, self._px(4), 0, self._px(4))
+        layout.setSpacing(self._px(8))
         
         # Label
         self.label = QLabel(label)
         self.label.setProperty("class", "param-label")
-        self.label.setFixedWidth(self._px(70))  # Compact label
+        self.label.setFixedWidth(self._px(90))  # Slightly wider for readability
         base_tooltip = tooltip.strip() if tooltip else ""
         reset_hint = "<br><br><span style='color:#7EA9D6'>Tip: doble clic para restaurar el valor por defecto.</span>"
         final_tooltip = f"{base_tooltip}{reset_hint}" if base_tooltip else "Doble clic para restaurar el valor por defecto."
@@ -62,7 +64,7 @@ class SmartSlider(QWidget):
         self.slider.setCursor(Qt.CursorShape.PointingHandCursor)
         self.slider.setSingleStep(1)
         self.slider.setPageStep(max(1, (max_val - min_val) // 10))
-        self.slider.setMinimumWidth(self._px(60))
+        self.slider.setMinimumWidth(self._px(80))
         # Avoid intrusive focus frames on sliders; keyboard editing is done via spinbox.
         self.slider.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.slider.installEventFilter(self)
@@ -74,7 +76,7 @@ class SmartSlider(QWidget):
         self.spinbox.setValue(default)
         self.spinbox.setSuffix(self.suffix)
         self.spinbox.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
-        self.spinbox.setMinimumWidth(self._px(55))
+        self.spinbox.setMinimumWidth(self._px(64))
         self.spinbox.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.spinbox.installEventFilter(self)
         layout.addWidget(self.spinbox, 0)  # stretch factor 0 to not expand
@@ -134,41 +136,48 @@ class CollapsibleSection(QFrame):
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setContentsMargins(self._px(2), self._px(2), self._px(2), self._px(2))
         outer.setSpacing(0)
 
-        header = QFrame()
-        header.setProperty("class", "section-header")
-        header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(4, 2, 4, 2)
-        header_layout.setSpacing(6)
+        self._header = QFrame()
+        self._header.setProperty("class", "section-header")
+        self._header.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._header.setFixedHeight(self._px(28))
+        header_layout = QHBoxLayout(self._header)
+        header_layout.setContentsMargins(self._px(8), self._px(5), self._px(8), self._px(5))
+        header_layout.setSpacing(self._px(8))
 
         self._toggle_btn = QToolButton()
-        self._toggle_btn.setProperty("class", "section-toggle")
-        self._toggle_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self._toggle_btn.setProperty("class", "section-arrow")
+        self._toggle_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self._toggle_btn.setCheckable(False)
         icon_color = "#AEB4BE"
         self._icon_expanded = qta.icon('fa5s.chevron-down', color=icon_color)
         self._icon_collapsed = qta.icon('fa5s.chevron-right', color=icon_color)
         self._toggle_btn.setIcon(self._icon_expanded if self._expanded else self._icon_collapsed)
         self._toggle_btn.setIconSize(QSize(self._px(10), self._px(10)))
-        self._toggle_btn.setText(self._title)
-        self._toggle_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self._toggle_btn.setStyleSheet("text-align: left; padding-left: 2px;")
+        self._toggle_btn.setFixedSize(self._px(20), self._px(20))
         self._toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._toggle_btn.setMinimumHeight(self._px(22))
         self._toggle_btn.clicked.connect(self._on_toggled)
-        header_layout.addWidget(self._toggle_btn, 1)
-        outer.addWidget(header)
+        header_layout.addWidget(self._toggle_btn, 0, Qt.AlignmentFlag.AlignLeft)
+
+        self._title_label = QLabel(self._title)
+        self._title_label.setProperty("class", "section-title")
+        self._title_label.setCursor(Qt.CursorShape.PointingHandCursor)
+        header_layout.addWidget(self._title_label, 1)
+        outer.addWidget(self._header)
 
         self._content = QWidget()
+        self._content.setProperty("class", "section-content")
         self._content.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self._content_layout = QVBoxLayout(self._content)
-        self._content_layout.setContentsMargins(8, 4, 8, 6)
-        self._content_layout.setSpacing(6)
+        self._content_layout.setContentsMargins(self._px(10), self._px(10), self._px(10), self._px(12))
+        self._content_layout.setSpacing(self._px(10))
         outer.addWidget(self._content)
 
         self.setExpanded(self._expanded, emit_signal=False)
+        self._header.mousePressEvent = self._on_header_clicked
+        self._title_label.mousePressEvent = self._on_header_clicked
 
     def _px(self, value: int) -> int:
         return max(int(round(value * self._scale)), 1)
@@ -193,18 +202,27 @@ class CollapsibleSection(QFrame):
     def _on_toggled(self):
         self.setExpanded(not self._expanded)
 
+    def _on_header_clicked(self, event):
+        if event is None:
+            return
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._on_toggled()
+            event.accept()
+        else:
+            event.ignore()
+
     def sizeHint(self) -> QSize:
         base = super().sizeHint()
         if self._expanded:
             return base
-        header_h = self._toggle_btn.sizeHint().height() + 12
+        header_h = self._header.sizeHint().height() + self._px(4)
         return QSize(base.width(), header_h)
 
     def minimumSizeHint(self) -> QSize:
         base = super().minimumSizeHint()
         if self._expanded:
             return base
-        header_h = self._toggle_btn.sizeHint().height() + 12
+        header_h = self._header.sizeHint().height() + self._px(4)
         return QSize(base.width(), header_h)
 
 
@@ -276,7 +294,7 @@ class LightAngleWidget(QWidget):
         end_y = cy + (radius - self._px(8)) * math.sin(angle_rad)
         
         # Glow effect for indicator
-        glow_pen = QPen(QColor("#0078D4"))
+        glow_pen = QPen(QColor(COLORS['accent_primary']))
         glow_pen.setWidth(self._px(6))
         glow_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setOpacity(0.3)
@@ -285,14 +303,14 @@ class LightAngleWidget(QWidget):
         
         # Main indicator line
         painter.setOpacity(1.0)
-        indicator_pen = QPen(QColor("#0078D4"))
+        indicator_pen = QPen(QColor(COLORS['accent_primary']))
         indicator_pen.setWidth(self._px(3))
         indicator_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(indicator_pen)
         painter.drawLine(cx, cy, int(end_x), int(end_y))
         
         # Indicator dot at end
-        painter.setBrush(QBrush(QColor("#0078D4")))
+        painter.setBrush(QBrush(QColor(COLORS['accent_primary'])))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(QPoint(int(end_x), int(end_y)), self._px(6), self._px(6))
         
@@ -308,7 +326,7 @@ class LightAngleWidget(QWidget):
             base_size = 9.0
         font.setPointSizeF(max(base_size * self._scale, 1.0))
         painter.setFont(font)
-        painter.setPen(QColor("#A0A0A0"))
+        painter.setPen(QColor(COLORS['text_muted']))
         text = f"{self._angle}°"
         text_rect = painter.fontMetrics().boundingRect(text)
         painter.drawText(cx - text_rect.width() // 2, cy + radius + self._px(18), text)
@@ -439,7 +457,7 @@ class ComparisonCanvas(QWidget):
             if self._show_original:
                 self._draw_indicator(painter, "ORIGINAL", QColor("#FF9800"))
             else:
-                self._draw_indicator(painter, "PROCESADA", QColor("#4CAF50"))
+                self._draw_indicator(painter, "PROCESADA", QColor(COLORS['success']))
             
             # Grid overlay (drawn OVER the image)
             if self._grid_visible:
@@ -523,7 +541,7 @@ class ComparisonCanvas(QWidget):
         painter.drawRoundedRect(rect, 4, 4)
         
         # Text
-        painter.setPen(QColor("#A0A0A0"))
+        painter.setPen(QColor(COLORS['text_muted']))
         painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, text)
         
     def _draw_placeholder(self, painter):
@@ -597,48 +615,85 @@ class FloatingToolbar(QFrame):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setProperty("class", "card")
+        self.setProperty("class", "floating-toolbar")
+        self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        self.setMinimumHeight(52)
         self._setup_ui()
         
     def _setup_ui(self):
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 6, 8, 6)
-        layout.setSpacing(4)
+        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setSpacing(12)
+        layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         
         # Grid button
-        self.btn_grid = QPushButton("⊞")
-        self.btn_grid.setProperty("class", "icon-btn")
+        self.btn_grid = QPushButton("Guías")
+        self.btn_grid.setProperty("class", "toolbar-btn")
         self.btn_grid.setCheckable(True)
         self.btn_grid.setToolTip("Guías de composición (regla de tercios)")
+        self.btn_grid.setMinimumWidth(90)
+        self.btn_grid.setFixedHeight(32)
         self.btn_grid.toggled.connect(self._on_grid_toggled)
-        layout.addWidget(self.btn_grid)
+        layout.addWidget(self.btn_grid, 0, Qt.AlignmentFlag.AlignVCenter)
         
-        # Separator
-        sep = QFrame()
-        sep.setFrameShape(QFrame.Shape.VLine)
-        sep.setStyleSheet("background-color: #3A3A3A;")
-        sep.setFixedWidth(1)
-        layout.addWidget(sep)
+        # Background label
+        bg_label = QLabel("Fondo")
+        bg_label.setProperty("class", "panel-label")
+        bg_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+        bg_label.setFixedHeight(32)
+        layout.addWidget(bg_label, 0, Qt.AlignmentFlag.AlignVCenter)
         
         # Background color buttons
+        swatch_group = QFrame()
+        swatch_group.setProperty("class", "swatch-group")
+        swatch_group.setFixedHeight(34)
+        swatch_layout = QHBoxLayout(swatch_group)
+        swatch_layout.setContentsMargins(4, 4, 4, 4)
+        swatch_layout.setSpacing(6)
+        swatch_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._bg_group = QButtonGroup(self)
+        self._bg_group.setExclusive(True)
+        self._bg_buttons = []
         for color, name in [("#FFFFFF", "Blanco"), ("#E6E6E6", "Gris"), ("#2A2A2A", "Oscuro")]:
             btn = QPushButton()
-            btn.setProperty("class", "icon-btn")
-            btn.setFixedSize(24, 24)
-            btn.setStyleSheet(f"background-color: {color}; border-radius: 4px; border: 1px solid #4A4A4A;")
+            btn.setProperty("class", "swatch-btn")
+            btn.setCheckable(True)
+            btn.setFixedSize(26, 26)
+            btn.setStyleSheet(f"background-color: {color};")
             btn.setToolTip(f"Fondo {name}")
-            btn.clicked.connect(lambda checked, c=color: self.bgColorChanged.emit(c))
-            layout.addWidget(btn)
+            btn.clicked.connect(lambda checked, c=color: self._select_background(c))
+            self._bg_group.addButton(btn)
+            swatch_layout.addWidget(btn)
+            self._bg_buttons.append((btn, color))
+
+        layout.addWidget(swatch_group, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        # Default selection
+        self._select_background("#E6E6E6", emit=False)
+        self.setMinimumWidth(320)
     
     def _on_grid_toggled(self, checked: bool):
         """Handle grid button toggle with visual feedback."""
-        if checked:
-            self.btn_grid.setStyleSheet("background-color: #0078D4; border-radius: 4px;")
-            self.btn_grid.setText("⊞ ON")
-        else:
-            self.btn_grid.setStyleSheet("")
-            self.btn_grid.setText("⊞")
         self.gridToggled.emit(checked)
+
+    def _select_background(self, color: str, emit: bool = True):
+        for btn, value in getattr(self, "_bg_buttons", []):
+            if value == color:
+                btn.setChecked(True)
+                btn.setStyleSheet(f"background-color: {value};")
+            else:
+                btn.setChecked(False)
+                btn.setStyleSheet(f"background-color: {value};")
+        if emit:
+            self.bgColorChanged.emit(color)
+
+    def set_background(self, color: str, emit: bool = False):
+        self._select_background(color, emit=emit)
+
+    def set_grid_enabled(self, enabled: bool, emit: bool = False):
+        self.btn_grid.blockSignals(not emit)
+        self.btn_grid.setChecked(bool(enabled))
+        self.btn_grid.blockSignals(False)
 
 
 class ModernSplashScreen(QWidget):
@@ -700,7 +755,7 @@ class ModernSplashScreen(QWidget):
         gradient.setColorAt(0, QColor("#1E1E1E"))
         gradient.setColorAt(1, QColor("#151515"))
         painter.setBrush(QBrush(gradient))
-        painter.setPen(QPen(QColor("#0078D4"), 2))
+        painter.setPen(QPen(QColor(COLORS['accent_primary']), 2))
         painter.drawRoundedRect(shadow_rect, 12, 12)
         
         # Content area
@@ -708,7 +763,7 @@ class ModernSplashScreen(QWidget):
         content_top = shadow_margin + 30
         
         # App icon placeholder (using accent color circle)
-        painter.setBrush(QBrush(QColor("#0078D4")))
+        painter.setBrush(QBrush(QColor(COLORS['accent_primary'])))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(cx - 30, content_top, 60, 60)
         
@@ -744,7 +799,7 @@ class ModernSplashScreen(QWidget):
         
         # Progress bar fill
         fill_width = int(bar_width * (self._progress / 100))
-        painter.setBrush(QBrush(QColor("#0078D4")))
+        painter.setBrush(QBrush(QColor(COLORS['accent_primary'])))
         painter.drawRoundedRect(cx - bar_width//2, bar_y, fill_width, bar_height, 2, 2)
         
         # Status text
@@ -832,7 +887,7 @@ class CurveGraphWidget(QWidget):
                     points.append((int(px), int(py)))
                 
                 # Draw curve line
-                painter.setPen(QPen(QColor("#0078D4"), 2))
+                painter.setPen(QPen(QColor(COLORS['accent_primary']), 2))
                 path = QPainterPath()
                 if points:
                     path.moveTo(points[0][0], points[0][1])
@@ -841,7 +896,7 @@ class CurveGraphWidget(QWidget):
                     painter.drawPath(path)
                 
                 # Draw points
-                painter.setBrush(QBrush(QColor("#0078D4")))
+                painter.setBrush(QBrush(QColor(COLORS['accent_primary'])))
                 painter.setPen(Qt.PenStyle.NoPen)
                 for px, py in points:
                     painter.drawEllipse(QPoint(px, py), 4, 4)

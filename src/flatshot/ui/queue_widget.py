@@ -14,6 +14,7 @@ from PyQt6.QtGui import QColor, QAction
 import qtawesome as qta
 
 from flatshot.core.models import JobItem
+from flatshot.ui.styles import COLORS
 
 
 class QueueWidget(QWidget):
@@ -42,20 +43,21 @@ class QueueWidget(QWidget):
         header = QHBoxLayout()
         header.setSpacing(4)
         
-        icon_color = '#A0A0A0'
+        icon_color = COLORS['text_muted']
         
         self.btn_add = QPushButton(qta.icon('fa5s.folder-plus', color=icon_color), " Añadir")
+        self.btn_add.setProperty("class", "secondary")
         self.btn_add.setToolTip("Añadir carpeta a la cola")
         self.btn_add.clicked.connect(self._add_folder)
         header.addWidget(self.btn_add)
         
-        self.btn_remove = QPushButton(qta.icon('fa5s.times', color='#E57373'), "")
+        self.btn_remove = QPushButton(qta.icon('fa5s.times', color=COLORS['error']), "")
         self.btn_remove.setProperty("class", "icon-btn")
         self.btn_remove.setToolTip("Quitar seleccionado")
         self.btn_remove.clicked.connect(self._remove_selected)
         header.addWidget(self.btn_remove)
         
-        self.btn_clear = QPushButton(qta.icon('fa5s.trash-alt', color='#E57373'), "")
+        self.btn_clear = QPushButton(qta.icon('fa5s.trash-alt', color=COLORS['error']), "")
         self.btn_clear.setProperty("class", "icon-btn")
         self.btn_clear.setToolTip("Limpiar cola")
         self.btn_clear.clicked.connect(self._clear_queue)
@@ -64,13 +66,14 @@ class QueueWidget(QWidget):
         header.addStretch()
         
         self.lbl_count = QLabel("0 carpetas")
-        self.lbl_count.setStyleSheet("color: #888;")
+        self.lbl_count.setProperty("class", "muted")
         header.addWidget(self.lbl_count)
         
         layout.addLayout(header)
         
         # Table for jobs
         self.table = QTableWidget()
+        self.table.setProperty("class", "table")
         self.table.setColumnCount(4)
         self.table.setHorizontalHeaderLabels(["Carpeta", "Imágenes", "Estado", "Progreso"])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -84,25 +87,6 @@ class QueueWidget(QWidget):
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._show_context_menu)
         self.table.verticalHeader().setVisible(False)
-        self.table.setStyleSheet("""
-            QTableWidget {
-                background-color: #1E1E1E;
-                border: 1px solid #3A3A3A;
-                border-radius: 4px;
-            }
-            QTableWidget::item {
-                padding: 4px;
-            }
-            QTableWidget::item:selected {
-                background-color: #0078D4;
-            }
-            QHeaderView::section {
-                background-color: #2A2A2A;
-                border: none;
-                padding: 6px;
-                font-weight: bold;
-            }
-        """)
         layout.addWidget(self.table)
         
         # Control buttons
@@ -116,13 +100,13 @@ class QueueWidget(QWidget):
         controls.addWidget(self.btn_start)
         
         self.btn_pause = QPushButton(qta.icon('fa5s.pause', color='white'), " PAUSAR")
-        self.btn_pause.setStyleSheet("background-color: #FF9800;")
+        self.btn_pause.setProperty("class", "warning-solid")
         self.btn_pause.clicked.connect(self._on_pause)
         self.btn_pause.hide()
         controls.addWidget(self.btn_pause)
         
         self.btn_stop = QPushButton(qta.icon('fa5s.stop', color='white'), " DETENER")
-        self.btn_stop.setStyleSheet("background-color: #C62828;")
+        self.btn_stop.setProperty("class", "danger-solid")
         self.btn_stop.clicked.connect(self._on_stop)
         self.btn_stop.hide()
         controls.addWidget(self.btn_stop)
@@ -214,9 +198,9 @@ class QueueWidget(QWidget):
             
             # Color by status
             if job.status == 'completed':
-                status_item.setForeground(QColor('#4CAF50'))
+                status_item.setForeground(QColor(COLORS['success']))
             elif job.status == 'error':
-                status_item.setForeground(QColor('#F44336'))
+                status_item.setForeground(QColor(COLORS['error']))
             elif job.status == 'processing':
                 status_item.setForeground(QColor('#2196F3'))
             

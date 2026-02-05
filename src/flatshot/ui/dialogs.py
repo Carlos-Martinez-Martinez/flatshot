@@ -9,6 +9,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QPixmap, QImage, QPainter, QColor, QPen
 from flatshot.ui.widgets import CurveGraphWidget
 from flatshot.core.models import ExportConfig
+from flatshot.ui.styles import COLORS
 
 class CurveEditorDialog(QDialog):
     def __init__(self, current_curve, folder_path, current_padding, parent=None):
@@ -23,23 +24,39 @@ class CurveEditorDialog(QDialog):
         self.init_ui()
         # Start with abstract samples, don't auto-load
         self.create_abstract_samples()
+    
+    def _set_label_class(self, label: QLabel, class_name: str):
+        label.setProperty("class", class_name)
+        try:
+            label.style().unpolish(label)
+            label.style().polish(label)
+        except Exception:
+            pass
 
     def init_ui(self):
+        self.setProperty("class", "dialog")
         main_layout = QVBoxLayout(self)
         
+        info_card = QFrame()
+        info_card.setProperty("class", "dialog-card")
+        info_layout = QVBoxLayout(info_card)
+        info_layout.setContentsMargins(10, 8, 10, 8)
         info = QLabel(f"<b>Sistema de 5 Puntos:</b> Control basado en la geometría de la imagen.<br>"
                       "Las imágenes se clasifican automáticamente desde <b>Formato Vertical</b> hasta <b>Formato Horizontal</b>.")
-        info.setStyleSheet("background: #21252B; padding: 10px; border-radius: 5px; color: #ABB2BF;")
-        main_layout.addWidget(info)
+        info.setProperty("class", "dialog-text")
+        info.setWordWrap(True)
+        info_layout.addWidget(info)
+        main_layout.addWidget(info_card)
 
         # Folder selection row
         folder_row = QHBoxLayout()
-        btn_load = QPushButton("📂 Cargar muestras reales")
+        btn_load = QPushButton("Cargar muestras reales")
+        btn_load.setProperty("class", "primary")
         btn_load.clicked.connect(self.select_sample_folder)
         folder_row.addWidget(btn_load)
         
         self.lbl_folder = QLabel("Ninguna carpeta cargada")
-        self.lbl_folder.setStyleSheet("color: #666; font-style: italic;")
+        self.lbl_folder.setProperty("class", "muted")
         folder_row.addWidget(self.lbl_folder)
         folder_row.addStretch()
         main_layout.addLayout(folder_row)
@@ -60,16 +77,16 @@ class CurveEditorDialog(QDialog):
             saved_fp = [0.98, 0.75, 0.85, 0.90, 0.95]
         
         for i, (key, title, sub, def_val) in enumerate(cats):
-            frame = QFrame(); frame.setStyleSheet("background: #181A1F; border-radius: 6px;")
+            frame = QFrame(); frame.setProperty("class", "card")
             l = QVBoxLayout(frame); l.setContentsMargins(5,5,5,5)
             
             l.addWidget(QLabel(f"<b>{title}</b>"))
-            sub_lbl = QLabel(sub); sub_lbl.setStyleSheet("color: #61AFEF; font-size: 10px;")
+            sub_lbl = QLabel(sub); sub_lbl.setProperty("class", "accent-text")
             l.addWidget(sub_lbl)
             
             img_lbl = QLabel("..."); img_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             img_lbl.setMinimumSize(220, 300) 
-            img_lbl.setStyleSheet("background: #282C34; border: 1px solid #3E4451;")
+            img_lbl.setProperty("class", "image-swatch")
             l.addWidget(img_lbl)
             
             slider_h = QHBoxLayout()
@@ -100,6 +117,12 @@ class CurveEditorDialog(QDialog):
 
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
         btns.accepted.connect(self.accept); btns.rejected.connect(self.reject)
+        btn_save = btns.button(QDialogButtonBox.StandardButton.Save)
+        if btn_save:
+            btn_save.setProperty("class", "primary")
+        btn_cancel = btns.button(QDialogButtonBox.StandardButton.Cancel)
+        if btn_cancel:
+            btn_cancel.setProperty("class", "ghost")
         main_layout.addWidget(btns)
 
     def select_sample_folder(self):
@@ -143,7 +166,7 @@ class CurveEditorDialog(QDialog):
             folder_name = Path(self.folder_path).name
             self.setWindowTitle(f"Calibrar escala - {folder_name}")
             self.lbl_folder.setText(f"📁 {self.folder_path}")
-            self.lbl_folder.setStyleSheet("color: #4CAF50;")
+            self._set_label_class(self.lbl_folder, "success-text")
             
             self.refresh_preview()
         except Exception as e: 
@@ -252,6 +275,7 @@ class ExportConfigDialog(QDialog):
         self.init_ui()
 
     def init_ui(self):
+        self.setProperty("class", "dialog")
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -303,11 +327,11 @@ class ExportConfigDialog(QDialog):
         naming_layout.addRow("Plantilla:", self.txt_template)
         
         help_text = QLabel("Tokens: {original}, {suffix}, {folder}, {index}")
-        help_text.setStyleSheet("color: #888; font-size: 10px;")
+        help_text.setProperty("class", "muted")
         naming_layout.addRow("", help_text)
         
         self.lbl_naming_preview = QLabel("")
-        self.lbl_naming_preview.setStyleSheet("color: #0078D4;")
+        self.lbl_naming_preview.setProperty("class", "accent-text")
         naming_layout.addRow("Ejemplo:", self.lbl_naming_preview)
         
         layout.addWidget(naming_group)
@@ -331,6 +355,7 @@ class ExportConfigDialog(QDialog):
         color_row = QHBoxLayout()
         self.btn_color = QPushButton()
         self.btn_color.setFixedSize(80, 28)
+        self.btn_color.setProperty("class", "swatch")
         self.current_color = tuple(self.settings.bg_color) if isinstance(self.settings.bg_color, list) else self.settings.bg_color
         self._update_color_btn()
         self.btn_color.clicked.connect(self._pick_color)
@@ -345,6 +370,12 @@ class ExportConfigDialog(QDialog):
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
+        btn_ok = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        if btn_ok:
+            btn_ok.setProperty("class", "primary")
+        btn_cancel = buttons.button(QDialogButtonBox.StandardButton.Cancel)
+        if btn_cancel:
+            btn_cancel.setProperty("class", "ghost")
         layout.addWidget(buttons)
         
         # Init state
@@ -381,7 +412,7 @@ class ExportConfigDialog(QDialog):
 
     def _update_color_btn(self):
         c = self.current_color
-        self.btn_color.setStyleSheet(f"background-color: rgb({c[0]},{c[1]},{c[2]}); border: 1px solid #555;")
+        self.btn_color.setStyleSheet(f"background-color: rgb({c[0]},{c[1]},{c[2]});")
     
     def _pick_color(self):
         c = self.current_color

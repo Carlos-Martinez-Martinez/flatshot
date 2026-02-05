@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QScrollArea, QSplitter, QToolButton, QButtonGroup, QDialog, QStackedWidget,
     QMenu, QRadioButton, QListWidget, QListWidgetItem, QSlider
 )
-from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QSize
+from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QSize, QEvent
 from PyQt6.QtGui import QPixmap, QImage, QPainter, QColor, QPainterPath, QAction, QIcon, QFont
 
 from flatshot.core.engine import ShadowEngine
@@ -29,7 +29,7 @@ from flatshot.utils.history_manager import HistoryManager
 from flatshot.utils.log_manager import LogManager
 from flatshot.utils.session_manager import SessionManager
 from flatshot.ui.dialogs import CurveEditorDialog, ExportConfigDialog
-from flatshot.ui.styles import scale_stylesheet
+from flatshot.ui.styles import scale_stylesheet, COLORS
 from flatshot.ui.widgets import SmartSlider, LightAngleWidget, ComparisonCanvas, FloatingToolbar, ModernSplashScreen, CollapsibleSection
 from flatshot.ui.queue_widget import QueueWidget
 from flatshot.ui.grid_preview import GridPreviewWidget
@@ -207,6 +207,17 @@ class MainWindow(QMainWindow):
     def _px(self, value: int) -> int:
         """Scale a pixel value according to the UI scale."""
         return max(int(round(value * self.ui_scale)), 1)
+
+    def _set_widget_class(self, widget: QWidget, class_name: str):
+        """Update a widget class property and refresh its style."""
+        if widget is None:
+            return
+        widget.setProperty("class", class_name)
+        try:
+            widget.style().unpolish(widget)
+            widget.style().polish(widget)
+        except Exception:
+            pass
             
     # ========== UI INITIALIZATION ==========
     
@@ -340,7 +351,7 @@ class MainWindow(QMainWindow):
         self.splitter.addWidget(left_panel)
         self.splitter.addWidget(center_panel)
         self.splitter.addWidget(right_panel)
-        self.splitter.setSizes([self._px(340), self._px(700), self._px(280)])
+        self.splitter.setSizes([self._px(340), self._px(560), self._px(520)])
         self.splitter.setStretchFactor(0, 0)  # Controls: fixed
         self.splitter.setStretchFactor(1, 1)  # Canvas: stretch
         self.splitter.setStretchFactor(2, 0)  # Grid: fixed
@@ -355,28 +366,28 @@ class MainWindow(QMainWindow):
     def _create_control_panel(self) -> QWidget:
         """Create the left control panel with all settings."""
         panel = QWidget()
+        panel.setProperty("class", "sidebar")
         panel.setFixedWidth(self._px(340))  # Compact width to fit on smaller screens
-        panel.setStyleSheet("background-color: #1E1E1E;")
         
         # Scroll area for controls
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setStyleSheet("QScrollArea { border: none; }")
+        scroll.setProperty("class", "panel-scroll")
         
         content = QWidget()
         content.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         layout = QVBoxLayout(content)
         layout.setContentsMargins(
-            self._px(8), self._px(8), self._px(8), self._px(2)
+            self._px(10), self._px(10), self._px(10), self._px(4)
         )  # Minimal margins
-        layout.setSpacing(self._px(6))
+        layout.setSpacing(self._px(10))
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetMinimumSize)
         
         # Header
         header = QLabel("FlatShot")
-        header.setProperty("class", "heading")
+        header.setProperty("class", "app-title")
         layout.addWidget(header)
         
         # === PRESETS SECTION ===
@@ -408,7 +419,7 @@ class MainWindow(QMainWindow):
             self._sections["finishing"] = finishing_section
             self._build_finishing_section(finishing_section.content_layout)
         
-        layout.addSpacing(self._px(6))
+        layout.addSpacing(self._px(8))
 
         scroll.setWidget(content)
         
@@ -443,10 +454,11 @@ class MainWindow(QMainWindow):
     
     def _build_presets_section(self, layout: QVBoxLayout):
         """Populate the presets management section."""
-        layout.setSpacing(self._px(8))
+        layout.setSpacing(self._px(10))
         
         # Combo box
         self.combo_presets = QComboBox()
+        self.combo_presets.setProperty("class", "compact")
         self.combo_presets.addItems(list(self.presets.keys()))
         self.combo_presets.currentIndexChanged.connect(self._apply_preset_from_combo)
         layout.addWidget(self.combo_presets)
@@ -456,8 +468,8 @@ class MainWindow(QMainWindow):
         btn_layout.setSpacing(self._px(4))
         
         # Icon color for dark theme
-        icon_color = '#A0A0A0'
-        icon_color_danger = '#E57373'
+        icon_color = COLORS['text_muted']
+        icon_color_danger = COLORS['error']
         
         btn_save = QPushButton(qta.icon('fa5s.save', color=icon_color), "")
         btn_save.setProperty("class", "icon-btn")
@@ -487,7 +499,7 @@ class MainWindow(QMainWindow):
         btn_layout.addSpacing(self._px(8))
         
         # Reset to defaults button
-        btn_reset = QPushButton(qta.icon('fa5s.undo', color='#A0A0A0'), "")
+        btn_reset = QPushButton(qta.icon('fa5s.undo', color=COLORS['text_muted']), "")
         btn_reset.setProperty("class", "icon-btn")
         btn_reset.setToolTip("Restaurar valores por defecto (Ctrl+R)")
         btn_reset.clicked.connect(self._reset_to_defaults)
@@ -498,7 +510,7 @@ class MainWindow(QMainWindow):
         
         # Status label
         self.lbl_status = QLabel("")
-        self.lbl_status.setProperty("class", "subheading")
+        self.lbl_status.setProperty("class", "muted")
         self.lbl_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.lbl_status)
         
@@ -506,7 +518,7 @@ class MainWindow(QMainWindow):
     
     def _build_lighting_section(self, layout: QVBoxLayout):
         """Populate the lighting controls section."""
-        layout.setSpacing(self._px(10))
+        layout.setSpacing(self._px(12))
         
         # Light angle widget with label
         angle_layout = QHBoxLayout()
@@ -563,7 +575,7 @@ class MainWindow(QMainWindow):
     
     def _build_shadows_section(self, layout: QVBoxLayout):
         """Populate the shadow controls section."""
-        layout.setSpacing(self._px(6))
+        layout.setSpacing(self._px(8))
         
         self.sl_blur = SmartSlider(
             "Desenfoque", 0, 100, 25, "px",
@@ -627,7 +639,7 @@ class MainWindow(QMainWindow):
     
     def _build_finishing_section(self, layout: QVBoxLayout):
         """Populate the finishing touches section."""
-        layout.setSpacing(self._px(6))
+        layout.setSpacing(self._px(8))
         
         self.sl_opacity = SmartSlider(
             "Opacidad", 0, 100, 30, "%",
@@ -693,10 +705,11 @@ class MainWindow(QMainWindow):
         folder_btn_layout = QHBoxLayout()
         folder_btn_layout.setSpacing(self._px(4))
         
-        icon_color = '#A0A0A0'
+        icon_color = COLORS['text_muted']
         
         # Add folder button with right-click context menu for recent folders
         self.btn_add_folder = QPushButton(qta.icon('fa5s.folder-plus', color=icon_color), " Añadir carpeta")
+        self.btn_add_folder.setProperty("class", "secondary")
         self.btn_add_folder.setToolTip("Añadir carpeta · Click derecho: carpetas recientes")
         self.btn_add_folder.clicked.connect(self._add_folders)
         self.btn_add_folder.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -705,7 +718,7 @@ class MainWindow(QMainWindow):
         self._update_recent_folders_menu()
         folder_btn_layout.addWidget(self.btn_add_folder)
         
-        self.btn_clear_folders = QPushButton(qta.icon('fa5s.trash-alt', color='#E57373'), "")
+        self.btn_clear_folders = QPushButton(qta.icon('fa5s.trash-alt', color=COLORS['error']), "")
         self.btn_clear_folders.setProperty("class", "icon-btn")
         self.btn_clear_folders.setToolTip("Limpiar lista de carpetas")
         self.btn_clear_folders.clicked.connect(self._clear_folders)
@@ -716,6 +729,7 @@ class MainWindow(QMainWindow):
 
         # Button to open details dialog (keeps panel height stable)
         self.btn_export_details = QPushButton(qta.icon('fa5s.list-alt', color=icon_color), " Ver lista")
+        self.btn_export_details.setProperty("class", "ghost")
         self.btn_export_details.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.btn_export_details.setMinimumWidth(self._px(92))
         self.btn_export_details.setToolTip("Ver carpetas seleccionadas y destino de exportación")
@@ -734,21 +748,7 @@ class MainWindow(QMainWindow):
         self.folder_list = QListWidget()
         self.folder_list.setMaximumHeight(self._px(90))
         self.folder_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
-        self.folder_list.setStyleSheet(scale_stylesheet("""
-            QListWidget {
-                background-color: #1A1A1A;
-                border: 1px solid #3A3A3A;
-                border-radius: 4px;
-                font-size: 11px;
-            }
-            QListWidget::item {
-                padding: 4px 8px;
-                border-bottom: 1px solid #2A2A2A;
-            }
-            QListWidget::item:selected {
-                background-color: #0078D4;
-            }
-        """, self.ui_scale))
+        self.folder_list.setProperty("class", "list-compact")
         self.folder_list.itemDoubleClicked.connect(self._remove_folder_item)
         self.folder_list.hide()  # Hidden until folders are added
         details_layout.addWidget(self.folder_list)
@@ -784,9 +784,8 @@ class MainWindow(QMainWindow):
         dest_layout.addLayout(custom_row)
 
         self.lbl_custom_dest = QLabel("")
-        self.lbl_custom_dest.setStyleSheet(scale_stylesheet(
-            "color: #888; font-size: 10px; margin-left: 20px;", self.ui_scale
-        ))
+        self.lbl_custom_dest.setProperty("class", "muted")
+        self.lbl_custom_dest.setContentsMargins(self._px(20), 0, 0, 0)
         self.lbl_custom_dest.hide()
         dest_layout.addWidget(self.lbl_custom_dest)
 
@@ -816,13 +815,13 @@ class MainWindow(QMainWindow):
         self.process_controls_layout.setSpacing(self._px(4))
         
         self.btn_pause = QPushButton(qta.icon('fa5s.pause', color='white'), " PAUSAR")
-        self.btn_pause.setStyleSheet("background-color: #F57C00; color: white; font-weight: 600;")
+        self.btn_pause.setProperty("class", "warning-solid")
         self.btn_pause.setToolTip("Pausar/Reanudar el procesamiento (Ctrl+Shift+P)")
         self.btn_pause.clicked.connect(self._toggle_pause)
         self.process_controls_layout.addWidget(self.btn_pause)
         
         self.btn_stop = QPushButton(qta.icon('fa5s.stop', color='white'), " DETENER")
-        self.btn_stop.setStyleSheet("background-color: #C62828; color: white; font-weight: 600;")
+        self.btn_stop.setProperty("class", "danger-solid")
         self.btn_stop.setToolTip("Detener el procesamiento en curso (Esc)")
         self.btn_stop.clicked.connect(self._stop_export)
         self.process_controls_layout.addWidget(self.btn_stop)
@@ -835,9 +834,7 @@ class MainWindow(QMainWindow):
         
         # Progress section
         self.lbl_progress_status = QLabel("")
-        self.lbl_progress_status.setStyleSheet(
-            scale_stylesheet("color: #888; font-size: 10px;", self.ui_scale)
-        )
+        self.lbl_progress_status.setProperty("class", "muted")
         self.lbl_progress_status.hide()
         layout.addWidget(self.lbl_progress_status)
         
@@ -862,7 +859,7 @@ class MainWindow(QMainWindow):
         
         # Toolbar
         toolbar = QFrame()
-        toolbar.setStyleSheet("background-color: #242424; border-bottom: 1px solid #3A3A3A;")
+        toolbar.setProperty("class", "panel-header")
         toolbar_layout = QHBoxLayout(toolbar)
         toolbar_layout.setContentsMargins(
             self._px(12), self._px(8), self._px(12), self._px(8)
@@ -891,7 +888,7 @@ class MainWindow(QMainWindow):
                 btn.setChecked(True)
         
         # Custom image button (hidden until image is dropped)
-        self.btn_custom = QPushButton(qta.icon('fa5s.image', color='#A0A0A0'), " Imagen")
+        self.btn_custom = QPushButton(qta.icon('fa5s.image', color=COLORS['text_muted']), " Imagen")
         self.btn_custom.setCheckable(True)
         self.btn_custom.setToolTip("Tu imagen personalizada")
         self.btn_custom.clicked.connect(lambda: self._set_mock_color('custom_drop'))
@@ -903,10 +900,8 @@ class MainWindow(QMainWindow):
         
         # Floating toolbar
         self.floating_toolbar = FloatingToolbar()
-        self.floating_toolbar.gridToggled.connect(lambda v: self.canvas.setGridVisible(v))
-        self.floating_toolbar.bgColorChanged.connect(
-            lambda c: self.canvas.setBackgroundColor(QColor(c))
-        )
+        self.floating_toolbar.gridToggled.connect(self._on_preview_grid_toggled)
+        self.floating_toolbar.bgColorChanged.connect(self._on_preview_bg_changed)
         toolbar_layout.addWidget(self.floating_toolbar)
         
         layout.addWidget(toolbar)
@@ -915,14 +910,19 @@ class MainWindow(QMainWindow):
         self.canvas = ComparisonCanvas()
         self.canvas.imageDropped.connect(self._on_image_dropped)
         layout.addWidget(self.canvas, 1)
+
+        # Restore preview UI preferences
+        saved_bg = self.app_settings.get('preview_bg_color', "#E6E6E6")
+        saved_grid = bool(self.app_settings.get('preview_grid', False))
+        self.canvas.setBackgroundColor(QColor(saved_bg))
+        self.canvas.setGridVisible(saved_grid)
+        self.floating_toolbar.set_background(saved_bg, emit=False)
+        self.floating_toolbar.set_grid_enabled(saved_grid, emit=False)
         
         # Help text
         help_text = QLabel("Mantén ESPACIO para ver el original | Arrastra una imagen para probarla")
-        help_text.setProperty("class", "subheading")
+        help_text.setProperty("class", "help-text")
         help_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        help_text.setStyleSheet(
-            scale_stylesheet("padding: 6px; background-color: #242424;", self.ui_scale)
-        )
         layout.addWidget(help_text)
         
         return panel
@@ -930,9 +930,9 @@ class MainWindow(QMainWindow):
     def _create_grid_panel(self) -> QWidget:
         """Create the right panel with grid of image previews."""
         panel = QWidget()
-        panel.setMinimumWidth(self._px(200))
-        panel.setMaximumWidth(self._px(350))
-        panel.setStyleSheet("background-color: #1A1A1A;")
+        panel.setProperty("class", "panel")
+        panel.setMinimumWidth(self._px(260))
+        panel.setMaximumWidth(self._px(520))
         
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -940,12 +940,12 @@ class MainWindow(QMainWindow):
         
         # Header toolbar
         toolbar = QFrame()
-        toolbar.setStyleSheet("background-color: #242424; border-bottom: 1px solid #3A3A3A;")
+        toolbar.setProperty("class", "panel-header")
         toolbar_layout = QVBoxLayout(toolbar)
         toolbar_layout.setContentsMargins(
-            self._px(8), self._px(6), self._px(8), self._px(6)
+            self._px(12), self._px(10), self._px(12), self._px(10)
         )
-        toolbar_layout.setSpacing(self._px(4))
+        toolbar_layout.setSpacing(self._px(8))
 
         # Title + column control row
         title_row = QHBoxLayout()
@@ -958,28 +958,74 @@ class MainWindow(QMainWindow):
         cols_label.setProperty("class", "panel-label")
         title_row.addWidget(cols_label)
 
+        # Segmented columns selector
+        cols_group = QFrame()
+        cols_group.setProperty("class", "segmented")
+        cols_layout = QHBoxLayout(cols_group)
+        cols_layout.setContentsMargins(2, 2, 2, 2)
+        cols_layout.setSpacing(0)
+
         self.grid_cols_group = QButtonGroup(self)
         self.grid_cols_group.setExclusive(True)
-        self.grid_cols_btn_1 = QPushButton("1")
+
+        def _build_cols_icon(cols: int) -> QIcon:
+            size = self._px(16)
+            padding = max(1, size // 8)
+            gap = max(1, size // 8)
+
+            def _pix(color: str) -> QPixmap:
+                pix = QPixmap(size, size)
+                pix.fill(Qt.GlobalColor.transparent)
+                painter = QPainter(pix)
+                painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QColor(color))
+                total_gap = gap * max(cols - 1, 0)
+                available = max(size - padding * 2 - total_gap, 2)
+                col_width = max(int(available / max(cols, 1)), 2)
+                x = padding
+                for _ in range(cols):
+                    painter.drawRoundedRect(x, padding, col_width, size - padding * 2, 2, 2)
+                    x += col_width + gap
+                painter.end()
+                return pix
+
+            icon = QIcon()
+            icon.addPixmap(_pix(COLORS['text_muted']), QIcon.Mode.Normal, QIcon.State.Off)
+            icon.addPixmap(_pix("#FFFFFF"), QIcon.Mode.Normal, QIcon.State.On)
+            return icon
+
+        self.grid_cols_btn_1 = QPushButton("")
         self.grid_cols_btn_1.setCheckable(True)
-        self.grid_cols_btn_1.setProperty("class", "segment-left")
-        self.grid_cols_btn_2 = QPushButton("2")
+        self.grid_cols_btn_1.setProperty("class", "seg-btn-left")
+        self.grid_cols_btn_1.setToolTip("1 columna")
+        self.grid_cols_btn_1.setIcon(_build_cols_icon(1))
+
+        self.grid_cols_btn_2 = QPushButton("")
         self.grid_cols_btn_2.setCheckable(True)
-        self.grid_cols_btn_2.setProperty("class", "segment-middle")
-        self.grid_cols_btn_3 = QPushButton("3")
+        self.grid_cols_btn_2.setProperty("class", "seg-btn-middle")
+        self.grid_cols_btn_2.setToolTip("2 columnas")
+        self.grid_cols_btn_2.setIcon(_build_cols_icon(2))
+
+        self.grid_cols_btn_3 = QPushButton("")
         self.grid_cols_btn_3.setCheckable(True)
-        self.grid_cols_btn_3.setProperty("class", "segment-right")
+        self.grid_cols_btn_3.setProperty("class", "seg-btn-right")
+        self.grid_cols_btn_3.setToolTip("3 columnas")
+        self.grid_cols_btn_3.setIcon(_build_cols_icon(3))
         for btn in (self.grid_cols_btn_1, self.grid_cols_btn_2, self.grid_cols_btn_3):
             btn.setFixedWidth(self._px(28))
-            btn.setFixedHeight(self._px(26))
+            btn.setFixedHeight(self._px(24))
+            btn.setIconSize(QSize(self._px(14), self._px(14)))
             self.grid_cols_group.addButton(btn)
-            title_row.addWidget(btn)
+            cols_layout.addWidget(btn)
+
+        title_row.addWidget(cols_group)
 
         toolbar_layout.addLayout(title_row)
         
         # Folder selector (hidden by default, shown when multiple folders)
         self.grid_folder_combo = QComboBox()
-        self.grid_folder_combo.setStyleSheet("font-size: 11px;")
+        self.grid_folder_combo.setProperty("class", "panel-combo")
         self.grid_folder_combo.currentIndexChanged.connect(self._on_grid_folder_changed)
         self.grid_folder_combo.hide()  # Hidden until multiple folders added
         toolbar_layout.addWidget(self.grid_folder_combo)
@@ -987,9 +1033,13 @@ class MainWindow(QMainWindow):
         # Full path label
         self.grid_folder_path = QLabel("Sin carpeta seleccionada")
         self.grid_folder_path.setProperty("class", "panel-path")
-        self.grid_folder_path.setWordWrap(True)
+        self.grid_folder_path.setWordWrap(False)
+        self.grid_folder_path.setFixedHeight(self._px(52))
         self.grid_folder_path.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.grid_folder_path.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.grid_folder_path.setContentsMargins(0, self._px(2), 0, 0)
         toolbar_layout.addWidget(self.grid_folder_path)
+        self.grid_folder_path.installEventFilter(self)
 
         layout.addWidget(toolbar)
         
@@ -998,14 +1048,6 @@ class MainWindow(QMainWindow):
         self.grid_preview.image_selected.connect(self._on_grid_image_selected)
         self.grid_preview.folder_empty.connect(self._on_grid_folder_empty)
         layout.addWidget(self.grid_preview, 1)
-        
-        # Info bar at bottom
-        self.grid_info_label = QLabel("Selecciona carpeta para previsualizar")
-        self.grid_info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.grid_info_label.setStyleSheet(
-            scale_stylesheet("color: #777; padding: 6px; font-size: 11px;", self.ui_scale)
-        )
-        layout.addWidget(self.grid_info_label)
 
         # Apply persisted grid settings
         columns = int(self.app_settings.get('grid_columns', 1))
@@ -1032,6 +1074,19 @@ class MainWindow(QMainWindow):
             self.grid_folder_combo.setAccessibleName("Selector de carpeta de previews")
         except RuntimeError:
             pass
+
+    def eventFilter(self, watched, event):
+        if watched is getattr(self, "grid_folder_path", None) and event.type() == QEvent.Type.Resize:
+            try:
+                idx = self.grid_folder_combo.currentIndex() if hasattr(self, "grid_folder_combo") else 0
+                if self.selected_folders:
+                    idx = min(max(int(idx), 0), len(self.selected_folders) - 1)
+                    self._update_grid_folder_path(self.selected_folders[idx])
+                else:
+                    self._update_grid_folder_path(None)
+            except Exception:
+                pass
+        return super().eventFilter(watched, event)
     
     def _on_grid_image_selected(self, path: str):
         """Load image from grid into the main canvas."""
@@ -1067,7 +1122,10 @@ class MainWindow(QMainWindow):
         self.grid_preview.set_folder(str(folder))
         settings = self._get_shadow_settings()
         self.grid_preview.set_settings(settings, self.scale_curve)
-        self.grid_info_label.setText(f"📂 {folder.name}")
+        label = folder.name
+        if hasattr(self, "_grid_folder_labels"):
+            label = self._grid_folder_labels.get(str(folder), label)
+        self.grid_preview.set_folder_label(label)
         self._update_grid_folder_path(folder)
         self.app_settings['grid_folder_index'] = int(index)
         self._save_app_settings()
@@ -1083,10 +1141,12 @@ class MainWindow(QMainWindow):
         if len(self.selected_folders) <= 1:
             # Hide combo for single or no folder
             self.grid_folder_combo.hide()
+            self._grid_folder_labels = {}
             if not self.selected_folders:
                 self._update_grid_folder_path(None)
         else:
             display_names = self._build_folder_display_names(self.selected_folders)
+            self._grid_folder_labels = display_names
             # Show combo and populate with folder names
             for folder in self.selected_folders:
                 self.grid_folder_combo.addItem(f"📁 {display_names.get(str(folder), folder.name)}")
@@ -1101,7 +1161,12 @@ class MainWindow(QMainWindow):
         if folder is None:
             self.grid_folder_path.setText("Sin carpeta seleccionada")
             return
-        self.grid_folder_path.setText(str(folder))
+        full_text = str(folder)
+        metrics = self.grid_folder_path.fontMetrics()
+        max_width = max(self.grid_folder_path.width() - self._px(4), 120)
+        self.grid_folder_path.setText(
+            metrics.elidedText(full_text, Qt.TextElideMode.ElideMiddle, max_width)
+        )
 
     def _on_grid_density_changed(self, value: int):
         if not hasattr(self, 'grid_preview'):
@@ -1113,6 +1178,16 @@ class MainWindow(QMainWindow):
             return
         self.grid_preview.set_fixed_columns(int(columns))
         self.app_settings['grid_columns'] = int(columns)
+        self._save_app_settings()
+
+    def _on_preview_grid_toggled(self, enabled: bool):
+        self.canvas.setGridVisible(bool(enabled))
+        self.app_settings['preview_grid'] = bool(enabled)
+        self._save_app_settings()
+
+    def _on_preview_bg_changed(self, color: str):
+        self.canvas.setBackgroundColor(QColor(color))
+        self.app_settings['preview_bg_color'] = color
         self._save_app_settings()
 
     def _build_folder_display_names(self, folders: list[Path]) -> dict[str, str]:
@@ -1175,8 +1250,8 @@ class MainWindow(QMainWindow):
 
         if not self.selected_folders:
             # Clear gallery when there are no folders selected.
+            self.grid_preview.set_folder_label("")
             self.grid_preview.set_folder("")
-            self.grid_info_label.setText("Selecciona carpeta para previsualizar")
             return
 
         if preferred_index is None:
@@ -1195,7 +1270,10 @@ class MainWindow(QMainWindow):
         self.grid_preview.set_folder(str(folder))
         settings = self._get_shadow_settings()
         self.grid_preview.set_settings(settings, self.scale_curve)
-        self.grid_info_label.setText(f"📂 {folder.name}")
+        label = folder.name
+        if hasattr(self, "_grid_folder_labels"):
+            label = self._grid_folder_labels.get(str(folder), label)
+        self.grid_preview.set_folder_label(label)
         self._update_grid_folder_path(folder)
     
     def _on_grid_folder_empty(self):
@@ -1577,10 +1655,7 @@ class MainWindow(QMainWindow):
         dialog = QDialog(self)
         dialog.setWindowTitle("Atajos de teclado")
         dialog.setFixedSize(self._px(380), self._px(500))
-        dialog.setStyleSheet(scale_stylesheet("""
-            QDialog { background-color: #1E1E1E; }
-            QLabel { color: #E8E8E8; font-size: 12px; }
-        """, self.ui_scale))
+        dialog.setProperty("class", "dialog")
         
         layout = QVBoxLayout(dialog)
         layout.setSpacing(self._px(12))
@@ -1592,34 +1667,32 @@ class MainWindow(QMainWindow):
         title_row = QHBoxLayout()
         title_icon = QLabel()
         title_icon.setPixmap(
-            qta.icon('fa5s.keyboard', color='#0078D4').pixmap(self._px(24), self._px(24))
+            qta.icon('fa5s.keyboard', color=COLORS['accent_primary']).pixmap(self._px(24), self._px(24))
         )
         title_row.addWidget(title_icon)
         title = QLabel("Atajos de teclado")
-        title.setStyleSheet(
-            scale_stylesheet("font-size: 16px; font-weight: bold; color: #0078D4;", self.ui_scale)
-        )
+        title.setProperty("class", "dialog-title")
         title_row.addWidget(title)
         title_row.addStretch()
         layout.addLayout(title_row)
         
         # Shortcut groups with icons
         groups = [
-            (qta.icon('fa5s.save', color='#61AFEF'), "Presets", [
+            (qta.icon('fa5s.save', color=COLORS['accent_primary']), "Presets", [
                 ("Ctrl+S", "Guardar preset"),
                 ("Ctrl+R", "Restaurar valores"),
             ]),
-            (qta.icon('fa5s.eye', color='#61AFEF'), "Vista previa", [
+            (qta.icon('fa5s.eye', color=COLORS['accent_primary']), "Vista previa", [
                 ("1  2  3", "Cambiar mockup"),
                 ("Espacio", "Ver original"),
                 ("Scroll", "Zoom"),
             ]),
-            (qta.icon('fa5s.cogs', color='#61AFEF'), "Exportación", [
+            (qta.icon('fa5s.cogs', color=COLORS['accent_primary']), "Exportación", [
                 ("Ctrl+Enter", "Procesar imágenes"),
                 ("Ctrl+Shift+P", "Pausar/Reanudar"),
                 ("Esc", "Detener procesamiento"),
             ]),
-            (qta.icon('fa5s.cog', color='#61AFEF'), "General", [
+            (qta.icon('fa5s.cog', color=COLORS['accent_primary']), "General", [
                 ("Ctrl+,", "Configuración"),
                 ("Ctrl+Q", "Salir"),
                 ("F1", "Ayuda"),
@@ -1633,9 +1706,7 @@ class MainWindow(QMainWindow):
             icon_lbl.setPixmap(icon.pixmap(self._px(14), self._px(14)))
             header_row.addWidget(icon_lbl)
             header = QLabel(group_title)
-            header.setStyleSheet(
-                scale_stylesheet("font-weight: 600; color: #888; font-size: 11px;", self.ui_scale)
-            )
+            header.setProperty("class", "dialog-section")
             header_row.addWidget(header)
             header_row.addStretch()
             layout.addLayout(header_row)
@@ -1648,28 +1719,17 @@ class MainWindow(QMainWindow):
                 key_lbl = QLabel(key)
                 key_lbl.setFixedWidth(self._px(70))
                 key_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                key_lbl.setStyleSheet(scale_stylesheet("""
-                    background: #2A2A2A; 
-                    padding: 4px 8px; 
-                    border-radius: 4px;
-                    border: 1px solid #3A3A3A;
-                    font-family: 'Segoe UI', sans-serif;
-                    font-size: 11px;
-                    font-weight: bold;
-                    color: #61AFEF;
-                """, self.ui_scale))
+                key_lbl.setProperty("class", "keycap")
                 
                 desc_lbl = QLabel(desc)
-                desc_lbl.setStyleSheet(
-                    scale_stylesheet("color: #AAA; font-size: 12px;", self.ui_scale)
-                )
+                desc_lbl.setProperty("class", "dialog-text")
                 
                 row.addWidget(key_lbl)
                 row.addWidget(desc_lbl, 1)
                 layout.addLayout(row)
 
         note = QLabel("Tip: doble clic sobre un slider o su valor para volver al valor por defecto.")
-        note.setStyleSheet(scale_stylesheet("color: #7EA9D6; font-size: 11px;", self.ui_scale))
+        note.setProperty("class", "note")
         note.setWordWrap(True)
         layout.addWidget(note)
         
@@ -1678,18 +1738,7 @@ class MainWindow(QMainWindow):
         # Close button
         btn_close = QPushButton("Cerrar")
         btn_close.setFixedWidth(self._px(100))
-        btn_close.setStyleSheet(scale_stylesheet("""
-            QPushButton {
-                background: #0078D4;
-                color: white;
-                border: none;
-                padding: 8px 20px;
-                border-radius: 4px;
-                font-weight: 600;
-                font-size: 12px;
-            }
-            QPushButton:hover { background: #1084D8; }
-        """, self.ui_scale))
+        btn_close.setProperty("class", "primary")
         btn_close.clicked.connect(dialog.accept)
         layout.addWidget(btn_close, alignment=Qt.AlignmentFlag.AlignCenter)
         
@@ -1909,36 +1958,20 @@ class MainWindow(QMainWindow):
         dialog = QDialog(self)
         dialog.setWindowTitle("Detalles de exportación")
         dialog.setMinimumWidth(self._px(360))
-        dialog.setStyleSheet(scale_stylesheet("""
-            QDialog { background-color: #1E1E1E; }
-        """, self.ui_scale))
+        dialog.setProperty("class", "dialog")
 
         layout = QVBoxLayout(dialog)
         layout.setContentsMargins(self._px(16), self._px(12), self._px(16), self._px(12))
         layout.setSpacing(self._px(10))
 
         summary = QLabel(self.lbl_folder_summary.text())
-        summary.setProperty("class", "subheading")
+        summary.setProperty("class", "dialog-text")
         layout.addWidget(summary)
 
         list_widget = QListWidget()
+        list_widget.setProperty("class", "list")
         list_widget.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         list_widget.setMaximumHeight(self._px(200))
-        list_widget.setStyleSheet(scale_stylesheet("""
-            QListWidget {
-                background-color: #1A1A1A;
-                border: 1px solid #3A3A3A;
-                border-radius: 4px;
-                font-size: 11px;
-            }
-            QListWidget::item {
-                border-bottom: 1px solid #2A2A2A;
-                margin: 0;
-            }
-            QListWidget::item:selected {
-                background-color: #222;
-            }
-        """, self.ui_scale))
         layout.addWidget(list_widget)
         display_names = self._build_folder_display_names(self.selected_folders)
 
@@ -1952,10 +1985,10 @@ class MainWindow(QMainWindow):
             lbl = QLabel(f"📁 {display_names.get(str(folder), folder.name)}")
             lbl.setToolTip(str(folder))
             count_lbl = QLabel(f"{img_count} imágenes")
-            count_lbl.setStyleSheet(scale_stylesheet("color: #888; font-size: 10px;", self.ui_scale))
+            count_lbl.setProperty("class", "muted")
             count_lbl.setToolTip(str(folder))
 
-            btn_remove = QPushButton(qta.icon('fa5s.trash-alt', color='#E57373'), "")
+            btn_remove = QPushButton(qta.icon('fa5s.trash-alt', color=COLORS['error']), "")
             btn_remove.setProperty("class", "icon-btn")
             btn_remove.setToolTip("Quitar carpeta de la lista")
             btn_remove.clicked.connect(lambda _, f=folder: on_remove_folder(f))
@@ -1996,15 +2029,17 @@ class MainWindow(QMainWindow):
         dest_layout.addLayout(custom_row)
 
         lbl_custom = QLabel(self.lbl_custom_dest.text())
-        lbl_custom.setStyleSheet(scale_stylesheet(
-            "color: #888; font-size: 10px; margin-left: 20px;", self.ui_scale
-        ))
+        lbl_custom.setProperty("class", "muted")
+        lbl_custom.setContentsMargins(self._px(20), 0, 0, 0)
         lbl_custom.setVisible(bool(self.lbl_custom_dest.text()))
         dest_layout.addWidget(lbl_custom)
 
         layout.addWidget(dest_box)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        btn_close = buttons.button(QDialogButtonBox.StandardButton.Close)
+        if btn_close:
+            btn_close.setProperty("class", "ghost")
         layout.addWidget(buttons)
 
         def on_remove_folder(folder):
@@ -2051,7 +2086,7 @@ class MainWindow(QMainWindow):
         # Reset pause button state
         self.btn_pause.setText(" PAUSAR")
         self.btn_pause.setIcon(qta.icon('fa5s.pause', color='white'))
-        self.btn_pause.setStyleSheet("background-color: #F57C00; color: white; font-weight: 600;")
+        self._set_widget_class(self.btn_pause, "warning-solid")
         
         # Only show pause button for queue (multiple folders)
         if len(self.selected_folders) > 1:
@@ -2172,13 +2207,13 @@ class MainWindow(QMainWindow):
             self.queue_worker.resume()
             self.btn_pause.setText(" PAUSAR")
             self.btn_pause.setIcon(qta.icon('fa5s.pause', color='white'))
-            self.btn_pause.setStyleSheet("background-color: #F57C00; color: white; font-weight: 600;")
+            self._set_widget_class(self.btn_pause, "warning-solid")
             self.lbl_progress_status.setText("Procesando...")
         else:
             self.queue_worker.pause()
             self.btn_pause.setText(" REANUDAR")
             self.btn_pause.setIcon(qta.icon('fa5s.play', color='white'))
-            self.btn_pause.setStyleSheet("background-color: #43A047; color: white; font-weight: 600;")
+            self._set_widget_class(self.btn_pause, "success-solid")
             self.lbl_progress_status.setText("⏸️ Pausado (terminando imagen actual...)")
 
     def _stop_export(self):
@@ -2380,29 +2415,20 @@ class MainWindow(QMainWindow):
         dialog = QDialog(self)
         dialog.setWindowTitle("Registro de actividad")
         dialog.setMinimumSize(self._px(700), self._px(500))
-        dialog.setStyleSheet("QDialog { background-color: #1E1E1E; }")
+        dialog.setProperty("class", "dialog")
         
         layout = QVBoxLayout(dialog)
         
         # Header
         header = QLabel(f"📋 Log: {log_path.name}")
-        header.setStyleSheet("font-weight: bold; font-size: 14px; color: #0078D4; padding: 8px;")
+        header.setProperty("class", "dialog-title")
         layout.addWidget(header)
         
         # Log content
         from PyQt6.QtWidgets import QTextEdit
         log_text = QTextEdit()
+        log_text.setProperty("class", "log-view")
         log_text.setReadOnly(True)
-        log_text.setStyleSheet("""
-            QTextEdit {
-                background-color: #21252B;
-                color: #ABB2BF;
-                font-family: 'Consolas', monospace;
-                font-size: 11px;
-                border: 1px solid #3A3A3A;
-                border-radius: 4px;
-            }
-        """)
         
         if entries:
             log_text.setPlainText("".join(entries))
@@ -2417,12 +2443,14 @@ class MainWindow(QMainWindow):
         btn_layout = QHBoxLayout()
         
         btn_open_folder = QPushButton("Abrir carpeta de logs")
+        btn_open_folder.setProperty("class", "primary")
         btn_open_folder.clicked.connect(lambda: self._open_folder_in_explorer(log_path.parent))
         btn_layout.addWidget(btn_open_folder)
         
         btn_layout.addStretch()
         
         btn_close = QPushButton("Cerrar")
+        btn_close.setProperty("class", "ghost")
         btn_close.clicked.connect(dialog.accept)
         btn_layout.addWidget(btn_close)
         
@@ -2453,47 +2481,35 @@ class MainWindow(QMainWindow):
         dialog = QDialog(self)
         dialog.setWindowTitle(title)
         dialog.setMinimumSize(self._px(640), self._px(420))
-        dialog.setStyleSheet("QDialog { background-color: #1E1E1E; }")
+        dialog.setProperty("class", "dialog")
 
         layout = QVBoxLayout(dialog)
         layout.setContentsMargins(self._px(16), self._px(14), self._px(16), self._px(14))
         layout.setSpacing(self._px(10))
 
         icon_name = 'fa5s.check-circle' if success else 'fa5s.exclamation-triangle'
-        icon_color = '#4CAF50' if success else '#F44336'
+        icon_color = COLORS['success'] if success else COLORS['error']
         header_row = QHBoxLayout()
         icon_label = QLabel()
         icon_label.setPixmap(qta.icon(icon_name, color=icon_color).pixmap(self._px(22), self._px(22)))
         header_row.addWidget(icon_label)
 
         header_title = QLabel(title)
-        header_title.setStyleSheet(scale_stylesheet("font-size: 16px; font-weight: 700; color: #E8E8E8;", self.ui_scale))
+        header_title.setProperty("class", "dialog-title")
         header_row.addWidget(header_title, 1)
         layout.addLayout(header_row)
 
         for line in summary_lines:
             summary_label = QLabel(line)
-            summary_label.setStyleSheet(scale_stylesheet("color: #AAB2BF; font-size: 12px;", self.ui_scale))
+            summary_label.setProperty("class", "dialog-text")
             layout.addWidget(summary_label)
 
-        layout.addWidget(QLabel("Destino(s) de exportación:"))
+        dest_title = QLabel("Destino(s) de exportación:")
+        dest_title.setProperty("class", "dialog-section")
+        layout.addWidget(dest_title)
         dest_list = QListWidget()
         dest_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
-        dest_list.setStyleSheet(scale_stylesheet("""
-            QListWidget {
-                background-color: #181A1F;
-                border: 1px solid #3A3A3A;
-                border-radius: 6px;
-                font-size: 11px;
-            }
-            QListWidget::item {
-                padding: 6px;
-                border-bottom: 1px solid #2A2A2A;
-            }
-            QListWidget::item:selected {
-                background-color: #2A3A4A;
-            }
-        """, self.ui_scale))
+        dest_list.setProperty("class", "list")
 
         valid_destinations = []
         for dest in destinations:
@@ -2513,16 +2529,18 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(dest_list, 1)
         hint_lbl = QLabel("Selecciona una ruta y pulsa 'Abrir carpeta'")
-        hint_lbl.setStyleSheet(scale_stylesheet("color: #777; font-size: 10px;", self.ui_scale))
+        hint_lbl.setProperty("class", "muted")
         layout.addWidget(hint_lbl)
 
         btn_row = QHBoxLayout()
         btn_open_selected = QPushButton("Abrir carpeta")
         btn_open_selected.setEnabled(bool(valid_destinations))
+        btn_open_selected.setProperty("class", "primary")
         btn_row.addWidget(btn_open_selected)
 
         btn_row.addStretch()
         btn_close = QPushButton("Cerrar")
+        btn_close.setProperty("class", "ghost")
         btn_row.addWidget(btn_close)
         layout.addLayout(btn_row)
 

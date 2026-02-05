@@ -105,25 +105,16 @@ class PreviewTile(QFrame):
         self._show_original = False
         self._is_loaded = False  # Track if image has been processed
         
-        self.setStyleSheet("""
-            PreviewTile {
-                background-color: #2A2A2A;
-                border: 1px solid #3A3A3A;
-                border-radius: 4px;
-            }
-            PreviewTile:hover {
-                border-color: #0078D4;
-            }
-        """)
+        self.setProperty("class", "preview-tile")
         self._tile_width = 150
         self._image_height = 200
-        self._label_height = 24
+        self._label_height = 30
         self._apply_size()
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(2)
+        layout.setContentsMargins(6, 6, 6, 8)
+        layout.setSpacing(6)
         
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -131,13 +122,16 @@ class PreviewTile(QFrame):
         layout.addWidget(self.image_label)
         
         self.name_label = QLabel()
-        self.name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.name_label.setStyleSheet("color: #9AA0A8; font-size: 10px;")
+        self.name_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.name_label.setProperty("class", "preview-label")
         self.name_label.setWordWrap(True)
+        self.name_label.setContentsMargins(2, 0, 2, 0)
+        self.name_label.setMinimumHeight(22)
         layout.addWidget(self.name_label)
 
     def _apply_size(self):
-        total_height = self._image_height + self._label_height + 8
+        # Account for layout margins + spacing (top/bottom + inter-item spacing).
+        total_height = self._image_height + self._label_height + 16
         self.setFixedSize(self._tile_width, total_height)
         if hasattr(self, "image_label"):
             self.image_label.setMinimumHeight(self._image_height)
@@ -146,8 +140,10 @@ class PreviewTile(QFrame):
         self._tile_width = max(int(width), 80)
         self._image_height = max(int(image_height), 80)
         # Keep label height proportional but readable
-        self._label_height = max(int(self._image_height * 0.14), 20)
+        self._label_height = max(int(self._image_height * 0.22), 30)
         self._apply_size()
+        if self.file_path:
+            self._set_label_text(self.file_path)
         self._update_display()
     
     def set_image(self, file_path: str, processed: QPixmap, original: QPixmap = None):
@@ -156,7 +152,7 @@ class PreviewTile(QFrame):
         self._processed_image = processed
         self._original_image = original or processed
         self._is_loaded = True
-        self.name_label.setText(Path(file_path).stem[:22])
+        self._set_label_text(file_path)
         self.setToolTip(file_path)
         self._update_display()
     
@@ -179,10 +175,17 @@ class PreviewTile(QFrame):
     def set_pending(self, file_path: str):
         """Set pending state with filename but no image yet."""
         self.file_path = file_path
-        self.name_label.setText(Path(file_path).stem[:22])
+        self._set_label_text(file_path)
         self.image_label.setText("⏳")
         self._is_loaded = False
         self.setToolTip(file_path)
+
+    def _set_label_text(self, file_path: str):
+        text = Path(file_path).stem
+        metrics = self.name_label.fontMetrics()
+        max_width = max(self._tile_width - 12, 60)
+        elided = metrics.elidedText(text, Qt.TextElideMode.ElideRight, max_width)
+        self.name_label.setText(elided)
     
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton and self.file_path:
@@ -224,10 +227,13 @@ class GridPreviewWidget(QWidget):
         self._pool.setMaxThreadCount(2)
         self._thumb_width = 150
         self._thumb_height = 200
-        self._tile_spacing = 6
+        self._tile_spacing = 10
         self._fixed_columns = 1
         self._columns = 1
-        self._grid_margins = (6, 6, 6, 6)
+        self._grid_margins = (10, 10, 14, 12)
+        self._folder_label = ""
+        self._status_text = ""
+        self._status_include_folder = True
         
         # Chunked loading
         self._current_chunk = 0
@@ -257,7 +263,7 @@ class GridPreviewWidget(QWidget):
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.scroll.setStyleSheet("QScrollArea { border: none; background-color: #1E1E1E; }")
+        self.scroll.setProperty("class", "preview-scroll")
         self.scroll.viewport().installEventFilter(self)
         
         self.grid_container = QWidget()
@@ -272,8 +278,26 @@ class GridPreviewWidget(QWidget):
         # Info label
         self.info_label = QLabel("Selecciona una carpeta para ver previews")
         self.info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.info_label.setStyleSheet("color: #777; padding: 8px; font-size: 11px;")
+        self.info_label.setProperty("class", "help-text")
+        self.info_label.setMinimumHeight(28)
         layout.addWidget(self.info_label)
+
+    def set_folder_label(self, label: str):
+        """Set a human-readable folder label for the status bar."""
+        self._folder_label = label or ""
+        if self._status_text:
+            self._set_status(self._status_text, include_folder=self._status_include_folder)
+        elif self._folder_label:
+            self._set_status("", include_folder=True)
+
+    def _set_status(self, status: str, include_folder: bool = True):
+        self._status_text = status
+        self._status_include_folder = include_folder
+        if include_folder and self._folder_label:
+            text = f"{self._folder_label} · {status}" if status else self._folder_label
+        else:
+            text = status
+        self.info_label.setText(text)
     
     def _clear_tiles(self):
         """Remove all tiles from the grid."""
@@ -322,7 +346,7 @@ class GridPreviewWidget(QWidget):
         if not self.folder_path:
             self._images = []
             self._clear_tiles()
-            self.info_label.setText("Selecciona una carpeta para ver previews")
+            self._set_status("Selecciona una carpeta para ver previews", include_folder=False)
             self.folder_empty.emit()
             return
         
@@ -331,10 +355,10 @@ class GridPreviewWidget(QWidget):
         
         if not self._images:
             self._clear_tiles()
-            self.info_label.setText("No se encontraron imágenes PNG")
+            self._set_status("No se encontraron imágenes PNG")
             self.folder_empty.emit()  # Notify parent to show placeholder
         else:
-            self.info_label.setText(f"Cargando {len(self._images)} imágenes...")
+            self._set_status(f"Cargando {len(self._images)} imágenes...")
             # Create tiles for all images
             self._create_tiles_for_images()
             self._schedule_update()
@@ -348,7 +372,7 @@ class GridPreviewWidget(QWidget):
         """Start the chunked update process."""
         if not self.settings or not self._images:
             if not self._images:
-                self.info_label.setText("No se encontraron imágenes PNG")
+                self._set_status("No se encontraron imágenes PNG")
             return
         self._render_generation += 1
         self._completed_tiles = 0
@@ -372,7 +396,7 @@ class GridPreviewWidget(QWidget):
         
         if start >= len(self._images):
             if self._completed_tiles >= len(self._images):
-                self.info_label.setText(f"Mostrando {len(self._images)} imágenes")
+                self._set_status(f"Mostrando {len(self._images)} imágenes")
             return
         
         preview_size = (self._thumb_width, self._thumb_height)
@@ -407,10 +431,10 @@ class GridPreviewWidget(QWidget):
         # Schedule next chunk or show final message
         self._current_chunk += 1
         if end < len(self._images):
-            self.info_label.setText(f"Procesando... {processed}/{len(self._images)}")
+            self._set_status(f"Procesando... {processed}/{len(self._images)}")
             self._chunk_timer.start(20)
         elif self._completed_tiles >= len(self._images):
-            self.info_label.setText(f"Mostrando {len(self._images)} imágenes")
+            self._set_status(f"Mostrando {len(self._images)} imágenes")
 
     def _on_tile_rendered(self, worker: TileRenderWorker, tile_index: int, generation: int, payload):
         self._active_workers.discard(worker)
@@ -426,9 +450,9 @@ class GridPreviewWidget(QWidget):
 
         self._completed_tiles += 1
         if self._completed_tiles >= len(self._images):
-            self.info_label.setText(f"Mostrando {len(self._images)} imágenes")
+            self._set_status(f"Mostrando {len(self._images)} imágenes")
         else:
-            self.info_label.setText(f"Generando... {self._completed_tiles}/{len(self._images)}")
+            self._set_status(f"Generando... {self._completed_tiles}/{len(self._images)}")
 
     def _on_tile_error(self, worker: TileRenderWorker, tile_index: int, generation: int, message: str):
         self._active_workers.discard(worker)
@@ -439,7 +463,7 @@ class GridPreviewWidget(QWidget):
 
         self._completed_tiles += 1
         if self._completed_tiles >= len(self._images):
-            self.info_label.setText(f"Mostrando {len(self._images)} imágenes")
+            self._set_status(f"Mostrando {len(self._images)} imágenes")
 
     def _payload_to_qpixmap(self, payload) -> QPixmap:
         width, height, data = payload
@@ -479,7 +503,7 @@ class GridPreviewWidget(QWidget):
             return self._thumb_width, self._thumb_height
         viewport_width = self.scroll.viewport().width()
         left, top, right, bottom = self._grid_margins
-        usable = max(viewport_width - left - right - self._tile_spacing * (columns - 1), 120)
+        usable = max(viewport_width - left - right - self._tile_spacing * (columns - 1), 130)
         tile_width = max(int(usable / max(columns, 1)), 90)
         tile_height = int(round(tile_width * 4 / 3))
         return tile_width, tile_height

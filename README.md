@@ -23,7 +23,13 @@ Procesador de imágenes de producto con generación de sombras realistas y flujo
 4) Alternativa: usa los scripts `scripts/install.bat` o `scripts/install.sh`.
 
 ## Ejecución (GUI)
-- Lanza la aplicación: `python -m flatshot` (o `flatshot` si está en el PATH tras la instalación).
+- Lanza la aplicación:
+  - Recomendado (sin depender de instalación editable): `python main.py`
+  - Alternativa: `python -m flatshot` (o `flatshot` si está en el PATH tras la instalación con `pip install -e .`).
+  - Scripts rápidos: `scripts/run.bat` (Windows) / `scripts/run.sh` (macOS/Linux).
+- Si aparece `No module named flatshot`, estás usando un entorno virtual distinto al del proyecto.
+  - Windows: `.\venv\Scripts\python.exe main.py`
+  - macOS/Linux: `./venv/bin/python main.py`
 - Flujo típico:
   1) Añade una o varias carpetas con PNG recortados (fondo transparente).  
   2) Elige un preset y ajusta los deslizadores: ángulo, distancia, blur, spread, fusión, opacidad, ruido, padding y blur de contacto.  

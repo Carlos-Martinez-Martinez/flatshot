@@ -5,14 +5,15 @@ import math
 import numpy as np
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QSlider, QSpinBox,
-    QFrame, QPushButton, QSizePolicy, QGraphicsDropShadowEffect
+    QFrame, QPushButton, QSizePolicy, QGraphicsDropShadowEffect, QToolButton
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QRectF, QTimer
+from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QRectF, QTimer, QEvent, QSize
 from PyQt6.QtGui import (
     QPainter, QColor, QPen, QBrush, QRadialGradient, 
     QLinearGradient, QFont, QPainterPath, QPixmap, QImage
 )
 from PIL import Image
+import qtawesome as qta
 
 
 class SmartSlider(QWidget):
@@ -23,12 +24,15 @@ class SmartSlider(QWidget):
     - Synchronized spinbox
     """
     valueChanged = pyqtSignal(int)
+    defaultReset = pyqtSignal(int)
     
     def __init__(self, label: str, min_val: int = 0, max_val: int = 100, 
                  default: int = 50, suffix: str = "", tooltip: str = "",
                  scale: float = 1.0, parent=None):
         super().__init__(parent)
         self.suffix = suffix
+        self._default = default
+        self._label_text = label
         self._scale = max(scale, 0.1)
         self._setup_ui(label, min_val, max_val, default, tooltip)
         
@@ -44,9 +48,11 @@ class SmartSlider(QWidget):
         self.label = QLabel(label)
         self.label.setProperty("class", "param-label")
         self.label.setFixedWidth(self._px(70))  # Compact label
-        if tooltip:
-            self.label.setToolTip(tooltip)
-            self.setToolTip(tooltip)
+        base_tooltip = tooltip.strip() if tooltip else ""
+        reset_hint = "<br><br><span style='color:#7EA9D6'>Tip: doble clic para restaurar el valor por defecto.</span>"
+        final_tooltip = f"{base_tooltip}{reset_hint}" if base_tooltip else "Doble clic para restaurar el valor por defecto."
+        self.label.setToolTip(final_tooltip)
+        self.setToolTip(final_tooltip)
         layout.addWidget(self.label)
         
         # Slider
@@ -54,7 +60,12 @@ class SmartSlider(QWidget):
         self.slider.setRange(min_val, max_val)
         self.slider.setValue(default)
         self.slider.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.slider.setSingleStep(1)
+        self.slider.setPageStep(max(1, (max_val - min_val) // 10))
         self.slider.setMinimumWidth(self._px(60))
+        # Avoid intrusive focus frames on sliders; keyboard editing is done via spinbox.
+        self.slider.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.slider.installEventFilter(self)
         layout.addWidget(self.slider, 1)  # Takes remaining space
         
         # SpinBox
@@ -64,11 +75,16 @@ class SmartSlider(QWidget):
         self.spinbox.setSuffix(self.suffix)
         self.spinbox.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
         self.spinbox.setMinimumWidth(self._px(55))
+        self.spinbox.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.spinbox.installEventFilter(self)
         layout.addWidget(self.spinbox, 0)  # stretch factor 0 to not expand
         
         # Bidirectional sync
         self.slider.valueChanged.connect(self._on_slider_changed)
         self.spinbox.valueChanged.connect(self._on_spinbox_changed)
+        self.setAccessibleName(f"Control {self._label_text}")
+        self.slider.setAccessibleName(f"{self._label_text} slider")
+        self.spinbox.setAccessibleName(f"{self._label_text} valor")
         
     def _on_slider_changed(self, value: int):
         self.spinbox.blockSignals(True)
@@ -87,6 +103,109 @@ class SmartSlider(QWidget):
     
     def setValue(self, value: int):
         self.slider.setValue(value)
+
+    def reset_to_default(self):
+        """Reset control to its initial default value."""
+        if hasattr(self, "slider"):
+            self.setValue(self._default)
+            self.defaultReset.emit(self._default)
+
+    def eventFilter(self, watched, event):
+        slider = getattr(self, "slider", None)
+        spinbox = getattr(self, "spinbox", None)
+        targets = tuple(w for w in (slider, spinbox) if w is not None)
+        if targets and watched in targets and event.type() == QEvent.Type.MouseButtonDblClick:
+            self.reset_to_default()
+            return True
+        return super().eventFilter(watched, event)
+
+
+class CollapsibleSection(QFrame):
+    """Lightroom-like collapsible section with arrow header and compact collapsed height."""
+
+    toggled = pyqtSignal(bool)
+
+    def __init__(self, title: str, expanded: bool = True, parent=None):
+        super().__init__(parent)
+        self._scale = getattr(parent, "ui_scale", 1.0)
+        self._title = title
+        self._expanded = bool(expanded)
+        self.setProperty("class", "section")
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        header = QFrame()
+        header.setProperty("class", "section-header")
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(4, 2, 4, 2)
+        header_layout.setSpacing(6)
+
+        self._toggle_btn = QToolButton()
+        self._toggle_btn.setProperty("class", "section-toggle")
+        self._toggle_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self._toggle_btn.setCheckable(False)
+        icon_color = "#AEB4BE"
+        self._icon_expanded = qta.icon('fa5s.chevron-down', color=icon_color)
+        self._icon_collapsed = qta.icon('fa5s.chevron-right', color=icon_color)
+        self._toggle_btn.setIcon(self._icon_expanded if self._expanded else self._icon_collapsed)
+        self._toggle_btn.setIconSize(QSize(self._px(10), self._px(10)))
+        self._toggle_btn.setText(self._title)
+        self._toggle_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self._toggle_btn.setStyleSheet("text-align: left; padding-left: 2px;")
+        self._toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._toggle_btn.setMinimumHeight(self._px(22))
+        self._toggle_btn.clicked.connect(self._on_toggled)
+        header_layout.addWidget(self._toggle_btn, 1)
+        outer.addWidget(header)
+
+        self._content = QWidget()
+        self._content.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self._content_layout = QVBoxLayout(self._content)
+        self._content_layout.setContentsMargins(8, 4, 8, 6)
+        self._content_layout.setSpacing(6)
+        outer.addWidget(self._content)
+
+        self.setExpanded(self._expanded, emit_signal=False)
+
+    def _px(self, value: int) -> int:
+        return max(int(round(value * self._scale)), 1)
+
+    @property
+    def content_layout(self) -> QVBoxLayout:
+        return self._content_layout
+
+    def setExpanded(self, expanded: bool, emit_signal: bool = True):
+        self._expanded = bool(expanded)
+        if self._expanded:
+            self._content.setVisible(True)
+            self._content.setMaximumHeight(16777215)
+        else:
+            self._content.setVisible(False)
+            self._content.setMaximumHeight(0)
+        self._toggle_btn.setIcon(self._icon_expanded if self._expanded else self._icon_collapsed)
+        if emit_signal:
+            self.toggled.emit(self._expanded)
+        self.updateGeometry()
+
+    def _on_toggled(self):
+        self.setExpanded(not self._expanded)
+
+    def sizeHint(self) -> QSize:
+        base = super().sizeHint()
+        if self._expanded:
+            return base
+        header_h = self._toggle_btn.sizeHint().height() + 12
+        return QSize(base.width(), header_h)
+
+    def minimumSizeHint(self) -> QSize:
+        base = super().minimumSizeHint()
+        if self._expanded:
+            return base
+        header_h = self._toggle_btn.sizeHint().height() + 12
+        return QSize(base.width(), header_h)
 
 
 class LightAngleWidget(QWidget):
@@ -184,7 +303,10 @@ class LightAngleWidget(QWidget):
         # Angle text
         font = QFont("Segoe UI", 9)
         font.setBold(True)
-        font.setPointSizeF(font.pointSizeF() * self._scale)
+        base_size = font.pointSizeF()
+        if base_size <= 0:
+            base_size = 9.0
+        font.setPointSizeF(max(base_size * self._scale, 1.0))
         painter.setFont(font)
         painter.setPen(QColor("#A0A0A0"))
         text = f"{self._angle}°"

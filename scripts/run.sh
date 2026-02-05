@@ -1,4 +1,12 @@
 #!/bin/bash
 cd "$(dirname "$0")/.."
-source .venv/bin/activate
-python -m flatshot
+
+if [ -x ".venv/bin/python" ]; then
+  exec .venv/bin/python main.py
+fi
+
+if [ -x "venv/bin/python" ]; then
+  exec venv/bin/python main.py
+fi
+
+exec python3 main.py

@@ -1,3 +1,13 @@
 @echo off
 cd /d "%~dp0\.."
-.\.venv\Scripts\python.exe -m flatshot
+if exist ".\.venv\Scripts\python.exe" (
+    .\.venv\Scripts\python.exe main.py
+    exit /b %errorlevel%
+)
+
+if exist ".\venv\Scripts\python.exe" (
+    .\venv\Scripts\python.exe main.py
+    exit /b %errorlevel%
+)
+
+python main.py

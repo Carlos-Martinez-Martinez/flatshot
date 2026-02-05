@@ -30,7 +30,7 @@ from flatshot.utils.log_manager import LogManager
 from flatshot.utils.session_manager import SessionManager
 from flatshot.ui.dialogs import CurveEditorDialog, ExportConfigDialog
 from flatshot.ui.styles import scale_stylesheet
-from flatshot.ui.widgets import SmartSlider, LightAngleWidget, ComparisonCanvas, FloatingToolbar, ModernSplashScreen
+from flatshot.ui.widgets import SmartSlider, LightAngleWidget, ComparisonCanvas, FloatingToolbar, ModernSplashScreen, CollapsibleSection
 from flatshot.ui.queue_widget import QueueWidget
 from flatshot.ui.grid_preview import GridPreviewWidget
 from flatshot.workers.export_worker import ExportWorker
@@ -183,6 +183,7 @@ class MainWindow(QMainWindow):
         self._init_menu()
         self._init_ui()
         self._setup_history_tracking()
+        self._setup_accessibility_and_tab_order()
         
         # Initial state
         # Restore session if available
@@ -282,6 +283,21 @@ class MainWindow(QMainWindow):
         redo_shortcut.setShortcut("Ctrl+Y")
         redo_shortcut.triggered.connect(self._action_redo)
         self.addAction(redo_shortcut)
+
+        process_shortcut = QAction(self)
+        process_shortcut.setShortcut("Ctrl+Return")
+        process_shortcut.triggered.connect(self._start_export)
+        self.addAction(process_shortcut)
+
+        pause_shortcut = QAction(self)
+        pause_shortcut.setShortcut("Ctrl+Shift+P")
+        pause_shortcut.triggered.connect(self._toggle_pause)
+        self.addAction(pause_shortcut)
+
+        stop_shortcut = QAction(self)
+        stop_shortcut.setShortcut("Esc")
+        stop_shortcut.triggered.connect(self._stop_export)
+        self.addAction(stop_shortcut)
         
         # Edit menu
         edit_menu = menubar.addMenu("Editar")
@@ -344,11 +360,14 @@ class MainWindow(QMainWindow):
         scroll.setStyleSheet("QScrollArea { border: none; }")
         
         content = QWidget()
+        content.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         layout = QVBoxLayout(content)
         layout.setContentsMargins(
-            self._px(10), self._px(12), self._px(10), self._px(12)
+            self._px(8), self._px(8), self._px(8), self._px(2)
         )  # Minimal margins
-        layout.setSpacing(self._px(8))
+        layout.setSpacing(self._px(6))
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetMinimumSize)
         
         # Header
         header = QLabel("FlatShot")
@@ -356,40 +375,69 @@ class MainWindow(QMainWindow):
         layout.addWidget(header)
         
         # === PRESETS SECTION ===
-        presets_group = self._create_presets_section()
-        layout.addWidget(presets_group)
+        self._sections = {}
+        presets_section = self._create_section("PRESETS", "presets", default_expanded=True, parent=content)
+        if presets_section is not None:
+            layout.addWidget(presets_section)
+            self._sections["presets"] = presets_section
+            self._build_presets_section(presets_section.content_layout)
         
         # === LIGHTING SECTION ===
-        lighting_group = self._create_lighting_section()
-        layout.addWidget(lighting_group)
+        lighting_section = self._create_section("ILUMINACIÓN", "lighting", default_expanded=True, parent=content)
+        if lighting_section is not None:
+            layout.addWidget(lighting_section)
+            self._sections["lighting"] = lighting_section
+            self._build_lighting_section(lighting_section.content_layout)
         
         # === SHADOWS SECTION ===
-        shadows_group = self._create_shadows_section()
-        layout.addWidget(shadows_group)
+        shadows_section = self._create_section("SOMBRAS", "shadows", default_expanded=True, parent=content)
+        if shadows_section is not None:
+            layout.addWidget(shadows_section)
+            self._sections["shadows"] = shadows_section
+            self._build_shadows_section(shadows_section.content_layout)
         
         # === FINISHING SECTION ===
-        finishing_group = self._create_finishing_section()
-        layout.addWidget(finishing_group)
+        finishing_section = self._create_section("ACABADO", "finishing", default_expanded=False, parent=content)
+        if finishing_section is not None:
+            layout.addWidget(finishing_section)
+            self._sections["finishing"] = finishing_section
+            self._build_finishing_section(finishing_section.content_layout)
         
-        layout.addStretch()
-        
-        # === EXPORT SECTION (Fixed at bottom) ===
-        export_section = self._create_export_section()
-        layout.addWidget(export_section)
         layout.addSpacing(self._px(6))
-        
+
         scroll.setWidget(content)
         
         panel_layout = QVBoxLayout(panel)
-        panel_layout.setContentsMargins(0, 0, 0, 0)
-        panel_layout.addWidget(scroll)
+        panel_layout.setContentsMargins(self._px(0), self._px(0), self._px(0), self._px(0))
+        panel_layout.setSpacing(self._px(4))
+        panel_layout.addWidget(scroll, 1)
+
+        # === EXPORT SECTION (Fixed at bottom, always visible) ===
+        export_section = self._create_export_section()
+        self.export_section = export_section
+        if export_section is not None:
+            panel_layout.addWidget(export_section, 0)
         
         return panel
+
+    def _on_section_toggled(self, key: str, checked: bool):
+        section_state = self.app_settings.get('section_visibility', {})
+        section_state[key] = bool(checked)
+        self.app_settings['section_visibility'] = section_state
+        self._save_app_settings()
+
+    def _create_section(self, title: str, key: str, default_expanded: bool, parent: QWidget) -> CollapsibleSection:
+        """Create a collapsible section with Lightroom-like behavior."""
+        if parent is None or parent.layout() is None:
+            return None
+        section_state = self.app_settings.get('section_visibility', {})
+        expanded = bool(section_state.get(key, default_expanded))
+        section = CollapsibleSection(title, expanded=expanded, parent=parent)
+        section.toggled.connect(lambda checked, k=key: self._on_section_toggled(k, checked))
+        return section
     
-    def _create_presets_section(self) -> QGroupBox:
-        """Create the presets management section."""
-        group = QGroupBox("PRESETS")
-        layout = QVBoxLayout(group)
+    def _build_presets_section(self, layout: QVBoxLayout):
+        """Populate the presets management section."""
         layout.setSpacing(self._px(8))
         
         # Combo box
@@ -449,12 +497,10 @@ class MainWindow(QMainWindow):
         self.lbl_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.lbl_status)
         
-        return group
+        return
     
-    def _create_lighting_section(self) -> QGroupBox:
-        """Create the lighting controls section."""
-        group = QGroupBox("ILUMINACIÓN")
-        layout = QVBoxLayout(group)
+    def _build_lighting_section(self, layout: QVBoxLayout):
+        """Populate the lighting controls section."""
         layout.setSpacing(self._px(10))
         
         # Light angle widget with label
@@ -508,12 +554,10 @@ class MainWindow(QMainWindow):
         self.sl_distance.valueChanged.connect(self._schedule_preview)
         layout.addWidget(self.sl_distance)
         
-        return group
+        return
     
-    def _create_shadows_section(self) -> QGroupBox:
-        """Create the shadow controls section."""
-        group = QGroupBox("SOMBRAS")
-        layout = QVBoxLayout(group)
+    def _build_shadows_section(self, layout: QVBoxLayout):
+        """Populate the shadow controls section."""
         layout.setSpacing(self._px(6))
         
         self.sl_blur = SmartSlider(
@@ -574,12 +618,10 @@ class MainWindow(QMainWindow):
         self.sl_contraction.valueChanged.connect(self._schedule_preview)
         layout.addWidget(self.sl_contraction)
         
-        return group
+        return
     
-    def _create_finishing_section(self) -> QGroupBox:
-        """Create the finishing touches section."""
-        group = QGroupBox("ACABADO")
-        layout = QVBoxLayout(group)
+    def _build_finishing_section(self, layout: QVBoxLayout):
+        """Populate the finishing touches section."""
         layout.setSpacing(self._px(6))
         
         self.sl_opacity = SmartSlider(
@@ -633,28 +675,14 @@ class MainWindow(QMainWindow):
         self.chk_adaptive.toggled.connect(self._schedule_preview)
         layout.addWidget(self.chk_adaptive)
         
-        return group
+        return
     
-    def _create_export_section(self) -> QFrame:
+    def _create_export_section(self) -> QGroupBox:
         """Create the export controls section with multi-folder support."""
-        frame = QFrame()
-        frame.setProperty("class", "card")
-        frame.setStyleSheet(scale_stylesheet("""
-            QFrame[class="card"] {
-                border-top: 2px solid #0078D4;
-                margin-top: 8px;
-            }
-        """, self.ui_scale))
-        layout = QVBoxLayout(frame)
+        group = QGroupBox("EXPORTAR")
+        group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        layout = QVBoxLayout(group)
         layout.setSpacing(self._px(6))
-        
-        # Section title
-        title = QLabel("EXPORTAR")
-        title.setStyleSheet(scale_stylesheet(
-            "font-size: 11px; font-weight: 600; color: #A0A0A0; letter-spacing: 1px;",
-            self.ui_scale,
-        ))
-        layout.addWidget(title)
         
         # Folder selection buttons
         folder_btn_layout = QHBoxLayout()
@@ -774,7 +802,7 @@ class MainWindow(QMainWindow):
         self.btn_process = QPushButton(qta.icon('fa5s.play', color='white'), " PROCESAR IMÁGENES")
         self.btn_process.setProperty("class", "primary")
         self.btn_process.setEnabled(False)
-        self.btn_process.setToolTip("Iniciar el procesamiento de todas las imágenes")
+        self.btn_process.setToolTip("Iniciar el procesamiento de todas las imágenes (Ctrl+Enter)")
         self.btn_process.clicked.connect(self._start_export)
         layout.addWidget(self.btn_process)
         
@@ -784,13 +812,13 @@ class MainWindow(QMainWindow):
         
         self.btn_pause = QPushButton(qta.icon('fa5s.pause', color='white'), " PAUSAR")
         self.btn_pause.setStyleSheet("background-color: #F57C00; color: white; font-weight: 600;")
-        self.btn_pause.setToolTip("Pausar el procesamiento")
+        self.btn_pause.setToolTip("Pausar/Reanudar el procesamiento (Ctrl+Shift+P)")
         self.btn_pause.clicked.connect(self._toggle_pause)
         self.process_controls_layout.addWidget(self.btn_pause)
         
         self.btn_stop = QPushButton(qta.icon('fa5s.stop', color='white'), " DETENER")
         self.btn_stop.setStyleSheet("background-color: #C62828; color: white; font-weight: 600;")
-        self.btn_stop.setToolTip("Detener el procesamiento en curso")
+        self.btn_stop.setToolTip("Detener el procesamiento en curso (Esc)")
         self.btn_stop.clicked.connect(self._stop_export)
         self.process_controls_layout.addWidget(self.btn_stop)
         
@@ -818,7 +846,7 @@ class MainWindow(QMainWindow):
         self.custom_output_path = None
         self.export_details_visible = False  # kept for compatibility; details shown in dialog
         
-        return frame
+        return group
     
     def _create_preview_panel(self) -> QWidget:
         """Create the right preview panel."""
@@ -942,6 +970,17 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.grid_info_label)
         
         return panel
+
+    def _setup_accessibility_and_tab_order(self):
+        """Improve keyboard ergonomics and screen-reader metadata."""
+        # Disable programmatic tab order to avoid issues with Qt object lifetime.
+        # Keep accessibility metadata minimal and safe.
+        try:
+            self.combo_presets.setAccessibleName("Selector de presets")
+            self.light_angle.setAccessibleName("Control de ángulo de luz")
+            self.grid_folder_combo.setAccessibleName("Selector de carpeta de previews")
+        except RuntimeError:
+            pass
     
     def _on_grid_image_selected(self, path: str):
         """Load image from grid into the main canvas."""
@@ -1188,7 +1227,14 @@ class MainWindow(QMainWindow):
             'scale_curve': {
                 'xp': [0.0, 0.35, 0.60, 0.85, 1.10, 1.40, 3.0],
                 'fp': [0.80, 0.80, 0.90, 1.00, 0.95, 0.90, 0.90]
-            }
+            },
+            'section_visibility': {
+                'presets': True,
+                'lighting': True,
+                'shadows': True,
+                'finishing': False,
+                'export': True,
+            },
         }
         if self.settings_file.exists():
             try:
@@ -1487,6 +1533,11 @@ class MainWindow(QMainWindow):
                 ("Espacio", "Ver original"),
                 ("Scroll", "Zoom"),
             ]),
+            (qta.icon('fa5s.cogs', color='#61AFEF'), "Exportación", [
+                ("Ctrl+Enter", "Procesar imágenes"),
+                ("Ctrl+Shift+P", "Pausar/Reanudar"),
+                ("Esc", "Detener procesamiento"),
+            ]),
             (qta.icon('fa5s.cog', color='#61AFEF'), "General", [
                 ("Ctrl+,", "Configuración"),
                 ("Ctrl+Q", "Salir"),
@@ -1535,6 +1586,11 @@ class MainWindow(QMainWindow):
                 row.addWidget(key_lbl)
                 row.addWidget(desc_lbl, 1)
                 layout.addLayout(row)
+
+        note = QLabel("Tip: doble clic sobre un slider o su valor para volver al valor por defecto.")
+        note.setStyleSheet(scale_stylesheet("color: #7EA9D6; font-size: 11px;", self.ui_scale))
+        note.setWordWrap(True)
+        layout.addWidget(note)
         
         layout.addStretch()
         
@@ -1699,8 +1755,19 @@ class MainWindow(QMainWindow):
     def _update_folder_ui(self):
         """Update UI based on selected folders."""
         from PyQt6.QtWidgets import QListWidgetItem
+        if not hasattr(self, 'folder_list') or self.folder_list is None:
+            return
+        try:
+            import sip
+            if sip.isdeleted(self.folder_list):
+                return
+        except Exception:
+            pass
         
-        self.folder_list.clear()
+        try:
+            self.folder_list.clear()
+        except RuntimeError:
+            return
         total_images = 0
         
         for folder in self.selected_folders:
@@ -2414,6 +2481,15 @@ class MainWindow(QMainWindow):
             self.preview_pool.waitForDone(1500)
 
             # Gather session data
+            output_destination = 'subfolder'
+            try:
+                import sip
+                if hasattr(self, 'rb_dest_custom') and self.rb_dest_custom is not None:
+                    if not sip.isdeleted(self.rb_dest_custom) and self.rb_dest_custom.isChecked():
+                        output_destination = 'custom'
+            except Exception:
+                pass
+
             session_data = {
                 'geometry': self.saveGeometry().toBase64().data().decode(),
                 'state': self.saveState().toBase64().data().decode(),
@@ -2425,7 +2501,7 @@ class MainWindow(QMainWindow):
                     'output_folder_name': self.app_settings.get('output_folder_name'),
                     'suffix': self.app_settings.get('suffix'),
                     'format': self.app_settings.get('format'),
-                    'output_destination': 'custom' if hasattr(self, 'rb_dest_custom') and self.rb_dest_custom.isChecked() else 'subfolder',
+                    'output_destination': output_destination,
                     'custom_output_path': str(self.custom_output_path) if self.custom_output_path else None
                 }
             }
@@ -2437,7 +2513,7 @@ class MainWindow(QMainWindow):
             self.session_manager.save_session(session_data)
             
         except Exception as e:
-            self.log_manager.error(f"Error saving session: {e}")
+            self.log_manager.log_error(f"Error saving session: {e}")
         
         super().closeEvent(event)
 
@@ -2462,8 +2538,18 @@ class MainWindow(QMainWindow):
                 
             # Restore folders
             if 'selected_folders' in data:
-                for folder in data['selected_folders']:
-                    self._add_folder_to_list(folder)
+                can_restore = True
+                try:
+                    import sip
+                    if not hasattr(self, 'folder_list') or self.folder_list is None:
+                        can_restore = False
+                    elif sip.isdeleted(self.folder_list):
+                        can_restore = False
+                except Exception:
+                    pass
+                if can_restore:
+                    for folder in data['selected_folders']:
+                        self._add_folder_to_list(folder)
                     
             # Restore preset
             if 'current_preset' in data:
@@ -2504,6 +2590,6 @@ class MainWindow(QMainWindow):
             return True
                         
         except Exception as e:
-            self.log_manager.error(f"Error restoring session: {e}")
+            self._log_error(f"Error restoring session: {e}")
         return False
 

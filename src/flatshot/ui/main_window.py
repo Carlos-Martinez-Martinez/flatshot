@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
     QProgressBar, QGroupBox, QComboBox, QFrame, QSpinBox, QInputDialog,
     QMessageBox, QSizePolicy, QFileDialog, QApplication, QCheckBox,
     QScrollArea, QSplitter, QToolButton, QButtonGroup, QDialog, QStackedWidget,
-    QMenu, QRadioButton, QListWidget, QListWidgetItem
+    QMenu, QRadioButton, QListWidget, QListWidgetItem, QSlider
 )
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QSize
 from PyQt6.QtGui import QPixmap, QImage, QPainter, QColor, QPainterPath, QAction, QIcon, QFont
@@ -344,6 +344,11 @@ class MainWindow(QMainWindow):
         self.splitter.setStretchFactor(0, 0)  # Controls: fixed
         self.splitter.setStretchFactor(1, 1)  # Canvas: stretch
         self.splitter.setStretchFactor(2, 0)  # Grid: fixed
+        if isinstance(self.app_settings.get('splitter_sizes'), list):
+            try:
+                self.splitter.setSizes(self.app_settings.get('splitter_sizes'))
+            except Exception:
+                pass
         
         main_layout.addWidget(self.splitter)
         
@@ -941,18 +946,51 @@ class MainWindow(QMainWindow):
             self._px(8), self._px(6), self._px(8), self._px(6)
         )
         toolbar_layout.setSpacing(self._px(4))
-        
-        header_label = QLabel("📋 Previews")
-        header_label.setProperty("class", "subheading")
-        toolbar_layout.addWidget(header_label)
+
+        # Title + column control row
+        title_row = QHBoxLayout()
+        header_label = QLabel("Previews")
+        header_label.setProperty("class", "panel-title")
+        title_row.addWidget(header_label)
+        title_row.addStretch()
+
+        cols_label = QLabel("Columnas")
+        cols_label.setProperty("class", "panel-label")
+        title_row.addWidget(cols_label)
+
+        self.grid_cols_group = QButtonGroup(self)
+        self.grid_cols_group.setExclusive(True)
+        self.grid_cols_btn_1 = QPushButton("1")
+        self.grid_cols_btn_1.setCheckable(True)
+        self.grid_cols_btn_1.setProperty("class", "segment-left")
+        self.grid_cols_btn_2 = QPushButton("2")
+        self.grid_cols_btn_2.setCheckable(True)
+        self.grid_cols_btn_2.setProperty("class", "segment-middle")
+        self.grid_cols_btn_3 = QPushButton("3")
+        self.grid_cols_btn_3.setCheckable(True)
+        self.grid_cols_btn_3.setProperty("class", "segment-right")
+        for btn in (self.grid_cols_btn_1, self.grid_cols_btn_2, self.grid_cols_btn_3):
+            btn.setFixedWidth(self._px(28))
+            btn.setFixedHeight(self._px(26))
+            self.grid_cols_group.addButton(btn)
+            title_row.addWidget(btn)
+
+        toolbar_layout.addLayout(title_row)
         
         # Folder selector (hidden by default, shown when multiple folders)
         self.grid_folder_combo = QComboBox()
-        self.grid_folder_combo.setStyleSheet("font-size: 10px;")
+        self.grid_folder_combo.setStyleSheet("font-size: 11px;")
         self.grid_folder_combo.currentIndexChanged.connect(self._on_grid_folder_changed)
         self.grid_folder_combo.hide()  # Hidden until multiple folders added
         toolbar_layout.addWidget(self.grid_folder_combo)
-        
+
+        # Full path label
+        self.grid_folder_path = QLabel("Sin carpeta seleccionada")
+        self.grid_folder_path.setProperty("class", "panel-path")
+        self.grid_folder_path.setWordWrap(True)
+        self.grid_folder_path.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        toolbar_layout.addWidget(self.grid_folder_path)
+
         layout.addWidget(toolbar)
         
         # Grid preview widget
@@ -965,9 +1003,22 @@ class MainWindow(QMainWindow):
         self.grid_info_label = QLabel("Selecciona carpeta para previsualizar")
         self.grid_info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.grid_info_label.setStyleSheet(
-            scale_stylesheet("color: #666; padding: 6px; font-size: 10px;", self.ui_scale)
+            scale_stylesheet("color: #777; padding: 6px; font-size: 11px;", self.ui_scale)
         )
         layout.addWidget(self.grid_info_label)
+
+        # Apply persisted grid settings
+        columns = int(self.app_settings.get('grid_columns', 1))
+        if columns == 2:
+            self.grid_cols_btn_2.setChecked(True)
+        elif columns == 3:
+            self.grid_cols_btn_3.setChecked(True)
+        else:
+            self.grid_cols_btn_1.setChecked(True)
+        self.grid_preview.set_fixed_columns(columns)
+        self.grid_cols_btn_1.clicked.connect(lambda: self._on_grid_columns_changed(1))
+        self.grid_cols_btn_2.clicked.connect(lambda: self._on_grid_columns_changed(2))
+        self.grid_cols_btn_3.clicked.connect(lambda: self._on_grid_columns_changed(3))
         
         return panel
 
@@ -1017,6 +1068,9 @@ class MainWindow(QMainWindow):
         settings = self._get_shadow_settings()
         self.grid_preview.set_settings(settings, self.scale_curve)
         self.grid_info_label.setText(f"📂 {folder.name}")
+        self._update_grid_folder_path(folder)
+        self.app_settings['grid_folder_index'] = int(index)
+        self._save_app_settings()
     
     def _update_grid_folder_combo(self):
         """Update the folder selector combo in grid panel."""
@@ -1029,6 +1083,8 @@ class MainWindow(QMainWindow):
         if len(self.selected_folders) <= 1:
             # Hide combo for single or no folder
             self.grid_folder_combo.hide()
+            if not self.selected_folders:
+                self._update_grid_folder_path(None)
         else:
             display_names = self._build_folder_display_names(self.selected_folders)
             # Show combo and populate with folder names
@@ -1037,6 +1093,27 @@ class MainWindow(QMainWindow):
             self.grid_folder_combo.show()
         
         self.grid_folder_combo.blockSignals(False)
+
+    def _update_grid_folder_path(self, folder: Path | None):
+        """Update the path label in the grid panel."""
+        if not hasattr(self, 'grid_folder_path'):
+            return
+        if folder is None:
+            self.grid_folder_path.setText("Sin carpeta seleccionada")
+            return
+        self.grid_folder_path.setText(str(folder))
+
+    def _on_grid_density_changed(self, value: int):
+        if not hasattr(self, 'grid_preview'):
+            return
+        return
+
+    def _on_grid_columns_changed(self, columns: int):
+        if not hasattr(self, 'grid_preview'):
+            return
+        self.grid_preview.set_fixed_columns(int(columns))
+        self.app_settings['grid_columns'] = int(columns)
+        self._save_app_settings()
 
     def _build_folder_display_names(self, folders: list[Path]) -> dict[str, str]:
         """
@@ -1103,7 +1180,7 @@ class MainWindow(QMainWindow):
             return
 
         if preferred_index is None:
-            preferred_index = previous_index
+            preferred_index = self.app_settings.get('grid_folder_index', previous_index)
         if preferred_index is None or preferred_index < 0:
             preferred_index = 0
 
@@ -1119,12 +1196,14 @@ class MainWindow(QMainWindow):
         settings = self._get_shadow_settings()
         self.grid_preview.set_settings(settings, self.scale_curve)
         self.grid_info_label.setText(f"📂 {folder.name}")
+        self._update_grid_folder_path(folder)
     
     def _on_grid_folder_empty(self):
         """Handle empty folder - reset canvas to show placeholder."""
         # Clear the processed image to show placeholder
         self.canvas.setProcessedImage(None)
         self.canvas.setOriginalImage(None)
+        self._update_grid_folder_path(None)
         # Hide custom button if it was showing
         if self.current_mock == 'custom_drop':
             self.current_mock = 'dark'
@@ -1235,6 +1314,8 @@ class MainWindow(QMainWindow):
                 'finishing': False,
                 'export': True,
             },
+            'grid_columns': 1,
+            'grid_folder_index': 0,
         }
         if self.settings_file.exists():
             try:
@@ -2511,6 +2592,11 @@ class MainWindow(QMainWindow):
             session_data['shadow_settings'] = current_settings.model_dump()
             
             self.session_manager.save_session(session_data)
+            try:
+                self.app_settings['splitter_sizes'] = self.splitter.sizes()
+                self._save_app_settings()
+            except Exception:
+                pass
             
         except Exception as e:
             self.log_manager.log_error(f"Error saving session: {e}")

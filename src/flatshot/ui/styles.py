@@ -146,6 +146,21 @@ QLabel[class="subheading"] {{
     font-size: 12px;
     color: {COLORS['text_secondary']};
 }}
+QLabel[class="panel-title"] {{
+    font-size: 12px;
+    font-weight: 600;
+    color: {COLORS['text_secondary']};
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}}
+QLabel[class="panel-label"] {{
+    font-size: 11px;
+    color: {COLORS['text_secondary']};
+}}
+QLabel[class="panel-path"] {{
+    font-size: 11px;
+    color: #9AA0A8;
+}}
 QLabel[class="param-label"] {{
     font-size: 13px;
     color: {COLORS['text_secondary']};

@@ -81,12 +81,23 @@ def main_gui():
     """Launch the GUI application."""
     _install_excepthook()
     from PyQt6.QtWidgets import QApplication
+    from PyQt6.QtCore import qInstallMessageHandler
     from PyQt6.QtGui import QFont
     
     from flatshot.ui.main_window import MainWindow
     from flatshot.ui.widgets import ModernSplashScreen
     from flatshot.ui.styles import get_stylesheet
     
+    def _qt_message_handler(mode, context, message):
+        # Suppress noisy font warnings while keeping other Qt messages visible.
+        if "QFont::setPointSize: Point size <= 0" in message:
+            return
+        try:
+            print(message, file=sys.stderr)
+        except Exception:
+            pass
+
+    qInstallMessageHandler(_qt_message_handler)
     app = QApplication(sys.argv)
     ui_scale = _calculate_ui_scale(app)
     

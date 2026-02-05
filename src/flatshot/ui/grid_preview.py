@@ -5,9 +5,9 @@ Displays multiple image previews in a grid layout with lazy loading.
 from pathlib import Path
 from typing import List, Optional
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QScrollArea, QSizePolicy, QFrame
+    QWidget, QVBoxLayout, QLabel, QScrollArea, QSizePolicy, QFrame, QGridLayout
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QSize, QRunnable, QThreadPool, QObject
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QSize, QRunnable, QThreadPool, QObject, QEvent
 from PyQt6.QtGui import QPixmap, QImage
 from PIL import Image
 
@@ -115,7 +115,10 @@ class PreviewTile(QFrame):
                 border-color: #0078D4;
             }
         """)
-        self.setFixedHeight(140)
+        self._tile_width = 150
+        self._image_height = 200
+        self._label_height = 24
+        self._apply_size()
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         
         layout = QVBoxLayout(self)
@@ -129,9 +132,23 @@ class PreviewTile(QFrame):
         
         self.name_label = QLabel()
         self.name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.name_label.setStyleSheet("color: #888; font-size: 9px;")
+        self.name_label.setStyleSheet("color: #9AA0A8; font-size: 10px;")
         self.name_label.setWordWrap(True)
         layout.addWidget(self.name_label)
+
+    def _apply_size(self):
+        total_height = self._image_height + self._label_height + 8
+        self.setFixedSize(self._tile_width, total_height)
+        if hasattr(self, "image_label"):
+            self.image_label.setMinimumHeight(self._image_height)
+
+    def set_tile_size(self, width: int, image_height: int):
+        self._tile_width = max(int(width), 80)
+        self._image_height = max(int(image_height), 80)
+        # Keep label height proportional but readable
+        self._label_height = max(int(self._image_height * 0.14), 20)
+        self._apply_size()
+        self._update_display()
     
     def set_image(self, file_path: str, processed: QPixmap, original: QPixmap = None):
         """Set the images for this tile."""
@@ -139,7 +156,8 @@ class PreviewTile(QFrame):
         self._processed_image = processed
         self._original_image = original or processed
         self._is_loaded = True
-        self.name_label.setText(Path(file_path).stem[:18])
+        self.name_label.setText(Path(file_path).stem[:22])
+        self.setToolTip(file_path)
         self._update_display()
     
     def _update_display(self):
@@ -161,9 +179,10 @@ class PreviewTile(QFrame):
     def set_pending(self, file_path: str):
         """Set pending state with filename but no image yet."""
         self.file_path = file_path
-        self.name_label.setText(Path(file_path).stem[:18])
+        self.name_label.setText(Path(file_path).stem[:22])
         self.image_label.setText("⏳")
         self._is_loaded = False
+        self.setToolTip(file_path)
     
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton and self.file_path:
@@ -203,6 +222,12 @@ class GridPreviewWidget(QWidget):
         self._active_workers = set()
         self._pool = QThreadPool()
         self._pool.setMaxThreadCount(2)
+        self._thumb_width = 150
+        self._thumb_height = 200
+        self._tile_spacing = 6
+        self._fixed_columns = 1
+        self._columns = 1
+        self._grid_margins = (6, 6, 6, 6)
         
         # Chunked loading
         self._current_chunk = 0
@@ -216,6 +241,11 @@ class GridPreviewWidget(QWidget):
         self._update_timer = QTimer()
         self._update_timer.setSingleShot(True)
         self._update_timer.timeout.connect(self._start_update_previews)
+
+        # Debounce timer for grid reflow
+        self._reflow_timer = QTimer()
+        self._reflow_timer.setSingleShot(True)
+        self._reflow_timer.timeout.connect(self._reflow_tiles)
         
         self._setup_ui()
     
@@ -228,11 +258,13 @@ class GridPreviewWidget(QWidget):
         self.scroll.setWidgetResizable(True)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.scroll.setStyleSheet("QScrollArea { border: none; background-color: #1E1E1E; }")
+        self.scroll.viewport().installEventFilter(self)
         
         self.grid_container = QWidget()
-        self.grid_layout = QVBoxLayout(self.grid_container)
-        self.grid_layout.setSpacing(6)
-        self.grid_layout.setContentsMargins(6, 6, 6, 6)
+        self.grid_layout = QGridLayout(self.grid_container)
+        self.grid_layout.setSpacing(self._tile_spacing)
+        self.grid_layout.setContentsMargins(*self._grid_margins)
+        self.grid_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         
         self.scroll.setWidget(self.grid_container)
         layout.addWidget(self.scroll)
@@ -240,7 +272,7 @@ class GridPreviewWidget(QWidget):
         # Info label
         self.info_label = QLabel("Selecciona una carpeta para ver previews")
         self.info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.info_label.setStyleSheet("color: #666; padding: 6px; font-size: 10px;")
+        self.info_label.setStyleSheet("color: #777; padding: 8px; font-size: 11px;")
         layout.addWidget(self.info_label)
     
     def _clear_tiles(self):
@@ -262,11 +294,10 @@ class GridPreviewWidget(QWidget):
             tile = PreviewTile()
             tile.clicked.connect(self.image_selected.emit)
             tile.set_pending(str(img_path))
-            self.grid_layout.addWidget(tile)
+            tile.set_tile_size(self._thumb_width, self._thumb_height)
             self._tiles.append(tile)
         
-        # Add stretch at end
-        self.grid_layout.addStretch()
+        self._reflow_tiles()
     
     def set_folder(self, folder_path: str):
         """Set the folder to preview images from."""
@@ -344,7 +375,7 @@ class GridPreviewWidget(QWidget):
                 self.info_label.setText(f"Mostrando {len(self._images)} imágenes")
             return
         
-        preview_size = (150, 200)
+        preview_size = (self._thumb_width, self._thumb_height)
         generation = self._render_generation
         settings_dict = self.settings.model_dump()
         curve_dict = self.curve_data.model_dump() if self.curve_data else None
@@ -431,6 +462,52 @@ class GridPreviewWidget(QWidget):
     def refresh(self):
         """Force refresh all previews."""
         self._schedule_update()
+
+    def set_fixed_columns(self, columns: int):
+        """Set fixed column count (1-3)."""
+        columns = max(int(columns), 1)
+        self._fixed_columns = min(columns, 3)
+        self._reflow_tiles()
+
+    def _calculate_columns(self) -> int:
+        if len(self._images) <= 1:
+            return 1
+        return max(1, self._fixed_columns)
+
+    def _compute_tile_size(self, columns: int) -> tuple[int, int]:
+        if not self.scroll or not self.scroll.viewport():
+            return self._thumb_width, self._thumb_height
+        viewport_width = self.scroll.viewport().width()
+        left, top, right, bottom = self._grid_margins
+        usable = max(viewport_width - left - right - self._tile_spacing * (columns - 1), 120)
+        tile_width = max(int(usable / max(columns, 1)), 90)
+        tile_height = int(round(tile_width * 4 / 3))
+        return tile_width, tile_height
+
+    def _reflow_tiles(self):
+        if not self._tiles:
+            return
+        columns = self._calculate_columns()
+        self._columns = max(columns, 1)
+        new_width, new_height = self._compute_tile_size(self._columns)
+        size_changed = new_width != self._thumb_width or new_height != self._thumb_height
+        if size_changed:
+            self._thumb_width = new_width
+            self._thumb_height = new_height
+            for tile in self._tiles:
+                tile.set_tile_size(self._thumb_width, self._thumb_height)
+        for idx, tile in enumerate(self._tiles):
+            row = idx // self._columns
+            col = idx % self._columns
+            self.grid_layout.addWidget(tile, row, col)
+        self.grid_container.adjustSize()
+        if size_changed and self._images:
+            self._schedule_update()
+
+    def eventFilter(self, watched, event):
+        if watched == self.scroll.viewport() and event.type() == QEvent.Type.Resize:
+            self._reflow_timer.start(30)
+        return super().eventFilter(watched, event)
 
     def closeEvent(self, event):
         """Stop background workers/timers cleanly on widget teardown."""

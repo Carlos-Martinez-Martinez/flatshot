@@ -4,6 +4,8 @@ Handles batch image processing with multiprocessing.
 """
 import os
 import threading
+import tempfile
+import shutil
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
 from time import time
@@ -103,14 +105,50 @@ class ExportWorker(QThread):
         self._pause_event = threading.Event()
         self._pause_event.set()
         self.input_files = input_files
+        self._snapshot_dir = None
+
+    def _copy_stable(self, src: Path, dest: Path):
+        """Copy a file while ensuring we capture a stable snapshot."""
+        for _ in range(3):
+            try:
+                before = src.stat()
+            except FileNotFoundError:
+                return False
+            try:
+                shutil.copy2(src, dest)
+            except Exception:
+                return False
+            try:
+                after = src.stat()
+            except FileNotFoundError:
+                try:
+                    dest.unlink(missing_ok=True)
+                except Exception:
+                    pass
+                return False
+            if before.st_mtime_ns == after.st_mtime_ns and before.st_size == after.st_size:
+                return True
+            try:
+                dest.unlink(missing_ok=True)
+            except Exception:
+                pass
+        return False
 
     def run(self):
         self.start_time = time()
         try:
             # Find all PNG images (or use provided snapshot list)
             if self.input_files is not None:
-                images = [Path(p) for p in self.input_files]
-                images = [p for p in images if p.is_file() and p.suffix.lower() == '.png']
+                source_files = [Path(p) for p in self.input_files]
+                source_files = [p for p in source_files if p.is_file() and p.suffix.lower() == '.png']
+                # Snapshot contents to a temp folder to keep a stable view
+                snap_dir = Path(tempfile.mkdtemp(prefix="flatshot_snap_"))
+                self._snapshot_dir = snap_dir
+                images = []
+                for src in source_files:
+                    dest = snap_dir / src.name
+                    if self._copy_stable(src, dest):
+                        images.append(dest)
             else:
                 images = [f for f in self.input_folder.iterdir()
                           if f.is_file() and f.suffix.lower() == '.png']
@@ -168,54 +206,64 @@ class ExportWorker(QThread):
         error_count = 0
         
         max_workers = max(1, (os.cpu_count() or 2) - 1)
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            self.executor = executor
-            pending_tasks = iter(tasks)
-            in_flight = set()
+        try:
+            with ProcessPoolExecutor(max_workers=max_workers) as executor:
+                self.executor = executor
+                pending_tasks = iter(tasks)
+                in_flight = set()
 
-            # Prime the worker pool.
-            for _ in range(min(max_workers, total)):
-                try:
-                    in_flight.add(executor.submit(process_single_image, next(pending_tasks)))
-                except StopIteration:
-                    break
-
-            while in_flight and self.is_running:
-                # Cooperative pause: stop consuming results and stop submitting new work.
-                self._pause_event.wait()
-                if not self.is_running:
-                    break
-
-                done, _ = wait(in_flight, timeout=0.2, return_when=FIRST_COMPLETED)
-                if not done:
-                    continue
-
-                for future in done:
-                    in_flight.discard(future)
+                # Prime the worker pool.
+                for _ in range(min(max_workers, total)):
                     try:
-                        success, msg = future.result()
-                    except Exception as exc:
-                        success, msg = False, f"Worker error: {exc}"
+                        in_flight.add(executor.submit(process_single_image, next(pending_tasks)))
+                    except StopIteration:
+                        break
 
-                    if success:
-                        self.image_completed.emit(msg, True)
-                    else:
-                        error_count += 1
-                        self.log_updated.emit(f"Error: {msg}")
-                        self.image_completed.emit(msg.split(':')[0], False)
+                while in_flight and self.is_running:
+                    # Cooperative pause: stop consuming results and stop submitting new work.
+                    self._pause_event.wait()
+                    if not self.is_running:
+                        break
 
-                    completed_count += 1
-                    self.progress_updated.emit(int((completed_count / total) * 100))
+                    done, _ = wait(in_flight, timeout=0.2, return_when=FIRST_COMPLETED)
+                    if not done:
+                        continue
 
-                    # Keep pool busy only while not paused.
-                    if self.is_running and self._pause_event.is_set():
+                    for future in done:
+                        in_flight.discard(future)
                         try:
-                            in_flight.add(executor.submit(process_single_image, next(pending_tasks)))
-                        except StopIteration:
-                            pass
+                            success, msg = future.result()
+                        except Exception as exc:
+                            success, msg = False, f"Worker error: {exc}"
 
-            if not self.is_running:
-                self.executor.shutdown(wait=False, cancel_futures=True)
+                        if success:
+                            self.image_completed.emit(msg, True)
+                        else:
+                            error_count += 1
+                            self.log_updated.emit(f"Error: {msg}")
+                            self.image_completed.emit(msg.split(':')[0], False)
+
+                        completed_count += 1
+                        self.progress_updated.emit(int((completed_count / total) * 100))
+
+                        # Keep pool busy only while not paused.
+                        if self.is_running and self._pause_event.is_set():
+                            try:
+                                in_flight.add(executor.submit(process_single_image, next(pending_tasks)))
+                            except StopIteration:
+                                pass
+        finally:
+            if self._snapshot_dir:
+                try:
+                    shutil.rmtree(self._snapshot_dir, ignore_errors=True)
+                except Exception:
+                    pass
+
+            if not self.is_running and self.executor:
+                try:
+                    self.executor.shutdown(wait=False, cancel_futures=True)
+                except Exception:
+                    pass
 
         duration = time() - self.start_time
         self.finished_process.emit(

@@ -68,8 +68,11 @@ class QueueWorker(QThread):
             job.status = "processing"
             folder_path = Path(job.folder_path)
             
-            # Count images
-            images = list(folder_path.glob("*.png"))
+            # Count images (use snapshot list if available)
+            if job.input_files:
+                images = [Path(p) for p in job.input_files if Path(p).suffix.lower() == ".png"]
+            else:
+                images = list(folder_path.glob("*.png"))
             job.total_images = len(images)
             
             self.job_started.emit(index, str(folder_path))
@@ -89,7 +92,8 @@ class QueueWorker(QThread):
                 self.settings,
                 self.export_config,
                 self.curve_data,
-                self.preset_name
+                self.preset_name,
+                input_files=[str(p) for p in images] if images else None
             )
             
             # Connect signals

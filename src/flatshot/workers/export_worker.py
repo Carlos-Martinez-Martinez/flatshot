@@ -90,7 +90,7 @@ class ExportWorker(QThread):
 
     def __init__(self, input_folder: str, shadow_settings: ShadowSettings, 
                  export_config: ExportConfig, curve_data: CurveData,
-                 preset_name: str = None):
+                 preset_name: str = None, input_files: list[str] | None = None):
         super().__init__()
         self.input_folder = Path(input_folder)
         self.settings = shadow_settings
@@ -102,13 +102,18 @@ class ExportWorker(QThread):
         self.start_time = None
         self._pause_event = threading.Event()
         self._pause_event.set()
+        self.input_files = input_files
 
     def run(self):
         self.start_time = time()
         try:
-            # Find all PNG images
-            images = [f for f in self.input_folder.iterdir()
-                      if f.is_file() and f.suffix.lower() == '.png']
+            # Find all PNG images (or use provided snapshot list)
+            if self.input_files is not None:
+                images = [Path(p) for p in self.input_files]
+                images = [p for p in images if p.is_file() and p.suffix.lower() == '.png']
+            else:
+                images = [f for f in self.input_folder.iterdir()
+                          if f.is_file() and f.suffix.lower() == '.png']
             total = len(images)
         except Exception as exc:
             self.log_updated.emit(f"Error al leer carpeta '{self.input_folder}': {exc}")

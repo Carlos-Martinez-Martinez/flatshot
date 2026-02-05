@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QScrollArea, QSplitter, QToolButton, QButtonGroup, QDialog, QStackedWidget,
     QMenu, QRadioButton, QListWidget, QListWidgetItem, QSlider
 )
-from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QSize, QEvent
+from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QSize, QEvent, QFileSystemWatcher
 from PyQt6.QtGui import QPixmap, QImage, QPainter, QColor, QPainterPath, QAction, QIcon, QFont
 
 from flatshot.core.engine import ShadowEngine
@@ -160,6 +160,14 @@ class MainWindow(QMainWindow):
         self.queue_worker = None
         self.worker = None
         self._last_export_destinations = []
+        self.current_custom_path = None
+        self._watched_folders = set()
+        self._pending_folder_updates = set()
+        self.folder_watcher = QFileSystemWatcher(self)
+        self.folder_watcher.directoryChanged.connect(self._on_source_folder_changed)
+        self._folder_update_timer = QTimer()
+        self._folder_update_timer.setSingleShot(True)
+        self._folder_update_timer.timeout.connect(self._process_folder_updates)
         
         # Load configuration
         self.presets = ConfigManager.get_flat_presets_from_categorized(
@@ -360,6 +368,10 @@ class MainWindow(QMainWindow):
                 self.splitter.setSizes(self.app_settings.get('splitter_sizes'))
             except Exception:
                 pass
+        self._splitter_save_timer = QTimer()
+        self._splitter_save_timer.setSingleShot(True)
+        self._splitter_save_timer.timeout.connect(self._save_splitter_sizes)
+        self.splitter.splitterMoved.connect(lambda *_: self._splitter_save_timer.start(250))
         
         main_layout.addWidget(self.splitter)
         
@@ -1091,25 +1103,7 @@ class MainWindow(QMainWindow):
     def _on_grid_image_selected(self, path: str):
         """Load image from grid into the main canvas."""
         try:
-            pil_img = Image.open(path).convert("RGBA")
-            pil_img.load()
-            pil_img = pil_img.copy()  # Detach from underlying file
-            self.mockups['custom_drop'] = pil_img
-            self.current_mock = 'custom_drop'
-            
-            # Clear caches to force recalculation for the new image
-            self.current_base_pil = None
-            self.current_orig_pixmap = None
-            self._update_current_assets(pil_img)
-            
-            # Show and select the custom image button
-            self.btn_custom.show()
-            self.btn_custom.setText(f" {Path(path).stem[:15]}")
-            self.btn_custom.setChecked(True)
-            
-            # Only update canvas, NOT the grid (to avoid reload)
-            self._schedule_canvas_only_preview()
-            self._show_feedback(f"Imagen cargada desde grid")
+            self._set_custom_image_from_path(path, show_feedback=True)
         except Exception as e:
             self._show_feedback(f"Error al cargar imagen")
             self._log_error(f"[grid-select-error] {path}: {e}")
@@ -1189,6 +1183,15 @@ class MainWindow(QMainWindow):
         self.canvas.setBackgroundColor(QColor(color))
         self.app_settings['preview_bg_color'] = color
         self._save_app_settings()
+
+    def _save_splitter_sizes(self):
+        if not hasattr(self, "splitter"):
+            return
+        try:
+            self.app_settings['splitter_sizes'] = self.splitter.sizes()
+            self._save_app_settings()
+        except Exception:
+            pass
 
     def _build_folder_display_names(self, folders: list[Path]) -> dict[str, str]:
         """
@@ -1287,6 +1290,7 @@ class MainWindow(QMainWindow):
             self.current_mock = 'dark'
             self.btn_custom.hide()
             self.mock_buttons['dark'].setChecked(True)
+        self.current_custom_path = None
     
     # ========== BUSINESS LOGIC ==========
     
@@ -1329,6 +1333,35 @@ class MainWindow(QMainWindow):
             mocks[key] = pil_img.crop(pil_img.getbbox()).copy()
             
         return mocks
+
+    def _set_custom_image_from_path(self, path: str, show_feedback: bool = False):
+        """Load and display a custom image from disk."""
+        try:
+            pil_img = Image.open(path).convert("RGBA")
+            pil_img.load()
+            pil_img = pil_img.copy()  # Detach from underlying file
+            self.mockups['custom_drop'] = pil_img
+            self.current_mock = 'custom_drop'
+            self.current_custom_path = path
+
+            # Clear caches to force recalculation for the new image
+            self.current_base_pil = None
+            self.current_orig_pixmap = None
+            self._update_current_assets(pil_img)
+
+            # Show and select the custom image button
+            self.btn_custom.show()
+            self.btn_custom.setText(f" {Path(path).stem[:15]}")
+            self.btn_custom.setChecked(True)
+
+            # Only update canvas, NOT the grid (to avoid reload)
+            self._schedule_canvas_only_preview()
+            if show_feedback:
+                self._show_feedback("Imagen cargada desde grid")
+        except Exception as e:
+            if show_feedback:
+                self._show_feedback("Error al cargar imagen")
+            self._log_error(f"[custom-image-error] {path}: {e}")
 
     def _update_current_assets(self, pil_img: Image.Image):
         """Pre-calculate and cache assets for the current image to ensure zero-lag UI."""
@@ -1834,6 +1867,62 @@ class MainWindow(QMainWindow):
         self._save_app_settings()
         
         self._update_folder_ui()
+
+    def _sync_folder_watcher(self):
+        """Keep filesystem watcher aligned with selected folders."""
+        if not hasattr(self, "folder_watcher"):
+            return
+        current = {str(f) for f in self.selected_folders if f.exists()}
+        to_remove = self._watched_folders - current
+        to_add = current - self._watched_folders
+        if to_remove:
+            try:
+                self.folder_watcher.removePaths(list(to_remove))
+            except Exception:
+                pass
+        if to_add:
+            try:
+                self.folder_watcher.addPaths(list(to_add))
+            except Exception:
+                pass
+        self._watched_folders = current
+
+    def _on_source_folder_changed(self, folder_path: str):
+        """Debounced handler for file system changes in watched folders."""
+        self._pending_folder_updates.add(folder_path)
+        self._folder_update_timer.start(150)
+
+    def _process_folder_updates(self):
+        """Refresh UI when source folders change on disk."""
+        if not self.selected_folders:
+            return
+        changed = {Path(p) for p in self._pending_folder_updates}
+        self._pending_folder_updates.clear()
+        # Refresh counts, grid preview and summary.
+        self._update_folder_ui()
+        # Refresh custom image if it belongs to a changed folder.
+        if self.current_custom_path:
+            try:
+                custom_path = Path(self.current_custom_path)
+                if not custom_path.exists():
+                    if self.current_mock == 'custom_drop':
+                        self.current_mock = 'dark'
+                        self.btn_custom.hide()
+                        self.mock_buttons['dark'].setChecked(True)
+                        self._schedule_preview()
+                    self.current_custom_path = None
+                else:
+                    for folder in changed:
+                        try:
+                            if custom_path.is_relative_to(folder):
+                                self._set_custom_image_from_path(str(custom_path), show_feedback=False)
+                                break
+                        except Exception:
+                            if str(custom_path).startswith(str(folder)):
+                                self._set_custom_image_from_path(str(custom_path), show_feedback=False)
+                                break
+            except Exception:
+                pass
     
     def _add_to_recent_folders(self, folder: str):
         """Add a folder to the recent folders list (max 10)."""
@@ -1936,6 +2025,7 @@ class MainWindow(QMainWindow):
         # Keep details button text/icon unchanged
         
         self._sync_grid_preview_with_folders()
+        self._sync_folder_watcher()
     
     def _on_dest_custom_toggled(self, checked: bool):
         """Handle custom destination radio button toggle."""
@@ -2076,6 +2166,9 @@ class MainWindow(QMainWindow):
         """Start export process for all selected folders."""
         if not self.selected_folders:
             return
+
+        # Ensure we are working with the latest on-disk images before exporting.
+        self._update_folder_ui()
         
         self.btn_process.hide()
         self.btn_add_folder.setEnabled(False)
@@ -2128,13 +2221,20 @@ class MainWindow(QMainWindow):
                 for folder in self.selected_folders
             ]
         
+        # Snapshot image lists at start to keep export consistent.
+        snapshot_files = {
+            folder: sorted(folder.glob("*.png"))
+            for folder in self.selected_folders
+        }
+
         # Single folder - use simple ExportWorker
         if len(self.selected_folders) == 1:
             self.worker = ExportWorker(
                 str(self.selected_folders[0]),
                 self._get_shadow_settings(),
                 export_config,
-                self.scale_curve
+                self.scale_curve,
+                input_files=[str(p) for p in snapshot_files.get(self.selected_folders[0], [])]
             )
             self.worker.progress_updated.connect(self.progress_bar.setValue)
             self.worker.log_updated.connect(self._log_error)
@@ -2144,7 +2244,10 @@ class MainWindow(QMainWindow):
             self.worker.start()
         else:
             # Multiple folders - use QueueWorker
-            jobs = [JobItem(folder_path=str(f)) for f in self.selected_folders]
+            jobs = [
+                JobItem(folder_path=str(f), input_files=[str(p) for p in snapshot_files.get(f, [])])
+                for f in self.selected_folders
+            ]
             preset_name = self.combo_presets.currentText()
             
             self.queue_worker = QueueWorker(

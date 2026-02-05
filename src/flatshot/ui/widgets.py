@@ -617,12 +617,12 @@ class FloatingToolbar(QFrame):
         super().__init__(parent)
         self.setProperty("class", "floating-toolbar")
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
-        self.setMinimumHeight(52)
+        self.setMinimumHeight(44)
         self._setup_ui()
         
     def _setup_ui(self):
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setContentsMargins(10, 6, 10, 6)
         layout.setSpacing(12)
         layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         
@@ -632,7 +632,7 @@ class FloatingToolbar(QFrame):
         self.btn_grid.setCheckable(True)
         self.btn_grid.setToolTip("Guías de composición (regla de tercios)")
         self.btn_grid.setMinimumWidth(90)
-        self.btn_grid.setFixedHeight(32)
+        self.btn_grid.setFixedHeight(30)
         self.btn_grid.toggled.connect(self._on_grid_toggled)
         layout.addWidget(self.btn_grid, 0, Qt.AlignmentFlag.AlignVCenter)
         
@@ -640,15 +640,15 @@ class FloatingToolbar(QFrame):
         bg_label = QLabel("Fondo")
         bg_label.setProperty("class", "panel-label")
         bg_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
-        bg_label.setFixedHeight(32)
+        bg_label.setFixedHeight(30)
         layout.addWidget(bg_label, 0, Qt.AlignmentFlag.AlignVCenter)
         
         # Background color buttons
         swatch_group = QFrame()
         swatch_group.setProperty("class", "swatch-group")
-        swatch_group.setFixedHeight(34)
+        swatch_group.setFixedHeight(30)
         swatch_layout = QHBoxLayout(swatch_group)
-        swatch_layout.setContentsMargins(4, 4, 4, 4)
+        swatch_layout.setContentsMargins(3, 3, 3, 3)
         swatch_layout.setSpacing(6)
         swatch_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._bg_group = QButtonGroup(self)
@@ -658,7 +658,7 @@ class FloatingToolbar(QFrame):
             btn = QPushButton()
             btn.setProperty("class", "swatch-btn")
             btn.setCheckable(True)
-            btn.setFixedSize(26, 26)
+            btn.setFixedSize(24, 24)
             btn.setStyleSheet(f"background-color: {color};")
             btn.setToolTip(f"Fondo {name}")
             btn.clicked.connect(lambda checked, c=color: self._select_background(c))

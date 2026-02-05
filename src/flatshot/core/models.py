@@ -38,6 +38,7 @@ class CurveData(BaseModel):
 class JobItem(BaseModel):
     """Represents a folder in the processing queue."""
     folder_path: str
+    input_files: Optional[List[str]] = None
     status: str = "pending"  # pending, processing, completed, error, cancelled
     progress: int = 0
     total_images: int = 0

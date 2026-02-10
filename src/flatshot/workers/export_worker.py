@@ -206,9 +206,12 @@ class ExportWorker(QThread):
         error_count = 0
         
         max_workers = max(1, (os.cpu_count() or 2) - 1)
+        self.log_updated.emit(f"Iniciando exportación con {max_workers} núcleos...")
+        
         try:
             with ProcessPoolExecutor(max_workers=max_workers) as executor:
                 self.executor = executor
+                self.log_updated.emit("Grupo de procesos inicializado correctamente.")
                 pending_tasks = iter(tasks)
                 in_flight = set()
 

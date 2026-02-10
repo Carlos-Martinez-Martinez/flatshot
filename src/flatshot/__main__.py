@@ -3,6 +3,7 @@ FlatShot - Modern Image Processing Application
 Entry point for both GUI and CLI modes.
 """
 import sys
+import multiprocessing
 
 
 def _install_excepthook():
@@ -138,6 +139,7 @@ def main_cli():
 
 def main():
     """Main entry point - detects CLI or GUI mode."""
+    multiprocessing.freeze_support()
     # Check if running in CLI mode
     if len(sys.argv) > 1 and sys.argv[1] in ['list-presets', 'process', '--help', '-h']:
         main_cli()

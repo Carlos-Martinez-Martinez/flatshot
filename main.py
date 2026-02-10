@@ -17,7 +17,11 @@ def _ensure_src_on_path():
         sys.path.insert(0, src_str)
 
 
+import multiprocessing
+
+
 def main():
+    multiprocessing.freeze_support()
     _ensure_src_on_path()
     from flatshot.__main__ import main as entrypoint
     entrypoint()

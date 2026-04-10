@@ -4,6 +4,7 @@ Handles presets, settings, and import/export functionality.
 """
 import json
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 from PyQt6.QtCore import QStandardPaths
@@ -15,6 +16,7 @@ class ConfigManager:
     
     PRESETS_FILE = "presets.json"
     CATEGORIZED_PRESETS_FILE = "presets_v2.json"
+    PRESETS_EXPORT_VERSION = 1
     
     @staticmethod
     def get_config_dir() -> Path:
@@ -58,9 +60,15 @@ class ConfigManager:
         file_path = ConfigManager.get_config_dir() / ConfigManager.CATEGORIZED_PRESETS_FILE
         try:
             with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(presets.model_dump(), f, indent=4)
+                json.dump(presets.model_dump(), f, indent=4, ensure_ascii=False)
         except Exception as e:
             logging.error(f"Error saving categorized presets: {e}")
+
+    @staticmethod
+    def save_all_presets(presets: CategorizedPresets):
+        """Persist categorized and legacy preset files together."""
+        ConfigManager.save_categorized_presets(presets)
+        ConfigManager.save_presets(ConfigManager.get_flat_presets_from_categorized(presets))
     
     @staticmethod
     def load_categorized_presets() -> CategorizedPresets:
@@ -86,27 +94,29 @@ class ConfigManager:
     @staticmethod
     def migrate_legacy_presets(legacy_presets: dict) -> CategorizedPresets:
         """Migrate legacy flat presets to categorized format."""
-        # Create default categories
+        categorized = ConfigManager._categorize_flat_presets(legacy_presets)
+        ConfigManager.save_all_presets(categorized)
+        return categorized
+
+    @staticmethod
+    def _categorize_flat_presets(legacy_presets: dict) -> CategorizedPresets:
+        """Convert a legacy flat preset mapping to categorized presets."""
         categorized = ConfigManager._get_default_categorized_presets()
-        
-        # Move all legacy presets to uncategorized
+
         for name, settings in legacy_presets.items():
-            # Try to auto-categorize based on name
             category_key = None
             name_lower = name.lower()
-            
+
             if 'clar' in name_lower or 'light' in name_lower:
                 category_key = 'ropa_clara'
             elif 'oscur' in name_lower or 'dark' in name_lower:
                 category_key = 'ropa_oscura'
-            
+
             if category_key and category_key in categorized.categories:
                 categorized.categories[category_key].presets[name] = settings
             else:
                 categorized.uncategorized[name] = settings
-        
-        # Save migrated presets
-        ConfigManager.save_categorized_presets(categorized)
+
         return categorized
     
     @staticmethod
@@ -153,8 +163,17 @@ class ConfigManager:
         """Export all presets to an external JSON file."""
         try:
             presets = ConfigManager.load_categorized_presets()
+            export_payload = {
+                "flatshot_export": {
+                    "type": "presets",
+                    "version": ConfigManager.PRESETS_EXPORT_VERSION,
+                    "exported_at": datetime.now(timezone.utc).isoformat(),
+                    "preset_count": len(ConfigManager.get_flat_presets_from_categorized(presets)),
+                },
+                "presets": presets.model_dump(),
+            }
             with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(presets.model_dump(), f, indent=4)
+                json.dump(export_payload, f, indent=4, ensure_ascii=False)
             return True
         except Exception as e:
             logging.error(f"Error exporting presets: {e}")
@@ -176,27 +195,52 @@ class ConfigManager:
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
-            imported = CategorizedPresets(**data)
+            imported = ConfigManager._parse_imported_presets(data)
             
             if merge:
-                existing = ConfigManager.load_categorized_presets()
-                # Merge categories
-                for cat_key, cat_value in imported.categories.items():
-                    if cat_key in existing.categories:
-                        existing.categories[cat_key].presets.update(cat_value.presets)
-                    else:
-                        existing.categories[cat_key] = cat_value
-                # Merge uncategorized
-                existing.uncategorized.update(imported.uncategorized)
-                ConfigManager.save_categorized_presets(existing)
-                return existing
-            else:
-                ConfigManager.save_categorized_presets(imported)
-                return imported
+                imported = ConfigManager._merge_categorized_presets(
+                    ConfigManager.load_categorized_presets(),
+                    imported,
+                )
+
+            ConfigManager.save_all_presets(imported)
+            return imported
                 
         except Exception as e:
             logging.error(f"Error importing presets: {e}")
             return None
+
+    @staticmethod
+    def _parse_imported_presets(data: dict) -> CategorizedPresets:
+        """Accept direct categorized JSON, exported bundles, or legacy flat mappings."""
+        if not isinstance(data, dict):
+            raise ValueError("El archivo de presets no contiene un objeto JSON válido.")
+
+        candidate = data
+        export_meta = data.get("flatshot_export")
+        if isinstance(export_meta, dict) and export_meta.get("type") == "presets":
+            candidate = data.get("presets", {})
+
+        if isinstance(candidate, dict) and (
+            "categories" in candidate or "uncategorized" in candidate
+        ):
+            return CategorizedPresets(**candidate)
+
+        return ConfigManager._categorize_flat_presets(candidate)
+
+    @staticmethod
+    def _merge_categorized_presets(
+        base: CategorizedPresets,
+        incoming: CategorizedPresets,
+    ) -> CategorizedPresets:
+        """Merge imported presets into the current categorized structure."""
+        for cat_key, cat_value in incoming.categories.items():
+            if cat_key in base.categories:
+                base.categories[cat_key].presets.update(cat_value.presets)
+            else:
+                base.categories[cat_key] = cat_value
+        base.uncategorized.update(incoming.uncategorized)
+        return base
     
     # ========== Utility Methods ==========
     

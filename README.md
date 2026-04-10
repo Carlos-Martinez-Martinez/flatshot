@@ -61,7 +61,8 @@ Procesador de imágenes de producto con generación de sombras realistas y flujo
 
 ## Presets y configuración
 - Los presets se guardan en el directorio de configuración que proporciona Qt (`QStandardPaths.AppConfigLocation`), archivo `presets_v2.json` (se migra automáticamente desde `presets.json` si existe).
-- Categorías por defecto: `Ropa Clara`, `Ropa Oscura`, `Complementos` y `Personalizados`. Puedes importar/exportar presets desde la UI.
+- Categorías por defecto: `Ropa Clara`, `Ropa Oscura`, `Complementos` y `Personalizados`.
+- Puedes importar/exportar presets desde el menú `Presets` o desde `Archivo`. El archivo exportado (`.json`) sirve para mover tus presets a otro ordenador y volver a cargarlos allí.
 - El historial de ajustes (undo/redo) se gestiona internamente y se evita duplicar estados idénticos.
 
 ## Exportación y nomenclatura

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "flatshot"
 version = "1.0.0"
-description = "Product Image Shadow Tool - Procesador de imágenes para e-commerce"
+description = "Procesa imágenes de producto por lotes, aplica sombras realistas y prepara salidas listas para e-commerce."
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "Proprietary"}

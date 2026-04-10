@@ -190,6 +190,7 @@ class MainWindow(QMainWindow):
         # Build UI
         self._init_menu()
         self._init_ui()
+        self._apply_export_preferences(self._build_export_config_from_settings())
         self._setup_history_tracking()
         self._setup_accessibility_and_tab_order()
         
@@ -245,11 +246,54 @@ class MainWindow(QMainWindow):
         file_menu.addAction(config_action)
         
         file_menu.addSeparator()
+
+        export_presets_action = QAction("Exportar presets...", self)
+        export_presets_action.triggered.connect(self._action_export_presets)
+        file_menu.addAction(export_presets_action)
+
+        import_presets_action = QAction("Importar presets...", self)
+        import_presets_action.triggered.connect(self._action_import_presets)
+        file_menu.addAction(import_presets_action)
+        
+        file_menu.addSeparator()
         
         exit_action = QAction("Salir", self)
         exit_action.setShortcut("Ctrl+Q")
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
+
+        preset_menu = menubar.addMenu("Presets")
+
+        save_preset_action = QAction("Guardar preset actual", self)
+        save_preset_action.setShortcut("Ctrl+S")
+        save_preset_action.triggered.connect(self._action_save_current)
+        preset_menu.addAction(save_preset_action)
+
+        new_preset_action = QAction("Crear preset...", self)
+        new_preset_action.triggered.connect(self._action_create_new)
+        preset_menu.addAction(new_preset_action)
+
+        rename_preset_action = QAction("Renombrar preset...", self)
+        rename_preset_action.triggered.connect(self._action_rename)
+        preset_menu.addAction(rename_preset_action)
+
+        delete_preset_action = QAction("Eliminar preset", self)
+        delete_preset_action.triggered.connect(self._action_delete)
+        preset_menu.addAction(delete_preset_action)
+
+        preset_menu.addSeparator()
+
+        preset_import_action = QAction("Importar presets...", self)
+        preset_import_action.triggered.connect(self._action_import_presets)
+        preset_menu.addAction(preset_import_action)
+
+        preset_export_action = QAction("Exportar presets...", self)
+        preset_export_action.triggered.connect(self._action_export_presets)
+        preset_menu.addAction(preset_export_action)
+
+        open_preset_folder_action = QAction("Abrir carpeta de presets", self)
+        open_preset_folder_action.triggered.connect(self._action_open_presets_folder)
+        preset_menu.addAction(open_preset_folder_action)
         
         # View menu
         view_menu = menubar.addMenu("Ver")
@@ -507,7 +551,6 @@ class MainWindow(QMainWindow):
         btn_delete.clicked.connect(self._action_delete)
         btn_layout.addWidget(btn_delete)
         
-        # Spacer
         btn_layout.addSpacing(self._px(8))
         
         # Reset to defaults button
@@ -516,6 +559,25 @@ class MainWindow(QMainWindow):
         btn_reset.setToolTip("Restaurar valores por defecto (Ctrl+R)")
         btn_reset.clicked.connect(self._reset_to_defaults)
         btn_layout.addWidget(btn_reset)
+
+        btn_layout.addSpacing(self._px(8))
+
+        btn_more = QToolButton()
+        btn_more.setIcon(qta.icon('fa5s.ellipsis-h', color=icon_color))
+        btn_more.setToolTip("Más opciones de presets")
+        btn_more.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        btn_more.setAutoRaise(True)
+
+        more_menu = QMenu(btn_more)
+        import_action = more_menu.addAction("Importar presets...")
+        import_action.triggered.connect(self._action_import_presets)
+        export_action = more_menu.addAction("Exportar presets...")
+        export_action.triggered.connect(self._action_export_presets)
+        more_menu.addSeparator()
+        open_folder_action = more_menu.addAction("Abrir carpeta de presets")
+        open_folder_action.triggered.connect(self._action_open_presets_folder)
+        btn_more.setMenu(more_menu)
+        btn_layout.addWidget(btn_more)
         
         btn_layout.addStretch()
         layout.addLayout(btn_layout)
@@ -1413,6 +1475,11 @@ class MainWindow(QMainWindow):
             'format': 'JPG',
             'transparent_bg': False,
             'bg_color': (230, 230, 230),
+            'output_width': 1800,
+            'output_height': 2400,
+            'naming_template': '{original}{suffix}',
+            'output_destination': 'subfolder',
+            'custom_output_path': None,
             'last_input_folder': '',
             'scale_curve': {
                 'xp': [0.0, 0.35, 0.60, 0.85, 1.10, 1.40, 3.0],
@@ -1449,9 +1516,6 @@ class MainWindow(QMainWindow):
             
     def _save_presets_to_disk(self):
         # Keep legacy file for backward compatibility.
-        ConfigManager.save_presets(self.presets)
-
-        # Keep categorized presets in sync so CLI and GUI see the same data.
         categorized = ConfigManager.load_categorized_presets()
         category_names = set()
         for category in categorized.categories.values():
@@ -1467,7 +1531,62 @@ class MainWindow(QMainWindow):
             for name, settings in self.presets.items()
             if name not in category_names
         }
-        ConfigManager.save_categorized_presets(categorized)
+        ConfigManager.save_all_presets(categorized)
+
+    def _build_export_config_from_settings(self) -> ExportConfig:
+        output_destination = self.app_settings.get('output_destination', 'subfolder')
+        custom_output_path = self.app_settings.get('custom_output_path')
+
+        if hasattr(self, 'rb_dest_custom') and self.rb_dest_custom.isChecked():
+            output_destination = 'custom'
+        elif hasattr(self, 'rb_dest_subfolder') and self.rb_dest_subfolder.isChecked():
+            output_destination = 'subfolder'
+
+        if self.custom_output_path:
+            custom_output_path = str(self.custom_output_path)
+
+        return ExportConfig(
+            output_folder_name=self.app_settings.get('output_folder_name', '_SALIDA_PRO'),
+            suffix=self.app_settings.get('suffix', '_PRO'),
+            format=self.app_settings.get('format', 'JPG'),
+            transparent_bg=self.app_settings.get('transparent_bg', False),
+            bg_color=self.app_settings.get('bg_color', (230, 230, 230)),
+            output_width=self.app_settings.get('output_width', 1800),
+            output_height=self.app_settings.get('output_height', 2400),
+            naming_template=self.app_settings.get('naming_template', '{original}{suffix}'),
+            output_destination=output_destination,
+            custom_output_path=custom_output_path,
+        )
+
+    def _apply_export_preferences(self, config: ExportConfig):
+        self.custom_output_path = Path(config.custom_output_path) if config.custom_output_path else None
+        is_custom = config.output_destination == 'custom'
+        self.app_settings['output_destination'] = 'custom' if is_custom else 'subfolder'
+        self.app_settings['custom_output_path'] = str(self.custom_output_path) if self.custom_output_path else None
+        self.rb_dest_custom.setChecked(is_custom)
+        self.rb_dest_subfolder.setChecked(not is_custom)
+        self.btn_choose_dest.setEnabled(is_custom)
+        if self.custom_output_path:
+            self.lbl_custom_dest.setText(f"→ {self.custom_output_path}")
+            self.lbl_custom_dest.setVisible(is_custom)
+        else:
+            self.lbl_custom_dest.clear()
+            self.lbl_custom_dest.hide()
+
+    def _refresh_presets_combo(self, preferred_name: str | None = None):
+        current_name = preferred_name or self.combo_presets.currentText()
+        self.combo_presets.blockSignals(True)
+        self.combo_presets.clear()
+        self.combo_presets.addItems(list(self.presets.keys()))
+        self.combo_presets.blockSignals(False)
+
+        if self.combo_presets.count() == 0:
+            self._show_feedback("No hay presets disponibles")
+            return
+
+        target_name = current_name if current_name in self.presets else self.combo_presets.itemText(0)
+        self.combo_presets.setCurrentText(target_name)
+        self._apply_preset_from_combo()
         
     def _get_shadow_settings(self) -> ShadowSettings:
         return ShadowSettings(
@@ -1841,7 +1960,74 @@ class MainWindow(QMainWindow):
             self._save_presets_to_disk()
             self.combo_presets.removeItem(self.combo_presets.currentIndex())
             self._show_feedback("Preset eliminado")
-            
+
+    def _action_export_presets(self):
+        default_name = str(Path.home() / "flatshot_presets.json")
+        file_path, _selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "Exportar presets",
+            default_name,
+            "Archivo JSON (*.json)",
+        )
+        if not file_path:
+            return
+        if not file_path.lower().endswith(".json"):
+            file_path = f"{file_path}.json"
+
+        if ConfigManager.export_presets_to_file(file_path):
+            self._show_feedback("Presets exportados")
+        else:
+            QMessageBox.warning(
+                self,
+                "No se pudieron exportar",
+                "FlatShot no ha podido generar el archivo de presets.",
+            )
+
+    def _action_import_presets(self):
+        current_name = self.combo_presets.currentText()
+        file_path, _selected_filter = QFileDialog.getOpenFileName(
+            self,
+            "Importar presets",
+            str(Path.home()),
+            "Archivo JSON (*.json)",
+        )
+        if not file_path:
+            return
+
+        message = QMessageBox(self)
+        message.setWindowTitle("Importar presets")
+        message.setText("¿Cómo quieres aplicar los presets del archivo?")
+        message.setInformativeText(
+            "Combinar conserva los presets actuales. Reemplazar deja solo los del archivo."
+        )
+        merge_button = message.addButton("Combinar", QMessageBox.ButtonRole.AcceptRole)
+        replace_button = message.addButton("Reemplazar", QMessageBox.ButtonRole.DestructiveRole)
+        message.addButton(QMessageBox.StandardButton.Cancel)
+        message.exec()
+
+        clicked = message.clickedButton()
+        if clicked not in (merge_button, replace_button):
+            return
+
+        imported = ConfigManager.import_presets_from_file(
+            file_path,
+            merge=(clicked == merge_button),
+        )
+        if imported is None:
+            QMessageBox.warning(
+                self,
+                "Archivo no válido",
+                "No se han podido importar los presets. Revisa el archivo seleccionado.",
+            )
+            return
+
+        self.presets = ConfigManager.get_flat_presets_from_categorized(imported)
+        self._refresh_presets_combo(current_name)
+        self._show_feedback("Presets importados")
+
+    def _action_open_presets_folder(self):
+        self._open_folder_in_explorer(ConfigManager.get_config_dir())
+             
     # ========== FOLDER & EXPORT ==========
     
     def _add_folders(self):
@@ -2030,16 +2216,21 @@ class MainWindow(QMainWindow):
     def _on_dest_custom_toggled(self, checked: bool):
         """Handle custom destination radio button toggle."""
         self.btn_choose_dest.setEnabled(checked)
-        if not checked:
+        self.app_settings['output_destination'] = 'custom' if checked else 'subfolder'
+        if checked and self.custom_output_path:
+            self.lbl_custom_dest.show()
+        elif not checked:
             self.lbl_custom_dest.hide()
     
     def _choose_custom_dest(self):
         """Choose a custom output destination folder."""
-        folder = QFileDialog.getExistingDirectory(self, "Elegir carpeta de destino")
+        initial_dir = str(self.custom_output_path) if self.custom_output_path else str(Path.home())
+        folder = QFileDialog.getExistingDirectory(self, "Elegir carpeta de destino", initial_dir)
         if folder:
             self.custom_output_path = Path(folder)
             self.lbl_custom_dest.setText(f"→ {folder}")
             self.lbl_custom_dest.show()
+            self.app_settings['custom_output_path'] = str(self.custom_output_path)
 
     def _open_export_details_dialog(self):
         """Show export details in a compact dialog to avoid resizing the left panel."""
@@ -2376,21 +2567,13 @@ class MainWindow(QMainWindow):
     # ========== DIALOGS ==========
     
     def _open_export_config(self):
-        current_config = ExportConfig(
-            output_folder_name=self.app_settings.get('output_folder_name', '_SALIDA_PRO'),
-            suffix=self.app_settings.get('suffix', '_PRO'),
-            format=self.app_settings.get('format', 'JPG'),
-            transparent_bg=self.app_settings.get('transparent_bg', False),
-            bg_color=self.app_settings.get('bg_color', (230, 230, 230)),
-            output_width=self.app_settings.get('output_width', 1800),
-            output_height=self.app_settings.get('output_height', 2400),
-            naming_template=self.app_settings.get('naming_template', '{original}{suffix}')
-        )
+        current_config = self._build_export_config_from_settings()
         
         dlg = ExportConfigDialog(current_config, self)
         if dlg.exec():
             new_settings = dlg.get_settings()
             self.app_settings.update(new_settings.model_dump())
+            self._apply_export_preferences(new_settings)
             self._save_app_settings()
             self._schedule_preview()
             self._show_feedback("Configuración guardada")
@@ -2780,15 +2963,10 @@ class MainWindow(QMainWindow):
             # Restore export config
             if 'export_config' in data:
                 exp = data['export_config']
-                if 'output_destination' in exp:
-                    is_custom = exp['output_destination'] == 'custom'
-                    if hasattr(self, 'rb_dest_custom'):
-                        self.rb_dest_custom.setChecked(is_custom)
-                        self.rb_dest_subfolder.setChecked(not is_custom)
-                if 'custom_output_path' in exp and exp['custom_output_path']:
-                    self.custom_output_path = Path(exp['custom_output_path'])
-                    if hasattr(self, 'lbl_custom_dest'):
-                        self.lbl_custom_dest.setText(str(self.custom_output_path))
+                restored_export = self._build_export_config_from_settings()
+                restored_export.output_destination = exp.get('output_destination', restored_export.output_destination)
+                restored_export.custom_output_path = exp.get('custom_output_path', restored_export.custom_output_path)
+                self._apply_export_preferences(restored_export)
             
             if 'shadow_settings' in data:
                 self._apply_settings(ShadowSettings(**data['shadow_settings']))

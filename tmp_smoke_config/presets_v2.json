@@ -1,0 +1,61 @@
+{
+    "categories": {
+        "ropa_clara": {
+            "name": "Ropa Clara",
+            "presets": {
+                "Luz cenital": {
+                    "angle": 180,
+                    "distance": 25,
+                    "blur": 30,
+                    "spread": 0,
+                    "fusion": 1,
+                    "opacity": 20,
+                    "noise": 2,
+                    "padding": 10,
+                    "contact_blur": 10,
+                    "adaptive_zoom": true
+                }
+            },
+            "locked": false
+        },
+        "ropa_oscura": {
+            "name": "Ropa Oscura",
+            "presets": {
+                "Estándar oscuro": {
+                    "angle": 180,
+                    "distance": 20,
+                    "blur": 40,
+                    "spread": 3,
+                    "fusion": 5,
+                    "opacity": 45,
+                    "noise": 5,
+                    "padding": 10,
+                    "contact_blur": 12,
+                    "adaptive_zoom": true
+                }
+            },
+            "locked": false
+        },
+        "complementos": {
+            "name": "Complementos",
+            "presets": {},
+            "locked": false
+        },
+        "custom": {
+            "name": "Personalizados",
+            "presets": {
+                "Portatil": {
+                    "angle": 123,
+                    "distance": 22
+                }
+            },
+            "locked": false
+        }
+    },
+    "uncategorized": {
+        "Nuevo": {
+            "angle": 180,
+            "distance": 30
+        }
+    }
+}

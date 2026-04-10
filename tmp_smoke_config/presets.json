@@ -1,0 +1,34 @@
+{
+    "Luz cenital": {
+        "angle": 180,
+        "distance": 25,
+        "blur": 30,
+        "spread": 0,
+        "fusion": 1,
+        "opacity": 20,
+        "noise": 2,
+        "padding": 10,
+        "contact_blur": 10,
+        "adaptive_zoom": true
+    },
+    "Est\u00e1ndar oscuro": {
+        "angle": 180,
+        "distance": 20,
+        "blur": 40,
+        "spread": 3,
+        "fusion": 5,
+        "opacity": 45,
+        "noise": 5,
+        "padding": 10,
+        "contact_blur": 12,
+        "adaptive_zoom": true
+    },
+    "Portatil": {
+        "angle": 123,
+        "distance": 22
+    },
+    "Nuevo": {
+        "angle": 180,
+        "distance": 30
+    }
+}

@@ -6,9 +6,9 @@ import numpy as np
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QSlider, QSpinBox,
     QFrame, QPushButton, QSizePolicy, QGraphicsDropShadowEffect, QToolButton,
-    QButtonGroup
+    QButtonGroup, QComboBox
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QRectF, QTimer, QEvent, QSize
+from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QPointF, QRectF, QTimer, QEvent, QSize
 from PyQt6.QtGui import (
     QPainter, QColor, QPen, QBrush, QRadialGradient, 
     QLinearGradient, QFont, QPainterPath, QPixmap, QImage
@@ -372,8 +372,14 @@ class ComparisonCanvas(QWidget):
         self._slider_pos = 0.5  # 0-1, position of comparison slider
         self._bg_color = QColor("#2A2A2A")
         self._grid_visible = False
+        self._guide_preset = "thirds"
+        self._guide_color = QColor(255, 255, 255)
+        self._guide_opacity = 42
         self._badge_opacity = 1.0  # For fade effect
         self._zoom_level = 1.0  # Zoom support
+        self._pan_offset = QPointF(0, 0)
+        self._panning = False
+        self._last_pan_pos = QPointF(0, 0)
         
         self.setAcceptDrops(True)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -389,10 +395,12 @@ class ComparisonCanvas(QWidget):
         
     def setOriginalImage(self, image: QPixmap):
         self._original_image = image
+        self._reset_view_if_needed()
         self.update()
         
     def setProcessedImage(self, image: QPixmap):
         self._processed_image = image
+        self._reset_view_if_needed()
         self._badge_opacity = 1.0  # Reset badge visibility
         self._fade_timer.start(2000)  # Start fade after 2s
         self.update()
@@ -409,19 +417,89 @@ class ComparisonCanvas(QWidget):
     def setGridVisible(self, visible: bool):
         self._grid_visible = visible
         self.update()
+
+    def setGuideSettings(self, settings: dict):
+        self._guide_preset = settings.get("preset", self._guide_preset)
+        self._guide_color = QColor(settings.get("color", self._guide_color.name()))
+        self._guide_opacity = int(settings.get("opacity", self._guide_opacity))
+        self.update()
         
     def setComparisonMode(self, mode: str):
         self._comparison_mode = mode
         self.update()
+
+    def resetView(self):
+        self._zoom_level = 1.0
+        self._pan_offset = QPointF(0, 0)
+        self.update()
+
+    def _reset_view_if_needed(self):
+        if self._zoom_level <= 1.01:
+            self._pan_offset = QPointF(0, 0)
         
     def wheelEvent(self, event):
-        """Handle mouse wheel for zooming."""
-        delta = event.angleDelta().y()
-        if delta > 0:
-            self._zoom_level = min(3.0, self._zoom_level * 1.1)
-        else:
-            self._zoom_level = max(0.5, self._zoom_level / 1.1)
+        """Zoom around the cursor so inspection stays anchored."""
+        current_image = self._original_image if self._show_original else self._processed_image
+        if not current_image or current_image.isNull():
+            return
+
+        old_rect = self._image_rect(current_image, self._zoom_level, self._pan_offset)
+        if old_rect.width() <= 0 or old_rect.height() <= 0:
+            return
+
+        cursor = event.position()
+        rel_x = min(max((cursor.x() - old_rect.x()) / old_rect.width(), 0.0), 1.0)
+        rel_y = min(max((cursor.y() - old_rect.y()) / old_rect.height(), 0.0), 1.0)
+
+        factor = 1.12 if event.angleDelta().y() > 0 else 1 / 1.12
+        self._zoom_level = min(6.0, max(1.0, self._zoom_level * factor))
+        new_rect = self._image_rect(current_image, self._zoom_level, self._pan_offset)
+
+        desired_x = cursor.x() - (new_rect.width() * rel_x)
+        desired_y = cursor.y() - (new_rect.height() * rel_y)
+        centered_x = (self.width() - new_rect.width()) / 2
+        centered_y = (self.height() - new_rect.height()) / 2
+        self._pan_offset = QPointF(desired_x - centered_x, desired_y - centered_y)
+        self._clamp_pan(current_image)
         self.update()
+        event.accept()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and self._zoom_level > 1.01:
+            self._panning = True
+            self._last_pan_pos = event.position()
+            self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._panning:
+            delta = event.position() - self._last_pan_pos
+            self._last_pan_pos = event.position()
+            self._pan_offset += delta
+            current_image = self._original_image if self._show_original else self._processed_image
+            if current_image and not current_image.isNull():
+                self._clamp_pan(current_image)
+            self.update()
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and self._panning:
+            self._panning = False
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.resetView()
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)
         
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -435,19 +513,8 @@ class ComparisonCanvas(QWidget):
         current_image = self._original_image if self._show_original else self._processed_image
         
         if current_image and not current_image.isNull():
-            # Scale to fit with zoom
-            base_size = self.size()
-            target_width = int(base_size.width() * self._zoom_level)
-            target_height = int(base_size.height() * self._zoom_level)
-            
-            scaled = current_image.scaled(
-                target_width, target_height,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            )
-            x = (self.width() - scaled.width()) // 2
-            y = (self.height() - scaled.height()) // 2
-            painter.drawPixmap(x, y, scaled)
+            image_rect = self._image_rect(current_image, self._zoom_level, self._pan_offset)
+            painter.drawPixmap(image_rect, current_image, QRectF(current_image.rect()))
             
             # Zoom indicator (if not 100%)
             if abs(self._zoom_level - 1.0) > 0.01:
@@ -461,41 +528,83 @@ class ComparisonCanvas(QWidget):
             
             # Grid overlay (drawn OVER the image)
             if self._grid_visible:
-                self._draw_grid(painter)
+                self._draw_grid(painter, image_rect)
         else:
             # Placeholder
             self._draw_placeholder(painter)
+
+    def _image_rect(self, image: QPixmap, zoom_level: float, pan_offset: QPointF) -> QRectF:
+        if not image or image.isNull():
+            return QRectF()
+        fit_scale = min(self.width() / image.width(), self.height() / image.height())
+        draw_w = image.width() * fit_scale * zoom_level
+        draw_h = image.height() * fit_scale * zoom_level
+        x = (self.width() - draw_w) / 2 + pan_offset.x()
+        y = (self.height() - draw_h) / 2 + pan_offset.y()
+        return QRectF(x, y, draw_w, draw_h)
+
+    def _clamp_pan(self, image: QPixmap):
+        if not image or image.isNull():
+            return
+        rect = self._image_rect(image, self._zoom_level, self._pan_offset)
+
+        def clamp_axis(rect_start, rect_size, viewport_size, current):
+            if rect_size <= viewport_size:
+                return current - rect_start + (viewport_size - rect_size) / 2
+            min_start = viewport_size - rect_size
+            max_start = 0
+            if rect_start < min_start:
+                return current + (min_start - rect_start)
+            if rect_start > max_start:
+                return current - rect_start
+            return current
+
+        self._pan_offset = QPointF(
+            clamp_axis(rect.x(), rect.width(), self.width(), self._pan_offset.x()),
+            clamp_axis(rect.y(), rect.height(), self.height(), self._pan_offset.y()),
+        )
             
-    def _draw_grid(self, painter):
-        """Draw rule-of-thirds grid overlay for composition help."""
-        w, h = self.width(), self.height()
+    def _draw_grid(self, painter, rect: QRectF):
+        """Draw configurable composition guides over the preview image."""
+        if rect.isEmpty():
+            return
         
-        # Semi-transparent lines
-        pen = QPen(QColor(255, 255, 255, 80))
+        color = QColor(self._guide_color)
+        color.setAlpha(max(20, min(220, int(self._guide_opacity * 2.55))))
+        pen = QPen(color)
         pen.setWidth(1)
         painter.setPen(pen)
-        
-        # Rule of thirds - vertical lines
-        x1 = w // 3
-        x2 = 2 * w // 3
-        painter.drawLine(x1, 0, x1, h)
-        painter.drawLine(x2, 0, x2, h)
-        
-        # Rule of thirds - horizontal lines
-        y1 = h // 3
-        y2 = 2 * h // 3
-        painter.drawLine(0, y1, w, y1)
-        painter.drawLine(0, y2, w, y2)
-        
-        # Center crosshair (thinner, dotted)
-        center_pen = QPen(QColor(0, 120, 212, 120))
-        center_pen.setWidth(1)
-        center_pen.setStyle(Qt.PenStyle.DashLine)
-        painter.setPen(center_pen)
-        
-        cx, cy = w // 2, h // 2
-        painter.drawLine(cx, 0, cx, h)  # Vertical center
-        painter.drawLine(0, cy, w, cy)  # Horizontal center
+
+        preset = self._guide_preset
+        if preset in ("thirds", "full"):
+            for factor in (1 / 3, 2 / 3):
+                x = rect.left() + rect.width() * factor
+                y = rect.top() + rect.height() * factor
+                painter.drawLine(QPointF(x, rect.top()), QPointF(x, rect.bottom()))
+                painter.drawLine(QPointF(rect.left(), y), QPointF(rect.right(), y))
+
+        if preset in ("center", "full"):
+            center_pen = QPen(color)
+            center_pen.setStyle(Qt.PenStyle.DashLine)
+            painter.setPen(center_pen)
+            cx = rect.center().x()
+            cy = rect.center().y()
+            painter.drawLine(QPointF(cx, rect.top()), QPointF(cx, rect.bottom()))
+            painter.drawLine(QPointF(rect.left(), cy), QPointF(rect.right(), cy))
+
+        if preset == "margins":
+            for factor in (0.1, 0.9):
+                x = rect.left() + rect.width() * factor
+                y = rect.top() + rect.height() * factor
+                painter.drawLine(QPointF(x, rect.top()), QPointF(x, rect.bottom()))
+                painter.drawLine(QPointF(rect.left(), y), QPointF(rect.right(), y))
+
+        if preset == "grid":
+            for factor in (0.25, 0.5, 0.75):
+                x = rect.left() + rect.width() * factor
+                y = rect.top() + rect.height() * factor
+                painter.drawLine(QPointF(x, rect.top()), QPointF(x, rect.bottom()))
+                painter.drawLine(QPointF(rect.left(), y), QPointF(rect.right(), y))
             
     def _draw_indicator(self, painter, text: str, color: QColor):
         painter.setOpacity(self._badge_opacity)
@@ -612,55 +721,93 @@ class FloatingToolbar(QFrame):
     gridToggled = pyqtSignal(bool)
     zoomChanged = pyqtSignal(int)
     bgColorChanged = pyqtSignal(str)
+    guideSettingsChanged = pyqtSignal(dict)
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setProperty("class", "floating-toolbar")
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
         self.setMinimumHeight(44)
+        self._guide_settings = {
+            "preset": "thirds",
+            "color": "#FFFFFF",
+            "opacity": 42,
+        }
         self._setup_ui()
         
     def _setup_ui(self):
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(10, 6, 10, 6)
-        layout.setSpacing(12)
+        layout.setContentsMargins(8, 5, 8, 5)
+        layout.setSpacing(8)
         layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         
         # Grid button
-        self.btn_grid = QPushButton("Guías")
-        self.btn_grid.setProperty("class", "toolbar-btn")
+        self.btn_grid = QPushButton(qta.icon('fa5s.th-large', color=COLORS['text_secondary']), "")
+        self.btn_grid.setProperty("class", "icon-btn")
         self.btn_grid.setCheckable(True)
-        self.btn_grid.setToolTip("Guías de composición (regla de tercios)")
-        self.btn_grid.setMinimumWidth(90)
-        self.btn_grid.setFixedHeight(30)
+        self.btn_grid.setToolTip("Mostrar u ocultar guías de composición")
         self.btn_grid.toggled.connect(self._on_grid_toggled)
         layout.addWidget(self.btn_grid, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        self.cmb_guides = QComboBox()
+        self.cmb_guides.setProperty("class", "toolbar-combo")
+        self.cmb_guides.setFixedWidth(118)
+        self.cmb_guides.setToolTip("Preset de guías")
+        for text, value in [
+            ("Tercios", "thirds"),
+            ("Centro", "center"),
+            ("Margen 10%", "margins"),
+            ("Cuadrícula", "grid"),
+            ("Completo", "full"),
+        ]:
+            self.cmb_guides.addItem(text, value)
+        self.cmb_guides.currentIndexChanged.connect(self._emit_guide_settings)
+        layout.addWidget(self.cmb_guides, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        self.guide_opacity = QSlider(Qt.Orientation.Horizontal)
+        self.guide_opacity.setProperty("class", "toolbar-slider")
+        self.guide_opacity.setRange(15, 90)
+        self.guide_opacity.setValue(self._guide_settings["opacity"])
+        self.guide_opacity.setFixedWidth(76)
+        self.guide_opacity.setToolTip("Transparencia de las guías")
+        self.guide_opacity.valueChanged.connect(self._emit_guide_settings)
+        layout.addWidget(self.guide_opacity, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        self._guide_buttons = []
+        for color, name in [("#FFFFFF", "Blanco"), ("#0A84FF", "Azul"), ("#FF9F0A", "Ámbar")]:
+            btn = QPushButton()
+            btn.setProperty("class", "mini-swatch")
+            btn.setCheckable(True)
+            btn.setFixedSize(20, 20)
+            btn.setToolTip(f"Guía {name}")
+            btn.clicked.connect(lambda checked, c=color: self._select_guide_color(c))
+            layout.addWidget(btn, 0, Qt.AlignmentFlag.AlignVCenter)
+            self._guide_buttons.append((btn, color))
+        self._select_guide_color(self._guide_settings["color"], emit=False)
         
-        # Background label
-        bg_label = QLabel("Fondo")
-        bg_label.setProperty("class", "panel-label")
-        bg_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
-        bg_label.setFixedHeight(30)
-        layout.addWidget(bg_label, 0, Qt.AlignmentFlag.AlignVCenter)
+        divider = QFrame()
+        divider.setProperty("class", "toolbar-divider")
+        divider.setFixedSize(1, 24)
+        layout.addWidget(divider)
         
         # Background color buttons
         swatch_group = QFrame()
         swatch_group.setProperty("class", "swatch-group")
-        swatch_group.setFixedHeight(30)
+        swatch_group.setFixedHeight(28)
         swatch_layout = QHBoxLayout(swatch_group)
         swatch_layout.setContentsMargins(3, 3, 3, 3)
-        swatch_layout.setSpacing(6)
+        swatch_layout.setSpacing(5)
         swatch_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._bg_group = QButtonGroup(self)
         self._bg_group.setExclusive(True)
         self._bg_buttons = []
-        for color, name in [("#FFFFFF", "Blanco"), ("#E6E6E6", "Gris"), ("#2A2A2A", "Oscuro")]:
+        for color, name in [("#FFFFFF", "Fondo blanco"), ("#E6E6E6", "Fondo gris"), ("#2A2A2A", "Fondo oscuro")]:
             btn = QPushButton()
             btn.setProperty("class", "swatch-btn")
             btn.setCheckable(True)
-            btn.setFixedSize(24, 24)
+            btn.setFixedSize(22, 22)
             btn.setStyleSheet(f"background-color: {color};")
-            btn.setToolTip(f"Fondo {name}")
+            btn.setToolTip(name)
             btn.clicked.connect(lambda checked, c=color: self._select_background(c))
             self._bg_group.addButton(btn)
             swatch_layout.addWidget(btn)
@@ -670,11 +817,28 @@ class FloatingToolbar(QFrame):
 
         # Default selection
         self._select_background("#E6E6E6", emit=False)
-        self.setMinimumWidth(320)
+        self.setMinimumWidth(430)
     
     def _on_grid_toggled(self, checked: bool):
         """Handle grid button toggle with visual feedback."""
         self.gridToggled.emit(checked)
+        self._emit_guide_settings()
+
+    def _select_guide_color(self, color: str, emit: bool = True):
+        self._guide_settings["color"] = color
+        for btn, value in getattr(self, "_guide_buttons", []):
+            btn.setChecked(value == color)
+            border = COLORS['accent_primary'] if value == color else COLORS['border']
+            btn.setStyleSheet(f"background-color: {value}; border: 1px solid {border};")
+        if emit:
+            self._emit_guide_settings()
+
+    def _emit_guide_settings(self):
+        if hasattr(self, "cmb_guides"):
+            self._guide_settings["preset"] = self.cmb_guides.currentData()
+        if hasattr(self, "guide_opacity"):
+            self._guide_settings["opacity"] = self.guide_opacity.value()
+        self.guideSettingsChanged.emit(dict(self._guide_settings))
 
     def _select_background(self, color: str, emit: bool = True):
         for btn, value in getattr(self, "_bg_buttons", []):
@@ -694,6 +858,22 @@ class FloatingToolbar(QFrame):
         self.btn_grid.blockSignals(not emit)
         self.btn_grid.setChecked(bool(enabled))
         self.btn_grid.blockSignals(False)
+
+    def set_guide_settings(self, settings: dict, emit: bool = False):
+        self._guide_settings.update(settings or {})
+        preset = self._guide_settings.get("preset", "thirds")
+        index = self.cmb_guides.findData(preset)
+        if index >= 0:
+            self.cmb_guides.blockSignals(True)
+            self.cmb_guides.setCurrentIndex(index)
+            self.cmb_guides.blockSignals(False)
+
+        self.guide_opacity.blockSignals(True)
+        self.guide_opacity.setValue(int(self._guide_settings.get("opacity", 42)))
+        self.guide_opacity.blockSignals(False)
+        self._select_guide_color(self._guide_settings.get("color", "#FFFFFF"), emit=False)
+        if emit:
+            self._emit_guide_settings()
 
 
 class ModernSplashScreen(QWidget):

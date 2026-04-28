@@ -1,5 +1,4 @@
 import os
-import numpy as np
 from pathlib import Path
 from PIL import Image
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QFrame, 
@@ -10,6 +9,14 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QPixmap, QImage, QPainter, QColor, QPen
 from flatshot.ui.widgets import CurveGraphWidget
 from flatshot.core.models import ExportConfig
+from flatshot.core.scaling import (
+    DEFAULT_SCALE_CURVE,
+    build_curve_from_controls,
+    calculate_subject_scale,
+    find_subject_bbox,
+    get_curve_control_values,
+    normalize_curve_data,
+)
 from flatshot.ui.styles import COLORS
 from flatshot.workers.export_worker import apply_naming_template
 
@@ -43,7 +50,7 @@ class CurveEditorDialog(QDialog):
         info_card.setProperty("class", "dialog-card")
         info_layout = QVBoxLayout(info_card)
         info_layout.setContentsMargins(10, 8, 10, 8)
-        info = QLabel(f"<b>Sistema de 5 Puntos:</b> Control basado en la geometría de la imagen.<br>"
+        info = QLabel(f"<b>Sistema de 5 Puntos:</b> Control basado en geometría y masa visual.<br>"
                       "Las imágenes se clasifican automáticamente desde <b>Formato Vertical</b> hasta <b>Formato Horizontal</b>.")
         info.setProperty("class", "dialog-text")
         info.setWordWrap(True)
@@ -74,9 +81,9 @@ class CurveEditorDialog(QDialog):
             ('c5_xwide',    'MUY ANCHO',      "Panorámico (Oversize)",          0.95)
         ]
         
-        saved_fp = self.curve.get('fp', [])
+        saved_fp = get_curve_control_values(self.curve)
         if len(saved_fp) != 5:
-            saved_fp = [0.98, 0.75, 0.85, 0.90, 0.95]
+            saved_fp = get_curve_control_values(DEFAULT_SCALE_CURVE)
         
         for i, (key, title, sub, def_val) in enumerate(cats):
             frame = QFrame(); frame.setProperty("class", "card")
@@ -142,7 +149,7 @@ class CurveEditorDialog(QDialog):
             for f in files[:150]:
                 try:
                     with Image.open(f) as im:
-                        bbox = im.getbbox()
+                        bbox = find_subject_bbox(im.convert("RGBA"))
                         if bbox:
                             w = bbox[2]-bbox[0]; h = bbox[3]-bbox[1]
                             data.append({'ar': w/h, 'img': im.copy(), 'path': f})
@@ -193,18 +200,12 @@ class CurveEditorDialog(QDialog):
 
     def get_current_curve(self):
         keys = ['c1_narrow', 'c2_semi', 'c3_regular', 'c4_wide', 'c5_xwide']
-        
-        xp = [0.35, 0.60, 0.85, 1.10, 1.40]
         fp = [self.inputs[k]['spin'].value() for k in keys]
-        
-        final_xp = [0.0] + xp + [3.0]
-        final_fp = [fp[0]] + fp + [fp[-1]]
-        
-        return {'xp': final_xp, 'fp': final_fp}
+        return build_curve_from_controls(fp, self.curve).model_dump()
 
     def refresh_preview(self, *args):
-        curve = self.get_current_curve()
-        self.graph.update_data(curve)
+        curve = normalize_curve_data(self.get_current_curve())
+        self.graph.update_data(curve.model_dump())
         
         canvas_w, canvas_h = 220, 300
         pad = self.padding_percent / 100.0
@@ -217,22 +218,11 @@ class CurveEditorDialog(QDialog):
             if key not in self.samples or not self.samples[key]: continue
             item = self.samples[key]
             img = item['img']
-            real_ar = item['ar']
-            
-            s_fit_h = safe_h / img.height
-            s_fit_w = safe_w / img.width
-            mix = np.interp(real_ar, [0.4, 1.0], [0.0, 1.0])
-            base_scale = s_fit_h * (1-mix) + s_fit_w * mix
-            
-            adj = np.interp(real_ar, curve['xp'], curve['fp'])
-            final_scale = base_scale * adj
-            
-            pw = img.width * final_scale; ph = img.height * final_scale
-            if pw > safe_w: final_scale = safe_w / img.width
-            if ph > safe_h: final_scale = min(final_scale, safe_h / img.height)
-            
-            tgt_w = int(img.width * final_scale)
-            tgt_h = int(img.height * final_scale)
+            bbox = find_subject_bbox(img.convert("RGBA"))
+            subject_img = img.crop(bbox) if bbox else img
+            scale_result = calculate_subject_scale(subject_img, (safe_w, safe_h), curve, color_scale_factor=1.0)
+            tgt_w = scale_result.width
+            tgt_h = scale_result.height
             
             base = QImage(canvas_w, canvas_h, QImage.Format.Format_RGB32)
             base.fill(QColor("#21252B"))
@@ -243,7 +233,7 @@ class CurveEditorDialog(QDialog):
             off_x = (canvas_w - safe_w)//2; off_y = (canvas_h - safe_h)//2
             p.drawRect(off_x, off_y, safe_w, safe_h)
             
-            resized = img.resize((max(1,tgt_w), max(1,tgt_h)), Image.Resampling.NEAREST)
+            resized = subject_img.resize((max(1,tgt_w), max(1,tgt_h)), Image.Resampling.NEAREST)
             if resized.mode == "RGBA":
                 d = resized.tobytes("raw", "RGBA")
                 qim = QImage(d, resized.width, resized.height, resized.width * 4, QImage.Format.Format_RGBA8888).copy()

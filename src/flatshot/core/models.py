@@ -34,6 +34,10 @@ class ExportConfig(BaseModel):
 class CurveData(BaseModel):
     xp: List[float]
     fp: List[float]
+    base_fill: float = Field(0.52, ge=0.10, le=0.90)
+    aspect_mix: float = Field(0.45, ge=0.0, le=1.0)
+    occupancy_influence: float = Field(0.42, ge=0.0, le=1.0)
+    manual_curve_strength: float = Field(0.60, ge=0.0, le=1.0)
 
 class JobItem(BaseModel):
     """Represents a folder in the processing queue."""

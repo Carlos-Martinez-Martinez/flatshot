@@ -559,6 +559,12 @@ QComboBox[class="compact"] {{
     min-height: 24px;
     font-size: 12px;
 }}
+QComboBox[class="toolbar-combo"] {{
+    background-color: {COLORS['bg_raised']};
+    padding: 4px 22px 4px 8px;
+    min-height: 22px;
+    font-size: 11px;
+}}
 
 /* ===== LINE EDITS ===== */
 QLineEdit {{
@@ -751,7 +757,10 @@ QFrame[class="card"] {{
 QFrame[class="floating-toolbar"] {{
     background-color: {COLORS['bg_secondary']};
     border: 1px solid {COLORS['border']};
-    border-radius: 12px;
+    border-radius: 8px;
+}}
+QFrame[class="toolbar-divider"] {{
+    background-color: {COLORS['divider']};
 }}
 QPushButton[class="toolbar-btn"] {{
     background-color: {COLORS['bg_raised']};
@@ -783,6 +792,36 @@ QPushButton[class="swatch-btn"] {{
 }}
 QPushButton[class="swatch-btn"]:checked {{
     border: 2px solid {COLORS['accent_primary']};
+}}
+QPushButton[class="mini-swatch"] {{
+    border: 1px solid {COLORS['border']};
+    border-radius: 5px;
+    padding: 0;
+    min-width: 18px;
+    min-height: 18px;
+}}
+QPushButton[class="mini-swatch"]:checked {{
+    border: 2px solid {COLORS['accent_primary']};
+}}
+QSlider[class="toolbar-slider"] {{
+    min-height: 22px;
+    max-height: 22px;
+}}
+QSlider[class="toolbar-slider"]::groove:horizontal {{
+    height: 4px;
+    background: {COLORS['bg_raised']};
+    border-radius: 2px;
+}}
+QSlider[class="toolbar-slider"]::handle:horizontal {{
+    background: {COLORS['text_secondary']};
+    border: 1px solid {COLORS['border']};
+    width: 12px;
+    height: 12px;
+    margin: -5px 0;
+    border-radius: 6px;
+}}
+QSlider[class="toolbar-slider"]::handle:horizontal:hover {{
+    background: {COLORS['accent_hover']};
 }}
 
 /* ===== SPLITTER ===== */

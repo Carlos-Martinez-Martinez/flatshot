@@ -24,6 +24,7 @@ from PyQt6.QtGui import QPixmap, QImage, QPainter, QColor, QPainterPath, QAction
 
 from flatshot.core.engine import ShadowEngine
 from flatshot.core.models import ShadowSettings, ExportConfig, CurveData, JobItem
+from flatshot.core.scaling import DEFAULT_SCALE_CURVE, normalize_curve_data
 from flatshot.utils.config import ConfigManager
 from flatshot.utils.history_manager import HistoryManager
 from flatshot.utils.log_manager import LogManager
@@ -181,11 +182,8 @@ class MainWindow(QMainWindow):
         self.settings_file = ConfigManager.get_config_dir() / "settings.json"
         self.app_settings = self._load_app_settings()
         
-        curve_dict = self.app_settings.get('scale_curve', {
-            'xp': [0.15, 0.42, 0.52, 0.85, 1.20],
-            'fp': [0.98, 0.98, 0.70, 0.82, 0.80]
-        })
-        self.scale_curve = CurveData(**curve_dict)
+        curve_dict = self.app_settings.get('scale_curve', DEFAULT_SCALE_CURVE.copy())
+        self.scale_curve = normalize_curve_data(curve_dict)
         
         # Build UI
         self._init_menu()
@@ -299,7 +297,7 @@ class MainWindow(QMainWindow):
         view_menu = menubar.addMenu("Ver")
         
         grid_action = QAction("Mostrar cuadrícula", self, checkable=True)
-        grid_action.triggered.connect(lambda checked: self.canvas.setGridVisible(checked))
+        grid_action.triggered.connect(self._on_preview_grid_toggled)
         view_menu.addAction(grid_action)
         
         # Help menu
@@ -756,10 +754,10 @@ class MainWindow(QMainWindow):
         self.chk_adaptive.setChecked(True)
         self.chk_adaptive.setToolTip(
             "<b>Compensación óptica automática</b><br><br>"
-            "Ajusta el tamaño del producto según su proporción (aspect ratio).<br><br>"
-            "Los productos más anchos se escalan ligeramente diferente<br>"
-            "que los más verticales, para que visualmente ocupen<br>"
-            "un espacio similar en la imagen final.<br><br>"
+            "Ajusta el tamaño del producto según su geometría y su masa visual.<br><br>"
+            "Combina la proporción de la silueta con su ocupación real<br>"
+            "para equilibrar mejor camisetas, pantalones, prendas oversize<br>"
+            "y piezas con huecos o volúmenes distintos.<br><br>"
             "<b>Activado:</b> Tamaño perceptualmente uniforme<br>"
             "<b>Desactivado:</b> Escalado matemático puro"
         )
@@ -976,6 +974,7 @@ class MainWindow(QMainWindow):
         self.floating_toolbar = FloatingToolbar()
         self.floating_toolbar.gridToggled.connect(self._on_preview_grid_toggled)
         self.floating_toolbar.bgColorChanged.connect(self._on_preview_bg_changed)
+        self.floating_toolbar.guideSettingsChanged.connect(self._on_preview_guides_changed)
         toolbar_layout.addWidget(self.floating_toolbar)
         
         layout.addWidget(toolbar)
@@ -988,9 +987,12 @@ class MainWindow(QMainWindow):
         # Restore preview UI preferences
         saved_bg = self.app_settings.get('preview_bg_color', "#E6E6E6")
         saved_grid = bool(self.app_settings.get('preview_grid', False))
+        saved_guides = self.app_settings.get('preview_guides', {})
         self.canvas.setBackgroundColor(QColor(saved_bg))
         self.canvas.setGridVisible(saved_grid)
+        self.canvas.setGuideSettings(saved_guides)
         self.floating_toolbar.set_background(saved_bg, emit=False)
+        self.floating_toolbar.set_guide_settings(saved_guides, emit=False)
         self.floating_toolbar.set_grid_enabled(saved_grid, emit=False)
         
         # Help text
@@ -1237,6 +1239,8 @@ class MainWindow(QMainWindow):
         self._save_app_settings()
 
     def _on_preview_grid_toggled(self, enabled: bool):
+        if hasattr(self, 'floating_toolbar'):
+            self.floating_toolbar.set_grid_enabled(bool(enabled), emit=False)
         self.canvas.setGridVisible(bool(enabled))
         self.app_settings['preview_grid'] = bool(enabled)
         self._save_app_settings()
@@ -1244,6 +1248,11 @@ class MainWindow(QMainWindow):
     def _on_preview_bg_changed(self, color: str):
         self.canvas.setBackgroundColor(QColor(color))
         self.app_settings['preview_bg_color'] = color
+        self._save_app_settings()
+
+    def _on_preview_guides_changed(self, settings: dict):
+        self.canvas.setGuideSettings(settings)
+        self.app_settings['preview_guides'] = dict(settings)
         self._save_app_settings()
 
     def _save_splitter_sizes(self):
@@ -1481,10 +1490,14 @@ class MainWindow(QMainWindow):
             'output_destination': 'subfolder',
             'custom_output_path': None,
             'last_input_folder': '',
-            'scale_curve': {
-                'xp': [0.0, 0.35, 0.60, 0.85, 1.10, 1.40, 3.0],
-                'fp': [0.80, 0.80, 0.90, 1.00, 0.95, 0.90, 0.90]
+            'preview_bg_color': '#E6E6E6',
+            'preview_grid': False,
+            'preview_guides': {
+                'preset': 'thirds',
+                'color': '#FFFFFF',
+                'opacity': 42,
             },
+            'scale_curve': dict(DEFAULT_SCALE_CURVE),
             'section_visibility': {
                 'presets': True,
                 'lighting': True,
@@ -1793,10 +1806,7 @@ class MainWindow(QMainWindow):
         self.chk_adaptive.setChecked(True)
         
         # Reset scale curve to new optimal defaults
-        self.scale_curve = CurveData(
-            xp=[0.0, 0.35, 0.60, 0.85, 1.10, 1.40, 3.0],
-            fp=[0.80, 0.80, 0.90, 1.00, 0.95, 0.90, 0.90]
-        )
+        self.scale_curve = CurveData(**DEFAULT_SCALE_CURVE)
         self._save_app_settings()
         
         self._schedule_preview()

@@ -3,6 +3,7 @@ import numpy as np
 from PIL import Image, ImageFilter, ImageChops
 from typing import Tuple, Optional
 from flatshot.core.models import ShadowSettings, CurveData
+from flatshot.core.scaling import build_subject_mask, calculate_subject_scale, find_subject_bbox
 
 class ShadowEngine:
     _noise_cache = {}
@@ -135,50 +136,21 @@ class ShadowEngine:
         safe_w = int(canvas_w * (1.0 - padding_pct))
         safe_h = int(canvas_h * (1.0 - padding_pct))
         
-        bbox = original_rgba.getbbox()
+        bbox = find_subject_bbox(original_rgba)
         if bbox: original_trimmed = original_rgba.crop(bbox)
         else: original_trimmed = original_rgba
 
         color_scale_factor, lum_val = ShadowEngine._calcular_factor_color(original_trimmed)
 
         if settings.adaptive_zoom and curve_data:
-            real_w, real_h = original_trimmed.size
-            if real_w > 0 and real_h > 0:
-                aspect_ratio = real_w / real_h
-                
-                # Calculate the scale that would fit the image within safe bounds
-                scale_fit = min(safe_w / real_w, safe_h / real_h)
-                
-                # Target visual area as percentage of safe area
-                # A "regular" product (AR ~0.85) should fill about 50% of safe area
-                safe_area = safe_w * safe_h
-                target_fill = 0.50  # Base target: 50% of safe area
-                
-                # Get curve adjustment factor
-                adj = np.interp(aspect_ratio, curve_data.xp, curve_data.fp)
-                
-                # Calculate current area if scaled to fit
-                fitted_w = real_w * scale_fit
-                fitted_h = real_h * scale_fit
-                fitted_area = fitted_w * fitted_h
-                
-                # Calculate scale needed to hit target area (adjusted by curve)
-                target_area = safe_area * target_fill * adj
-                area_scale = np.sqrt(target_area / (real_w * real_h))
-                
-                # Use the smaller of: area-based scale or fit scale (to not exceed bounds)
-                final_scale = min(area_scale, scale_fit) * color_scale_factor
-                
-                # Safety clamp: ensure we don't exceed safe bounds
-                prop_w = real_w * final_scale
-                prop_h = real_h * final_scale
-                if prop_w > safe_w: final_scale = safe_w / real_w
-                if prop_h > safe_h: final_scale = min(final_scale, safe_h / real_h)
-                
-                new_w = max(1, int(real_w * final_scale))
-                new_h = max(1, int(real_h * final_scale))
-            else: 
-                new_w, new_h = 100, 100
+            scale_result = calculate_subject_scale(
+                original_trimmed,
+                (safe_w, safe_h),
+                curve_data,
+                color_scale_factor=color_scale_factor,
+            )
+            new_w = scale_result.width
+            new_h = scale_result.height
         else:
             ratio = min(safe_w / original_trimmed.width, safe_h / original_trimmed.height)
             new_w = int(original_trimmed.width * ratio)
@@ -249,8 +221,13 @@ class ShadowEngine:
         pos_x = (canvas_w // 2) - cx
         pos_y = ((canvas_h // 2) - opt_y) - cy
 
+        subject_mask = build_subject_mask(subject_resized)
+        paste_mask = subject_resized.getchannel("A")
+        if paste_mask.getextrema()[0] >= 250:
+            paste_mask = subject_mask
+
         silueta_canvas = Image.new("L", target_size, 0)
-        silueta_canvas.paste(subject_resized.split()[-1], (pos_x, pos_y))
+        silueta_canvas.paste(subject_mask, (pos_x, pos_y))
 
         shadow_density_mult = 1.7 - (lum_val * 0.8)
         
@@ -296,11 +273,11 @@ class ShadowEngine:
         if settings.transparent_bg:
             final = Image.new("RGBA", target_size, (0,0,0,0))
             final.paste(final_shadow, (0, 0), mask=final_shadow)
-            final.paste(subject_resized, (pos_x, pos_y), mask=subject_resized)
+            final.paste(subject_resized, (pos_x, pos_y), mask=paste_mask)
             return final
         else:
             bg = settings.bg_color
             final = Image.new("RGB", target_size, bg)
             final.paste(final_shadow, (0, 0), mask=final_shadow)
-            final.paste(subject_resized, (pos_x, pos_y), mask=subject_resized)
+            final.paste(subject_resized, (pos_x, pos_y), mask=paste_mask)
             return final

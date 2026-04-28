@@ -9,6 +9,7 @@ from time import time
 
 from flatshot.core.engine import ShadowEngine
 from flatshot.core.models import ShadowSettings, ExportConfig, CurveData
+from flatshot.core.scaling import DEFAULT_SCALE_CURVE, normalize_curve_data
 from flatshot.utils.config import ConfigManager
 from flatshot.utils.log_manager import LogManager
 
@@ -117,11 +118,8 @@ def process_folder(args):
         with open(settings_file, 'r') as f:
             app_settings = json.load(f)
     
-    curve_dict = app_settings.get('scale_curve', {
-        'xp': [0.0, 0.35, 0.60, 0.85, 1.10, 1.40, 3.0],
-        'fp': [0.80, 0.80, 0.90, 1.00, 0.95, 0.90, 0.90]
-    })
-    curve_data = CurveData(**curve_dict)
+    curve_dict = app_settings.get('scale_curve', DEFAULT_SCALE_CURVE.copy())
+    curve_data = normalize_curve_data(curve_dict)
     
     # Process images
     from PIL import Image

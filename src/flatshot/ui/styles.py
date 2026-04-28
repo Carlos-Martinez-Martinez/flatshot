@@ -127,6 +127,28 @@ QWidget[class="sidebar"] {{
     background-color: {COLORS['bg_primary']};
     border-right: 1px solid {COLORS['divider']};
 }}
+QFrame[class="app-shell"] {{
+    background-color: {COLORS['bg_primary']};
+}}
+QFrame[class="workflow-panel"] {{
+    background-color: {COLORS['bg_primary']};
+    border-right: 1px solid {COLORS['divider']};
+}}
+QFrame[class="canvas-workbench"] {{
+    background-color: #242424;
+    border-right: 1px solid {COLORS['divider']};
+}}
+QFrame[class="batch-panel"] {{
+    background-color: {COLORS['bg_primary']};
+}}
+QFrame[class="command-bar"] {{
+    background-color: {COLORS['bg_secondary']};
+    border-bottom: 1px solid {COLORS['divider']};
+}}
+QFrame[class="export-bar"] {{
+    background-color: {COLORS['bg_secondary']};
+    border-top: 1px solid {COLORS['divider']};
+}}
 QWidget[class="panel"] {{
     background-color: {COLORS['bg_primary']};
 }}
@@ -203,6 +225,41 @@ QLabel[class="app-title"] {{
     letter-spacing: 0.4px;
     padding: 4px 2px 8px 2px;
 }}
+QLabel[class="workflow-title"] {{
+    font-size: 16px;
+    font-weight: 700;
+    color: {COLORS['text_primary']};
+    letter-spacing: 0.2px;
+}}
+QLabel[class="workflow-subtitle"] {{
+    font-size: 11px;
+    font-weight: 600;
+    color: {COLORS['text_muted']};
+    padding-bottom: 2px;
+}}
+QLabel[class="command-current"] {{
+    background-color: {COLORS['bg_raised']};
+    border: 1px solid {COLORS['border']};
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: {COLORS['text_secondary']};
+}}
+QLabel[class="batch-count"] {{
+    font-size: 11px;
+    color: {COLORS['text_muted']};
+    padding-left: 8px;
+}}
+QLabel[class="export-summary-title"] {{
+    font-size: 13px;
+    font-weight: 700;
+    color: {COLORS['text_primary']};
+}}
+QLabel[class="export-summary-subtitle"] {{
+    font-size: 11px;
+    color: {COLORS['text_muted']};
+}}
 QLabel[class="subheading"] {{
     font-size: 12px;
     color: {COLORS['text_secondary']};
@@ -217,18 +274,18 @@ QLabel[class="info-label"] {{
     padding: 8px;
 }}
 QLabel[class="section-title"] {{
-    font-size: 11px;
-    font-weight: 600;
-    color: {COLORS['text_secondary']};
+    font-size: 10px;
+    font-weight: 700;
+    color: {COLORS['text_muted']};
     text-transform: uppercase;
-    letter-spacing: 0.6px;
+    letter-spacing: 0.8px;
 }}
 QLabel[class="panel-title"] {{
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 11px;
+    font-weight: 700;
     color: {COLORS['text_secondary']};
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 0.4px;
 }}
 QLabel[class="panel-label"] {{
     font-size: 12px;
@@ -236,10 +293,9 @@ QLabel[class="panel-label"] {{
 }}
 QLabel[class="toolbar-section-label"] {{
     font-size: 11px;
-    font-weight: 700;
-    color: {COLORS['text_secondary']};
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-weight: 600;
+    color: {COLORS['text_muted']};
+    letter-spacing: 0.2px;
 }}
 QLabel[class="toolbar-hint"] {{
     font-size: 11px;
@@ -273,8 +329,9 @@ QLabel[class="local-status-active"] {{
     color: #A9D2FF;
 }}
 QLabel[class="panel-path"] {{
-    font-size: 12px;
+    font-size: 11px;
     color: {COLORS['text_muted']};
+    padding: 0 2px;
 }}
 QLabel[class="help-text"] {{
     font-size: 12px;
@@ -316,6 +373,21 @@ QLabel[class="success-text"] {{
     font-size: 11px;
     color: {COLORS['success']};
 }}
+QPushButton[class="primary"] {{
+    background-color: {COLORS['accent_primary']};
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 700;
+    color: white;
+}}
+QPushButton[class="primary"]:hover {{
+    background-color: {COLORS['accent_hover']};
+}}
+QPushButton[class="primary"]:pressed {{
+    background-color: {COLORS['accent_pressed']};
+}}
 QLabel[class="keycap"] {{
     background-color: {COLORS['bg_raised']};
     border: 1px solid {COLORS['border']};
@@ -351,25 +423,12 @@ QPushButton:disabled {{
     background-color: {COLORS['bg_secondary']};
     color: {COLORS['text_disabled']};
 }}
-QPushButton[class="primary"] {{
-    background-color: {COLORS['accent_primary']};
-    border: none;
-    color: white;
-    font-weight: 600;
-    padding: 12px 20px;
-    font-size: 14px;
-}}
-QPushButton[class="primary"]:hover {{
-    background-color: {COLORS['accent_hover']};
-}}
-QPushButton[class="primary"]:pressed {{
-    background-color: {COLORS['accent_pressed']};
-}}
 QPushButton[class="secondary"] {{
     background-color: {COLORS['bg_raised']};
     border: 1px solid {COLORS['border']};
     color: {COLORS['text_primary']};
     font-weight: 600;
+    padding: 8px 14px;
 }}
 QPushButton[class="secondary"]:hover {{
     background-color: {COLORS['bg_hover']};
@@ -401,6 +460,7 @@ QPushButton[class="ghost"] {{
     background: transparent;
     border: 1px solid {COLORS['border']};
     color: {COLORS['text_secondary']};
+    padding: 8px 14px;
 }}
 QPushButton[class="ghost"]:hover {{
     background-color: {COLORS['bg_hover']};
@@ -436,6 +496,31 @@ QPushButton[class="success-solid"] {{
 }}
 QPushButton[class="success-solid"]:hover {{
     background-color: #3DDC71;
+}}
+QPushButton[class="preset-action"],
+QPushButton[class="preset-action-danger"],
+QPushButton[class="batch-filter"] {{
+    background-color: {COLORS['bg_raised']};
+    border: 1px solid {COLORS['border']};
+    color: {COLORS['text_secondary']};
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 8px;
+    min-height: 22px;
+}}
+QPushButton[class="preset-action"]:hover,
+QPushButton[class="preset-action-danger"]:hover,
+QPushButton[class="batch-filter"]:hover {{
+    background-color: {COLORS['bg_hover']};
+    border-color: {COLORS['border_focus']};
+}}
+QPushButton[class="preset-action-danger"] {{
+    color: {COLORS['error']};
+}}
+QPushButton[class="batch-filter"]:checked {{
+    background-color: rgba(10, 132, 255, 0.18);
+    border-color: {COLORS['accent_primary']};
+    color: #A9D2FF;
 }}
 
 /* ===== SEGMENTED CONTROL (COMPACT) ===== */
@@ -487,6 +572,31 @@ QFrame[class="preview-tile"] {{
 }}
 QFrame[class="preview-tile"]:hover {{
     border-color: {COLORS['accent_primary']};
+}}
+QLabel[class="tile-status-ok"],
+QLabel[class="tile-status-adjusted"],
+QLabel[class="tile-status-error"],
+QLabel[class="tile-status-processing"] {{
+    border-radius: 7px;
+    padding: 3px 6px;
+    font-size: 10px;
+    font-weight: 800;
+}}
+QLabel[class="tile-status-ok"] {{
+    background-color: rgba(52, 199, 89, 0.14);
+    color: #8EE7A5;
+}}
+QLabel[class="tile-status-adjusted"] {{
+    background-color: rgba(10, 132, 255, 0.18);
+    color: #A9D2FF;
+}}
+QLabel[class="tile-status-error"] {{
+    background-color: rgba(255, 69, 58, 0.18);
+    color: #FF9D97;
+}}
+QLabel[class="tile-status-processing"] {{
+    background-color: {COLORS['bg_raised']};
+    color: {COLORS['text_muted']};
 }}
 
 /* ===== TABLES ===== */
@@ -799,25 +909,45 @@ QFrame[class="card"] {{
     border: 1px solid {COLORS['border']};
     border-radius: 10px;
 }}
+QFrame[class="essential-card"] {{
+    background-color: {COLORS['bg_secondary']};
+    border: 1px solid {COLORS['border']};
+    border-radius: 12px;
+}}
+QFrame[class="export-cluster"],
+QFrame[class="export-summary"],
+QFrame[class="export-progress"],
+QFrame[class="export-actions"] {{
+    background-color: transparent;
+}}
 QFrame[class="floating-toolbar"] {{
     background-color: {COLORS['bg_secondary']};
     border: 1px solid {COLORS['border']};
     border-radius: 8px;
 }}
+QFrame[class="floating-toolbar-inline"] {{
+    background-color: transparent;
+    border: none;
+}}
 QFrame[class="local-adjust-panel"] {{
-    background-color: {COLORS['bg_primary']};
+    background-color: {COLORS['bg_secondary']};
     border: 1px solid {COLORS['border']};
-    border-radius: 8px;
+    border-radius: 12px;
 }}
 QFrame[class="toolbar-divider"] {{
     background-color: {COLORS['divider']};
 }}
+QFrame[class="toolbar-separator-v"] {{
+    background-color: {COLORS['divider']};
+    max-width: 1px;
+}}
 QPushButton[class="toolbar-btn"] {{
     background-color: {COLORS['bg_raised']};
     border: 1px solid {COLORS['border']};
-    border-radius: 8px;
-    padding: 6px 12px;
-    min-height: 28px;
+    border-radius: 6px;
+    padding: 4px 10px;
+    min-height: 24px;
+    font-size: 11px;
     font-weight: 600;
     color: {COLORS['text_secondary']};
 }}
@@ -968,18 +1098,33 @@ QPushButton[class="segment-left"] {{
     border-top-right-radius: 0;
     border-bottom-right-radius: 0;
     border-right: none;
+    padding: 4px 10px;
+    min-height: 22px;
+    font-size: 11px;
+    font-weight: 600;
 }}
 QPushButton[class="segment-middle"] {{
     background-color: {COLORS['bg_raised']};
     border: 1px solid {COLORS['border']};
     border-radius: 0;
     border-right: none;
+    padding: 4px 10px;
+    min-height: 22px;
+    font-size: 11px;
+    font-weight: 600;
 }}
 QPushButton[class="segment-right"] {{
     background-color: {COLORS['bg_raised']};
     border: 1px solid {COLORS['border']};
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
+    padding: 4px 10px;
+    min-height: 22px;
+    font-size: 11px;
+    font-weight: 600;
+}}
+QPushButton[class^="segment"]:hover {{
+    background-color: {COLORS['bg_hover']};
 }}
 QPushButton[class^="segment"]:checked {{
     background-color: {COLORS['accent_primary']};

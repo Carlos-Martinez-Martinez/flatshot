@@ -38,6 +38,7 @@ from flatshot.utils.log_manager import LogManager
 from flatshot.utils.session_manager import SessionManager
 from flatshot.ui.dialogs import CurveEditorDialog, ExportConfigDialog
 from flatshot.ui.styles import scale_stylesheet, COLORS
+from flatshot.ui.shell import AppShell, WorkflowPanel, CanvasWorkbench, BatchPanel, ExportBar, CommandBar, UiViewState, BatchSummary
 from flatshot.ui.widgets import SmartSlider, LightAngleWidget, ComparisonCanvas, FloatingToolbar, ModernSplashScreen, CollapsibleSection
 from flatshot.ui.queue_widget import QueueWidget
 from flatshot.ui.grid_preview import GridPreviewWidget
@@ -188,6 +189,13 @@ class MainWindow(QMainWindow):
             
         self.settings_file = ConfigManager.get_config_dir() / "settings.json"
         self.app_settings = self._load_app_settings()
+        self.ui_view_state = UiViewState(
+            grid_columns=int(self.app_settings.get('grid_columns', 3)),
+            preview_background=self.app_settings.get('preview_bg_color', "#E6E6E6"),
+            guides_enabled=bool(self.app_settings.get('preview_grid', False)),
+            advanced_open=bool(self.app_settings.get('section_visibility', {}).get('advanced', False)),
+        )
+        self.batch_summary = BatchSummary()
         
         curve_dict = self.app_settings.get('scale_curve', DEFAULT_SCALE_CURVE.copy())
         self.scale_curve = normalize_curve_data(curve_dict)
@@ -217,8 +225,11 @@ class MainWindow(QMainWindow):
         elif not restored:
             self._schedule_preview()
         self._push_history()
-        # Always start maximized and then fit the workspace to the grid density.
-        QTimer.singleShot(0, self._show_maximized_workspace)
+        if not restored:
+            # Only force grid fitting if we don't have a saved session size
+            QTimer.singleShot(0, self._show_maximized_workspace)
+        else:
+            self.showMaximized()
     
     def _normalize_scale(self, scale: float) -> float:
         """Clamp the incoming UI scale to a safe range."""
@@ -396,12 +407,9 @@ class MainWindow(QMainWindow):
         file_menu.insertAction(exit_action, log_action)
         
     def _init_ui(self):
-        central = QWidget()
-        self.setCentralWidget(central)
-        
-        main_layout = QHBoxLayout(central)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
+        shell = AppShell()
+        self.app_shell = shell
+        self.setCentralWidget(shell)
         
         # === LEFT PANEL (Controls) ===
         left_panel = self._create_control_panel()
@@ -420,10 +428,12 @@ class MainWindow(QMainWindow):
         self.splitter.addWidget(left_panel)
         self.splitter.addWidget(center_panel)
         self.splitter.addWidget(right_panel)
-        self.splitter.setSizes([self._px(340), self._px(860), self._px(560)])
+        self.splitter.setSizes([self._px(320), self._px(960), self._px(640)])
         self.splitter.setStretchFactor(0, 0)  # Controls: fixed
         self.splitter.setStretchFactor(1, 1)  # Canvas: stretch
         self.splitter.setStretchFactor(2, 0)  # Grid: fixed
+        self.splitter.setCollapsible(0, False)
+        self.splitter.setCollapsible(2, False)
         if isinstance(self.app_settings.get('splitter_sizes'), list):
             try:
                 self.splitter.setSizes(self.app_settings.get('splitter_sizes'))
@@ -434,7 +444,12 @@ class MainWindow(QMainWindow):
         self._splitter_save_timer.timeout.connect(self._save_splitter_sizes)
         self.splitter.splitterMoved.connect(lambda *_: self._splitter_save_timer.start(250))
         
-        main_layout.addWidget(self.splitter)
+        shell.main_layout.addWidget(self.splitter, 1)
+
+        export_bar = self._create_export_section()
+        self.export_section = export_bar
+        self.export_bar = export_bar
+        shell.main_layout.addWidget(export_bar, 0)
 
     def _show_maximized_workspace(self):
         self.showMaximized()
@@ -445,9 +460,9 @@ class MainWindow(QMainWindow):
             columns = int(self.app_settings.get('grid_columns', 1))
         columns = min(max(int(columns), 1), 3)
         targets = {
-            1: 360,
-            2: 500,
-            3: 650,
+            1: 420,
+            2: 540,
+            3: 640,
         }
         return self._px(targets[columns])
 
@@ -456,7 +471,7 @@ class MainWindow(QMainWindow):
             return
         target = self._target_grid_panel_width(columns)
         self.right_panel.setMinimumWidth(target)
-        self.right_panel.setMaximumWidth(self._px(780))
+        self.right_panel.setMaximumWidth(self._px(740))
 
     def _fit_workspace_to_grid(self, columns: int | None = None, force: bool = False):
         if not hasattr(self, 'splitter'):
@@ -468,87 +483,81 @@ class MainWindow(QMainWindow):
             return
 
         total = max(self.splitter.width(), self.width(), self._px(1600))
-        left = self._px(340)
+        left = self._px(300)
         center = max(total - left - target_right, self._px(720))
         self.splitter.setSizes([left, center, target_right])
         
     def _create_control_panel(self) -> QWidget:
-        """Create the left control panel with all settings."""
-        panel = QWidget()
-        panel.setProperty("class", "sidebar")
-        panel.setFixedWidth(self._px(340))  # Compact width to fit on smaller screens
+        """Create the workflow panel with batch-level adjustments."""
+        panel = WorkflowPanel()
+        panel.setMinimumWidth(self._px(340))
+        panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         
-        # Scroll area for controls
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setProperty("class", "panel-scroll")
         
         content = QWidget()
-        content.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        content.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         layout = QVBoxLayout(content)
-        layout.setContentsMargins(
-            self._px(10), self._px(10), self._px(10), self._px(4)
-        )  # Minimal margins
-        layout.setSpacing(self._px(10))
+        layout.setContentsMargins(self._px(12), self._px(16), self._px(12), self._px(14))
+        layout.setSpacing(self._px(14))
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetMinimumSize)
         
-        # Header
-        header = QLabel("FlatShot")
-        header.setProperty("class", "app-title")
+        header = QLabel("Ajustes del lote")
+        header.setProperty("class", "workflow-title")
         layout.addWidget(header)
+
+        flow_hint = QLabel("Importar -> Ajustar -> Revisar -> Exportar")
+        flow_hint.setProperty("class", "workflow-subtitle")
+        layout.addWidget(flow_hint)
         
-        # === PRESETS SECTION ===
         self._sections = {}
-        presets_section = self._create_section("PRESETS", "presets", default_expanded=True, parent=content)
+        presets_section = self._create_section("PRESET ACTIVO", "presets", default_expanded=True, parent=content)
         if presets_section is not None:
             layout.addWidget(presets_section)
             self._sections["presets"] = presets_section
             self._build_presets_section(presets_section.content_layout)
-        
-        # === LIGHTING SECTION ===
-        lighting_section = self._create_section("ILUMINACIÓN", "lighting", default_expanded=True, parent=content)
-        if lighting_section is not None:
-            layout.addWidget(lighting_section)
-            self._sections["lighting"] = lighting_section
-            self._build_lighting_section(lighting_section.content_layout)
-        
-        # === SHADOWS SECTION ===
-        shadows_section = self._create_section("SOMBRAS", "shadows", default_expanded=True, parent=content)
-        if shadows_section is not None:
-            layout.addWidget(shadows_section)
-            self._sections["shadows"] = shadows_section
-            self._build_shadows_section(shadows_section.content_layout)
-        
-        # === FINISHING SECTION ===
-        finishing_section = self._create_section("ACABADO", "finishing", default_expanded=False, parent=content)
-        if finishing_section is not None:
-            layout.addWidget(finishing_section)
-            self._sections["finishing"] = finishing_section
-            self._build_finishing_section(finishing_section.content_layout)
-        
-        layout.addSpacing(self._px(8))
 
+        essentials = QFrame()
+        essentials.setProperty("class", "essential-card")
+        essentials_layout = QVBoxLayout(essentials)
+        essentials_layout.setContentsMargins(self._px(8), self._px(8), self._px(8), self._px(8))
+        essentials_layout.setSpacing(self._px(6))
+
+        essentials_title = QLabel("Controles esenciales")
+        essentials_title.setProperty("class", "panel-title")
+        essentials_layout.addWidget(essentials_title)
+        self._build_essential_controls(essentials_layout)
+        layout.addWidget(essentials)
+
+        self.local_adjust_panel = self._create_local_adjustment_bar(orientation="vertical")
+        layout.addWidget(self.local_adjust_panel)
+
+        advanced_section = self._create_section("AVANZADO", "advanced", default_expanded=False, parent=content)
+        if advanced_section is not None:
+            layout.addWidget(advanced_section)
+            self._sections["advanced"] = advanced_section
+            self._build_lighting_section(advanced_section.content_layout)
+            self._build_shadows_section(advanced_section.content_layout)
+            self._build_finishing_section(advanced_section.content_layout)
+
+        layout.addStretch()
         scroll.setWidget(content)
         
         panel_layout = QVBoxLayout(panel)
-        panel_layout.setContentsMargins(self._px(0), self._px(0), self._px(0), self._px(0))
-        panel_layout.setSpacing(self._px(4))
+        panel_layout.setContentsMargins(0, 0, 0, 0)
+        panel_layout.setSpacing(0)
         panel_layout.addWidget(scroll, 1)
-
-        # === EXPORT SECTION (Fixed at bottom, always visible) ===
-        export_section = self._create_export_section()
-        self.export_section = export_section
-        if export_section is not None:
-            panel_layout.addWidget(export_section, 0)
-        
         return panel
 
     def _on_section_toggled(self, key: str, checked: bool):
         section_state = self.app_settings.get('section_visibility', {})
         section_state[key] = bool(checked)
         self.app_settings['section_visibility'] = section_state
+        if key == "advanced":
+            self.ui_view_state.advanced_open = bool(checked)
         self._save_app_settings()
 
     def _create_section(self, title: str, key: str, default_expanded: bool, parent: QWidget) -> CollapsibleSection:
@@ -572,48 +581,51 @@ class MainWindow(QMainWindow):
         self.combo_presets.currentIndexChanged.connect(self._apply_preset_from_combo)
         layout.addWidget(self.combo_presets)
         
-        # Action buttons row - compact icon-only buttons
+        # Preset actions use text because they affect persistent settings.
+        actions_layout = QVBoxLayout()
+        actions_layout.setSpacing(self._px(6))
         btn_layout = QHBoxLayout()
-        btn_layout.setSpacing(self._px(4))
+        btn_layout.setSpacing(self._px(6))
         
         # Icon color for dark theme
         icon_color = COLORS['text_muted']
         icon_color_danger = COLORS['error']
         
-        btn_save = QPushButton(qta.icon('fa5s.save', color=icon_color), "")
-        btn_save.setProperty("class", "icon-btn")
+        btn_save = QPushButton(qta.icon('fa5s.save', color=icon_color), "Guardar")
+        btn_save.setProperty("class", "preset-action")
         btn_save.setToolTip("Guardar preset (Ctrl+S)")
         btn_save.clicked.connect(self._action_save_current)
         btn_layout.addWidget(btn_save)
         
-        btn_new = QPushButton(qta.icon('fa5s.plus', color=icon_color), "")
-        btn_new.setProperty("class", "icon-btn")
+        btn_new = QPushButton(qta.icon('fa5s.plus', color=icon_color), "Nuevo")
+        btn_new.setProperty("class", "preset-action")
         btn_new.setToolTip("Crear nuevo preset")
         btn_new.clicked.connect(self._action_create_new)
         btn_layout.addWidget(btn_new)
+
+        actions_layout.addLayout(btn_layout)
+
+        btn_layout_2 = QHBoxLayout()
+        btn_layout_2.setSpacing(self._px(6))
         
-        btn_rename = QPushButton(qta.icon('fa5s.edit', color=icon_color), "")
-        btn_rename.setProperty("class", "icon-btn")
+        btn_rename = QPushButton(qta.icon('fa5s.edit', color=icon_color), "Renombrar")
+        btn_rename.setProperty("class", "preset-action")
         btn_rename.setToolTip("Renombrar preset")
         btn_rename.clicked.connect(self._action_rename)
-        btn_layout.addWidget(btn_rename)
+        btn_layout_2.addWidget(btn_rename)
         
-        btn_delete = QPushButton(qta.icon('fa5s.trash-alt', color=icon_color_danger), "")
-        btn_delete.setProperty("class", "icon-btn")
+        btn_delete = QPushButton(qta.icon('fa5s.trash-alt', color=icon_color_danger), "Eliminar")
+        btn_delete.setProperty("class", "preset-action-danger")
         btn_delete.setToolTip("Eliminar preset")
         btn_delete.clicked.connect(self._action_delete)
-        btn_layout.addWidget(btn_delete)
-        
-        btn_layout.addSpacing(self._px(8))
+        btn_layout_2.addWidget(btn_delete)
         
         # Reset to defaults button
-        btn_reset = QPushButton(qta.icon('fa5s.undo', color=COLORS['text_muted']), "")
-        btn_reset.setProperty("class", "icon-btn")
+        btn_reset = QPushButton(qta.icon('fa5s.undo', color=COLORS['text_muted']), "Reset")
+        btn_reset.setProperty("class", "preset-action")
         btn_reset.setToolTip("Restaurar valores por defecto (Ctrl+R)")
         btn_reset.clicked.connect(self._reset_to_defaults)
-        btn_layout.addWidget(btn_reset)
-
-        btn_layout.addSpacing(self._px(8))
+        btn_layout_2.addWidget(btn_reset)
 
         btn_more = QToolButton()
         btn_more.setIcon(qta.icon('fa5s.ellipsis-h', color=icon_color))
@@ -630,10 +642,10 @@ class MainWindow(QMainWindow):
         open_folder_action = more_menu.addAction("Abrir carpeta de presets")
         open_folder_action.triggered.connect(self._action_open_presets_folder)
         btn_more.setMenu(more_menu)
-        btn_layout.addWidget(btn_more)
+        btn_layout_2.addWidget(btn_more)
         
-        btn_layout.addStretch()
-        layout.addLayout(btn_layout)
+        actions_layout.addLayout(btn_layout_2)
+        layout.addLayout(actions_layout)
         
         # Status label
         self.lbl_status = QLabel("")
@@ -642,6 +654,45 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.lbl_status)
         
         return
+
+    def _build_essential_controls(self, layout: QVBoxLayout):
+        """Expose the controls that affect day-to-day batch balance."""
+        self.sl_scale_adjustment = SmartSlider(
+            "Tamaño producto", -30, 30, 0, "%",
+            "<b>Tamaño global del producto</b><br><br>"
+            "Ajuste fino aplicado sobre la escala inteligente del preset.<br>"
+            "Úsalo para hacer todo el lote ligeramente más grande o pequeño.",
+            scale=self.ui_scale
+        )
+        self.sl_scale_adjustment.valueChanged.connect(self._schedule_preview)
+        layout.addWidget(self.sl_scale_adjustment)
+
+        self.sl_padding = SmartSlider(
+            "Margen", 0, 50, 10, "%",
+            "<b>Margen / espacio</b><br><br>"
+            "Define el aire alrededor del producto dentro del lienzo final.",
+            scale=self.ui_scale
+        )
+        self.sl_padding.valueChanged.connect(self._schedule_preview)
+        layout.addWidget(self.sl_padding)
+
+        self.sl_opacity = SmartSlider(
+            "Sombra", 0, 100, 30, "%",
+            "<b>Intensidad de sombra</b><br><br>"
+            "Controla la presencia general de la sombra en el lote.",
+            scale=self.ui_scale
+        )
+        self.sl_opacity.valueChanged.connect(self._schedule_preview)
+        layout.addWidget(self.sl_opacity)
+
+        self.sl_blur = SmartSlider(
+            "Suavidad", 0, 100, 25, "px",
+            "<b>Suavidad de sombra</b><br><br>"
+            "Ajusta lo difusa o marcada que se percibe la sombra.",
+            scale=self.ui_scale
+        )
+        self.sl_blur.valueChanged.connect(self._schedule_preview)
+        layout.addWidget(self.sl_blur)
     
     def _build_lighting_section(self, layout: QVBoxLayout):
         """Populate the lighting controls section."""
@@ -703,19 +754,7 @@ class MainWindow(QMainWindow):
     def _build_shadows_section(self, layout: QVBoxLayout):
         """Populate the shadow controls section."""
         layout.setSpacing(self._px(8))
-        
-        self.sl_blur = SmartSlider(
-            "Desenfoque", 0, 100, 25, "px",
-            "<b>Desenfoque principal (Blur)</b><br><br>"
-            "Suaviza los bordes de la sombra proyectada.<br><br>"
-            "<b>0-15:</b> Sombra dura y definida (luz intensa)<br>"
-            "<b>15-40:</b> Sombra natural y suave<br>"
-            "<b>40+:</b> Sombra muy difusa (luz ambiental)",
-            scale=self.ui_scale
-        )
-        self.sl_blur.valueChanged.connect(self._schedule_preview)
-        layout.addWidget(self.sl_blur)
-        
+
         self.sl_spread = SmartSlider(
             "Expansión", 0, 10, 0, "px",
             "<b>Expansión de sombra (Spread)</b><br><br>"
@@ -767,19 +806,7 @@ class MainWindow(QMainWindow):
     def _build_finishing_section(self, layout: QVBoxLayout):
         """Populate the finishing touches section."""
         layout.setSpacing(self._px(8))
-        
-        self.sl_opacity = SmartSlider(
-            "Opacidad", 0, 100, 30, "%",
-            "<b>Opacidad / Intensidad</b><br><br>"
-            "Controla qué tan oscura es la sombra en general.<br><br>"
-            "<b>10-25%:</b> Sombra sutil, ideal para fondos claros<br>"
-            "<b>25-50%:</b> Sombra visible y natural<br>"
-            "<b>50%+:</b> Sombra intensa, dramática",
-            scale=self.ui_scale
-        )
-        self.sl_opacity.valueChanged.connect(self._schedule_preview)
-        layout.addWidget(self.sl_opacity)
-        
+
         self.sl_noise = SmartSlider(
             "Ruido", 0, 50, 0, "%",
             "<b>Textura de ruido (Grain)</b><br><br>"
@@ -791,19 +818,7 @@ class MainWindow(QMainWindow):
         )
         self.sl_noise.valueChanged.connect(self._schedule_preview)
         layout.addWidget(self.sl_noise)
-        
-        self.sl_padding = SmartSlider(
-            "Margen", 0, 50, 10, "%",
-            "<b>Margen / Espacio (Padding)</b><br><br>"
-            "Define el espacio vacío alrededor del producto.<br><br>"
-            "<b>5-10%:</b> Producto ocupa casi todo el lienzo<br>"
-            "<b>10-20%:</b> Espacio equilibrado para e-commerce<br>"
-            "<b>20%+:</b> Producto pequeño con mucho 'aire'",
-            scale=self.ui_scale
-        )
-        self.sl_padding.valueChanged.connect(self._schedule_preview)
-        layout.addWidget(self.sl_padding)
-        
+
         # Adaptive zoom checkbox
         self.chk_adaptive = QCheckBox("Compensación óptica inteligente")
         self.chk_adaptive.setChecked(True)
@@ -821,21 +836,25 @@ class MainWindow(QMainWindow):
         
         return
     
-    def _create_export_section(self) -> QGroupBox:
-        """Create the export controls section with multi-folder support."""
-        group = QGroupBox("EXPORTAR")
-        group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        layout = QVBoxLayout(group)
-        layout.setSpacing(self._px(6))
-        
-        # Folder selection buttons
-        folder_btn_layout = QHBoxLayout()
-        folder_btn_layout.setSpacing(self._px(4))
-        
+    def _create_export_section(self) -> QFrame:
+        """Create the persistent bottom export bar."""
+        bar = ExportBar()
+        bar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        bar.setFixedHeight(self._px(76))
+
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(self._px(16), self._px(10), self._px(16), self._px(10))
+        layout.setSpacing(self._px(16))
+
         icon_color = COLORS['text_muted']
-        
-        # Add folder button with right-click context menu for recent folders
-        self.btn_add_folder = QPushButton(qta.icon('fa5s.folder-plus', color=icon_color), " Añadir carpeta")
+
+        import_cluster = QFrame()
+        import_cluster.setProperty("class", "export-cluster")
+        import_layout = QHBoxLayout(import_cluster)
+        import_layout.setContentsMargins(0, 0, 0, 0)
+        import_layout.setSpacing(self._px(8))
+
+        self.btn_add_folder = QPushButton(qta.icon('fa5s.folder-plus', color=icon_color), "Añadir carpeta")
         self.btn_add_folder.setProperty("class", "secondary")
         self.btn_add_folder.setToolTip("Añadir carpeta · Click derecho: carpetas recientes")
         self.btn_add_folder.clicked.connect(self._add_folders)
@@ -843,56 +862,117 @@ class MainWindow(QMainWindow):
         self.btn_add_folder.customContextMenuRequested.connect(self._show_recent_folders_menu)
         self.recent_folders_menu = QMenu(self)
         self._update_recent_folders_menu()
-        folder_btn_layout.addWidget(self.btn_add_folder)
-        
-        self.btn_clear_folders = QPushButton(qta.icon('fa5s.trash-alt', color=COLORS['error']), "")
-        self.btn_clear_folders.setProperty("class", "icon-btn")
+        import_layout.addWidget(self.btn_add_folder)
+
+        self.btn_clear_folders = QPushButton(qta.icon('fa5s.trash-alt', color=COLORS['error']), "Limpiar")
+        self.btn_clear_folders.setProperty("class", "ghost")
         self.btn_clear_folders.setToolTip("Limpiar lista de carpetas")
         self.btn_clear_folders.clicked.connect(self._clear_folders)
         self.btn_clear_folders.setEnabled(False)
-        folder_btn_layout.addWidget(self.btn_clear_folders)
-        
-        folder_btn_layout.addStretch()
+        import_layout.addWidget(self.btn_clear_folders)
 
-        # Button to open details dialog (keeps panel height stable)
-        self.btn_export_details = QPushButton(qta.icon('fa5s.list-alt', color=icon_color), " Ver lista")
+        self.btn_export_details = QPushButton(qta.icon('fa5s.list-alt', color=icon_color), "Lote y destino")
         self.btn_export_details.setProperty("class", "ghost")
-        self.btn_export_details.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        self.btn_export_details.setMinimumWidth(self._px(92))
         self.btn_export_details.setToolTip("Ver carpetas seleccionadas y destino de exportación")
         self.btn_export_details.clicked.connect(self._open_export_details_dialog)
-        folder_btn_layout.addWidget(self.btn_export_details)
-        layout.addLayout(folder_btn_layout)
-        
-        # Details container (folder list + destination options) collapsible
-        details_container = QWidget()
+        self.btn_export_details.setEnabled(False)
+        import_layout.addWidget(self.btn_export_details)
+        layout.addWidget(import_cluster, 0)
+
+        summary_cluster = QFrame()
+        summary_cluster.setProperty("class", "export-summary")
+        summary_layout = QVBoxLayout(summary_cluster)
+        summary_layout.setContentsMargins(0, 0, 0, 0)
+        summary_layout.setSpacing(self._px(2))
+
+        self.lbl_folder_summary = QLabel("Sin lote cargado")
+        self.lbl_folder_summary.setProperty("class", "export-summary-title")
+        summary_layout.addWidget(self.lbl_folder_summary)
+
+        self.lbl_destination_summary = QLabel("Destino: subcarpeta en origen")
+        self.lbl_destination_summary.setProperty("class", "export-summary-subtitle")
+        summary_layout.addWidget(self.lbl_destination_summary)
+        layout.addWidget(summary_cluster, 1)
+
+        progress_cluster = QFrame()
+        progress_cluster.setProperty("class", "export-progress")
+        progress_layout = QVBoxLayout(progress_cluster)
+        progress_layout.setContentsMargins(0, 0, 0, 0)
+        progress_layout.setSpacing(self._px(5))
+
+        self.lbl_progress_status = QLabel("Listo")
+        self.lbl_progress_status.setProperty("class", "muted")
+        self.lbl_progress_status.hide()
+        progress_layout.addWidget(self.lbl_progress_status)
+
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setFixedHeight(self._px(6))
+        self.progress_bar.setFixedWidth(self._px(260))
+        progress_layout.addWidget(self.progress_bar)
+        layout.addWidget(progress_cluster, 0)
+
+        action_cluster = QFrame()
+        action_cluster.setProperty("class", "export-actions")
+        action_layout = QHBoxLayout(action_cluster)
+        action_layout.setContentsMargins(0, 0, 0, 0)
+        action_layout.setSpacing(self._px(8))
+
+        self.btn_process = QPushButton(qta.icon('fa5s.play', color='white'), "Procesar lote")
+        self.btn_process.setProperty("class", "primary")
+        self.btn_process.setEnabled(False)
+        self.btn_process.setMinimumWidth(self._px(170))
+        self.btn_process.setToolTip("Iniciar el procesamiento de todas las imágenes (Ctrl+Enter)")
+        self.btn_process.clicked.connect(self._start_export)
+        action_layout.addWidget(self.btn_process)
+
+        self.process_controls_layout = QHBoxLayout()
+        self.process_controls_layout.setSpacing(self._px(6))
+
+        self.btn_pause = QPushButton(qta.icon('fa5s.pause', color='white'), "Pausar")
+        self.btn_pause.setProperty("class", "warning-solid")
+        self.btn_pause.setToolTip("Pausar/Reanudar el procesamiento (Ctrl+Shift+P)")
+        self.btn_pause.clicked.connect(self._toggle_pause)
+        self.process_controls_layout.addWidget(self.btn_pause)
+
+        self.btn_stop = QPushButton(qta.icon('fa5s.stop', color='white'), "Detener")
+        self.btn_stop.setProperty("class", "danger-solid")
+        self.btn_stop.setToolTip("Detener el procesamiento en curso (Esc)")
+        self.btn_stop.clicked.connect(self._stop_export)
+        self.process_controls_layout.addWidget(self.btn_stop)
+
+        self.process_controls_widget = QWidget()
+        self.process_controls_widget.setLayout(self.process_controls_layout)
+        self.process_controls_widget.hide()
+        action_layout.addWidget(self.process_controls_widget)
+        layout.addWidget(action_cluster, 0)
+
+        details_container = QWidget(bar)
         details_layout = QVBoxLayout(details_container)
         details_layout.setContentsMargins(0, 0, 0, 0)
         details_layout.setSpacing(self._px(4))
 
-        # Folder list (compact table)
-        from PyQt6.QtWidgets import QListWidget, QListWidgetItem, QAbstractItemView
+        from PyQt6.QtWidgets import QListWidget, QAbstractItemView
         self.folder_list = QListWidget()
         self.folder_list.setMaximumHeight(self._px(90))
         self.folder_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.folder_list.setProperty("class", "list-compact")
         self.folder_list.itemDoubleClicked.connect(self._remove_folder_item)
-        self.folder_list.hide()  # Hidden until folders are added
+        self.folder_list.hide()
         details_layout.addWidget(self.folder_list)
 
-        # Destination options
         dest_group = QFrame()
         dest_layout = QVBoxLayout(dest_group)
         dest_layout.setContentsMargins(0, self._px(4), 0, self._px(4))
         dest_layout.setSpacing(self._px(4))
 
-        from PyQt6.QtWidgets import QRadioButton, QButtonGroup
         self.dest_btn_group = QButtonGroup(self)
 
         self.rb_dest_subfolder = QRadioButton("Subcarpeta en origen")
         self.rb_dest_subfolder.setChecked(True)
-        self.rb_dest_subfolder.setToolTip("Crea una subcarpeta (ej: _SALIDA_PRO) dentro de cada carpeta de origen")
+        self.rb_dest_subfolder.setToolTip("Crea una subcarpeta dentro de cada carpeta de origen")
         self.dest_btn_group.addButton(self.rb_dest_subfolder)
+        self.rb_dest_subfolder.toggled.connect(lambda checked: checked and self._update_export_destination_label())
         dest_layout.addWidget(self.rb_dest_subfolder)
 
         custom_row = QHBoxLayout()
@@ -916,98 +996,49 @@ class MainWindow(QMainWindow):
         self.lbl_custom_dest.hide()
         dest_layout.addWidget(self.lbl_custom_dest)
 
-        dest_group.hide()  # Hidden until folders are added
+        dest_group.hide()
         self.dest_group = dest_group
         details_layout.addWidget(dest_group)
-
-        details_container.hide()  # we keep it hidden; dialog will present details
+        details_container.hide()
         self.export_details_container = details_container
-        layout.addWidget(details_container)
 
-        # Summary label (shows when no folders or summary)
-        self.lbl_folder_summary = QLabel("Ninguna carpeta seleccionada")
-        self.lbl_folder_summary.setProperty("class", "subheading")
-        layout.addWidget(self.lbl_folder_summary)
-        
-        # Process button
-        self.btn_process = QPushButton(qta.icon('fa5s.play', color='white'), " PROCESAR IMÁGENES")
-        self.btn_process.setProperty("class", "primary")
-        self.btn_process.setEnabled(False)
-        self.btn_process.setToolTip("Iniciar el procesamiento de todas las imágenes (Ctrl+Enter)")
-        self.btn_process.clicked.connect(self._start_export)
-        layout.addWidget(self.btn_process)
-        
-        # Process control buttons (hidden by default)
-        self.process_controls_layout = QHBoxLayout()
-        self.process_controls_layout.setSpacing(self._px(4))
-        
-        self.btn_pause = QPushButton(qta.icon('fa5s.pause', color='white'), " PAUSAR")
-        self.btn_pause.setProperty("class", "warning-solid")
-        self.btn_pause.setToolTip("Pausar/Reanudar el procesamiento (Ctrl+Shift+P)")
-        self.btn_pause.clicked.connect(self._toggle_pause)
-        self.process_controls_layout.addWidget(self.btn_pause)
-        
-        self.btn_stop = QPushButton(qta.icon('fa5s.stop', color='white'), " DETENER")
-        self.btn_stop.setProperty("class", "danger-solid")
-        self.btn_stop.setToolTip("Detener el procesamiento en curso (Esc)")
-        self.btn_stop.clicked.connect(self._stop_export)
-        self.process_controls_layout.addWidget(self.btn_stop)
-        
-        # Container for controls to manage visibility easily
-        self.process_controls_widget = QWidget()
-        self.process_controls_widget.setLayout(self.process_controls_layout)
-        self.process_controls_widget.hide()
-        layout.addWidget(self.process_controls_widget)
-        
-        # Progress section
-        self.lbl_progress_status = QLabel("")
-        self.lbl_progress_status.setProperty("class", "muted")
-        self.lbl_progress_status.hide()
-        layout.addWidget(self.lbl_progress_status)
-        
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setTextVisible(False)
-        self.progress_bar.setFixedHeight(self._px(6))
-        layout.addWidget(self.progress_bar)
-        
-        # Initialize folder list state
-        self.selected_folders = []  # List of Path objects
+        self.selected_folders = []
         self.custom_output_path = None
-        self.export_details_visible = False  # kept for compatibility; details shown in dialog
-        
-        return group
+        self.export_details_visible = False
+
+        return bar
     
     def _create_preview_panel(self) -> QWidget:
-        """Create the right preview panel."""
-        panel = QWidget()
+        """Create the central canvas workbench with a single unified toolbar."""
+        panel = CanvasWorkbench()
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(self._px(4))
-        
-        # Toolbar: two rows keep global preview controls separate from per-image adjustments.
-        toolbar = QFrame()
-        toolbar.setProperty("class", "preview-toolbar")
-        toolbar_layout = QVBoxLayout(toolbar)
-        toolbar_layout.setContentsMargins(
-            self._px(12), self._px(8), self._px(12), self._px(8)
-        )
-        toolbar_layout.setSpacing(self._px(8))
+        layout.setSpacing(0)
 
-        preview_row = QFrame()
-        preview_row.setProperty("class", "preview-toolbar-row")
-        preview_layout = QHBoxLayout(preview_row)
-        preview_layout.setContentsMargins(0, 0, 0, 0)
-        preview_layout.setSpacing(self._px(8))
-        
-        # Mock selection buttons
-        mock_label = QLabel("Vista previa")
+        toolbar = CommandBar()
+        toolbar_layout = QHBoxLayout(toolbar)
+        toolbar_layout.setContentsMargins(self._px(10), self._px(6), self._px(10), self._px(6))
+        toolbar_layout.setSpacing(self._px(6))
+
+        # --- Section 1: Current image name ---
+        self.lbl_current_image = QLabel("Sin imagen")
+        self.lbl_current_image.setProperty("class", "command-current")
+        self.lbl_current_image.setMinimumWidth(self._px(100))
+        self.lbl_current_image.setMaximumWidth(self._px(200))
+        self.lbl_current_image.setToolTip("Imagen mostrada en el canvas · ESPACIO = ver original")
+        toolbar_layout.addWidget(self.lbl_current_image, 0)
+
+        toolbar_layout.addWidget(self._toolbar_divider())
+
+        # --- Section 2: Mockup selector (input test image) ---
+        mock_label = QLabel("Mockup")
         mock_label.setProperty("class", "toolbar-section-label")
-        preview_layout.addWidget(mock_label)
-        
+        mock_label.setToolTip("Imagen de prueba para ajustar el preset")
+        toolbar_layout.addWidget(mock_label)
+
         self.btn_group = QButtonGroup(self)
         self.btn_group.setExclusive(True)
-        
-        # Predefined mockup buttons
+
         self.mock_buttons = {}
         for i, (text, mock_id) in enumerate([("Clara", "light"), ("Media", "medium"), ("Oscura", "dark")]):
             btn = QPushButton(text)
@@ -1016,41 +1047,45 @@ class MainWindow(QMainWindow):
             btn.clicked.connect(lambda checked, m=mock_id: self._set_mock_color(m))
             self.btn_group.addButton(btn)
             self.mock_buttons[mock_id] = btn
-            preview_layout.addWidget(btn)
+            toolbar_layout.addWidget(btn)
             if mock_id == 'dark':
                 btn.setChecked(True)
-        
-        # Custom image button (hidden until image is dropped)
-        self.btn_custom = QPushButton(qta.icon('fa5s.image', color=COLORS['text_muted']), " Imagen")
+
+        self.btn_custom = QPushButton(qta.icon('fa5s.image', color=COLORS['text_muted']), "")
         self.btn_custom.setCheckable(True)
         self.btn_custom.setToolTip("Tu imagen personalizada")
         self.btn_custom.clicked.connect(lambda: self._set_mock_color('custom_drop'))
-        self.btn_custom.hide()  # Hidden by default
+        self.btn_custom.hide()
         self.btn_group.addButton(self.btn_custom)
-        preview_layout.addWidget(self.btn_custom)
+        toolbar_layout.addWidget(self.btn_custom)
 
-        preview_layout.addStretch()
+        toolbar_layout.addWidget(self._toolbar_divider())
 
-        zoom_hint = QLabel("Rueda: zoom al cursor  ·  arrastrar: mover  ·  doble clic: reset")
-        zoom_hint.setProperty("class", "toolbar-hint")
-        preview_layout.addWidget(zoom_hint)
-        toolbar_layout.addWidget(preview_row)
-
-        self.local_adjust_panel = self._create_local_adjustment_bar()
-        toolbar_layout.addWidget(self.local_adjust_panel)
-
-        # Guide/background toolbar
+        # --- Section 3: Canvas background color ---
         self.floating_toolbar = FloatingToolbar()
         self.floating_toolbar.gridToggled.connect(self._on_preview_grid_toggled)
         self.floating_toolbar.bgColorChanged.connect(self._on_preview_bg_changed)
         self.floating_toolbar.guideSettingsChanged.connect(self._on_preview_guides_changed)
-        toolbar_layout.addWidget(self.floating_toolbar)
-        
+        toolbar_layout.addWidget(self.floating_toolbar, 1)
+
+        toolbar_layout.addWidget(self._toolbar_divider())
+
+        # --- Section 4: Actions ---
+        btn_fit = QPushButton(qta.icon('fa5s.expand-arrows-alt', color=COLORS['text_muted']), "Encajar")
+        btn_fit.setProperty("class", "toolbar-btn")
+        btn_fit.setToolTip("Resetear zoom y posición (doble clic en canvas)")
+        btn_fit.clicked.connect(lambda: self.canvas.resetView() if hasattr(self, "canvas") else None)
+        toolbar_layout.addWidget(btn_fit)
+
         layout.addWidget(toolbar)
-        
+
         # Canvas
         self.canvas = ComparisonCanvas()
         self.canvas.imageDropped.connect(self._on_image_dropped)
+        self.canvas.setToolTip(
+            "Rueda: zoom al cursor. Arrastra con zoom para mover. "
+            "Doble clic: encajar. Espacio: ver original."
+        )
         layout.addWidget(self.canvas, 1)
 
         # Restore preview UI preferences
@@ -1064,17 +1099,18 @@ class MainWindow(QMainWindow):
         self.floating_toolbar.set_guide_settings(saved_guides, emit=False)
         self.floating_toolbar.set_grid_enabled(saved_grid, emit=False)
         self._sync_local_override_ui()
-        
-        # Help text
-        help_text = QLabel("Mantén ESPACIO para ver el original | Arrastra una imagen para probarla")
-        help_text.setProperty("class", "help-text")
-        help_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(help_text)
-        
+
         return panel
 
-    def _create_local_adjustment_bar(self) -> QFrame:
-        """Create the per-image override controls shown above the canvas."""
+    def _toolbar_divider(self) -> QFrame:
+        """Create a vertical divider for the unified toolbar."""
+        d = QFrame()
+        d.setProperty("class", "toolbar-separator-v")
+        d.setFixedSize(1, self._px(22))
+        return d
+
+    def _create_local_adjustment_bar(self, orientation: str = "horizontal") -> QFrame:
+        """Create the per-image override controls."""
         panel = QFrame()
         panel.setProperty("class", "local-adjust-panel")
         panel.setToolTip(
@@ -1082,19 +1118,26 @@ class MainWindow(QMainWindow):
             "Se aplican encima del preset actual y solo afectan a esa imagen."
         )
 
-        layout = QHBoxLayout(panel)
-        layout.setContentsMargins(self._px(10), self._px(5), self._px(10), self._px(5))
-        layout.setSpacing(self._px(8))
-        layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        vertical = orientation == "vertical"
+        layout = QVBoxLayout(panel) if vertical else QHBoxLayout(panel)
+        layout.setContentsMargins(self._px(12), self._px(12), self._px(12), self._px(12))
+        layout.setSpacing(self._px(10))
+        if not vertical:
+            layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
-        title = QLabel("Imagen")
-        title.setProperty("class", "toolbar-section-label")
-        layout.addWidget(title)
+        header_layout = QHBoxLayout()
+        header_layout.setSpacing(self._px(8))
+
+        title = QLabel("Ajuste por imagen")
+        title.setProperty("class", "section-title")
+        header_layout.addWidget(title)
 
         self.lbl_local_adjust_state = QLabel("Preset")
         self.lbl_local_adjust_state.setProperty("class", "local-status")
-        self.lbl_local_adjust_state.setFixedWidth(self._px(96))
-        layout.addWidget(self.lbl_local_adjust_state)
+        self.lbl_local_adjust_state.setFixedWidth(self._px(96 if not vertical else 86))
+        header_layout.addWidget(self.lbl_local_adjust_state)
+
+        header_layout.addStretch()
 
         self._local_override_sliders = {}
         self._local_override_value_labels = {}
@@ -1107,84 +1150,111 @@ class MainWindow(QMainWindow):
         ]
 
         for field, label, minimum, maximum, suffix, tooltip in slider_specs:
+            row = QHBoxLayout()
+            row.setSpacing(self._px(8))
             field_label = QLabel(label)
             field_label.setProperty("class", "mini-label")
             field_label.setToolTip(tooltip)
-            layout.addWidget(field_label)
+            field_label.setMinimumWidth(self._px(120))
+            field_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            row.addWidget(field_label)
             self._local_override_controls.append(field_label)
 
             slider = QSlider(Qt.Orientation.Horizontal)
             slider.setProperty("class", "local-slider")
             slider.setRange(minimum, maximum)
             slider.setValue(0)
-            slider.setFixedWidth(self._px(78))
             slider.setToolTip(tooltip)
             slider.sliderPressed.connect(self._begin_local_override_edit)
             slider.sliderReleased.connect(self._end_local_override_edit)
             slider.valueChanged.connect(
                 lambda value, key=field: self._on_local_override_slider_changed(key, value)
             )
-            layout.addWidget(slider)
+            row.addWidget(slider, 1)
             self._local_override_sliders[field] = slider
             self._local_override_controls.append(slider)
 
             value_label = QLabel("0")
             value_label.setProperty("class", "mini-value")
-            value_label.setFixedWidth(self._px(36))
+            value_label.setFixedWidth(self._px(40))
             value_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             value_label.setToolTip(tooltip)
-            layout.addWidget(value_label)
+            row.addWidget(value_label)
             self._local_override_value_labels[field] = (value_label, suffix)
             self._local_override_controls.append(value_label)
 
-        layout.addStretch()
+            if vertical:
+                layout.addLayout(row)
+            else:
+                layout.addLayout(row)
 
         self.btn_local_undo = QPushButton(qta.icon('fa5s.undo-alt', color=COLORS['text_secondary']), "")
         self.btn_local_undo.setProperty("class", "icon-btn")
         self.btn_local_undo.setToolTip("Volver al ajuste local anterior de esta imagen")
         self.btn_local_undo.clicked.connect(self._undo_local_override)
-        layout.addWidget(self.btn_local_undo)
+        header_layout.addWidget(self.btn_local_undo)
         self._local_override_controls.append(self.btn_local_undo)
 
         self.btn_local_reset = QPushButton(qta.icon('fa5s.eraser', color=COLORS['text_secondary']), "")
         self.btn_local_reset.setProperty("class", "icon-btn")
         self.btn_local_reset.setToolTip("Quitar ajuste local y volver al preset")
         self.btn_local_reset.clicked.connect(self._reset_local_override)
-        layout.addWidget(self.btn_local_reset)
+        header_layout.addWidget(self.btn_local_reset)
         self._local_override_controls.append(self.btn_local_reset)
+
+        if vertical:
+            layout.insertLayout(0, header_layout)
+        else:
+            layout.insertLayout(0, header_layout)
+            layout.addStretch()
 
         return panel
     
     def _create_grid_panel(self) -> QWidget:
         """Create the right panel with grid of image previews."""
-        panel = QWidget()
-        panel.setProperty("class", "panel")
+        panel = BatchPanel()
         panel.setMinimumWidth(self._target_grid_panel_width())
-        panel.setMaximumWidth(self._px(780))
-        
+        panel.setMaximumWidth(self._px(740))
+
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        
-        # Header toolbar
+
+        # --- Compact header toolbar ---
         toolbar = QFrame()
         toolbar.setProperty("class", "panel-header")
         toolbar_layout = QVBoxLayout(toolbar)
         toolbar_layout.setContentsMargins(
-            self._px(12), self._px(10), self._px(12), self._px(10)
+            self._px(12), self._px(10), self._px(12), self._px(8)
         )
-        toolbar_layout.setSpacing(self._px(8))
+        toolbar_layout.setSpacing(self._px(6))
 
-        # Title + column control row
+        # Row 1: Title + count + columns + filters (all in one row)
         title_row = QHBoxLayout()
-        header_label = QLabel("Previews")
+        title_row.setSpacing(self._px(6))
+        header_label = QLabel("Lote")
         header_label.setProperty("class", "panel-title")
         title_row.addWidget(header_label)
+
+        self.lbl_batch_count = QLabel("0 imágenes")
+        self.lbl_batch_count.setProperty("class", "batch-count")
+        title_row.addWidget(self.lbl_batch_count)
         title_row.addStretch()
 
-        cols_label = QLabel("Columnas")
-        cols_label.setProperty("class", "panel-label")
-        title_row.addWidget(cols_label)
+        # Filters inline
+        self.batch_filter_group = QButtonGroup(self)
+        self.batch_filter_group.setExclusive(True)
+        self.batch_filter_buttons = {}
+        for text, mode in [("Todas", "all"), ("Ajustadas", "adjusted"), ("Error", "error")]:
+            btn = QPushButton(text)
+            btn.setCheckable(True)
+            btn.setProperty("class", "batch-filter")
+            btn.clicked.connect(lambda checked, m=mode: self._on_batch_filter_changed(m))
+            self.batch_filter_group.addButton(btn)
+            self.batch_filter_buttons[mode] = btn
+            title_row.addWidget(btn)
+            if mode == "all":
+                btn.setChecked(True)
 
         # Segmented columns selector
         cols_group = QFrame()
@@ -1241,36 +1311,34 @@ class MainWindow(QMainWindow):
         self.grid_cols_btn_3.setToolTip("3 columnas")
         self.grid_cols_btn_3.setIcon(_build_cols_icon(3))
         for btn in (self.grid_cols_btn_1, self.grid_cols_btn_2, self.grid_cols_btn_3):
-            btn.setFixedWidth(self._px(28))
-            btn.setFixedHeight(self._px(24))
-            btn.setIconSize(QSize(self._px(14), self._px(14)))
+            btn.setFixedWidth(self._px(26))
+            btn.setFixedHeight(self._px(22))
+            btn.setIconSize(QSize(self._px(12), self._px(12)))
             self.grid_cols_group.addButton(btn)
             cols_layout.addWidget(btn)
 
         title_row.addWidget(cols_group)
-
         toolbar_layout.addLayout(title_row)
-        
+
         # Folder selector (hidden by default, shown when multiple folders)
         self.grid_folder_combo = QComboBox()
         self.grid_folder_combo.setProperty("class", "panel-combo")
         self.grid_folder_combo.currentIndexChanged.connect(self._on_grid_folder_changed)
-        self.grid_folder_combo.hide()  # Hidden until multiple folders added
+        self.grid_folder_combo.hide()
         toolbar_layout.addWidget(self.grid_folder_combo)
 
-        # Full path label
-        self.grid_folder_path = QLabel("Sin carpeta seleccionada")
+        # Path label (compact, single line with elide)
+        self.grid_folder_path = QLabel("")
         self.grid_folder_path.setProperty("class", "panel-path")
         self.grid_folder_path.setWordWrap(False)
-        self.grid_folder_path.setFixedHeight(self._px(52))
+        self.grid_folder_path.setMaximumHeight(self._px(22))
         self.grid_folder_path.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self.grid_folder_path.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.grid_folder_path.setContentsMargins(0, self._px(2), 0, 0)
+        self.grid_folder_path.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         toolbar_layout.addWidget(self.grid_folder_path)
         self.grid_folder_path.installEventFilter(self)
 
         layout.addWidget(toolbar)
-        
+
         # Grid preview widget
         self.grid_preview = GridPreviewWidget()
         self.grid_preview.image_selected.connect(self._on_grid_image_selected)
@@ -1290,7 +1358,7 @@ class MainWindow(QMainWindow):
         self.grid_cols_btn_1.clicked.connect(lambda: self._on_grid_columns_changed(1))
         self.grid_cols_btn_2.clicked.connect(lambda: self._on_grid_columns_changed(2))
         self.grid_cols_btn_3.clicked.connect(lambda: self._on_grid_columns_changed(3))
-        
+
         return panel
 
     def _setup_accessibility_and_tab_order(self):
@@ -1330,6 +1398,7 @@ class MainWindow(QMainWindow):
         if index < 0 or index >= len(self.selected_folders):
             return
         folder = self.selected_folders[index]
+        self.ui_view_state.active_folder = str(folder)
         self.grid_preview.set_folder(str(folder))
         self.grid_preview.set_image_overrides(self.image_overrides)
         settings = self._get_shadow_settings()
@@ -1385,10 +1454,29 @@ class MainWindow(QMainWindow):
             return
         return
 
+    def _on_batch_filter_changed(self, mode: str):
+        if hasattr(self, 'grid_preview'):
+            self.grid_preview.set_filter_mode(mode)
+
+    def _update_batch_header(self):
+        if not hasattr(self, 'lbl_batch_count'):
+            return
+        images = self.batch_summary.images_count
+        folders = self.batch_summary.folders_count
+        adjusted = self.batch_summary.adjusted_count
+        if folders <= 0:
+            text = "0 imágenes"
+        elif adjusted:
+            text = f"{images} imágenes · {adjusted} ajustadas"
+        else:
+            text = f"{images} imágenes"
+        self.lbl_batch_count.setText(text)
+
     def _on_grid_columns_changed(self, columns: int):
         if not hasattr(self, 'grid_preview'):
             return
         self.grid_preview.set_fixed_columns(int(columns))
+        self.ui_view_state.grid_columns = int(columns)
         self.app_settings['grid_columns'] = int(columns)
         self._fit_workspace_to_grid(columns=int(columns), force=True)
         self.app_settings['splitter_sizes'] = self.splitter.sizes()
@@ -1398,11 +1486,13 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'floating_toolbar'):
             self.floating_toolbar.set_grid_enabled(bool(enabled), emit=False)
         self.canvas.setGridVisible(bool(enabled))
+        self.ui_view_state.guides_enabled = bool(enabled)
         self.app_settings['preview_grid'] = bool(enabled)
         self._save_app_settings()
 
     def _on_preview_bg_changed(self, color: str):
         self.canvas.setBackgroundColor(QColor(color))
+        self.ui_view_state.preview_background = color
         self.app_settings['preview_bg_color'] = color
         self._save_app_settings()
 
@@ -1480,6 +1570,7 @@ class MainWindow(QMainWindow):
 
         if not self.selected_folders:
             # Clear gallery when there are no folders selected.
+            self.ui_view_state.active_folder = None
             self.grid_preview.set_folder_label("")
             self.grid_preview.set_folder("")
             return
@@ -1497,6 +1588,7 @@ class MainWindow(QMainWindow):
             self.grid_folder_combo.blockSignals(False)
 
         folder = self.selected_folders[target_index]
+        self.ui_view_state.active_folder = str(folder)
         self.grid_preview.set_folder(str(folder))
         self.grid_preview.set_image_overrides(self.image_overrides)
         settings = self._get_shadow_settings()
@@ -1519,6 +1611,10 @@ class MainWindow(QMainWindow):
             self.btn_custom.hide()
             self.mock_buttons['dark'].setChecked(True)
         self.current_custom_path = None
+        self.ui_view_state.selected_image = None
+        if hasattr(self, 'lbl_current_image'):
+            self.lbl_current_image.setText("Sin imagen seleccionada")
+            self.lbl_current_image.setToolTip("")
         self._sync_local_override_ui()
     
     # ========== BUSINESS LOGIC ==========
@@ -1572,6 +1668,7 @@ class MainWindow(QMainWindow):
             self.mockups['custom_drop'] = pil_img
             self.current_mock = 'custom_drop'
             self.current_custom_path = path
+            self.ui_view_state.selected_image = path
 
             # Clear caches to force recalculation for the new image
             self.current_base_pil = None
@@ -1582,6 +1679,9 @@ class MainWindow(QMainWindow):
             self.btn_custom.show()
             self.btn_custom.setText(f" {Path(path).stem[:15]}")
             self.btn_custom.setChecked(True)
+            if hasattr(self, 'lbl_current_image'):
+                self.lbl_current_image.setText(Path(path).stem)
+                self.lbl_current_image.setToolTip(path)
             self._sync_local_override_ui()
 
             # Only update canvas, NOT the grid (to avoid reload)
@@ -1663,9 +1763,10 @@ class MainWindow(QMainWindow):
                 'lighting': True,
                 'shadows': True,
                 'finishing': False,
+                'advanced': False,
                 'export': True,
             },
-            'grid_columns': 1,
+            'grid_columns': 3,
             'grid_folder_index': 0,
         }
         if self.settings_file.exists():
@@ -1746,6 +1847,23 @@ class MainWindow(QMainWindow):
         else:
             self.lbl_custom_dest.clear()
             self.lbl_custom_dest.hide()
+        self._update_export_destination_label()
+
+    def _update_export_destination_label(self):
+        """Keep the persistent export bar destination summary in sync."""
+        if not hasattr(self, 'lbl_destination_summary'):
+            return
+        if hasattr(self, 'rb_dest_custom') and self.rb_dest_custom.isChecked():
+            if self.custom_output_path:
+                text = f"Destino: {self.custom_output_path}"
+            else:
+                text = "Destino: carpeta personalizada sin elegir"
+        else:
+            folder_name = self.app_settings.get('output_folder_name', '_SALIDA_PRO')
+            text = f"Destino: subcarpeta en origen ({folder_name})"
+        self.lbl_destination_summary.setText(text)
+        if hasattr(self, 'batch_summary'):
+            self.batch_summary.destination_label = text.replace("Destino: ", "", 1)
 
     def _refresh_presets_combo(self, preferred_name: str | None = None):
         current_name = preferred_name or self.combo_presets.currentText()
@@ -1774,7 +1892,8 @@ class MainWindow(QMainWindow):
             padding=self.sl_padding.value(),
             contact_blur=self.sl_contact_blur.value(),
             contraction=self.sl_contraction.value(),
-            adaptive_zoom=self.chk_adaptive.isChecked()
+            adaptive_zoom=self.chk_adaptive.isChecked(),
+            scale_adjustment=self.sl_scale_adjustment.value()
         )
 
     def _current_image_override_key(self) -> str:
@@ -1804,6 +1923,15 @@ class MainWindow(QMainWindow):
     def _refresh_image_overrides(self):
         if hasattr(self, 'grid_preview'):
             self.grid_preview.set_image_overrides(self.image_overrides)
+        if self.selected_folders:
+            adjusted_count = 0
+            for folder in self.selected_folders:
+                adjusted_count += sum(
+                    1 for path in folder.glob("*.png")
+                    if has_image_override(self.image_overrides.get(override_key(str(path)), {}))
+                )
+            self.batch_summary.adjusted_count = adjusted_count
+            self._update_batch_header()
 
     def _format_local_delta(self, value: int, suffix: str = "") -> str:
         if value > 0:
@@ -2083,6 +2211,9 @@ class MainWindow(QMainWindow):
         if mock_id == "med":
             mock_id = "medium"
         self.current_mock = mock_id
+        if hasattr(self, 'lbl_current_image') and mock_id != 'custom_drop':
+            self.lbl_current_image.setText("Mockup de prueba")
+            self.lbl_current_image.setToolTip("Vista previa generada para ajustar el preset")
         # Clear cache to force re-generation for the mockup
         self.current_base_pil = None
         self.current_orig_pixmap = None
@@ -2105,6 +2236,9 @@ class MainWindow(QMainWindow):
             self.btn_custom.show()
             self.btn_custom.setText(f" {os.path.basename(path)[:15]}")
             self.btn_custom.setChecked(True)
+            if hasattr(self, 'lbl_current_image'):
+                self.lbl_current_image.setText(Path(path).stem)
+                self.lbl_current_image.setToolTip(path)
             
             self.current_mock = 'custom_drop'
             self.current_custom_path = path
@@ -2134,6 +2268,7 @@ class MainWindow(QMainWindow):
         self.sl_noise.setValue(0)
         self.sl_padding.setValue(10)
         self.sl_contraction.setValue(0)
+        self.sl_scale_adjustment.setValue(0)
         self.chk_adaptive.setChecked(True)
         
         # Reset scale curve to new optimal defaults
@@ -2257,6 +2392,7 @@ class MainWindow(QMainWindow):
             self.sl_padding.setValue(d.get('padding', 10))
             self.sl_contact_blur.setValue(d.get('contact_blur', 10))
             self.sl_contraction.setValue(d.get('contraction', 0))
+            self.sl_scale_adjustment.setValue(d.get('scale_adjustment', 0))
             self.chk_adaptive.setChecked(d.get('adaptive_zoom', True))
             self._schedule_preview()
             
@@ -2515,11 +2651,17 @@ class MainWindow(QMainWindow):
         except RuntimeError:
             return
         total_images = 0
+        adjusted_count = 0
         
         for folder in self.selected_folders:
-            img_count = len(list(folder.glob("*.png")))
+            image_paths = list(folder.glob("*.png"))
+            img_count = len(image_paths)
             total_images += img_count
-            item = QListWidgetItem(f"📁 {folder.name}  —  {img_count} imágenes")
+            adjusted_count += sum(
+                1 for path in image_paths
+                if has_image_override(self.image_overrides.get(override_key(str(path)), {}))
+            )
+            item = QListWidgetItem(f"Carpeta: {folder.name}  -  {img_count} imágenes")
             item.setToolTip(str(folder))
             self.folder_list.addItem(item)
         
@@ -2535,21 +2677,32 @@ class MainWindow(QMainWindow):
         
         # Update summary label
         if not has_folders:
-            self.lbl_folder_summary.setText("Ninguna carpeta seleccionada")
+            self.lbl_folder_summary.setText("Sin lote cargado")
             self.lbl_folder_summary.show()
         elif len(self.selected_folders) == 1:
-            self.lbl_folder_summary.setText(f"📊 {total_images} imágenes")
+            adjusted_text = f" · {adjusted_count} ajustadas" if adjusted_count else ""
+            self.lbl_folder_summary.setText(f"1 carpeta · {total_images} imágenes{adjusted_text}")
             self.lbl_folder_summary.show()
         else:
-            self.lbl_folder_summary.setText(f"📊 {len(self.selected_folders)} carpetas • {total_images} imágenes")
+            adjusted_text = f" · {adjusted_count} ajustadas" if adjusted_count else ""
+            self.lbl_folder_summary.setText(f"{len(self.selected_folders)} carpetas · {total_images} imágenes{adjusted_text}")
             self.lbl_folder_summary.show()
         
         # Update process button text
         if total_images > 0:
-            self.btn_process.setText(f" PROCESAR {total_images} IMÁGENES")
+            self.btn_process.setText(f"Procesar {total_images} imágenes")
         else:
-            self.btn_process.setText(" PROCESAR IMÁGENES")
+            self.btn_process.setText("Procesar lote")
         # Keep details button text/icon unchanged
+
+        self.batch_summary = BatchSummary(
+            folders_count=len(self.selected_folders),
+            images_count=total_images,
+            adjusted_count=adjusted_count,
+            destination_label=self.lbl_destination_summary.text().replace("Destino: ", "", 1)
+            if hasattr(self, "lbl_destination_summary") else "Subcarpeta en origen",
+        )
+        self._update_batch_header()
         
         self._sync_grid_preview_with_folders()
         self._sync_folder_watcher()
@@ -2562,6 +2715,7 @@ class MainWindow(QMainWindow):
             self.lbl_custom_dest.show()
         elif not checked:
             self.lbl_custom_dest.hide()
+        self._update_export_destination_label()
     
     def _choose_custom_dest(self):
         """Choose a custom output destination folder."""
@@ -2572,6 +2726,7 @@ class MainWindow(QMainWindow):
             self.lbl_custom_dest.setText(f"→ {folder}")
             self.lbl_custom_dest.show()
             self.app_settings['custom_output_path'] = str(self.custom_output_path)
+            self._update_export_destination_label()
 
     def _open_export_details_dialog(self):
         """Show export details in a compact dialog to avoid resizing the left panel."""
@@ -2709,7 +2864,7 @@ class MainWindow(QMainWindow):
         self.lbl_progress_status.show()
         
         # Reset pause button state
-        self.btn_pause.setText(" PAUSAR")
+        self.btn_pause.setText("Pausar")
         self.btn_pause.setIcon(qta.icon('fa5s.pause', color='white'))
         self._set_widget_class(self.btn_pause, "warning-solid")
         
@@ -2842,16 +2997,16 @@ class MainWindow(QMainWindow):
             
         if self.queue_worker.is_paused:
             self.queue_worker.resume()
-            self.btn_pause.setText(" PAUSAR")
+            self.btn_pause.setText("Pausar")
             self.btn_pause.setIcon(qta.icon('fa5s.pause', color='white'))
             self._set_widget_class(self.btn_pause, "warning-solid")
             self.lbl_progress_status.setText("Procesando...")
         else:
             self.queue_worker.pause()
-            self.btn_pause.setText(" REANUDAR")
+            self.btn_pause.setText("Reanudar")
             self.btn_pause.setIcon(qta.icon('fa5s.play', color='white'))
             self._set_widget_class(self.btn_pause, "success-solid")
-            self.lbl_progress_status.setText("⏸️ Pausado (terminando imagen actual...)")
+            self.lbl_progress_status.setText("Pausado (terminando imagen actual...)")
 
     def _stop_export(self):
         """Stop current export or queue."""
@@ -2860,18 +3015,19 @@ class MainWindow(QMainWindow):
         elif hasattr(self, 'worker') and self.worker:
             self.worker.stop()
         
-        self.btn_stop.setText(" Deteniendo...")
+        self.btn_stop.setText("Deteniendo...")
         self.btn_stop.setEnabled(False)
     
     def _reset_export_ui(self):
         """Reset export UI to idle state."""
         self.process_controls_widget.hide()
-        self.btn_stop.setText(" DETENER")
+        self.btn_stop.setText("Detener")
         self.btn_stop.setEnabled(True)
         self.btn_process.show()
         self.btn_add_folder.setEnabled(True)
-        self.btn_clear_folders.setEnabled(True)
+        self.btn_clear_folders.setEnabled(bool(self.selected_folders))
         self.progress_bar.setValue(0)
+        self.lbl_progress_status.setText("Listo")
         self.lbl_progress_status.hide()
             
     def _on_export_finished(self, success: bool, processed: int = 0, total: int = 0, duration: float = 0.0):
@@ -2960,6 +3116,7 @@ class MainWindow(QMainWindow):
             self.sl_opacity,
             self.sl_noise,
             self.sl_padding,
+            self.sl_scale_adjustment,
         ]
         for control in sliders:
             control.slider.sliderReleased.connect(self._schedule_history_push)
@@ -2993,45 +3150,41 @@ class MainWindow(QMainWindow):
     
     def _apply_settings(self, settings: ShadowSettings):
         """Apply a ShadowSettings object to all controls."""
-        # Block signals to avoid triggering preview multiple times
+        controls = [
+            (self.sl_distance, settings.distance),
+            (self.sl_blur, settings.blur),
+            (self.sl_spread, settings.spread),
+            (self.sl_fusion, settings.fusion),
+            (self.sl_opacity, settings.opacity),
+            (self.sl_noise, settings.noise),
+            (self.sl_padding, settings.padding),
+            (self.sl_scale_adjustment, settings.scale_adjustment),
+            (self.sl_contact_blur, settings.contact_blur),
+            (self.sl_contraction, settings.contraction),
+        ]
+
         self.light_angle.blockSignals(True)
-        self.sl_distance.slider.blockSignals(True)
-        self.sl_blur.slider.blockSignals(True)
-        self.sl_spread.slider.blockSignals(True)
-        self.sl_fusion.slider.blockSignals(True)
-        self.sl_opacity.slider.blockSignals(True)
-        self.sl_noise.slider.blockSignals(True)
-        self.sl_padding.slider.blockSignals(True)
-        self.sl_contact_blur.slider.blockSignals(True)
-        self.sl_contraction.slider.blockSignals(True)
+        self.angle_spinbox.blockSignals(True)
         self.chk_adaptive.blockSignals(True)
-        
-        self.light_angle.setAngle(settings.angle)
-        self.angle_spinbox.setValue(settings.angle)
-        self.sl_distance.setValue(settings.distance)
-        self.sl_blur.setValue(settings.blur)
-        self.sl_spread.setValue(settings.spread)
-        self.sl_fusion.setValue(settings.fusion)
-        self.sl_opacity.setValue(settings.opacity)
-        self.sl_noise.setValue(settings.noise)
-        self.sl_padding.setValue(settings.padding)
-        self.sl_contact_blur.setValue(settings.contact_blur)
-        self.sl_contraction.setValue(settings.contraction)
-        self.chk_adaptive.setChecked(settings.adaptive_zoom)
-        
-        # Restore signals
-        self.light_angle.blockSignals(False)
-        self.sl_distance.slider.blockSignals(False)
-        self.sl_blur.slider.blockSignals(False)
-        self.sl_spread.slider.blockSignals(False)
-        self.sl_fusion.slider.blockSignals(False)
-        self.sl_opacity.slider.blockSignals(False)
-        self.sl_noise.slider.blockSignals(False)
-        self.sl_padding.slider.blockSignals(False)
-        self.sl_contact_blur.slider.blockSignals(False)
-        self.sl_contraction.slider.blockSignals(False)
-        self.chk_adaptive.blockSignals(False)
-        
+        for control, _ in controls:
+            control.slider.blockSignals(True)
+            control.spinbox.blockSignals(True)
+
+        try:
+            self.light_angle.setAngle(settings.angle)
+            self.angle_spinbox.setValue(settings.angle)
+            for control, value in controls:
+                control.slider.setValue(value)
+                control.spinbox.setValue(value)
+            self.chk_adaptive.setChecked(settings.adaptive_zoom)
+        finally:
+            self.light_angle.blockSignals(False)
+            self.angle_spinbox.blockSignals(False)
+            self.chk_adaptive.blockSignals(False)
+            for control, _ in controls:
+                control.slider.blockSignals(False)
+                control.spinbox.blockSignals(False)
+
         self._schedule_preview()
     
     # ========== LOG VIEWER ==========

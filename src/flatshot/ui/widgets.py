@@ -49,7 +49,8 @@ class SmartSlider(QWidget):
         # Label
         self.label = QLabel(label)
         self.label.setProperty("class", "param-label")
-        self.label.setFixedWidth(self._px(90))  # Slightly wider for readability
+        self.label.setMinimumWidth(self._px(120))
+        self.label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         base_tooltip = tooltip.strip() if tooltip else ""
         reset_hint = "<br><br><span style='color:#7EA9D6'>Tip: doble clic para restaurar el valor por defecto.</span>"
         final_tooltip = f"{base_tooltip}{reset_hint}" if base_tooltip else "Doble clic para restaurar el valor por defecto."
@@ -64,7 +65,7 @@ class SmartSlider(QWidget):
         self.slider.setCursor(Qt.CursorShape.PointingHandCursor)
         self.slider.setSingleStep(1)
         self.slider.setPageStep(max(1, (max_val - min_val) // 10))
-        self.slider.setMinimumWidth(self._px(80))
+        self.slider.setMinimumWidth(self._px(40))
         # Avoid intrusive focus frames on sliders; keyboard editing is done via spinbox.
         self.slider.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.slider.installEventFilter(self)
@@ -76,7 +77,7 @@ class SmartSlider(QWidget):
         self.spinbox.setValue(default)
         self.spinbox.setSuffix(self.suffix)
         self.spinbox.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
-        self.spinbox.setMinimumWidth(self._px(64))
+        self.spinbox.setMinimumWidth(self._px(46))
         self.spinbox.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.spinbox.installEventFilter(self)
         layout.addWidget(self.spinbox, 0)  # stretch factor 0 to not expand
@@ -171,8 +172,8 @@ class CollapsibleSection(QFrame):
         self._content.setProperty("class", "section-content")
         self._content.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self._content_layout = QVBoxLayout(self._content)
-        self._content_layout.setContentsMargins(self._px(10), self._px(10), self._px(10), self._px(12))
-        self._content_layout.setSpacing(self._px(10))
+        self._content_layout.setContentsMargins(self._px(8), self._px(6), self._px(8), self._px(8))
+        self._content_layout.setSpacing(self._px(6))
         outer.addWidget(self._content)
 
         self.setExpanded(self._expanded, emit_signal=False)
@@ -716,36 +717,36 @@ class ComparisonCanvas(QWidget):
 
 class FloatingToolbar(QFrame):
     """
-    Floating toolbar for canvas controls.
+    Inline toolbar for canvas controls (guides + canvas background).
+    Designed to be embedded in a parent horizontal layout.
     """
     gridToggled = pyqtSignal(bool)
     zoomChanged = pyqtSignal(int)
     bgColorChanged = pyqtSignal(str)
     guideSettingsChanged = pyqtSignal(dict)
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setProperty("class", "floating-toolbar")
+        self.setProperty("class", "floating-toolbar-inline")
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.setMinimumHeight(44)
         self._guide_settings = {
             "preset": "thirds",
             "color": "#FFFFFF",
             "opacity": 42,
         }
         self._setup_ui()
-        
+
     def _setup_ui(self):
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 5, 8, 5)
-        layout.setSpacing(8)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
         layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
+        # --- Guides section ---
         guide_label = QLabel("Guías")
         guide_label.setProperty("class", "toolbar-section-label")
         layout.addWidget(guide_label, 0, Qt.AlignmentFlag.AlignVCenter)
-        
-        # Grid button
+
         self.btn_grid = QPushButton(qta.icon('fa5s.th-large', color=COLORS['text_secondary']), "")
         self.btn_grid.setProperty("class", "icon-btn")
         self.btn_grid.setCheckable(True)
@@ -755,7 +756,7 @@ class FloatingToolbar(QFrame):
 
         self.cmb_guides = QComboBox()
         self.cmb_guides.setProperty("class", "toolbar-combo")
-        self.cmb_guides.setFixedWidth(118)
+        self.cmb_guides.setFixedWidth(100)
         self.cmb_guides.setToolTip("Preset de guías")
         for text, value in [
             ("Tercios", "thirds"),
@@ -772,7 +773,7 @@ class FloatingToolbar(QFrame):
         self.guide_opacity.setProperty("class", "toolbar-slider")
         self.guide_opacity.setRange(15, 90)
         self.guide_opacity.setValue(self._guide_settings["opacity"])
-        self.guide_opacity.setFixedWidth(76)
+        self.guide_opacity.setFixedWidth(60)
         self.guide_opacity.setToolTip("Transparencia de las guías")
         self.guide_opacity.valueChanged.connect(self._emit_guide_settings)
         layout.addWidget(self.guide_opacity, 0, Qt.AlignmentFlag.AlignVCenter)
@@ -782,56 +783,44 @@ class FloatingToolbar(QFrame):
             btn = QPushButton()
             btn.setProperty("class", "mini-swatch")
             btn.setCheckable(True)
-            btn.setFixedSize(20, 20)
+            btn.setFixedSize(18, 18)
             btn.setToolTip(f"Guía {name}")
             btn.clicked.connect(lambda checked, c=color: self._select_guide_color(c))
             layout.addWidget(btn, 0, Qt.AlignmentFlag.AlignVCenter)
             self._guide_buttons.append((btn, color))
         self._select_guide_color(self._guide_settings["color"], emit=False)
 
-        layout.addStretch()
-        
+        # --- Divider ---
         divider = QFrame()
-        divider.setProperty("class", "toolbar-divider")
-        divider.setFixedSize(1, 24)
+        divider.setProperty("class", "toolbar-separator-v")
+        divider.setFixedSize(1, 20)
         layout.addWidget(divider)
 
-        bg_label = QLabel("Fondo")
+        # --- Canvas background section ---
+        bg_label = QLabel("Canvas")
         bg_label.setProperty("class", "toolbar-section-label")
         layout.addWidget(bg_label, 0, Qt.AlignmentFlag.AlignVCenter)
-        
-        # Background color buttons
-        swatch_group = QFrame()
-        swatch_group.setProperty("class", "bg-selector")
-        swatch_group.setFixedHeight(36)
-        swatch_layout = QHBoxLayout(swatch_group)
-        swatch_layout.setContentsMargins(4, 4, 4, 4)
-        swatch_layout.setSpacing(4)
-        swatch_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
         self._bg_group = QButtonGroup(self)
         self._bg_group.setExclusive(True)
         self._bg_buttons = []
-        for color, text, name in [
+        for i, (color, text, name) in enumerate([
             ("#FFFFFF", "Claro", "Fondo blanco"),
             ("#E6E6E6", "Neutro", "Fondo gris"),
             ("#2A2A2A", "Oscuro", "Fondo oscuro"),
-        ]:
+        ]):
+            seg_class = "segment-left" if i == 0 else ("segment-right" if i == 2 else "segment-middle")
             btn = QPushButton(text)
-            btn.setProperty("class", "bg-choice")
+            btn.setProperty("class", seg_class)
             btn.setCheckable(True)
-            btn.setFixedSize(72, 28)
-            btn.setStyleSheet(self._background_button_style(color, selected=False))
             btn.setToolTip(name)
             btn.clicked.connect(lambda checked, c=color: self._select_background(c))
             self._bg_group.addButton(btn)
-            swatch_layout.addWidget(btn)
+            layout.addWidget(btn, 0, Qt.AlignmentFlag.AlignVCenter)
             self._bg_buttons.append((btn, color))
-
-        layout.addWidget(swatch_group, 0, Qt.AlignmentFlag.AlignVCenter)
 
         # Default selection
         self._select_background("#E6E6E6", emit=False)
-        self.setMinimumWidth(660)
     
     def _on_grid_toggled(self, checked: bool):
         """Handle grid button toggle with visual feedback."""
@@ -856,9 +845,7 @@ class FloatingToolbar(QFrame):
 
     def _select_background(self, color: str, emit: bool = True):
         for btn, value in getattr(self, "_bg_buttons", []):
-            selected = value == color
-            btn.setChecked(selected)
-            btn.setStyleSheet(self._background_button_style(value, selected=selected))
+            btn.setChecked(value == color)
         if emit:
             self.bgColorChanged.emit(color)
 

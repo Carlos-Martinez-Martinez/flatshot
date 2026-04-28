@@ -5,7 +5,7 @@ Displays multiple image previews in a grid layout with lazy loading.
 from pathlib import Path
 from typing import List, Optional
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QScrollArea, QSizePolicy, QFrame, QGridLayout
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QSizePolicy, QFrame, QGridLayout
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QSize, QRunnable, QThreadPool, QObject, QEvent
 from PyQt6.QtGui import QPixmap, QImage
@@ -106,6 +106,7 @@ class PreviewTile(QFrame):
         self._show_original = False
         self._is_loaded = False  # Track if image has been processed
         self._has_override = False
+        self._status_key = "processing"
         
         self.setProperty("class", "preview-tile")
         self._tile_width = 150
@@ -115,21 +116,32 @@ class PreviewTile(QFrame):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(6, 6, 6, 8)
-        layout.setSpacing(6)
+        layout.setContentsMargins(4, 4, 4, 6)
+        layout.setSpacing(4)
         
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.image_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         layout.addWidget(self.image_label)
         
+        meta_row = QWidget()
+        meta_layout = QHBoxLayout(meta_row)
+        meta_layout.setContentsMargins(2, 0, 2, 0)
+        meta_layout.setSpacing(6)
+
         self.name_label = QLabel()
         self.name_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.name_label.setProperty("class", "preview-label")
-        self.name_label.setWordWrap(True)
-        self.name_label.setContentsMargins(2, 0, 2, 0)
+        self.name_label.setWordWrap(False)
         self.name_label.setMinimumHeight(22)
-        layout.addWidget(self.name_label)
+        meta_layout.addWidget(self.name_label, 1)
+
+        self.status_label = QLabel("...")
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.status_label.setProperty("class", "tile-status-processing")
+        self.status_label.setMinimumWidth(42)
+        meta_layout.addWidget(self.status_label, 0)
+        layout.addWidget(meta_row)
 
     def _apply_size(self):
         # Account for layout margins + spacing (top/bottom + inter-item spacing).
@@ -155,6 +167,7 @@ class PreviewTile(QFrame):
         self._original_image = original or processed
         self._is_loaded = True
         self._set_label_text(file_path)
+        self.set_status("adjusted" if self._has_override else "ok")
         suffix = "\nAjuste local aplicado" if self._has_override else ""
         self.setToolTip(f"{file_path}{suffix}")
         self._update_display()
@@ -165,6 +178,31 @@ class PreviewTile(QFrame):
             self._set_label_text(self.file_path)
             suffix = "\nAjuste local aplicado" if self._has_override else ""
             self.setToolTip(f"{self.file_path}{suffix}")
+        if self._status_key not in ("processing", "error"):
+            self.set_status("adjusted" if self._has_override else "ok")
+
+    def set_status(self, status: str):
+        labels = {
+            "ok": "OK",
+            "adjusted": "Ajustada",
+            "error": "Error",
+            "processing": "...",
+        }
+        status = status if status in labels else "ok"
+        self._status_key = status
+        self.status_label.setText(labels[status])
+        self.status_label.setProperty("class", f"tile-status-{status}")
+        try:
+            self.status_label.style().unpolish(self.status_label)
+            self.status_label.style().polish(self.status_label)
+        except Exception:
+            pass
+
+    def set_error(self, message: str):
+        self._is_loaded = False
+        self.image_label.setText("Error")
+        self.name_label.setText(f"Error: {message[:24]}")
+        self.set_status("error")
     
     def _update_display(self):
         """Update the displayed image."""
@@ -181,13 +219,15 @@ class PreviewTile(QFrame):
         """Show loading state."""
         self.image_label.setText("...")
         self._is_loaded = False
+        self.set_status("processing")
     
     def set_pending(self, file_path: str):
         """Set pending state with filename but no image yet."""
         self.file_path = file_path
         self._set_label_text(file_path)
-        self.image_label.setText("⏳")
+        self.image_label.setText("...")
         self._is_loaded = False
+        self.set_status("processing")
         suffix = "\nAjuste local aplicado" if self._has_override else ""
         self.setToolTip(f"{file_path}{suffix}")
 
@@ -248,6 +288,7 @@ class GridPreviewWidget(QWidget):
         self._folder_label = ""
         self._status_text = ""
         self._status_include_folder = True
+        self._filter_mode = "all"
         
         # Chunked loading
         self._current_chunk = 0
@@ -293,7 +334,7 @@ class GridPreviewWidget(QWidget):
         self.info_label = QLabel("Selecciona una carpeta para ver previews")
         self.info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.info_label.setProperty("class", "help-text")
-        self.info_label.setMinimumHeight(28)
+        self.info_label.setMinimumHeight(22)
         layout.addWidget(self.info_label)
 
     def set_folder_label(self, label: str):
@@ -361,6 +402,15 @@ class GridPreviewWidget(QWidget):
                 tile.set_override_active(self._image_has_override(str(self._images[i])))
         if changed and self._images and self.settings:
             self._schedule_update()
+        self._reflow_tiles()
+
+    def set_filter_mode(self, mode: str):
+        """Filter visible tiles by batch state."""
+        mode = mode if mode in ("all", "adjusted", "error") else "all"
+        if mode == self._filter_mode:
+            return
+        self._filter_mode = mode
+        self._reflow_tiles()
 
     def _override_for_path(self, path: str) -> dict:
         return self.image_overrides.get(override_key(path), {})
@@ -488,6 +538,8 @@ class GridPreviewWidget(QWidget):
             self._image_has_override(str(self._images[tile_index]))
         )
         self._tiles[tile_index].set_image(str(self._images[tile_index]), processed_qpixmap, original_qpixmap)
+        if self._filter_mode != "all":
+            self._reflow_tiles()
 
         self._completed_tiles += 1
         if self._completed_tiles >= len(self._images):
@@ -500,7 +552,8 @@ class GridPreviewWidget(QWidget):
         if generation != self._render_generation:
             return
         if 0 <= tile_index < len(self._tiles):
-            self._tiles[tile_index].name_label.setText(f"Error: {message[:15]}")
+            self._tiles[tile_index].set_error(message)
+            self._reflow_tiles()
 
         self._completed_tiles += 1
         if self._completed_tiles >= len(self._images):
@@ -561,13 +614,31 @@ class GridPreviewWidget(QWidget):
             self._thumb_height = new_height
             for tile in self._tiles:
                 tile.set_tile_size(self._thumb_width, self._thumb_height)
-        for idx, tile in enumerate(self._tiles):
-            row = idx // self._columns
-            col = idx % self._columns
+        while self.grid_layout.count():
+            item = self.grid_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                self.grid_layout.removeWidget(widget)
+        visible_idx = 0
+        for tile in self._tiles:
+            if not self._tile_matches_filter(tile):
+                tile.hide()
+                continue
+            tile.show()
+            row = visible_idx // self._columns
+            col = visible_idx % self._columns
             self.grid_layout.addWidget(tile, row, col)
+            visible_idx += 1
         self.grid_container.adjustSize()
         if size_changed and self._images:
             self._schedule_update()
+
+    def _tile_matches_filter(self, tile: PreviewTile) -> bool:
+        if self._filter_mode == "adjusted":
+            return bool(tile._has_override)
+        if self._filter_mode == "error":
+            return tile._status_key == "error"
+        return True
 
     def eventFilter(self, watched, event):
         if watched == self.scroll.viewport() and event.type() == QEvent.Type.Resize:

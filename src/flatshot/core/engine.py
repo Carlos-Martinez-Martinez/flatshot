@@ -156,6 +156,15 @@ class ShadowEngine:
             new_w = int(original_trimmed.width * ratio)
             new_h = int(original_trimmed.height * ratio)
 
+        scale_adjustment = getattr(settings, "scale_adjustment", 0)
+        if scale_adjustment:
+            local_scale = 1.0 + (scale_adjustment / 100.0)
+            adjusted_w = max(1, int(round(new_w * local_scale)))
+            adjusted_h = max(1, int(round(new_h * local_scale)))
+            fit_ratio = min(safe_w / adjusted_w, safe_h / adjusted_h, 1.0)
+            new_w = max(1, int(round(adjusted_w * fit_ratio)))
+            new_h = max(1, int(round(adjusted_h * fit_ratio)))
+
         if original_trimmed.width == 0: return Image.new("RGB", target_size, (230,230,230))
         
         # Prepare subject for processing

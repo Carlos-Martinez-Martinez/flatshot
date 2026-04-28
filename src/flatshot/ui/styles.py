@@ -134,6 +134,13 @@ QFrame[class="panel-header"] {{
     background-color: {COLORS['bg_secondary']};
     border-bottom: 1px solid {COLORS['divider']};
 }}
+QFrame[class="preview-toolbar"] {{
+    background-color: {COLORS['bg_secondary']};
+    border-bottom: 1px solid {COLORS['divider']};
+}}
+QFrame[class="preview-toolbar-row"] {{
+    background-color: transparent;
+}}
 QDialog[class="dialog"] {{
     background-color: {COLORS['bg_primary']};
 }}
@@ -226,6 +233,44 @@ QLabel[class="panel-title"] {{
 QLabel[class="panel-label"] {{
     font-size: 12px;
     color: {COLORS['text_secondary']};
+}}
+QLabel[class="toolbar-section-label"] {{
+    font-size: 11px;
+    font-weight: 700;
+    color: {COLORS['text_secondary']};
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}}
+QLabel[class="toolbar-hint"] {{
+    font-size: 11px;
+    color: {COLORS['text_muted']};
+}}
+QLabel[class="mini-label"] {{
+    font-size: 11px;
+    color: {COLORS['text_muted']};
+}}
+QLabel[class="mini-value"] {{
+    font-size: 11px;
+    font-weight: 700;
+    color: {COLORS['text_secondary']};
+}}
+QLabel[class="local-status"] {{
+    background-color: {COLORS['bg_raised']};
+    border: 1px solid {COLORS['border']};
+    border-radius: 10px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: {COLORS['text_muted']};
+}}
+QLabel[class="local-status-active"] {{
+    background-color: rgba(10, 132, 255, 0.18);
+    border: 1px solid {COLORS['accent_primary']};
+    border-radius: 10px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #A9D2FF;
 }}
 QLabel[class="panel-path"] {{
     font-size: 12px;
@@ -759,6 +804,11 @@ QFrame[class="floating-toolbar"] {{
     border: 1px solid {COLORS['border']};
     border-radius: 8px;
 }}
+QFrame[class="local-adjust-panel"] {{
+    background-color: {COLORS['bg_primary']};
+    border: 1px solid {COLORS['border']};
+    border-radius: 8px;
+}}
 QFrame[class="toolbar-divider"] {{
     background-color: {COLORS['divider']};
 }}
@@ -783,6 +833,11 @@ QFrame[class="swatch-group"] {{
     background-color: {COLORS['bg_raised']};
     border: 1px solid {COLORS['border']};
     border-radius: 8px;
+}}
+QFrame[class="bg-selector"] {{
+    background-color: {COLORS['bg_raised']};
+    border: 1px solid {COLORS['border']};
+    border-radius: 9px;
 }}
 QPushButton[class="swatch-btn"] {{
     border: 1px solid {COLORS['border']};
@@ -821,6 +876,26 @@ QSlider[class="toolbar-slider"]::handle:horizontal {{
     border-radius: 6px;
 }}
 QSlider[class="toolbar-slider"]::handle:horizontal:hover {{
+    background: {COLORS['accent_hover']};
+}}
+QSlider[class="local-slider"] {{
+    min-height: 22px;
+    max-height: 22px;
+}}
+QSlider[class="local-slider"]::groove:horizontal {{
+    height: 4px;
+    background: {COLORS['bg_active']};
+    border-radius: 2px;
+}}
+QSlider[class="local-slider"]::handle:horizontal {{
+    background: {COLORS['accent_primary']};
+    border: 1px solid {COLORS['border_focus']};
+    width: 12px;
+    height: 12px;
+    margin: -5px 0;
+    border-radius: 6px;
+}}
+QSlider[class="local-slider"]::handle:horizontal:hover {{
     background: {COLORS['accent_hover']};
 }}
 

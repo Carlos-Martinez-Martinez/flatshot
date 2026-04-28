@@ -24,13 +24,14 @@ class QueueWorker(QThread):
     
     def __init__(self, jobs: List[JobItem], shadow_settings: ShadowSettings,
                  export_config: ExportConfig, curve_data: CurveData,
-                 preset_name: str = None):
+                 preset_name: str = None, image_overrides: dict | None = None):
         super().__init__()
         self.jobs = jobs
         self.settings = shadow_settings
         self.export_config = export_config
         self.curve_data = curve_data
         self.preset_name = preset_name
+        self.image_overrides = dict(image_overrides or {})
         self.is_running = True
         self.is_paused = False
         self.current_worker = None
@@ -93,7 +94,8 @@ class QueueWorker(QThread):
                 self.export_config,
                 self.curve_data,
                 self.preset_name,
-                input_files=[str(p) for p in images] if images else None
+                input_files=[str(p) for p in images] if images else None,
+                image_overrides=self.image_overrides
             )
             
             # Connect signals

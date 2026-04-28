@@ -13,6 +13,7 @@ from PIL import Image
 
 from flatshot.core.engine import ShadowEngine
 from flatshot.core.models import ShadowSettings, CurveData
+from flatshot.core.overrides import apply_image_override, has_image_override, override_key
 
 
 def _render_tile_preview(
@@ -104,6 +105,7 @@ class PreviewTile(QFrame):
         self._processed_image: Optional[QPixmap] = None
         self._show_original = False
         self._is_loaded = False  # Track if image has been processed
+        self._has_override = False
         
         self.setProperty("class", "preview-tile")
         self._tile_width = 150
@@ -153,8 +155,16 @@ class PreviewTile(QFrame):
         self._original_image = original or processed
         self._is_loaded = True
         self._set_label_text(file_path)
-        self.setToolTip(file_path)
+        suffix = "\nAjuste local aplicado" if self._has_override else ""
+        self.setToolTip(f"{file_path}{suffix}")
         self._update_display()
+
+    def set_override_active(self, active: bool):
+        self._has_override = bool(active)
+        if self.file_path:
+            self._set_label_text(self.file_path)
+            suffix = "\nAjuste local aplicado" if self._has_override else ""
+            self.setToolTip(f"{self.file_path}{suffix}")
     
     def _update_display(self):
         """Update the displayed image."""
@@ -178,10 +188,13 @@ class PreviewTile(QFrame):
         self._set_label_text(file_path)
         self.image_label.setText("⏳")
         self._is_loaded = False
-        self.setToolTip(file_path)
+        suffix = "\nAjuste local aplicado" if self._has_override else ""
+        self.setToolTip(f"{file_path}{suffix}")
 
     def _set_label_text(self, file_path: str):
         text = Path(file_path).stem
+        if self._has_override:
+            text = f"● {text}"
         metrics = self.name_label.fontMetrics()
         max_width = max(self._tile_width - 12, 60)
         elided = metrics.elidedText(text, Qt.TextElideMode.ElideRight, max_width)
@@ -218,6 +231,7 @@ class GridPreviewWidget(QWidget):
         self.folder_path: Optional[str] = None
         self.settings: Optional[ShadowSettings] = None
         self.curve_data: Optional[CurveData] = None
+        self.image_overrides: dict[str, dict] = {}
         self._tiles: List[PreviewTile] = []
         self._images: List[Path] = []
         self._render_generation = 0
@@ -317,6 +331,7 @@ class GridPreviewWidget(QWidget):
         for i, img_path in enumerate(self._images):
             tile = PreviewTile()
             tile.clicked.connect(self.image_selected.emit)
+            tile.set_override_active(self._image_has_override(str(img_path)))
             tile.set_pending(str(img_path))
             tile.set_tile_size(self._thumb_width, self._thumb_height)
             self._tiles.append(tile)
@@ -335,6 +350,23 @@ class GridPreviewWidget(QWidget):
         # Only update if we have images
         if self._images:
             self._schedule_update()
+
+    def set_image_overrides(self, overrides: dict | None):
+        """Update per-image local adjustments and refresh affected previews."""
+        incoming = dict(overrides or {})
+        changed = incoming != self.image_overrides
+        self.image_overrides = incoming
+        for i, tile in enumerate(self._tiles):
+            if i < len(self._images):
+                tile.set_override_active(self._image_has_override(str(self._images[i])))
+        if changed and self._images and self.settings:
+            self._schedule_update()
+
+    def _override_for_path(self, path: str) -> dict:
+        return self.image_overrides.get(override_key(path), {})
+
+    def _image_has_override(self, path: str) -> bool:
+        return has_image_override(self._override_for_path(path))
     
     def _load_images(self):
         """Load image paths from the folder."""
@@ -380,6 +412,7 @@ class GridPreviewWidget(QWidget):
         # Reset all tiles to pending state
         for i, tile in enumerate(self._tiles):
             if i < len(self._images):
+                tile.set_override_active(self._image_has_override(str(self._images[i])))
                 tile.set_pending(str(self._images[i]))
         
         # Start processing from beginning
@@ -401,18 +434,23 @@ class GridPreviewWidget(QWidget):
         
         preview_size = (self._thumb_width, self._thumb_height)
         generation = self._render_generation
-        settings_dict = self.settings.model_dump()
         curve_dict = self.curve_data.model_dump() if self.curve_data else None
         
         for i in range(start, end):
             if i >= len(self._tiles):
                 break
 
+            image_path = str(self._images[i])
+            effective_settings = apply_image_override(
+                self.settings,
+                self._override_for_path(image_path),
+            )
+
             worker = TileRenderWorker(
                 tile_index=i,
                 generation=generation,
-                image_path=str(self._images[i]),
-                settings_dict=settings_dict,
+                image_path=image_path,
+                settings_dict=effective_settings.model_dump(),
                 curve_dict=curve_dict,
                 preview_size=preview_size,
             )
@@ -446,6 +484,9 @@ class GridPreviewWidget(QWidget):
         processed_payload, original_payload = payload
         processed_qpixmap = self._payload_to_qpixmap(processed_payload)
         original_qpixmap = self._payload_to_qpixmap(original_payload)
+        self._tiles[tile_index].set_override_active(
+            self._image_has_override(str(self._images[tile_index]))
+        )
         self._tiles[tile_index].set_image(str(self._images[tile_index]), processed_qpixmap, original_qpixmap)
 
         self._completed_tiles += 1

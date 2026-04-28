@@ -13,6 +13,7 @@ class ShadowSettings(BaseModel):
     contact_blur: int = 10
     contraction: int = 0
     adaptive_zoom: bool = True
+    scale_adjustment: int = Field(0, ge=-30, le=30)
     transparent_bg: bool = False
     bg_color: Tuple[int, int, int] = (230, 230, 230)
 

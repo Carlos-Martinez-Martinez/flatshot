@@ -726,7 +726,7 @@ class FloatingToolbar(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setProperty("class", "floating-toolbar")
-        self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setMinimumHeight(44)
         self._guide_settings = {
             "preset": "thirds",
@@ -740,6 +740,10 @@ class FloatingToolbar(QFrame):
         layout.setContentsMargins(8, 5, 8, 5)
         layout.setSpacing(8)
         layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+
+        guide_label = QLabel("Guías")
+        guide_label.setProperty("class", "toolbar-section-label")
+        layout.addWidget(guide_label, 0, Qt.AlignmentFlag.AlignVCenter)
         
         # Grid button
         self.btn_grid = QPushButton(qta.icon('fa5s.th-large', color=COLORS['text_secondary']), "")
@@ -784,29 +788,39 @@ class FloatingToolbar(QFrame):
             layout.addWidget(btn, 0, Qt.AlignmentFlag.AlignVCenter)
             self._guide_buttons.append((btn, color))
         self._select_guide_color(self._guide_settings["color"], emit=False)
+
+        layout.addStretch()
         
         divider = QFrame()
         divider.setProperty("class", "toolbar-divider")
         divider.setFixedSize(1, 24)
         layout.addWidget(divider)
+
+        bg_label = QLabel("Fondo")
+        bg_label.setProperty("class", "toolbar-section-label")
+        layout.addWidget(bg_label, 0, Qt.AlignmentFlag.AlignVCenter)
         
         # Background color buttons
         swatch_group = QFrame()
-        swatch_group.setProperty("class", "swatch-group")
-        swatch_group.setFixedHeight(28)
+        swatch_group.setProperty("class", "bg-selector")
+        swatch_group.setFixedHeight(36)
         swatch_layout = QHBoxLayout(swatch_group)
-        swatch_layout.setContentsMargins(3, 3, 3, 3)
-        swatch_layout.setSpacing(5)
+        swatch_layout.setContentsMargins(4, 4, 4, 4)
+        swatch_layout.setSpacing(4)
         swatch_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._bg_group = QButtonGroup(self)
         self._bg_group.setExclusive(True)
         self._bg_buttons = []
-        for color, name in [("#FFFFFF", "Fondo blanco"), ("#E6E6E6", "Fondo gris"), ("#2A2A2A", "Fondo oscuro")]:
-            btn = QPushButton()
-            btn.setProperty("class", "swatch-btn")
+        for color, text, name in [
+            ("#FFFFFF", "Claro", "Fondo blanco"),
+            ("#E6E6E6", "Neutro", "Fondo gris"),
+            ("#2A2A2A", "Oscuro", "Fondo oscuro"),
+        ]:
+            btn = QPushButton(text)
+            btn.setProperty("class", "bg-choice")
             btn.setCheckable(True)
-            btn.setFixedSize(22, 22)
-            btn.setStyleSheet(f"background-color: {color};")
+            btn.setFixedSize(72, 28)
+            btn.setStyleSheet(self._background_button_style(color, selected=False))
             btn.setToolTip(name)
             btn.clicked.connect(lambda checked, c=color: self._select_background(c))
             self._bg_group.addButton(btn)
@@ -817,7 +831,7 @@ class FloatingToolbar(QFrame):
 
         # Default selection
         self._select_background("#E6E6E6", emit=False)
-        self.setMinimumWidth(430)
+        self.setMinimumWidth(660)
     
     def _on_grid_toggled(self, checked: bool):
         """Handle grid button toggle with visual feedback."""
@@ -842,14 +856,22 @@ class FloatingToolbar(QFrame):
 
     def _select_background(self, color: str, emit: bool = True):
         for btn, value in getattr(self, "_bg_buttons", []):
-            if value == color:
-                btn.setChecked(True)
-                btn.setStyleSheet(f"background-color: {value};")
-            else:
-                btn.setChecked(False)
-                btn.setStyleSheet(f"background-color: {value};")
+            selected = value == color
+            btn.setChecked(selected)
+            btn.setStyleSheet(self._background_button_style(value, selected=selected))
         if emit:
             self.bgColorChanged.emit(color)
+
+    def _background_button_style(self, color: str, selected: bool) -> str:
+        text_color = "#111318" if color.upper() in {"#FFFFFF", "#E6E6E6"} else COLORS['text_primary']
+        border_color = COLORS['accent_primary'] if selected else COLORS['border']
+        border_width = 2 if selected else 1
+        return (
+            f"QPushButton {{ background-color: {color}; color: {text_color}; "
+            f"border: {border_width}px solid {border_color}; border-radius: 7px; "
+            "padding: 2px 8px; font-size: 11px; font-weight: 700; }}"
+            f"QPushButton:hover {{ border: 2px solid {COLORS['accent_hover']}; }}"
+        )
 
     def set_background(self, color: str, emit: bool = False):
         self._select_background(color, emit=emit)

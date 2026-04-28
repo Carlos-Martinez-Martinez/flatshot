@@ -24,6 +24,13 @@ from PyQt6.QtGui import QPixmap, QImage, QPainter, QColor, QPainterPath, QAction
 
 from flatshot.core.engine import ShadowEngine
 from flatshot.core.models import ShadowSettings, ExportConfig, CurveData, JobItem
+from flatshot.core.overrides import (
+    LOCAL_OVERRIDE_DEFAULTS,
+    apply_image_override,
+    has_image_override,
+    normalize_image_override,
+    override_key,
+)
 from flatshot.core.scaling import DEFAULT_SCALE_CURVE, normalize_curve_data
 from flatshot.utils.config import ConfigManager
 from flatshot.utils.history_manager import HistoryManager
@@ -184,6 +191,15 @@ class MainWindow(QMainWindow):
         
         curve_dict = self.app_settings.get('scale_curve', DEFAULT_SCALE_CURVE.copy())
         self.scale_curve = normalize_curve_data(curve_dict)
+        loaded_overrides = self.app_settings.get('image_overrides', {})
+        self.image_overrides = {
+            str(key): normalize_image_override(value)
+            for key, value in loaded_overrides.items()
+            if has_image_override(value)
+        } if isinstance(loaded_overrides, dict) else {}
+        self._local_override_history = {}
+        self._local_override_edit_key = None
+        self._syncing_local_override_ui = False
         
         # Build UI
         self._init_menu()
@@ -201,8 +217,8 @@ class MainWindow(QMainWindow):
         elif not restored:
             self._schedule_preview()
         self._push_history()
-        # Always start maximized for better workspace visibility.
-        QTimer.singleShot(0, self.showMaximized)
+        # Always start maximized and then fit the workspace to the grid density.
+        QTimer.singleShot(0, self._show_maximized_workspace)
     
     def _normalize_scale(self, scale: float) -> float:
         """Clamp the incoming UI scale to a safe range."""
@@ -389,19 +405,22 @@ class MainWindow(QMainWindow):
         
         # === LEFT PANEL (Controls) ===
         left_panel = self._create_control_panel()
+        self.left_panel = left_panel
         
         # === CENTER PANEL (Canvas Preview) ===
         center_panel = self._create_preview_panel()
+        self.center_panel = center_panel
         
         # === RIGHT PANEL (Grid Preview) ===
         right_panel = self._create_grid_panel()
+        self.right_panel = right_panel
         
         # Splitter for resizable panels (3 columns)
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.splitter.addWidget(left_panel)
         self.splitter.addWidget(center_panel)
         self.splitter.addWidget(right_panel)
-        self.splitter.setSizes([self._px(340), self._px(560), self._px(520)])
+        self.splitter.setSizes([self._px(340), self._px(860), self._px(560)])
         self.splitter.setStretchFactor(0, 0)  # Controls: fixed
         self.splitter.setStretchFactor(1, 1)  # Canvas: stretch
         self.splitter.setStretchFactor(2, 0)  # Grid: fixed
@@ -416,6 +435,42 @@ class MainWindow(QMainWindow):
         self.splitter.splitterMoved.connect(lambda *_: self._splitter_save_timer.start(250))
         
         main_layout.addWidget(self.splitter)
+
+    def _show_maximized_workspace(self):
+        self.showMaximized()
+        QTimer.singleShot(0, lambda: self._fit_workspace_to_grid(force=False))
+
+    def _target_grid_panel_width(self, columns: int | None = None) -> int:
+        if columns is None:
+            columns = int(self.app_settings.get('grid_columns', 1))
+        columns = min(max(int(columns), 1), 3)
+        targets = {
+            1: 360,
+            2: 500,
+            3: 650,
+        }
+        return self._px(targets[columns])
+
+    def _apply_grid_panel_width_policy(self, columns: int | None = None):
+        if not hasattr(self, 'right_panel'):
+            return
+        target = self._target_grid_panel_width(columns)
+        self.right_panel.setMinimumWidth(target)
+        self.right_panel.setMaximumWidth(self._px(780))
+
+    def _fit_workspace_to_grid(self, columns: int | None = None, force: bool = False):
+        if not hasattr(self, 'splitter'):
+            return
+        self._apply_grid_panel_width_policy(columns)
+        target_right = self._target_grid_panel_width(columns)
+        sizes = self.splitter.sizes()
+        if not force and len(sizes) == 3 and sizes[2] >= target_right - self._px(12):
+            return
+
+        total = max(self.splitter.width(), self.width(), self._px(1600))
+        left = self._px(340)
+        center = max(total - left - target_right, self._px(720))
+        self.splitter.setSizes([left, center, target_right])
         
     def _create_control_panel(self) -> QWidget:
         """Create the left control panel with all settings."""
@@ -929,19 +984,25 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(self._px(4))
         
-        # Toolbar
+        # Toolbar: two rows keep global preview controls separate from per-image adjustments.
         toolbar = QFrame()
-        toolbar.setProperty("class", "panel-header")
-        toolbar_layout = QHBoxLayout(toolbar)
+        toolbar.setProperty("class", "preview-toolbar")
+        toolbar_layout = QVBoxLayout(toolbar)
         toolbar_layout.setContentsMargins(
             self._px(12), self._px(8), self._px(12), self._px(8)
         )
         toolbar_layout.setSpacing(self._px(8))
+
+        preview_row = QFrame()
+        preview_row.setProperty("class", "preview-toolbar-row")
+        preview_layout = QHBoxLayout(preview_row)
+        preview_layout.setContentsMargins(0, 0, 0, 0)
+        preview_layout.setSpacing(self._px(8))
         
         # Mock selection buttons
-        mock_label = QLabel("Vista previa:")
-        mock_label.setProperty("class", "subheading")
-        toolbar_layout.addWidget(mock_label)
+        mock_label = QLabel("Vista previa")
+        mock_label.setProperty("class", "toolbar-section-label")
+        preview_layout.addWidget(mock_label)
         
         self.btn_group = QButtonGroup(self)
         self.btn_group.setExclusive(True)
@@ -955,7 +1016,7 @@ class MainWindow(QMainWindow):
             btn.clicked.connect(lambda checked, m=mock_id: self._set_mock_color(m))
             self.btn_group.addButton(btn)
             self.mock_buttons[mock_id] = btn
-            toolbar_layout.addWidget(btn)
+            preview_layout.addWidget(btn)
             if mock_id == 'dark':
                 btn.setChecked(True)
         
@@ -966,11 +1027,19 @@ class MainWindow(QMainWindow):
         self.btn_custom.clicked.connect(lambda: self._set_mock_color('custom_drop'))
         self.btn_custom.hide()  # Hidden by default
         self.btn_group.addButton(self.btn_custom)
-        toolbar_layout.addWidget(self.btn_custom)
-                
-        toolbar_layout.addStretch()
-        
-        # Floating toolbar
+        preview_layout.addWidget(self.btn_custom)
+
+        preview_layout.addStretch()
+
+        zoom_hint = QLabel("Rueda: zoom al cursor  ·  arrastrar: mover  ·  doble clic: reset")
+        zoom_hint.setProperty("class", "toolbar-hint")
+        preview_layout.addWidget(zoom_hint)
+        toolbar_layout.addWidget(preview_row)
+
+        self.local_adjust_panel = self._create_local_adjustment_bar()
+        toolbar_layout.addWidget(self.local_adjust_panel)
+
+        # Guide/background toolbar
         self.floating_toolbar = FloatingToolbar()
         self.floating_toolbar.gridToggled.connect(self._on_preview_grid_toggled)
         self.floating_toolbar.bgColorChanged.connect(self._on_preview_bg_changed)
@@ -994,6 +1063,7 @@ class MainWindow(QMainWindow):
         self.floating_toolbar.set_background(saved_bg, emit=False)
         self.floating_toolbar.set_guide_settings(saved_guides, emit=False)
         self.floating_toolbar.set_grid_enabled(saved_grid, emit=False)
+        self._sync_local_override_ui()
         
         # Help text
         help_text = QLabel("Mantén ESPACIO para ver el original | Arrastra una imagen para probarla")
@@ -1002,13 +1072,95 @@ class MainWindow(QMainWindow):
         layout.addWidget(help_text)
         
         return panel
+
+    def _create_local_adjustment_bar(self) -> QFrame:
+        """Create the per-image override controls shown above the canvas."""
+        panel = QFrame()
+        panel.setProperty("class", "local-adjust-panel")
+        panel.setToolTip(
+            "Ajustes locales para la imagen seleccionada. "
+            "Se aplican encima del preset actual y solo afectan a esa imagen."
+        )
+
+        layout = QHBoxLayout(panel)
+        layout.setContentsMargins(self._px(10), self._px(5), self._px(10), self._px(5))
+        layout.setSpacing(self._px(8))
+        layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+
+        title = QLabel("Imagen")
+        title.setProperty("class", "toolbar-section-label")
+        layout.addWidget(title)
+
+        self.lbl_local_adjust_state = QLabel("Preset")
+        self.lbl_local_adjust_state.setProperty("class", "local-status")
+        self.lbl_local_adjust_state.setFixedWidth(self._px(96))
+        layout.addWidget(self.lbl_local_adjust_state)
+
+        self._local_override_sliders = {}
+        self._local_override_value_labels = {}
+        self._local_override_controls = []
+
+        slider_specs = [
+            ("size_delta", "Tamaño", -20, 20, "%", "Compensa una imagen concreta haciéndola más grande o pequeña."),
+            ("shadow_delta", "Sombra", -30, 30, "", "Sube o baja la presencia de sombra solo en esta imagen."),
+            ("blur_delta", "Suavidad", -30, 30, "", "Ajusta la difusión de la sombra solo en esta imagen."),
+        ]
+
+        for field, label, minimum, maximum, suffix, tooltip in slider_specs:
+            field_label = QLabel(label)
+            field_label.setProperty("class", "mini-label")
+            field_label.setToolTip(tooltip)
+            layout.addWidget(field_label)
+            self._local_override_controls.append(field_label)
+
+            slider = QSlider(Qt.Orientation.Horizontal)
+            slider.setProperty("class", "local-slider")
+            slider.setRange(minimum, maximum)
+            slider.setValue(0)
+            slider.setFixedWidth(self._px(78))
+            slider.setToolTip(tooltip)
+            slider.sliderPressed.connect(self._begin_local_override_edit)
+            slider.sliderReleased.connect(self._end_local_override_edit)
+            slider.valueChanged.connect(
+                lambda value, key=field: self._on_local_override_slider_changed(key, value)
+            )
+            layout.addWidget(slider)
+            self._local_override_sliders[field] = slider
+            self._local_override_controls.append(slider)
+
+            value_label = QLabel("0")
+            value_label.setProperty("class", "mini-value")
+            value_label.setFixedWidth(self._px(36))
+            value_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            value_label.setToolTip(tooltip)
+            layout.addWidget(value_label)
+            self._local_override_value_labels[field] = (value_label, suffix)
+            self._local_override_controls.append(value_label)
+
+        layout.addStretch()
+
+        self.btn_local_undo = QPushButton(qta.icon('fa5s.undo-alt', color=COLORS['text_secondary']), "")
+        self.btn_local_undo.setProperty("class", "icon-btn")
+        self.btn_local_undo.setToolTip("Volver al ajuste local anterior de esta imagen")
+        self.btn_local_undo.clicked.connect(self._undo_local_override)
+        layout.addWidget(self.btn_local_undo)
+        self._local_override_controls.append(self.btn_local_undo)
+
+        self.btn_local_reset = QPushButton(qta.icon('fa5s.eraser', color=COLORS['text_secondary']), "")
+        self.btn_local_reset.setProperty("class", "icon-btn")
+        self.btn_local_reset.setToolTip("Quitar ajuste local y volver al preset")
+        self.btn_local_reset.clicked.connect(self._reset_local_override)
+        layout.addWidget(self.btn_local_reset)
+        self._local_override_controls.append(self.btn_local_reset)
+
+        return panel
     
     def _create_grid_panel(self) -> QWidget:
         """Create the right panel with grid of image previews."""
         panel = QWidget()
         panel.setProperty("class", "panel")
-        panel.setMinimumWidth(self._px(260))
-        panel.setMaximumWidth(self._px(520))
+        panel.setMinimumWidth(self._target_grid_panel_width())
+        panel.setMaximumWidth(self._px(780))
         
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -1123,6 +1275,7 @@ class MainWindow(QMainWindow):
         self.grid_preview = GridPreviewWidget()
         self.grid_preview.image_selected.connect(self._on_grid_image_selected)
         self.grid_preview.folder_empty.connect(self._on_grid_folder_empty)
+        self.grid_preview.set_image_overrides(self.image_overrides)
         layout.addWidget(self.grid_preview, 1)
 
         # Apply persisted grid settings
@@ -1178,6 +1331,7 @@ class MainWindow(QMainWindow):
             return
         folder = self.selected_folders[index]
         self.grid_preview.set_folder(str(folder))
+        self.grid_preview.set_image_overrides(self.image_overrides)
         settings = self._get_shadow_settings()
         self.grid_preview.set_settings(settings, self.scale_curve)
         label = folder.name
@@ -1236,6 +1390,8 @@ class MainWindow(QMainWindow):
             return
         self.grid_preview.set_fixed_columns(int(columns))
         self.app_settings['grid_columns'] = int(columns)
+        self._fit_workspace_to_grid(columns=int(columns), force=True)
+        self.app_settings['splitter_sizes'] = self.splitter.sizes()
         self._save_app_settings()
 
     def _on_preview_grid_toggled(self, enabled: bool):
@@ -1342,6 +1498,7 @@ class MainWindow(QMainWindow):
 
         folder = self.selected_folders[target_index]
         self.grid_preview.set_folder(str(folder))
+        self.grid_preview.set_image_overrides(self.image_overrides)
         settings = self._get_shadow_settings()
         self.grid_preview.set_settings(settings, self.scale_curve)
         label = folder.name
@@ -1362,6 +1519,7 @@ class MainWindow(QMainWindow):
             self.btn_custom.hide()
             self.mock_buttons['dark'].setChecked(True)
         self.current_custom_path = None
+        self._sync_local_override_ui()
     
     # ========== BUSINESS LOGIC ==========
     
@@ -1424,6 +1582,7 @@ class MainWindow(QMainWindow):
             self.btn_custom.show()
             self.btn_custom.setText(f" {Path(path).stem[:15]}")
             self.btn_custom.setChecked(True)
+            self._sync_local_override_ui()
 
             # Only update canvas, NOT the grid (to avoid reload)
             self._schedule_canvas_only_preview()
@@ -1497,6 +1656,7 @@ class MainWindow(QMainWindow):
                 'color': '#FFFFFF',
                 'opacity': 42,
             },
+            'image_overrides': {},
             'scale_curve': dict(DEFAULT_SCALE_CURVE),
             'section_visibility': {
                 'presets': True,
@@ -1521,6 +1681,7 @@ class MainWindow(QMainWindow):
     
     def _save_app_settings(self):
         self.app_settings['scale_curve'] = self.scale_curve.model_dump()
+        self.app_settings['image_overrides'] = self.image_overrides
         try:
             with open(self.settings_file, 'w') as f:
                 json.dump(self.app_settings, f, indent=4)
@@ -1615,6 +1776,172 @@ class MainWindow(QMainWindow):
             contraction=self.sl_contraction.value(),
             adaptive_zoom=self.chk_adaptive.isChecked()
         )
+
+    def _current_image_override_key(self) -> str:
+        if self.current_mock != 'custom_drop' or not self.current_custom_path:
+            return ""
+        return override_key(self.current_custom_path)
+
+    def _override_for_path(self, path: str | None) -> dict:
+        key = override_key(path)
+        return self.image_overrides.get(key, {}) if key else {}
+
+    def _get_effective_shadow_settings(self, path: str | None = None) -> ShadowSettings:
+        source_path = path
+        if source_path is None and self.current_mock == 'custom_drop':
+            source_path = self.current_custom_path
+        return apply_image_override(self._get_shadow_settings(), self._override_for_path(source_path))
+
+    def _save_image_overrides(self):
+        self.image_overrides = {
+            key: normalize_image_override(value)
+            for key, value in self.image_overrides.items()
+            if has_image_override(value)
+        }
+        self.app_settings['image_overrides'] = self.image_overrides
+        self._save_app_settings()
+
+    def _refresh_image_overrides(self):
+        if hasattr(self, 'grid_preview'):
+            self.grid_preview.set_image_overrides(self.image_overrides)
+
+    def _format_local_delta(self, value: int, suffix: str = "") -> str:
+        if value > 0:
+            return f"+{value}{suffix}"
+        if value < 0:
+            return f"{value}{suffix}"
+        return f"0{suffix}" if suffix else "0"
+
+    def _update_local_override_value_labels(self):
+        if not hasattr(self, '_local_override_value_labels'):
+            return
+        for field, (label, suffix) in self._local_override_value_labels.items():
+            slider = self._local_override_sliders.get(field)
+            if slider:
+                label.setText(self._format_local_delta(slider.value(), suffix))
+
+    def _collect_local_override_from_ui(self) -> dict:
+        values = dict(LOCAL_OVERRIDE_DEFAULTS)
+        for field, slider in getattr(self, '_local_override_sliders', {}).items():
+            values[field] = slider.value()
+        return normalize_image_override(values)
+
+    def _begin_local_override_edit(self):
+        self._remember_local_override_state()
+
+    def _end_local_override_edit(self):
+        self._local_override_edit_key = None
+
+    def _remember_local_override_state(self, force: bool = False):
+        key = self._current_image_override_key()
+        if not key or (self._local_override_edit_key == key and not force):
+            return
+        stack = self._local_override_history.setdefault(key, [])
+        stack.append(dict(self.image_overrides.get(key, {})))
+        if len(stack) > 20:
+            del stack[:-20]
+        self._local_override_edit_key = key
+
+    def _on_local_override_slider_changed(self, field: str, value: int):
+        if self._syncing_local_override_ui:
+            return
+        key = self._current_image_override_key()
+        if not key:
+            self._sync_local_override_ui()
+            return
+
+        self._remember_local_override_state()
+        self._update_local_override_value_labels()
+        override = self._collect_local_override_from_ui()
+        if override:
+            self.image_overrides[key] = override
+        else:
+            self.image_overrides.pop(key, None)
+
+        self._save_image_overrides()
+        self._update_local_override_state_label()
+        self._refresh_image_overrides()
+        self._schedule_canvas_only_preview()
+
+    def _undo_local_override(self):
+        key = self._current_image_override_key()
+        if not key:
+            return
+        stack = self._local_override_history.get(key, [])
+        if not stack:
+            return
+
+        previous = normalize_image_override(stack.pop())
+        if previous:
+            self.image_overrides[key] = previous
+        else:
+            self.image_overrides.pop(key, None)
+        self._local_override_edit_key = None
+        self._save_image_overrides()
+        self._sync_local_override_ui()
+        self._refresh_image_overrides()
+        self._schedule_canvas_only_preview()
+        self._show_feedback("Ajuste local anterior")
+
+    def _reset_local_override(self):
+        key = self._current_image_override_key()
+        if not key or not has_image_override(self.image_overrides.get(key)):
+            return
+        self._remember_local_override_state(force=True)
+        self._local_override_edit_key = None
+        self.image_overrides.pop(key, None)
+        self._save_image_overrides()
+        self._sync_local_override_ui()
+        self._refresh_image_overrides()
+        self._schedule_canvas_only_preview()
+        self._show_feedback("Imagen de nuevo al preset")
+
+    def _update_local_override_state_label(self):
+        if not hasattr(self, 'lbl_local_adjust_state'):
+            return
+        key = self._current_image_override_key()
+        enabled = bool(key)
+        active = enabled and has_image_override(self.image_overrides.get(key))
+
+        if not enabled:
+            self.lbl_local_adjust_state.setText("Sin imagen")
+            self.lbl_local_adjust_state.setToolTip("Selecciona una imagen del grid o arrástrala al canvas.")
+            self._set_widget_class(self.lbl_local_adjust_state, "local-status")
+        elif active:
+            self.lbl_local_adjust_state.setText("Ajuste local")
+            self.lbl_local_adjust_state.setToolTip("Esta imagen tiene cambios propios encima del preset.")
+            self._set_widget_class(self.lbl_local_adjust_state, "local-status-active")
+        else:
+            self.lbl_local_adjust_state.setText("Preset")
+            self.lbl_local_adjust_state.setToolTip("Esta imagen usa el preset sin cambios locales.")
+            self._set_widget_class(self.lbl_local_adjust_state, "local-status")
+
+        for widget in getattr(self, '_local_override_controls', []):
+            widget.setEnabled(enabled)
+        if hasattr(self, 'btn_local_reset'):
+            self.btn_local_reset.setEnabled(active)
+        if hasattr(self, 'btn_local_undo'):
+            self.btn_local_undo.setEnabled(enabled and bool(self._local_override_history.get(key, [])))
+
+    def _sync_local_override_ui(self):
+        if not hasattr(self, '_local_override_sliders'):
+            return
+        key = self._current_image_override_key()
+        current = dict(LOCAL_OVERRIDE_DEFAULTS)
+        if key:
+            current.update(normalize_image_override(self.image_overrides.get(key)))
+
+        self._syncing_local_override_ui = True
+        try:
+            for field, slider in self._local_override_sliders.items():
+                slider.blockSignals(True)
+                slider.setValue(int(current.get(field, 0)))
+                slider.blockSignals(False)
+        finally:
+            self._syncing_local_override_ui = False
+
+        self._update_local_override_value_labels()
+        self._update_local_override_state_label()
     
     # ========== EVENT HANDLERS ==========
     
@@ -1626,6 +1953,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'grid_preview'):
             settings = self._get_shadow_settings()
             self.grid_preview.set_settings(settings, self.scale_curve)
+            self.grid_preview.set_image_overrides(self.image_overrides)
     
     def _schedule_canvas_only_preview(self, *args):
         """Schedule preview update for canvas only (not grid)."""
@@ -1654,7 +1982,7 @@ class MainWindow(QMainWindow):
             worker = PreviewWorker(
                 self.current_base_pil,
                 self.preview_size,
-                self._get_shadow_settings().model_dump(),
+                self._get_effective_shadow_settings().model_dump(),
                 self.scale_curve.model_dump(),
                 self.preview_scale_ratio,
                 quality_level=1
@@ -1758,6 +2086,7 @@ class MainWindow(QMainWindow):
         # Clear cache to force re-generation for the mockup
         self.current_base_pil = None
         self.current_orig_pixmap = None
+        self._sync_local_override_ui()
         self._schedule_preview()
         
     def _on_image_dropped(self, path: str):
@@ -1778,11 +2107,13 @@ class MainWindow(QMainWindow):
             self.btn_custom.setChecked(True)
             
             self.current_mock = 'custom_drop'
+            self.current_custom_path = path
             
             # Update assets and schedule
             self.current_base_pil = None
             self.current_orig_pixmap = None
             self._update_current_assets(pil_img)
+            self._sync_local_override_ui()
             
             self._schedule_preview()
             self._show_feedback(f"Imagen cargada")
@@ -2435,7 +2766,8 @@ class MainWindow(QMainWindow):
                 self._get_shadow_settings(),
                 export_config,
                 self.scale_curve,
-                input_files=[str(p) for p in snapshot_files.get(self.selected_folders[0], [])]
+                input_files=[str(p) for p in snapshot_files.get(self.selected_folders[0], [])],
+                image_overrides=self.image_overrides
             )
             self.worker.progress_updated.connect(self.progress_bar.setValue)
             self.worker.log_updated.connect(self._log_error)
@@ -2456,7 +2788,8 @@ class MainWindow(QMainWindow):
                 self._get_shadow_settings(),
                 export_config,
                 self.scale_curve,
-                preset_name
+                preset_name,
+                image_overrides=self.image_overrides
             )
             
             self.queue_worker.job_started.connect(self._on_queue_job_started)

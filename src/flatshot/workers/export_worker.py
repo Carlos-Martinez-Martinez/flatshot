@@ -13,6 +13,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from PIL import Image
 from flatshot.core.engine import ShadowEngine
 from flatshot.core.models import ShadowSettings, ExportConfig, CurveData
+from flatshot.core.overrides import apply_image_override, override_key
 
 
 def apply_naming_template(template: str, original_name: str, suffix: str, 
@@ -49,11 +50,11 @@ def apply_naming_template(template: str, original_name: str, suffix: str,
 def process_single_image(args):
     """Process a single image in a worker process."""
     (img_path, output_folder, settings_dict, target_size, 
-     naming_template, suffix, folder_name, index, fmt, curve_data_dict) = args
+     naming_template, suffix, folder_name, index, fmt, curve_data_dict, local_override) = args
     
     try:
         # Reconstruct Pydantic models from dicts (pickle serialization fix)
-        settings = ShadowSettings(**settings_dict)
+        settings = apply_image_override(ShadowSettings(**settings_dict), local_override)
         curve_data = CurveData(**curve_data_dict) if curve_data_dict else None
         
         original = Image.open(img_path).convert('RGBA')
@@ -92,7 +93,8 @@ class ExportWorker(QThread):
 
     def __init__(self, input_folder: str, shadow_settings: ShadowSettings, 
                  export_config: ExportConfig, curve_data: CurveData,
-                 preset_name: str = None, input_files: list[str] | None = None):
+                 preset_name: str = None, input_files: list[str] | None = None,
+                 image_overrides: dict | None = None):
         super().__init__()
         self.input_folder = Path(input_folder)
         self.settings = shadow_settings
@@ -105,6 +107,7 @@ class ExportWorker(QThread):
         self._pause_event = threading.Event()
         self._pause_event.set()
         self.input_files = input_files
+        self.image_overrides = dict(image_overrides or {})
         self._snapshot_dir = None
 
     def _copy_stable(self, src: Path, dest: Path):
@@ -144,15 +147,18 @@ class ExportWorker(QThread):
                 # Snapshot contents to a temp folder to keep a stable view
                 snap_dir = Path(tempfile.mkdtemp(prefix="flatshot_snap_"))
                 self._snapshot_dir = snap_dir
-                images = []
+                image_items = []
                 for src in source_files:
                     dest = snap_dir / src.name
                     if self._copy_stable(src, dest):
-                        images.append(dest)
+                        image_items.append((dest, override_key(src)))
             else:
-                images = [f for f in self.input_folder.iterdir()
-                          if f.is_file() and f.suffix.lower() == '.png']
-            total = len(images)
+                image_items = [
+                    (f, override_key(f))
+                    for f in self.input_folder.iterdir()
+                    if f.is_file() and f.suffix.lower() == '.png'
+                ]
+            total = len(image_items)
         except Exception as exc:
             self.log_updated.emit(f"Error al leer carpeta '{self.input_folder}': {exc}")
             self.finished_process.emit(False, 0, 0, 0.0)
@@ -195,11 +201,14 @@ class ExportWorker(QThread):
 
         # Build task list
         tasks = []
-        for index, img_path in enumerate(sorted(images), start=1):
+        for index, (img_path, local_key) in enumerate(
+            sorted(image_items, key=lambda item: item[0].name),
+            start=1,
+        ):
             tasks.append((
                 img_path, output_folder, settings_dict, target_size,
                 naming_template, suffix, parent_folder_name, index, 
-                fmt, curve_data_dict
+                fmt, curve_data_dict, self.image_overrides.get(local_key, {})
             ))
 
         completed_count = 0

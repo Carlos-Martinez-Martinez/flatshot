@@ -3,8 +3,11 @@ Tests for FlatShot Models
 """
 import pytest
 from flatshot.core.models import (
-    ShadowSettings, ExportConfig, CurveData, 
-    JobItem, PresetCategory, CategorizedPresets
+    SHADOW_ENGINE_COMPAT,
+    SHADOW_ENGINE_DEFAULT,
+    ShadowSettings, ExportConfig, CurveData,
+    JobItem, PresetCategory, CategorizedPresets,
+    normalize_shadow_settings,
 )
 
 
@@ -21,6 +24,7 @@ class TestShadowSettings:
         assert settings.opacity == 20
         assert settings.padding == 10
         assert settings.adaptive_zoom is True
+        assert settings.shadow_engine == SHADOW_ENGINE_DEFAULT
         assert settings.transparent_bg is False
         assert settings.bg_color == (230, 230, 230)
     
@@ -56,6 +60,20 @@ class TestShadowSettings:
         assert 'angle' in data
         assert 'distance' in data
         assert 'blur' in data
+        assert data['shadow_engine'] == SHADOW_ENGINE_DEFAULT
+
+    def test_normalize_missing_shadow_engine_uses_legacy_for_loaded_data(self):
+        settings = normalize_shadow_settings({"angle": 90, "distance": 12})
+
+        assert settings.shadow_engine == SHADOW_ENGINE_COMPAT
+        assert settings.angle == 90
+
+    def test_normalize_preserves_explicit_shadow_engine(self):
+        settings = normalize_shadow_settings(
+            {"angle": 90, "shadow_engine": SHADOW_ENGINE_DEFAULT},
+        )
+
+        assert settings.shadow_engine == SHADOW_ENGINE_DEFAULT
 
 
 class TestExportConfig:

@@ -3,7 +3,11 @@ History Manager for FlatShot
 Handles undo/redo functionality for shadow settings.
 """
 from typing import Optional
-from flatshot.core.models import ShadowSettings
+from flatshot.core.models import (
+    SHADOW_ENGINE_COMPAT,
+    ShadowSettings,
+    normalize_shadow_settings,
+)
 
 
 class HistoryManager:
@@ -54,7 +58,10 @@ class HistoryManager:
         self._current_index -= 1
         self._is_restoring = True
         try:
-            return ShadowSettings(**self._history[self._current_index])
+            return normalize_shadow_settings(
+                self._history[self._current_index],
+                missing_engine=SHADOW_ENGINE_COMPAT,
+            )
         finally:
             self._is_restoring = False
     
@@ -69,7 +76,10 @@ class HistoryManager:
         self._current_index += 1
         self._is_restoring = True
         try:
-            return ShadowSettings(**self._history[self._current_index])
+            return normalize_shadow_settings(
+                self._history[self._current_index],
+                missing_engine=SHADOW_ENGINE_COMPAT,
+            )
         finally:
             self._is_restoring = False
     
@@ -89,7 +99,10 @@ class HistoryManager:
     def get_current(self) -> Optional[ShadowSettings]:
         """Get current state without changing index."""
         if self._current_index >= 0 and self._current_index < len(self._history):
-            return ShadowSettings(**self._history[self._current_index])
+            return normalize_shadow_settings(
+                self._history[self._current_index],
+                missing_engine=SHADOW_ENGINE_COMPAT,
+            )
         return None
     
     @property

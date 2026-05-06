@@ -1,73 +1,39 @@
-import math
+import os
+import logging
 import numpy as np
-from PIL import Image, ImageFilter, ImageChops
+from PIL import Image, ImageFilter
 from typing import Tuple, Optional
-from flatshot.core.models import ShadowSettings, CurveData
+from flatshot.core.models import (
+    SHADOW_ENGINE_LEGACY,
+    SHADOW_ENGINE_REALISTIC_V2,
+    ShadowSettings,
+    CurveData,
+    normalize_shadow_settings,
+)
 from flatshot.core.scaling import build_subject_mask, calculate_subject_scale, find_subject_bbox
+from flatshot.core.shadow.legacy import (
+    crear_capa_ao,
+    crear_capa_base,
+    generar_ruido as legacy_generar_ruido,
+    render_legacy,
+)
+from flatshot.core.shadow.realistic_v2 import render_realistic_v2
+from flatshot.core.shadow.types import RenderDiagnostics, ShadowRenderContext, ShadowRenderResult
 
 class ShadowEngine:
     _noise_cache = {}
 
     @staticmethod
     def generar_ruido(width: int, height: int, intensidad: float) -> Optional[Image.Image]:
-        if intensidad <= 0 or width < 1 or height < 1: return None
-        key = (width, height, round(intensidad, 2))
-        if key in ShadowEngine._noise_cache:
-            return ShadowEngine._noise_cache[key]
-
-        sigma = intensidad * 255.0
-        noise = np.random.normal(128, sigma, (height, width)).astype(np.uint8)
-        img = Image.fromarray(noise, mode='L')
-        
-        if len(ShadowEngine._noise_cache) > 20: ShadowEngine._noise_cache.clear()
-        ShadowEngine._noise_cache[key] = img
-        return img
+        return legacy_generar_ruido(width, height, intensidad)
 
     @staticmethod
     def _crear_capa_base(silueta: Image.Image, canvas_size: Tuple[int, int], offset: Tuple[int, int], blur: float, opacity: float, spread: float) -> Image.Image:
-        if opacity <= 0: return Image.new("RGBA", canvas_size, (0,0,0,0))
-        spread_radius = int(spread + 0.5)
-        
-        mask_base = silueta
-        if spread_radius > 0:
-            k_size = spread_radius * 2 + 1
-            mask_base = mask_base.filter(ImageFilter.MaxFilter(size=k_size))
-            
-        shadow_layer = Image.new("RGBA", canvas_size, (0,0,0,0))
-        alpha_val = min(255, int(opacity))
-        solid_black = Image.new("RGBA", canvas_size, (0,0,0, alpha_val))
-        
-        if blur > 0: 
-            mask_blur = mask_base.filter(ImageFilter.GaussianBlur(blur))
-        else: mask_blur = mask_base
-        
-        temp_mask = Image.new("L", canvas_size, 0)
-        temp_mask.paste(mask_blur, offset) 
-        shadow_layer.paste(solid_black, (0,0), mask=temp_mask)
-        return shadow_layer
+        return crear_capa_base(silueta, canvas_size, offset, blur, opacity, spread)
 
     @staticmethod
     def _crear_capa_ao(silueta: Image.Image, canvas_size: Tuple[int, int], blur_ref: float, intensity: float) -> Image.Image:
-        if intensity <= 0: return Image.new("RGBA", canvas_size, (0,0,0,0))
-
-        ao_blur = blur_ref * 1.0 
-        mask_blur = silueta.filter(ImageFilter.GaussianBlur(ao_blur))
-
-        threshold = 90
-        lut = []
-        for p in range(256):
-            if p < threshold: lut.append(0)
-            else: lut.append(min(255, int((p - threshold) * 2.5)))
-        
-        mask_ao = mask_blur.point(lut)
-        mask_ao = mask_ao.filter(ImageFilter.GaussianBlur(ao_blur * 0.3))
-
-        ao_layer = Image.new("RGBA", canvas_size, (0,0,0,0))
-        alpha_val = min(255, int(255 * intensity))
-        solid_black = Image.new("RGBA", canvas_size, (0,0,0, alpha_val))
-        
-        ao_layer.paste(solid_black, (0,0), mask=mask_ao)
-        return ao_layer
+        return crear_capa_ao(silueta, canvas_size, blur_ref, intensity)
 
     @staticmethod
     def _calcular_factor_color(img_rgba: Image.Image) -> Tuple[float, float]:
@@ -131,6 +97,21 @@ class ShadowEngine:
 
     @staticmethod
     def aplicar_efectos(original_rgba: Image.Image, settings: ShadowSettings, target_size: Tuple[int, int], scale_factor: float = 1.0, curve_data: Optional[CurveData] = None, is_preview: bool = False) -> Image.Image:
+        final, _diagnostics = ShadowEngine._aplicar_efectos_with_diagnostics(
+            original_rgba,
+            settings,
+            target_size,
+            scale_factor=scale_factor,
+            curve_data=curve_data,
+            is_preview=is_preview,
+        )
+        return final
+
+    @staticmethod
+    def _aplicar_efectos_with_diagnostics(original_rgba: Image.Image, settings: ShadowSettings, target_size: Tuple[int, int], scale_factor: float = 1.0, curve_data: Optional[CurveData] = None, is_preview: bool = False) -> tuple[Image.Image, RenderDiagnostics]:
+        settings = normalize_shadow_settings(settings, missing_engine=SHADOW_ENGINE_REALISTIC_V2)
+        if original_rgba.mode != "RGBA":
+            original_rgba = original_rgba.convert("RGBA")
         canvas_w, canvas_h = target_size
         padding_pct = settings.padding / 100.0
         safe_w = int(canvas_w * (1.0 - padding_pct))
@@ -165,7 +146,9 @@ class ShadowEngine:
             new_w = max(1, int(round(adjusted_w * fit_ratio)))
             new_h = max(1, int(round(adjusted_h * fit_ratio)))
 
-        if original_trimmed.width == 0: return Image.new("RGB", target_size, (230,230,230))
+        if original_trimmed.width == 0:
+            empty = Image.new("RGB", target_size, (230,230,230))
+            return empty, RenderDiagnostics(settings.shadow_engine, settings.shadow_engine)
         
         # Prepare subject for processing
         # Working at a reasonable resolution ensures speed and quality
@@ -238,55 +221,54 @@ class ShadowEngine:
         silueta_canvas = Image.new("L", target_size, 0)
         silueta_canvas.paste(subject_mask, (pos_x, pos_y))
 
-        shadow_density_mult = 1.7 - (lum_val * 0.8)
-        
-        s_dist = settings.distance * scale_factor
-        angle = math.radians(settings.angle)
-        vx = math.sin(angle); vy = -math.cos(angle) 
-        
-        base_alpha = settings.opacity * 2.55 * shadow_density_mult
-        
-        blur = settings.blur * scale_factor
-        c_blur = max(1, settings.contact_blur * scale_factor)
-
-        l_vol = ShadowEngine._crear_capa_base(silueta_canvas, target_size, (0, 0), max(10, blur*1.5), base_alpha*0.4, max(5, int(new_w*0.025)))
-        l_dir = ShadowEngine._crear_capa_base(silueta_canvas, target_size, (int(s_dist*vx), int(s_dist*vy)), blur, base_alpha*0.7, 0)
-        
-        core_int = 1.0 - (max(0, lum_val - 0.2) * 0.5) 
-        l_soft = ShadowEngine._crear_capa_base(silueta_canvas, target_size, (int(s_dist*0.1*vx), int(s_dist*0.1*vy)), c_blur, min(255, base_alpha*0.8), 0)
-        l_core = ShadowEngine._crear_capa_base(silueta_canvas, target_size, (0, int(2*scale_factor)), max(1, c_blur*0.25), min(255, base_alpha*1.5*core_int), 0)
-        
-        l_ao = ShadowEngine._crear_capa_ao(silueta_canvas, target_size, blur, 0.25 * shadow_density_mult)
-
-        final_shadow = Image.new("RGBA", target_size, (0,0,0,0))
-        final_shadow.paste(l_vol, (0,0), mask=l_vol)
-        final_shadow.paste(l_dir, (0,0), mask=l_dir)
-        final_shadow.paste(l_soft, (0,0), mask=l_soft)
-        final_shadow.paste(l_core, (0,0), mask=l_core)
-        final_shadow.paste(l_ao, (0,0), mask=l_ao)
-
-        if settings.noise > 0:
-            nm = ShadowEngine.generar_ruido(canvas_w, canvas_h, settings.noise/100.0)
-            if nm:
-                nl = Image.new("RGBA", target_size, (0,0,0,0)); nl.paste(nm, (0,0))
-                final_shadow = ImageChops.multiply(final_shadow, nl.convert('RGBA'))
-
-        fusion_orig = int(settings.fusion * scale_factor)
-        if fusion_orig > 0:
-            bleed_factor = 1.0 - (lum_val * 0.6) 
-            dynamic_fusion = max(1, int(fusion_orig * bleed_factor))
-            mask_protectora = silueta_canvas.filter(ImageFilter.MinFilter(size=dynamic_fusion * 2 + 1))
-            mask_cutout = mask_protectora.point(lambda p: 255 if p > 10 else 0)
-            final_shadow = Image.composite(Image.new("RGBA", target_size, (0,0,0,0)), final_shadow, mask_cutout)
+        render_context = ShadowRenderContext(
+            settings=settings,
+            canvas_size=target_size,
+            scale_factor=scale_factor,
+            subject_width=new_w,
+            subject_mask_canvas=silueta_canvas,
+            subject_mask_local=subject_mask,
+            subject_position=(pos_x, pos_y),
+            luminance_value=lum_val,
+            background_rgb=None if settings.transparent_bg else settings.bg_color,
+            is_preview=is_preview,
+        )
+        render_result = ShadowEngine._render_shadow(render_context)
+        final_shadow = render_result.shadow
+        diagnostics = render_result.diagnostics
 
         if settings.transparent_bg:
             final = Image.new("RGBA", target_size, (0,0,0,0))
             final.paste(final_shadow, (0, 0), mask=final_shadow)
             final.paste(subject_resized, (pos_x, pos_y), mask=paste_mask)
-            return final
-        else:
-            bg = settings.bg_color
-            final = Image.new("RGB", target_size, bg)
-            final.paste(final_shadow, (0, 0), mask=final_shadow)
-            final.paste(subject_resized, (pos_x, pos_y), mask=paste_mask)
-            return final
+            return final, diagnostics
+
+        bg = settings.bg_color
+        final = Image.new("RGB", target_size, bg)
+        final.paste(final_shadow, (0, 0), mask=final_shadow)
+        final.paste(subject_resized, (pos_x, pos_y), mask=paste_mask)
+        return final, diagnostics
+
+    @staticmethod
+    def _render_shadow(context: ShadowRenderContext) -> ShadowRenderResult:
+        engine = context.settings.shadow_engine
+        if engine == SHADOW_ENGINE_LEGACY:
+            return render_legacy(context)
+
+        try:
+            return render_realistic_v2(context)
+        except Exception as exc:
+            if os.environ.get("FLATSHOT_SHADOW_STRICT") == "1":
+                raise
+            warning = f"realistic_v2 failed; rendered legacy: {exc}"
+            logging.warning("FlatShot shadow fallback: %s", warning)
+            legacy_result = render_legacy(context)
+            return ShadowRenderResult(
+                shadow=legacy_result.shadow,
+                diagnostics=RenderDiagnostics(
+                    engine_requested=SHADOW_ENGINE_REALISTIC_V2,
+                    engine_used=SHADOW_ENGINE_LEGACY,
+                    fallback_used=True,
+                    warning=warning,
+                ),
+            )

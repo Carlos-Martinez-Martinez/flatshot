@@ -1,5 +1,13 @@
 from pydantic import BaseModel, Field
-from typing import Tuple, List, Optional, Dict
+from typing import Any, Dict, List, Literal, Mapping, Optional, Tuple
+
+ShadowEngineName = Literal["realistic_v2", "legacy"]
+
+SHADOW_ENGINE_REALISTIC_V2 = "realistic_v2"
+SHADOW_ENGINE_LEGACY = "legacy"
+SHADOW_ENGINE_DEFAULT: ShadowEngineName = SHADOW_ENGINE_REALISTIC_V2
+SHADOW_ENGINE_COMPAT: ShadowEngineName = SHADOW_ENGINE_LEGACY
+VALID_SHADOW_ENGINES = {SHADOW_ENGINE_REALISTIC_V2, SHADOW_ENGINE_LEGACY}
 
 class ShadowSettings(BaseModel):
     angle: int = Field(180, ge=0, le=360)
@@ -14,8 +22,40 @@ class ShadowSettings(BaseModel):
     contraction: int = 0
     adaptive_zoom: bool = True
     scale_adjustment: int = Field(0, ge=-30, le=30)
+    shadow_engine: ShadowEngineName = SHADOW_ENGINE_DEFAULT
     transparent_bg: bool = False
     bg_color: Tuple[int, int, int] = (230, 230, 230)
+
+
+def normalize_shadow_settings(
+    data: ShadowSettings | Mapping[str, Any] | None,
+    *,
+    missing_engine: ShadowEngineName = SHADOW_ENGINE_COMPAT,
+) -> ShadowSettings:
+    """
+    Build a ShadowSettings object while making the shadow engine explicit.
+
+    Loaded presets and sessions that predate shadow_engine must keep the legacy
+    renderer to preserve visual compatibility. New in-memory defaults can still
+    use ShadowSettings() directly and therefore use realistic_v2.
+    """
+    if isinstance(data, ShadowSettings):
+        if data.shadow_engine in VALID_SHADOW_ENGINES:
+            return data
+        return data.model_copy(update={"shadow_engine": missing_engine})
+
+    raw = dict(data or {})
+    if raw.get("shadow_engine") not in VALID_SHADOW_ENGINES:
+        raw["shadow_engine"] = missing_engine
+    return ShadowSettings(**raw)
+
+
+def normalize_shadow_settings_dict(
+    data: ShadowSettings | Mapping[str, Any] | None,
+    *,
+    missing_engine: ShadowEngineName = SHADOW_ENGINE_COMPAT,
+) -> dict:
+    return normalize_shadow_settings(data, missing_engine=missing_engine).model_dump()
 
 class ExportConfig(BaseModel):
     output_folder_name: str = "_SALIDA_PRO"

@@ -8,7 +8,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 from PyQt6.QtCore import QStandardPaths
-from flatshot.core.models import CategorizedPresets, PresetCategory
+from flatshot.core.models import (
+    CategorizedPresets,
+    PresetCategory,
+    SHADOW_ENGINE_COMPAT,
+    SHADOW_ENGINE_DEFAULT,
+    normalize_shadow_settings_dict,
+)
 
 
 class ConfigManager:
@@ -34,8 +40,15 @@ class ConfigManager:
         """Save presets in legacy flat format."""
         file_path = ConfigManager.get_config_dir() / ConfigManager.PRESETS_FILE
         try:
+            normalized = {
+                name: normalize_shadow_settings_dict(
+                    settings,
+                    missing_engine=SHADOW_ENGINE_COMPAT,
+                )
+                for name, settings in (presets or {}).items()
+            }
             with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(presets, f, indent=4)
+                json.dump(normalized, f, indent=4)
         except Exception as e:
             logging.error(f"Error saving presets: {e}")
 
@@ -47,7 +60,14 @@ class ConfigManager:
             return {}
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
+            return {
+                name: normalize_shadow_settings_dict(
+                    settings,
+                    missing_engine=SHADOW_ENGINE_COMPAT,
+                )
+                for name, settings in (data or {}).items()
+            }
         except Exception as e:
             logging.error(f"Error loading presets: {e}")
             return {}
@@ -67,6 +87,10 @@ class ConfigManager:
     @staticmethod
     def save_all_presets(presets: CategorizedPresets):
         """Persist categorized and legacy preset files together."""
+        presets = ConfigManager.normalize_categorized_presets(
+            presets,
+            missing_engine=SHADOW_ENGINE_COMPAT,
+        )
         ConfigManager.save_categorized_presets(presets)
         ConfigManager.save_presets(ConfigManager.get_flat_presets_from_categorized(presets))
     
@@ -79,7 +103,10 @@ class ConfigManager:
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    return CategorizedPresets(**data)
+                    return ConfigManager.normalize_categorized_presets(
+                        CategorizedPresets(**data),
+                        missing_engine=SHADOW_ENGINE_COMPAT,
+                    )
             except Exception as e:
                 logging.error(f"Error loading categorized presets: {e}")
         
@@ -99,6 +126,31 @@ class ConfigManager:
         return categorized
 
     @staticmethod
+    def normalize_categorized_presets(
+        categorized: CategorizedPresets,
+        *,
+        missing_engine: str = SHADOW_ENGINE_COMPAT,
+    ) -> CategorizedPresets:
+        """Ensure every stored preset has an explicit shadow_engine."""
+        data = categorized.model_dump()
+        for category in data.get("categories", {}).values():
+            category["presets"] = {
+                name: normalize_shadow_settings_dict(
+                    settings,
+                    missing_engine=missing_engine,
+                )
+                for name, settings in (category.get("presets") or {}).items()
+            }
+        data["uncategorized"] = {
+            name: normalize_shadow_settings_dict(
+                settings,
+                missing_engine=missing_engine,
+            )
+            for name, settings in (data.get("uncategorized") or {}).items()
+        }
+        return CategorizedPresets(**data)
+
+    @staticmethod
     def _categorize_flat_presets(legacy_presets: dict) -> CategorizedPresets:
         """Convert a legacy flat preset mapping to categorized presets."""
         categorized = ConfigManager._get_default_categorized_presets()
@@ -113,9 +165,15 @@ class ConfigManager:
                 category_key = 'ropa_oscura'
 
             if category_key and category_key in categorized.categories:
-                categorized.categories[category_key].presets[name] = settings
+                categorized.categories[category_key].presets[name] = normalize_shadow_settings_dict(
+                    settings,
+                    missing_engine=SHADOW_ENGINE_COMPAT,
+                )
             else:
-                categorized.uncategorized[name] = settings
+                categorized.uncategorized[name] = normalize_shadow_settings_dict(
+                    settings,
+                    missing_engine=SHADOW_ENGINE_COMPAT,
+                )
 
         return categorized
     
@@ -130,7 +188,8 @@ class ConfigManager:
                         'Luz cenital': {
                             'angle': 180, 'distance': 25, 'blur': 30, 'spread': 0,
                             'fusion': 1, 'opacity': 20, 'noise': 2, 'padding': 10,
-                            'contact_blur': 10, 'adaptive_zoom': True
+                            'contact_blur': 10, 'adaptive_zoom': True,
+                            'shadow_engine': SHADOW_ENGINE_DEFAULT,
                         }
                     }
                 ),
@@ -140,7 +199,8 @@ class ConfigManager:
                         'Estándar oscuro': {
                             'angle': 180, 'distance': 20, 'blur': 40, 'spread': 3,
                             'fusion': 5, 'opacity': 45, 'noise': 5, 'padding': 10,
-                            'contact_blur': 12, 'adaptive_zoom': True
+                            'contact_blur': 12, 'adaptive_zoom': True,
+                            'shadow_engine': SHADOW_ENGINE_DEFAULT,
                         }
                     }
                 ),
@@ -224,7 +284,10 @@ class ConfigManager:
         if isinstance(candidate, dict) and (
             "categories" in candidate or "uncategorized" in candidate
         ):
-            return CategorizedPresets(**candidate)
+            return ConfigManager.normalize_categorized_presets(
+                CategorizedPresets(**candidate),
+                missing_engine=SHADOW_ENGINE_COMPAT,
+            )
 
         return ConfigManager._categorize_flat_presets(candidate)
 

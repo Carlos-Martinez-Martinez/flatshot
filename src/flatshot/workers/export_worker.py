@@ -12,7 +12,13 @@ from time import time
 from PyQt6.QtCore import QThread, pyqtSignal
 from PIL import Image
 from flatshot.core.engine import ShadowEngine
-from flatshot.core.models import ShadowSettings, ExportConfig, CurveData
+from flatshot.core.models import (
+    CurveData,
+    ExportConfig,
+    SHADOW_ENGINE_DEFAULT,
+    ShadowSettings,
+    normalize_shadow_settings,
+)
 from flatshot.core.overrides import apply_image_override, override_key
 
 
@@ -53,17 +59,24 @@ def process_single_image(args):
      naming_template, suffix, folder_name, index, fmt, curve_data_dict, local_override) = args
     
     try:
-        # Reconstruct Pydantic models from dicts (pickle serialization fix)
-        settings = apply_image_override(ShadowSettings(**settings_dict), local_override)
+        # Reconstruct Pydantic models from dicts (pickle serialization fix).
+        settings = apply_image_override(
+            normalize_shadow_settings(
+                settings_dict,
+                missing_engine=SHADOW_ENGINE_DEFAULT,
+            ),
+            local_override,
+        )
         curve_data = CurveData(**curve_data_dict) if curve_data_dict else None
         
         original = Image.open(img_path).convert('RGBA')
         dpi = original.info.get('dpi', (300, 300))
         
-        final_img = ShadowEngine.aplicar_efectos(
+        final_img, diagnostics = ShadowEngine._aplicar_efectos_with_diagnostics(
             original, settings, target_size, 
             scale_factor=1.0, curve_data=curve_data
         )
+        warning = diagnostics.warning if diagnostics.fallback_used else None
         
         # Apply naming template
         base_name = apply_naming_template(
@@ -78,9 +91,9 @@ def process_single_image(args):
         else:
             final_img.save(save_path, optimize=False, compress_level=0, dpi=dpi)
             
-        return True, str(img_path.name)
+        return True, str(img_path.name), warning
     except Exception as e:
-        return False, f"{img_path.name}: {e}"
+        return False, f"{img_path.name}: {e}", None
 
 
 class ExportWorker(QThread):
@@ -244,11 +257,18 @@ class ExportWorker(QThread):
                     for future in done:
                         in_flight.discard(future)
                         try:
-                            success, msg = future.result()
+                            result = future.result()
+                            if len(result) == 2:
+                                success, msg = result
+                                warning = None
+                            else:
+                                success, msg, warning = result
                         except Exception as exc:
-                            success, msg = False, f"Worker error: {exc}"
+                            success, msg, warning = False, f"Worker error: {exc}", None
 
                         if success:
+                            if warning:
+                                self.log_updated.emit(f"Aviso: {msg}: {warning}")
                             self.image_completed.emit(msg, True)
                         else:
                             error_count += 1

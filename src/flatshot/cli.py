@@ -8,7 +8,14 @@ from pathlib import Path
 from time import time
 
 from flatshot.core.engine import ShadowEngine
-from flatshot.core.models import ShadowSettings, ExportConfig, CurveData
+from flatshot.core.models import (
+    ExportConfig,
+    SHADOW_ENGINE_COMPAT,
+    SHADOW_ENGINE_LEGACY,
+    SHADOW_ENGINE_REALISTIC_V2,
+    ShadowSettings,
+    normalize_shadow_settings,
+)
 from flatshot.core.scaling import DEFAULT_SCALE_CURVE, normalize_curve_data
 from flatshot.utils.config import ConfigManager
 from flatshot.utils.log_manager import LogManager
@@ -50,7 +57,26 @@ def get_preset_settings(preset_name: str) -> ShadowSettings:
         print("Use --list-presets to see available presets.")
         sys.exit(1)
     
-    return ShadowSettings(**flat[preset_name])
+    return normalize_shadow_settings(
+        flat[preset_name],
+        missing_engine=SHADOW_ENGINE_COMPAT,
+    )
+
+
+def _load_app_settings() -> dict:
+    """Load app settings for CLI defaults without changing old visual output."""
+    settings_file = ConfigManager.get_config_dir() / "settings.json"
+    if not settings_file.exists():
+        return {}
+    try:
+        import json
+        with open(settings_file, 'r') as f:
+            loaded = json.load(f)
+        if isinstance(loaded, dict) and 'shadow_engine' not in loaded:
+            loaded['shadow_engine'] = SHADOW_ENGINE_COMPAT
+        return loaded if isinstance(loaded, dict) else {}
+    except Exception:
+        return {}
 
 
 def process_folder(args):
@@ -61,13 +87,25 @@ def process_folder(args):
         print(f"Error: Folder '{input_folder}' does not exist.")
         sys.exit(1)
     
-    # Get settings from preset or defaults
+    app_settings = _load_app_settings()
+
+    # Get settings from explicit CLI, preset, global config or model defaults.
     if args.preset:
         settings = get_preset_settings(args.preset)
         print(f"Using preset: {args.preset}")
+    elif app_settings:
+        settings = normalize_shadow_settings(
+            app_settings,
+            missing_engine=SHADOW_ENGINE_COMPAT,
+        )
+        print("Using global settings")
     else:
         settings = ShadowSettings()
         print("Using default settings")
+
+    shadow_engine_override = getattr(args, "shadow_engine", None)
+    if shadow_engine_override:
+        settings = settings.model_copy(update={"shadow_engine": shadow_engine_override})
     
     # Parse output size
     if args.size:
@@ -111,13 +149,6 @@ def process_folder(args):
     output_folder.mkdir(exist_ok=True)
     
     # Load curve data
-    app_settings = {}
-    settings_file = ConfigManager.get_config_dir() / "settings.json"
-    if settings_file.exists():
-        import json
-        with open(settings_file, 'r') as f:
-            app_settings = json.load(f)
-    
     curve_dict = app_settings.get('scale_curve', DEFAULT_SCALE_CURVE.copy())
     curve_data = normalize_curve_data(curve_dict)
     
@@ -145,10 +176,12 @@ def process_folder(args):
             original = Image.open(img_path).convert('RGBA')
             dpi = original.info.get('dpi', (300, 300))
             
-            final_img = ShadowEngine.aplicar_efectos(
+            final_img, diagnostics = ShadowEngine._aplicar_efectos_with_diagnostics(
                 original, settings, target_size,
                 scale_factor=1.0, curve_data=curve_data
             )
+            if diagnostics.fallback_used and diagnostics.warning:
+                print(f"\nWarning: {img_path.name}: {diagnostics.warning}")
             
             # Generate output name
             base_name = apply_naming_template(
@@ -204,6 +237,11 @@ def main():
     process_parser.add_argument(
         "--preset", "-p",
         help="Preset name to use for shadow settings"
+    )
+    process_parser.add_argument(
+        "--shadow-engine",
+        choices=[SHADOW_ENGINE_REALISTIC_V2, SHADOW_ENGINE_LEGACY],
+        help="Shadow renderer override: realistic_v2 or legacy"
     )
     process_parser.add_argument(
         "--output", "-o",

@@ -12,7 +12,12 @@ from PyQt6.QtGui import QPixmap, QImage
 from PIL import Image
 
 from flatshot.core.engine import ShadowEngine
-from flatshot.core.models import ShadowSettings, CurveData
+from flatshot.core.models import (
+    CurveData,
+    SHADOW_ENGINE_DEFAULT,
+    ShadowSettings,
+    normalize_shadow_settings,
+)
 from flatshot.core.overrides import apply_image_override, has_image_override, override_key
 
 
@@ -23,7 +28,10 @@ def _render_tile_preview(
     preview_size: tuple[int, int],
 ):
     """Render a grid tile preview off the UI thread."""
-    settings = ShadowSettings(**settings_dict)
+    settings = normalize_shadow_settings(
+        settings_dict,
+        missing_engine=SHADOW_ENGINE_DEFAULT,
+    )
     curve_data = CurveData(**curve_dict) if curve_dict else None
 
     with Image.open(image_path) as pil_img:

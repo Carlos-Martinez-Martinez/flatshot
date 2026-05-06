@@ -1,5 +1,6 @@
 import json
 
+from flatshot.core.models import SHADOW_ENGINE_COMPAT, SHADOW_ENGINE_DEFAULT
 from flatshot.utils.config import ConfigManager
 
 
@@ -28,6 +29,10 @@ def test_export_presets_to_file_writes_portable_bundle(tmp_path, monkeypatch):
     assert exported["flatshot_export"]["type"] == "presets"
     assert exported["flatshot_export"]["version"] == ConfigManager.PRESETS_EXPORT_VERSION
     assert exported["presets"]["categories"]["custom"]["presets"]["Mi preset"]["angle"] == 135
+    assert (
+        exported["presets"]["categories"]["custom"]["presets"]["Mi preset"]["shadow_engine"]
+        == SHADOW_ENGINE_COMPAT
+    )
 
 
 def test_import_presets_from_bundle_merges_and_syncs_legacy_file(tmp_path, monkeypatch):
@@ -73,6 +78,7 @@ def test_import_presets_from_bundle_merges_and_syncs_legacy_file(tmp_path, monke
 
     legacy_file = json.loads((tmp_path / ConfigManager.PRESETS_FILE).read_text(encoding="utf-8"))
     assert "Remoto" in legacy_file
+    assert legacy_file["Remoto"]["shadow_engine"] == SHADOW_ENGINE_COMPAT
 
 
 def test_import_presets_accepts_legacy_flat_mapping(tmp_path, monkeypatch):
@@ -95,3 +101,25 @@ def test_import_presets_accepts_legacy_flat_mapping(tmp_path, monkeypatch):
 
     flat = ConfigManager.get_flat_presets_from_categorized(imported)
     assert "Preset legado" in flat
+    assert flat["Preset legado"]["shadow_engine"] == SHADOW_ENGINE_COMPAT
+
+
+def test_default_presets_use_realistic_v2():
+    presets = ConfigManager._get_default_categorized_presets()
+    flat = ConfigManager.get_flat_presets_from_categorized(presets)
+
+    assert flat
+    assert {settings["shadow_engine"] for settings in flat.values()} == {SHADOW_ENGINE_DEFAULT}
+
+
+def test_flat_preset_load_and_save_adds_shadow_engine(tmp_path, monkeypatch):
+    _use_temp_config_dir(monkeypatch, tmp_path)
+    raw = {"Antiguo": {"angle": 180, "distance": 25}}
+    (tmp_path / ConfigManager.PRESETS_FILE).write_text(json.dumps(raw), encoding="utf-8")
+
+    loaded = ConfigManager.load_presets()
+    assert loaded["Antiguo"]["shadow_engine"] == SHADOW_ENGINE_COMPAT
+
+    ConfigManager.save_presets(raw)
+    saved = json.loads((tmp_path / ConfigManager.PRESETS_FILE).read_text(encoding="utf-8"))
+    assert saved["Antiguo"]["shadow_engine"] == SHADOW_ENGINE_COMPAT

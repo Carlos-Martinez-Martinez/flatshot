@@ -48,3 +48,6 @@ output/
 outputs/
 export/
 exports/
+artifacts/shadow_contact_sheet.png
+artifacts/shadow_contact_sheet_noise5.png
+artifacts/shadow_contact_sheet_v2_retune.png

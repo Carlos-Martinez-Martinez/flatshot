@@ -23,7 +23,17 @@ from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QSize, QEvent, QFileSy
 from PyQt6.QtGui import QPixmap, QImage, QPainter, QColor, QPainterPath, QAction, QIcon, QFont
 
 from flatshot.core.engine import ShadowEngine
-from flatshot.core.models import ShadowSettings, ExportConfig, CurveData, JobItem
+from flatshot.core.models import (
+    SHADOW_ENGINE_COMPAT,
+    SHADOW_ENGINE_DEFAULT,
+    SHADOW_ENGINE_LEGACY,
+    SHADOW_ENGINE_REALISTIC_V2,
+    ShadowSettings,
+    ExportConfig,
+    CurveData,
+    JobItem,
+    normalize_shadow_settings,
+)
 from flatshot.core.overrides import (
     LOCAL_OVERRIDE_DEFAULTS,
     apply_image_override,
@@ -55,10 +65,10 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 def _render_preview_task(pil_img: Image.Image, target_size, settings_dict: dict, curve_dict: dict, scale_ratio: float, is_preview: bool = True):
     """Render preview off the UI thread; safe for ThreadPoolExecutor."""
     from flatshot.core.engine import ShadowEngine
-    from flatshot.core.models import ShadowSettings, CurveData
-    settings = ShadowSettings(**settings_dict)
+    from flatshot.core.models import CurveData, SHADOW_ENGINE_DEFAULT, normalize_shadow_settings
+    settings = normalize_shadow_settings(settings_dict, missing_engine=SHADOW_ENGINE_DEFAULT)
     curve = CurveData(**curve_dict)
-    final_pil = ShadowEngine.aplicar_efectos(
+    final_pil, diagnostics = ShadowEngine._aplicar_efectos_with_diagnostics(
         pil_img,
         settings,
         target_size,
@@ -73,7 +83,8 @@ def _render_preview_task(pil_img: Image.Image, target_size, settings_dict: dict,
     else:
         final_for_display = final_pil
     im_data = final_for_display.convert("RGB").tobytes("raw", "RGB")
-    return final_for_display.width, final_for_display.height, im_data
+    warning = diagnostics.warning if diagnostics.fallback_used else None
+    return final_for_display.width, final_for_display.height, im_data, warning
 
 
 from PyQt6.QtCore import QRunnable, QThreadPool, QObject
@@ -81,7 +92,7 @@ from PyQt6.QtCore import QRunnable, QThreadPool, QObject
 
 class PreviewWorkerSignals(QObject):
     """Signals for PreviewWorker to communicate with main thread."""
-    finished = pyqtSignal(object, int)  # (QImage, quality_level)
+    finished = pyqtSignal(object, int, object)  # (QImage, quality_level, warning)
     error = pyqtSignal(str)
 
 
@@ -104,7 +115,7 @@ class PreviewWorker(QRunnable):
     def run(self):
         """Execute render in background thread."""
         try:
-            width, height, im_data = _render_preview_task(
+            width, height, im_data, warning = _render_preview_task(
                 self.pil_img,
                 self.target_size,
                 self.settings_dict,
@@ -113,7 +124,7 @@ class PreviewWorker(QRunnable):
             )
             qim = QImage(im_data, width, height, width * 3, QImage.Format.Format_RGB888).copy()
             # The signal will be queued to the main thread
-            self.signals.finished.emit(qim, self.quality_level)
+            self.signals.finished.emit(qim, self.quality_level, warning)
         except Exception as e:
             self.signals.error.emit(str(e))
 
@@ -702,15 +713,15 @@ class MainWindow(QMainWindow):
         angle_layout = QHBoxLayout()
         
         angle_label_layout = QVBoxLayout()
-        angle_label = QLabel("Fuente de luz")
+        angle_label = QLabel("Dirección de sombra")
         angle_label.setProperty("class", "param-label")
         angle_label.setToolTip(
-            "<b>Ángulo de la fuente de luz</b><br><br>"
-            "Define desde qué dirección viene la luz.<br>"
-            "<b>0°</b> = Luz desde arriba<br>"
-            "<b>90°</b> = Luz desde la derecha<br>"
-            "<b>180°</b> = Luz desde abajo (cenital invertida)<br>"
-            "<b>270°</b> = Luz desde la izquierda"
+            "<b>Ángulo de caída de la sombra</b><br><br>"
+            "Define hacia dónde cae la sombra.<br>"
+            "<b>0°</b> = Arriba<br>"
+            "<b>90°</b> = Derecha<br>"
+            "<b>180°</b> = Abajo<br>"
+            "<b>270°</b> = Izquierda"
         )
         angle_label_layout.addWidget(angle_label)
         
@@ -718,7 +729,7 @@ class MainWindow(QMainWindow):
         self.angle_spinbox.setRange(0, 359)
         self.angle_spinbox.setSuffix("°")
         self.angle_spinbox.setValue(180)
-        self.angle_spinbox.setToolTip("Ángulo exacto en grados (0-359)")
+        self.angle_spinbox.setToolTip("Ángulo exacto de caída de sombra en grados (0-359)")
         angle_label_layout.addWidget(self.angle_spinbox)
         angle_label_layout.addStretch()
         
@@ -727,7 +738,7 @@ class MainWindow(QMainWindow):
         self.light_angle = LightAngleWidget(scale=self.ui_scale)
         self.light_angle.setToolTip(
             "<b>Control circular de ángulo</b><br><br>"
-            "Haz clic y arrastra para ajustar la dirección de la luz."
+            "Haz clic y arrastra para ajustar hacia dónde cae la sombra."
         )
         self.light_angle.angleChanged.connect(self._on_angle_changed)
         self.angle_spinbox.valueChanged.connect(self._on_angle_spinbox_changed)
@@ -833,6 +844,27 @@ class MainWindow(QMainWindow):
         )
         self.chk_adaptive.toggled.connect(self._schedule_preview)
         layout.addWidget(self.chk_adaptive)
+
+        engine_row = QHBoxLayout()
+        engine_label = QLabel("Motor de sombra")
+        engine_label.setProperty("class", "param-label")
+        engine_label.setToolTip(
+            "<b>Motor de sombra</b><br><br>"
+            "<b>Realista V2:</b> más rápido y natural, recomendado.<br>"
+            "<b>Clásico:</b> mantiene el aspecto de versiones anteriores."
+        )
+        engine_row.addWidget(engine_label)
+
+        self.combo_shadow_engine = QComboBox()
+        self.combo_shadow_engine.addItem("Realista V2", SHADOW_ENGINE_REALISTIC_V2)
+        self.combo_shadow_engine.addItem("Clásico", SHADOW_ENGINE_LEGACY)
+        self.combo_shadow_engine.setToolTip(
+            "Realista V2: más rápido y natural, recomendado.\n"
+            "Clásico: mantiene el aspecto de versiones anteriores."
+        )
+        self.combo_shadow_engine.currentIndexChanged.connect(self._schedule_preview)
+        engine_row.addWidget(self.combo_shadow_engine, 1)
+        layout.addLayout(engine_row)
         
         return
     
@@ -1727,12 +1759,14 @@ class MainWindow(QMainWindow):
             "Ropa clara (luz cenital)": {
                 'angle': 180, 'distance': 25, 'blur': 30, 'spread': 0,
                 'fusion': 1, 'opacity': 20, 'noise': 2, 'padding': 10,
-                'contact_blur': 10, 'adaptive_zoom': True
+                'contact_blur': 10, 'adaptive_zoom': True,
+                'shadow_engine': SHADOW_ENGINE_DEFAULT,
             },
             "Ropa oscura": {
                 'angle': 180, 'distance': 20, 'blur': 40, 'spread': 3,
                 'fusion': 5, 'opacity': 45, 'noise': 5, 'padding': 10,
-                'contact_blur': 12, 'adaptive_zoom': True
+                'contact_blur': 12, 'adaptive_zoom': True,
+                'shadow_engine': SHADOW_ENGINE_DEFAULT,
             },
         }
     
@@ -1757,6 +1791,7 @@ class MainWindow(QMainWindow):
                 'opacity': 42,
             },
             'image_overrides': {},
+            'shadow_engine': SHADOW_ENGINE_DEFAULT,
             'scale_curve': dict(DEFAULT_SCALE_CURVE),
             'section_visibility': {
                 'presets': True,
@@ -1775,6 +1810,8 @@ class MainWindow(QMainWindow):
                     loaded = json.load(f)
                     if 'bg_color' in loaded and isinstance(loaded['bg_color'], list):
                         loaded['bg_color'] = tuple(loaded['bg_color'])
+                    if 'shadow_engine' not in loaded:
+                        loaded['shadow_engine'] = SHADOW_ENGINE_COMPAT
                     return {**defaults, **loaded}
             except:
                 return defaults
@@ -1783,6 +1820,8 @@ class MainWindow(QMainWindow):
     def _save_app_settings(self):
         self.app_settings['scale_curve'] = self.scale_curve.model_dump()
         self.app_settings['image_overrides'] = self.image_overrides
+        if hasattr(self, 'combo_shadow_engine'):
+            self.app_settings['shadow_engine'] = self.combo_shadow_engine.currentData() or SHADOW_ENGINE_DEFAULT
         try:
             with open(self.settings_file, 'w') as f:
                 json.dump(self.app_settings, f, indent=4)
@@ -1881,6 +1920,11 @@ class MainWindow(QMainWindow):
         self._apply_preset_from_combo()
         
     def _get_shadow_settings(self) -> ShadowSettings:
+        shadow_engine = SHADOW_ENGINE_DEFAULT
+        if hasattr(self, 'combo_shadow_engine'):
+            shadow_engine = self.combo_shadow_engine.currentData() or SHADOW_ENGINE_DEFAULT
+        else:
+            shadow_engine = self.app_settings.get('shadow_engine', SHADOW_ENGINE_DEFAULT)
         return ShadowSettings(
             angle=self.light_angle.angle(),
             distance=self.sl_distance.value(),
@@ -1893,7 +1937,8 @@ class MainWindow(QMainWindow):
             contact_blur=self.sl_contact_blur.value(),
             contraction=self.sl_contraction.value(),
             adaptive_zoom=self.chk_adaptive.isChecked(),
-            scale_adjustment=self.sl_scale_adjustment.value()
+            scale_adjustment=self.sl_scale_adjustment.value(),
+            shadow_engine=shadow_engine,
         )
 
     def _current_image_override_key(self) -> str:
@@ -2117,7 +2162,12 @@ class MainWindow(QMainWindow):
             )
             self._active_preview_workers.add(worker)
             worker.signals.finished.connect(
-                lambda qim, quality, w=worker: self._on_preview_worker_finished(w, qim, quality)
+                lambda qim, quality, warning, w=worker: self._on_preview_worker_finished(
+                    w,
+                    qim,
+                    quality,
+                    warning,
+                )
             )
             worker.signals.error.connect(
                 lambda message, w=worker: self._on_preview_worker_error(w, message)
@@ -2128,8 +2178,17 @@ class MainWindow(QMainWindow):
             self._log_error(f"[preview-start-error] {e}")
             traceback.print_exc()
 
-    def _on_preview_worker_finished(self, worker: PreviewWorker, qim: QImage, quality: int = 1):
+    def _on_preview_worker_finished(
+        self,
+        worker: PreviewWorker,
+        qim: QImage,
+        quality: int = 1,
+        warning: str | None = None,
+    ):
         self._release_preview_worker(worker)
+        if warning:
+            self._log_error(f"[shadow-fallback] {warning}")
+            self._show_feedback("Aviso: V2 usó sombra clásica")
         self._update_preview(qim, quality)
 
     def _on_preview_worker_error(self, worker: PreviewWorker, message: str):
@@ -2270,6 +2329,10 @@ class MainWindow(QMainWindow):
         self.sl_contraction.setValue(0)
         self.sl_scale_adjustment.setValue(0)
         self.chk_adaptive.setChecked(True)
+        if hasattr(self, 'combo_shadow_engine'):
+            engine_idx = self.combo_shadow_engine.findData(SHADOW_ENGINE_DEFAULT)
+            if engine_idx >= 0:
+                self.combo_shadow_engine.setCurrentIndex(engine_idx)
         
         # Reset scale curve to new optimal defaults
         self.scale_curve = CurveData(**DEFAULT_SCALE_CURVE)
@@ -2381,7 +2444,9 @@ class MainWindow(QMainWindow):
     def _apply_preset_from_combo(self):
         name = self.combo_presets.currentText()
         if name in self.presets:
-            d = self.presets[name]
+            settings = normalize_shadow_settings(self.presets[name], missing_engine=SHADOW_ENGINE_COMPAT)
+            d = settings.model_dump()
+            self.presets[name] = d
             self.light_angle.setAngle(d.get('angle', 180))
             self.sl_distance.setValue(d.get('distance', 30))
             self.sl_blur.setValue(d.get('blur', 25))
@@ -2394,6 +2459,10 @@ class MainWindow(QMainWindow):
             self.sl_contraction.setValue(d.get('contraction', 0))
             self.sl_scale_adjustment.setValue(d.get('scale_adjustment', 0))
             self.chk_adaptive.setChecked(d.get('adaptive_zoom', True))
+            if hasattr(self, 'combo_shadow_engine'):
+                engine_idx = self.combo_shadow_engine.findData(d.get('shadow_engine', SHADOW_ENGINE_COMPAT))
+                if engine_idx >= 0:
+                    self.combo_shadow_engine.setCurrentIndex(engine_idx)
             self._schedule_preview()
             
     def _action_save_current(self):
@@ -3125,6 +3194,8 @@ class MainWindow(QMainWindow):
         self.light_angle.angleChanged.connect(self._schedule_history_push)
         self.angle_spinbox.editingFinished.connect(self._schedule_history_push)
         self.chk_adaptive.toggled.connect(self._schedule_history_push)
+        if hasattr(self, 'combo_shadow_engine'):
+            self.combo_shadow_engine.currentIndexChanged.connect(self._schedule_history_push)
     
     def _action_undo(self):
         """Undo to previous settings state."""
@@ -3150,6 +3221,7 @@ class MainWindow(QMainWindow):
     
     def _apply_settings(self, settings: ShadowSettings):
         """Apply a ShadowSettings object to all controls."""
+        settings = normalize_shadow_settings(settings, missing_engine=SHADOW_ENGINE_COMPAT)
         controls = [
             (self.sl_distance, settings.distance),
             (self.sl_blur, settings.blur),
@@ -3166,6 +3238,8 @@ class MainWindow(QMainWindow):
         self.light_angle.blockSignals(True)
         self.angle_spinbox.blockSignals(True)
         self.chk_adaptive.blockSignals(True)
+        if hasattr(self, 'combo_shadow_engine'):
+            self.combo_shadow_engine.blockSignals(True)
         for control, _ in controls:
             control.slider.blockSignals(True)
             control.spinbox.blockSignals(True)
@@ -3177,10 +3251,16 @@ class MainWindow(QMainWindow):
                 control.slider.setValue(value)
                 control.spinbox.setValue(value)
             self.chk_adaptive.setChecked(settings.adaptive_zoom)
+            if hasattr(self, 'combo_shadow_engine'):
+                engine_idx = self.combo_shadow_engine.findData(settings.shadow_engine)
+                if engine_idx >= 0:
+                    self.combo_shadow_engine.setCurrentIndex(engine_idx)
         finally:
             self.light_angle.blockSignals(False)
             self.angle_spinbox.blockSignals(False)
             self.chk_adaptive.blockSignals(False)
+            if hasattr(self, 'combo_shadow_engine'):
+                self.combo_shadow_engine.blockSignals(False)
             for control, _ in controls:
                 control.slider.blockSignals(False)
                 control.spinbox.blockSignals(False)
@@ -3465,7 +3545,12 @@ class MainWindow(QMainWindow):
                 self._apply_export_preferences(restored_export)
             
             if 'shadow_settings' in data:
-                self._apply_settings(ShadowSettings(**data['shadow_settings']))
+                self._apply_settings(
+                    normalize_shadow_settings(
+                        data['shadow_settings'],
+                        missing_engine=SHADOW_ENGINE_COMPAT,
+                    )
+                )
             else:
                 self._schedule_preview()
             return True

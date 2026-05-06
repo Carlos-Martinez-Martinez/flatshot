@@ -79,7 +79,7 @@ def test_process_single_image_accepts_local_override(tmp_path):
     subject.paste(Image.new("RGBA", (60, 80), (40, 80, 180, 255)), (20, 20))
     subject.save(source)
 
-    success, message = process_single_image(
+    success, message, warning = process_single_image(
         (
             source,
             tmp_path,
@@ -96,4 +96,5 @@ def test_process_single_image_accepts_local_override(tmp_path):
     )
 
     assert success, message
+    assert warning is None
     assert (tmp_path / "source_PRO.png").exists()

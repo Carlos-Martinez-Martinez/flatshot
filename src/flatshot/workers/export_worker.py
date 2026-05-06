@@ -20,6 +20,7 @@ from flatshot.core.models import (
     normalize_shadow_settings,
 )
 from flatshot.core.overrides import apply_image_override, override_key
+from flatshot.utils.render_cache import RenderCache
 
 
 def apply_naming_template(template: str, original_name: str, suffix: str, 
@@ -152,6 +153,10 @@ class ExportWorker(QThread):
 
     def run(self):
         self.start_time = time()
+        completed_count = 0
+        error_count = 0
+        total = 0
+        
         try:
             # Find all PNG images (or use provided snapshot list)
             if self.input_files is not None:
@@ -171,131 +176,153 @@ class ExportWorker(QThread):
                     for f in self.input_folder.iterdir()
                     if f.is_file() and f.suffix.lower() == '.png'
                 ]
+            
             total = len(image_items)
-        except Exception as exc:
-            self.log_updated.emit(f"Error al leer carpeta '{self.input_folder}': {exc}")
-            self.finished_process.emit(False, 0, 0, 0.0)
-            return
+            if total == 0:
+                self.finished_process.emit(True, 0, 0, 0.0)
+                return
 
-        if total == 0:
-            self.finished_process.emit(True, 0, 0, 0.0)
-            return
+            folder_name = self.export_config.output_folder_name
+            suffix = self.export_config.suffix
+            fmt = self.export_config.format.lower()
+            naming_template = self.export_config.naming_template
+            
+            # Use dynamic output size from config
+            target_size = (self.export_config.output_width, self.export_config.output_height)
+            
+            # Update settings with export config
+            self.settings.transparent_bg = self.export_config.transparent_bg
+            self.settings.bg_color = self.export_config.bg_color
+            
+            if self.export_config.output_destination == 'custom' and self.export_config.custom_output_path:
+                output_folder = Path(self.export_config.custom_output_path)
+            else:
+                output_folder = self.input_folder / folder_name
+            
+            try:
+                output_folder.mkdir(parents=True, exist_ok=True)
+            except Exception as exc:
+                self.log_updated.emit(f"No se pudo crear carpeta de salida '{output_folder}': {exc}")
+                duration = time() - self.start_time
+                self.finished_process.emit(False, 0, total, duration)
+                return
 
-        folder_name = self.export_config.output_folder_name
-        suffix = self.export_config.suffix
-        fmt = self.export_config.format.lower()
-        naming_template = self.export_config.naming_template
-        
-        # Use dynamic output size from config
-        target_size = (self.export_config.output_width, self.export_config.output_height)
-        
-        # Update settings with export config
-        self.settings.transparent_bg = self.export_config.transparent_bg
-        self.settings.bg_color = self.export_config.bg_color
-        
-        if self.export_config.output_destination == 'custom' and self.export_config.custom_output_path:
-            output_folder = Path(self.export_config.custom_output_path)
-        else:
-            output_folder = self.input_folder / folder_name
-        try:
-            output_folder.mkdir(parents=True, exist_ok=True)
-        except Exception as exc:
-            self.log_updated.emit(f"No se pudo crear carpeta de salida '{output_folder}': {exc}")
-            duration = time() - self.start_time
-            self.finished_process.emit(False, 0, total, duration)
-            return
+            # Convert Pydantic models to dicts for pickle serialization
+            settings_dict = self.settings.model_dump()
+            curve_data_dict = self.curve_data.model_dump() if self.curve_data else None
+            parent_folder_name = self.input_folder.name
 
-        # Convert Pydantic models to dicts for pickle serialization
-        settings_dict = self.settings.model_dump()
-        curve_data_dict = self.curve_data.model_dump() if self.curve_data else None
-        
-        # Parent folder name for {folder} placeholder
-        parent_folder_name = self.input_folder.name
+            # Initialize RenderCache
+            cache = RenderCache()
 
-        # Build task list
-        tasks = []
-        for index, (img_path, local_key) in enumerate(
-            sorted(image_items, key=lambda item: item[0].name),
-            start=1,
-        ):
-            tasks.append((
-                img_path, output_folder, settings_dict, target_size,
-                naming_template, suffix, parent_folder_name, index, 
-                fmt, curve_data_dict, self.image_overrides.get(local_key, {})
-            ))
+            # Build task list
+            tasks = []
+            cached_tasks = []
+            
+            for index, (img_path, local_key) in enumerate(
+                sorted(image_items, key=lambda item: item[0].name),
+                start=1,
+            ):
+                local_override = self.image_overrides.get(local_key, {})
+                
+                # Check for cache
+                key = cache.get_cache_key(str(img_path), settings_dict, curve_data_dict, target_size)
+                if cache.exists(key):
+                    cached_tasks.append((img_path, key, index, local_override))
+                else:
+                    tasks.append((
+                        img_path, output_folder, settings_dict, target_size,
+                        naming_template, suffix, parent_folder_name, index, 
+                        fmt, curve_data_dict, local_override
+                    ))
 
-        completed_count = 0
-        error_count = 0
-        
-        max_workers = max(1, (os.cpu_count() or 2) - 1)
-        self.log_updated.emit(f"Iniciando exportación con {max_workers} núcleos...")
-        
-        try:
-            with ProcessPoolExecutor(max_workers=max_workers) as executor:
-                self.executor = executor
-                self.log_updated.emit("Grupo de procesos inicializado correctamente.")
-                pending_tasks = iter(tasks)
-                in_flight = set()
-
-                # Prime the worker pool.
-                for _ in range(min(max_workers, total)):
-                    try:
-                        in_flight.add(executor.submit(process_single_image, next(pending_tasks)))
-                    except StopIteration:
-                        break
-
-                while in_flight and self.is_running:
-                    # Cooperative pause: stop consuming results and stop submitting new work.
+            # Handle cached tasks first
+            if cached_tasks:
+                self.log_updated.emit(f"Exportando {len(cached_tasks)} imágenes desde caché (instantáneo)...")
+                for img_path, key, index, local_override in cached_tasks:
+                    if not self.is_running: break
                     self._pause_event.wait()
-                    if not self.is_running:
-                        break
-
-                    done, _ = wait(in_flight, timeout=0.2, return_when=FIRST_COMPLETED)
-                    if not done:
-                        continue
-
-                    for future in done:
-                        in_flight.discard(future)
-                        try:
-                            result = future.result()
-                            if len(result) == 2:
-                                success, msg = result
-                                warning = None
+                    
+                    try:
+                        cache_path = cache.get_cached_path(key)
+                        base_name = apply_naming_template(
+                            naming_template, img_path.stem, suffix, parent_folder_name, index
+                        )
+                        save_name = f"{base_name}.{fmt}"
+                        save_path = output_folder / save_name
+                        
+                        with Image.open(cache_path) as cached_img:
+                            if fmt in ['jpg', 'jpeg']:
+                                if cached_img.mode != "RGB":
+                                    cached_img = cached_img.convert("RGB")
+                                cached_img.save(save_path, quality=100, subsampling=0)
                             else:
-                                success, msg, warning = result
-                        except Exception as exc:
-                            success, msg, warning = False, f"Worker error: {exc}", None
-
-                        if success:
-                            if warning:
-                                self.log_updated.emit(f"Aviso: {msg}: {warning}")
-                            self.image_completed.emit(msg, True)
-                        else:
-                            error_count += 1
-                            self.log_updated.emit(f"Error: {msg}")
-                            self.image_completed.emit(msg.split(':')[0], False)
-
+                                shutil.copy2(cache_path, save_path)
+                        
                         completed_count += 1
+                        self.image_completed.emit(img_path.name, True)
                         self.progress_updated.emit(int((completed_count / total) * 100))
+                    except Exception as e:
+                        error_count += 1
+                        self.log_updated.emit(f"Error al exportar desde caché {img_path.name}: {e}")
 
-                        # Keep pool busy only while not paused.
-                        if self.is_running and self._pause_event.is_set():
+            # Proceed with remaining tasks
+            if tasks and self.is_running:
+                max_workers = max(1, (os.cpu_count() or 2) - 1)
+                self.log_updated.emit(f"Procesando {len(tasks)} imágenes restantes con {max_workers} núcleos...")
+                
+                try:
+                    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+                        self.executor = executor
+                        pending_tasks = iter(tasks)
+                        in_flight = set()
+
+                        for _ in range(min(max_workers, len(tasks))):
                             try:
                                 in_flight.add(executor.submit(process_single_image, next(pending_tasks)))
                             except StopIteration:
-                                pass
+                                break
+
+                        while in_flight and self.is_running:
+                            self._pause_event.wait()
+                            if not self.is_running: break
+
+                            done, _ = wait(in_flight, timeout=0.2, return_when=FIRST_COMPLETED)
+                            if not done: continue
+
+                            for future in done:
+                                in_flight.discard(future)
+                                try:
+                                    success, msg, warning = future.result()
+                                except Exception as exc:
+                                    success, msg, warning = False, f"Worker error: {exc}", None
+
+                                if success:
+                                    if warning: self.log_updated.emit(f"Aviso: {msg}: {warning}")
+                                    self.image_completed.emit(msg, True)
+                                else:
+                                    error_count += 1
+                                    self.log_updated.emit(f"Error: {msg}")
+                                    self.image_completed.emit(msg.split(':')[0], False)
+
+                                completed_count += 1
+                                self.progress_updated.emit(int((completed_count / total) * 100))
+
+                                if self.is_running and self._pause_event.is_set():
+                                    try:
+                                        in_flight.add(executor.submit(process_single_image, next(pending_tasks)))
+                                    except StopIteration:
+                                        pass
+                except Exception as exc:
+                    self.log_updated.emit(f"Error en el proceso de exportación: {exc}")
+
+        except Exception as exc:
+            self.log_updated.emit(f"Error crítico en ExportWorker: {exc}")
         finally:
             if self._snapshot_dir:
-                try:
-                    shutil.rmtree(self._snapshot_dir, ignore_errors=True)
-                except Exception:
-                    pass
-
-            if not self.is_running and self.executor:
-                try:
-                    self.executor.shutdown(wait=False, cancel_futures=True)
-                except Exception:
-                    pass
+                shutil.rmtree(self._snapshot_dir, ignore_errors=True)
+            if self.executor:
+                self.executor.shutdown(wait=False, cancel_futures=True)
 
         duration = time() - self.start_time
         self.finished_process.emit(

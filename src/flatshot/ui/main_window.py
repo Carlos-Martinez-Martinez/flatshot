@@ -54,11 +54,11 @@ from flatshot.ui.queue_widget import QueueWidget
 from flatshot.ui.grid_preview import GridPreviewWidget
 from flatshot.workers.export_worker import ExportWorker
 from flatshot.workers.queue_worker import QueueWorker
+from flatshot.workers.pre_render_worker import PreRenderWorker
+from flatshot.utils.render_cache import RenderCache
 
-# Icon library
 import qtawesome as qta
 
-# Allow loading truncated images to avoid decoder aborts
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
@@ -171,10 +171,25 @@ class MainWindow(QMainWindow):
         self.preview_size = (int(1800 * self.preview_scale_ratio), 
                             int(2400 * self.preview_scale_ratio))
         
-        # Simple debounce timer for preview
+        # --- Responsiveness infrastructure ---
+        # Track whether any SmartSlider is being dragged so we can skip
+        # expensive work (grid refresh, disk writes) during interaction.
+        self._slider_dragging = False
+
+        # Fast debounce for canvas-only preview (during drag)
         self.preview_timer = QTimer()
         self.preview_timer.setSingleShot(True)
         self.preview_timer.timeout.connect(self._start_preview_thread)
+
+        # Deferred grid sync timer — only fires after slider release
+        self._grid_sync_timer = QTimer()
+        self._grid_sync_timer.setSingleShot(True)
+        self._grid_sync_timer.timeout.connect(self._deferred_grid_sync)
+
+        # Deferred settings-save timer — coalesce disk writes
+        self._save_settings_timer = QTimer()
+        self._save_settings_timer.setSingleShot(True)
+        self._save_settings_timer.timeout.connect(self._flush_app_settings)
         
         # Queue worker reference
         self.queue_worker = None
@@ -207,6 +222,15 @@ class MainWindow(QMainWindow):
             advanced_open=bool(self.app_settings.get('section_visibility', {}).get('advanced', False)),
         )
         self.batch_summary = BatchSummary()
+
+        # --- Background Pre-rendering ---
+        self.render_cache = RenderCache()
+        self.pre_render_pool = QThreadPool()
+        self.pre_render_pool.setMaxThreadCount(max(1, (os.cpu_count() or 4) // 2))
+        
+        self.pre_render_timer = QTimer()
+        self.pre_render_timer.setSingleShot(True)
+        self.pre_render_timer.timeout.connect(self._start_background_pre_render)
         
         curve_dict = self.app_settings.get('scale_curve', DEFAULT_SCALE_CURVE.copy())
         self.scale_curve = normalize_curve_data(curve_dict)
@@ -1818,10 +1842,19 @@ class MainWindow(QMainWindow):
         return defaults
     
     def _save_app_settings(self):
+        """Schedule a coalesced disk write (avoids blocking UI on every slider tick)."""
         self.app_settings['scale_curve'] = self.scale_curve.model_dump()
         self.app_settings['image_overrides'] = self.image_overrides
         if hasattr(self, 'combo_shadow_engine'):
             self.app_settings['shadow_engine'] = self.combo_shadow_engine.currentData() or SHADOW_ENGINE_DEFAULT
+        # Coalesce: actual write happens after 400ms of inactivity
+        if hasattr(self, '_save_settings_timer'):
+            self._save_settings_timer.start(400)
+        else:
+            self._flush_app_settings()
+
+    def _flush_app_settings(self):
+        """Actually write settings to disk (called by coalesced timer)."""
         try:
             with open(self.settings_file, 'w') as f:
                 json.dump(self.app_settings, f, indent=4)
@@ -2119,19 +2152,87 @@ class MainWindow(QMainWindow):
     # ========== EVENT HANDLERS ==========
     
     def _schedule_preview(self, *args):
-        """Schedule debounced preview update."""
+        """Schedule debounced preview update.
+
+        During an active slider drag the canvas preview fires quickly (50ms)
+        while the expensive grid refresh is deferred until after release.
+        When no drag is active (combo change, checkbox, etc.) both fire
+        together with a short debounce.
+        """
         self._preview_pending = True
-        self.preview_timer.start(200)
-        # Also update grid preview with current settings
+        if self._slider_dragging:
+            # Fast canvas-only update; grid will sync on release
+            self.preview_timer.start(50)
+            self._grid_sync_timer.start(600)
+        else:
+            self.preview_timer.start(120)
+            # Immediate grid sync (debounced inside grid widget already)
+            self._grid_sync_timer.start(150)
+        
+        # Also schedule background pre-rendering (idle task)
+        # We wait 2.5 seconds of inactivity before starting heavy background renders
+        if hasattr(self, "pre_render_timer"):
+            self.pre_render_timer.start(2500)
+            # Cancel current background work if settings changed
+            if hasattr(self, "pre_render_pool"):
+                self.pre_render_pool.clear()
+
+    def _schedule_canvas_only_preview(self, *args):
+        """Schedule preview update for canvas only (not grid)."""
+        self._preview_pending = True
+        if self._slider_dragging:
+            self.preview_timer.start(50)
+        else:
+            self.preview_timer.start(120)
+
+    def _deferred_grid_sync(self):
+        """Push current settings to the grid preview widget (heavy operation)."""
         if hasattr(self, 'grid_preview'):
             settings = self._get_shadow_settings()
             self.grid_preview.set_settings(settings, self.scale_curve)
             self.grid_preview.set_image_overrides(self.image_overrides)
-    
-    def _schedule_canvas_only_preview(self, *args):
-        """Schedule preview update for canvas only (not grid)."""
-        self._preview_pending = True
-        self.preview_timer.start(200)
+
+    def _start_background_pre_render(self):
+        """Analyze selected folders and queue images for background rendering."""
+        # Don't pre-render if an export is already running
+        if not self.selected_folders or (hasattr(self, "worker") and self.worker and self.worker.isRunning()):
+            return
+            
+        settings_dict = self._get_shadow_settings().model_dump()
+        curve_dict = self.scale_curve.model_dump() if self.scale_curve else None
+        target_size = (self.app_settings.get('output_width', 1800), 
+                      self.app_settings.get('output_height', 2400))
+
+        all_images = []
+        for folder in self.selected_folders:
+            if folder.exists():
+                all_images.extend(list(folder.glob("*.png")))
+        
+        if not all_images:
+            return
+            
+        # Prioritize images in the currently visible grid
+        # For now we just process all of them in order
+        queued = 0
+        for img_path in all_images:
+            if queued >= 15: break # Batch of 15 at a time
+            
+            local_key = override_key(img_path)
+            local_override = self.image_overrides.get(local_key, {})
+            
+            key = self.render_cache.get_cache_key(str(img_path), settings_dict, curve_dict, target_size)
+            if not self.render_cache.exists(key):
+                cache_path = self.render_cache.get_cached_path(key)
+                worker = PreRenderWorker(
+                    key, str(img_path), settings_dict, curve_dict, 
+                    target_size, cache_path, local_override
+                )
+                self.pre_render_pool.start(worker)
+                queued += 1
+        
+        # Check again in 8s if there's more work
+        if queued > 0:
+            self.pre_render_timer.start(8000)
     
     def _start_preview_thread(self):
         """Start an asynchronous preview render using cached assets."""
@@ -2445,24 +2546,8 @@ class MainWindow(QMainWindow):
         name = self.combo_presets.currentText()
         if name in self.presets:
             settings = normalize_shadow_settings(self.presets[name], missing_engine=SHADOW_ENGINE_COMPAT)
-            d = settings.model_dump()
-            self.presets[name] = d
-            self.light_angle.setAngle(d.get('angle', 180))
-            self.sl_distance.setValue(d.get('distance', 30))
-            self.sl_blur.setValue(d.get('blur', 25))
-            self.sl_spread.setValue(d.get('spread', 0))
-            self.sl_fusion.setValue(d.get('fusion', 2))
-            self.sl_opacity.setValue(d.get('opacity', 30))
-            self.sl_noise.setValue(d.get('noise', 0))
-            self.sl_padding.setValue(d.get('padding', 10))
-            self.sl_contact_blur.setValue(d.get('contact_blur', 10))
-            self.sl_contraction.setValue(d.get('contraction', 0))
-            self.sl_scale_adjustment.setValue(d.get('scale_adjustment', 0))
-            self.chk_adaptive.setChecked(d.get('adaptive_zoom', True))
-            if hasattr(self, 'combo_shadow_engine'):
-                engine_idx = self.combo_shadow_engine.findData(d.get('shadow_engine', SHADOW_ENGINE_COMPAT))
-                if engine_idx >= 0:
-                    self.combo_shadow_engine.setCurrentIndex(engine_idx)
+            self.presets[name] = settings.model_dump()
+            self._apply_settings(settings)
             self._schedule_preview()
             
     def _action_save_current(self):
@@ -2923,6 +3008,12 @@ class MainWindow(QMainWindow):
         if not self.selected_folders:
             return
 
+        # Stop background work to free resources
+        if hasattr(self, "pre_render_pool"):
+            self.pre_render_pool.clear()
+        if hasattr(self, "pre_render_timer"):
+            self.pre_render_timer.stop()
+
         # Ensure we are working with the latest on-disk images before exporting.
         self._update_folder_ui()
         
@@ -3188,6 +3279,8 @@ class MainWindow(QMainWindow):
             self.sl_scale_adjustment,
         ]
         for control in sliders:
+            control.slider.sliderPressed.connect(self._on_slider_drag_started)
+            control.slider.sliderReleased.connect(self._on_slider_drag_ended)
             control.slider.sliderReleased.connect(self._schedule_history_push)
             control.spinbox.editingFinished.connect(self._schedule_history_push)
 
@@ -3196,6 +3289,20 @@ class MainWindow(QMainWindow):
         self.chk_adaptive.toggled.connect(self._schedule_history_push)
         if hasattr(self, 'combo_shadow_engine'):
             self.combo_shadow_engine.currentIndexChanged.connect(self._schedule_history_push)
+
+    def _on_slider_drag_started(self):
+        """Called when a slider interaction starts."""
+        self._slider_dragging = True
+        if hasattr(self, "pre_render_pool"):
+            self.pre_render_pool.clear()
+
+    def _on_slider_drag_ended(self):
+        """Called when a slider interaction ends."""
+        self._slider_dragging = False
+        # Sync grid and check for background render
+        self._deferred_grid_sync()
+        if hasattr(self, "pre_render_timer"):
+            self.pre_render_timer.start(2500)
     
     def _action_undo(self):
         """Undo to previous settings state."""
@@ -3475,6 +3582,11 @@ class MainWindow(QMainWindow):
             try:
                 self.app_settings['splitter_sizes'] = self.splitter.sizes()
                 self._save_app_settings()
+                if hasattr(self, "pre_render_pool"):
+                    self.pre_render_pool.clear()
+                    self.pre_render_pool.waitForDone(500)
+                if hasattr(self, "render_cache"):
+                    self.render_cache.prune(max_files=500)
             except Exception:
                 pass
             

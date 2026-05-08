@@ -184,7 +184,7 @@ class ExportWorker(QThread):
 
             folder_name = self.export_config.output_folder_name
             suffix = self.export_config.suffix
-            fmt = self.export_config.format.lower()
+            fmt = RenderCache.normalize_format(self.export_config.format)
             naming_template = self.export_config.naming_template
             
             # Use dynamic output size from config
@@ -225,52 +225,58 @@ class ExportWorker(QThread):
             ):
                 local_override = self.image_overrides.get(local_key, {})
                 
-                # Check for cache
+                task_args = (
+                    img_path, output_folder, settings_dict, target_size,
+                    naming_template, suffix, parent_folder_name, index,
+                    fmt, curve_data_dict, local_override
+                )
+
+                # Check for export-ready cache
                 key = cache.get_cache_key(
                     str(cache_identity_path),
                     settings_dict,
                     curve_data_dict,
                     target_size,
                     local_override,
+                    fmt,
                 )
-                if cache.exists(key):
-                    cached_tasks.append((img_path, key, index, local_override))
+                if cache.exists(key, fmt, validate=True):
+                    cached_tasks.append((img_path, key, index, task_args))
                 else:
-                    tasks.append((
-                        img_path, output_folder, settings_dict, target_size,
-                        naming_template, suffix, parent_folder_name, index, 
-                        fmt, curve_data_dict, local_override
-                    ))
+                    tasks.append(task_args)
 
             # Handle cached tasks first
             if cached_tasks:
                 self.log_updated.emit(f"Exportando {len(cached_tasks)} imágenes desde caché (instantáneo)...")
-                for img_path, key, index, local_override in cached_tasks:
+                for img_path, key, index, task_args in cached_tasks:
                     if not self.is_running: break
                     self._pause_event.wait()
-                    
+                     
                     try:
-                        cache_path = cache.get_cached_path(key)
+                        cache_path = cache.get_cached_path(key, fmt)
                         base_name = apply_naming_template(
                             naming_template, img_path.stem, suffix, parent_folder_name, index
                         )
                         save_name = f"{base_name}.{fmt}"
                         save_path = output_folder / save_name
-                        
-                        with Image.open(cache_path) as cached_img:
-                            if fmt in ['jpg', 'jpeg']:
-                                if cached_img.mode != "RGB":
-                                    cached_img = cached_img.convert("RGB")
-                                cached_img.save(save_path, quality=100, subsampling=0)
-                            else:
-                                shutil.copy2(cache_path, save_path)
-                        
+
+                        shutil.copy2(cache_path, save_path)
+                         
                         completed_count += 1
                         self.image_completed.emit(img_path.name, True)
                         self.progress_updated.emit(int((completed_count / total) * 100))
                     except Exception as e:
-                        error_count += 1
-                        self.log_updated.emit(f"Error al exportar desde caché {img_path.name}: {e}")
+                        self.log_updated.emit(f"Caché no válida para {img_path.name}; renderizando normal ({e})")
+                        success, msg, warning = process_single_image(task_args)
+                        if success:
+                            if warning: self.log_updated.emit(f"Aviso: {msg}: {warning}")
+                            self.image_completed.emit(msg, True)
+                        else:
+                            error_count += 1
+                            self.log_updated.emit(f"Error: {msg}")
+                            self.image_completed.emit(msg.split(':')[0], False)
+                        completed_count += 1
+                        self.progress_updated.emit(int((completed_count / total) * 100))
 
             # Proceed with remaining tasks
             if tasks and self.is_running:

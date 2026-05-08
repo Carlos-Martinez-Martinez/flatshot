@@ -589,6 +589,15 @@ class GridPreviewWidget(QWidget):
         """Force refresh all previews."""
         self._schedule_update()
 
+    def is_busy(self) -> bool:
+        """Return whether the grid is actively rendering or scheduled to render."""
+        return (
+            self._pool.activeThreadCount() > 0
+            or self._chunk_timer.isActive()
+            or self._update_timer.isActive()
+            or self._reflow_timer.isActive()
+        )
+
     def set_fixed_columns(self, columns: int):
         """Set fixed column count (1-3)."""
         columns = max(int(columns), 1)

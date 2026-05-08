@@ -54,12 +54,25 @@ from flatshot.ui.queue_widget import QueueWidget
 from flatshot.ui.grid_preview import GridPreviewWidget
 from flatshot.workers.export_worker import ExportWorker
 from flatshot.workers.queue_worker import QueueWorker
-from flatshot.workers.pre_render_worker import PreRenderWorker
-from flatshot.utils.render_cache import RenderCache
+from flatshot.workers.pre_render_scheduler import PreRenderScheduler
 
 import qtawesome as qta
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
+
+PRE_RENDER_ACTIVITY_EVENTS = {
+    QEvent.Type.MouseButtonPress,
+    QEvent.Type.MouseButtonRelease,
+    QEvent.Type.MouseButtonDblClick,
+    QEvent.Type.MouseMove,
+    QEvent.Type.Wheel,
+    QEvent.Type.KeyPress,
+    QEvent.Type.KeyRelease,
+    QEvent.Type.ShortcutOverride,
+    QEvent.Type.DragEnter,
+    QEvent.Type.DragMove,
+    QEvent.Type.Drop,
+}
 
 
 def _render_preview_task(pil_img: Image.Image, target_size, settings_dict: dict, curve_dict: dict, scale_ratio: float, is_preview: bool = True):
@@ -224,15 +237,14 @@ class MainWindow(QMainWindow):
         self.batch_summary = BatchSummary()
 
         # --- Background Pre-rendering ---
-        self.render_cache = RenderCache()
-        self.pre_render_pool = QThreadPool()
-        self.pre_render_pool.setMaxThreadCount(1)
-        self._active_pre_render_workers = set()
-        self._pre_render_inflight_keys = set()
-        
-        self.pre_render_timer = QTimer()
-        self.pre_render_timer.setSingleShot(True)
-        self.pre_render_timer.timeout.connect(self._start_background_pre_render)
+        self.pre_render_scheduler = PreRenderScheduler(
+            idle_ms=int(self.app_settings.get('background_pre_render_idle_ms', 8000)),
+            max_cache_bytes=int(self.app_settings.get('background_pre_render_cache_mb', 2048)) * 1024 * 1024,
+            busy_callback=self._pre_render_should_pause,
+            parent=self,
+        )
+        self.pre_render_scheduler.status_changed.connect(self._on_pre_render_status)
+        self.pre_render_scheduler.error.connect(self._log_error)
         
         curve_dict = self.app_settings.get('scale_curve', DEFAULT_SCALE_CURVE.copy())
         self.scale_curve = normalize_curve_data(curve_dict)
@@ -249,6 +261,9 @@ class MainWindow(QMainWindow):
         # Build UI
         self._init_menu()
         self._init_ui()
+        app = QApplication.instance()
+        if app is not None:
+            app.installEventFilter(self)
         self._apply_export_preferences(self._build_export_config_from_settings())
         self._setup_history_tracking()
         self._setup_accessibility_and_tab_order()
@@ -1430,7 +1445,12 @@ class MainWindow(QMainWindow):
         except RuntimeError:
             pass
 
+    def _is_pre_render_activity_event(self, event) -> bool:
+        return event.type() in PRE_RENDER_ACTIVITY_EVENTS
+
     def eventFilter(self, watched, event):
+        if self._is_pre_render_activity_event(event) and hasattr(self, "pre_render_scheduler"):
+            self.pre_render_scheduler.note_activity("activity")
         if watched is getattr(self, "grid_folder_path", None) and event.type() == QEvent.Type.Resize:
             try:
                 idx = self.grid_folder_combo.currentIndex() if hasattr(self, "grid_folder_combo") else 0
@@ -1468,6 +1488,7 @@ class MainWindow(QMainWindow):
         self._update_grid_folder_path(folder)
         self.app_settings['grid_folder_index'] = int(index)
         self._save_app_settings()
+        self._schedule_background_pre_render()
     
     def _update_grid_folder_combo(self):
         """Update the folder selector combo in grid panel."""
@@ -1830,7 +1851,8 @@ class MainWindow(QMainWindow):
             'grid_columns': 3,
             'grid_folder_index': 0,
             'background_pre_render': False,
-            'background_pre_render_batch_size': 1,
+            'background_pre_render_cache_mb': 2048,
+            'background_pre_render_idle_ms': 8000,
         }
         if self.settings_file.exists():
             try:
@@ -2182,6 +2204,7 @@ class MainWindow(QMainWindow):
             self.preview_timer.start(50)
         else:
             self.preview_timer.start(120)
+        self._schedule_background_pre_render()
 
     def _deferred_grid_sync(self):
         """Push current settings to the grid preview widget (heavy operation)."""
@@ -2190,125 +2213,78 @@ class MainWindow(QMainWindow):
             self.grid_preview.set_settings(settings, self.scale_curve)
             self.grid_preview.set_image_overrides(self.image_overrides)
 
-    def _background_pre_render_enabled(self) -> bool:
-        return bool(self.app_settings.get('background_pre_render', False))
+    def _pre_render_should_pause(self) -> bool:
+        if self._slider_dragging:
+            return True
+        if self.worker and self.worker.isRunning():
+            return True
+        if self.queue_worker and self.queue_worker.isRunning():
+            return True
+        if self.preview_pool.activeThreadCount() > 0:
+            return True
+        if hasattr(self, "grid_preview") and hasattr(self.grid_preview, "is_busy"):
+            return self.grid_preview.is_busy()
+        return False
 
     def _cancel_background_pre_render(self):
-        if hasattr(self, "pre_render_timer"):
-            self.pre_render_timer.stop()
-        if hasattr(self, "pre_render_pool"):
-            self.pre_render_pool.clear()
-        self._pre_render_inflight_keys.clear()
+        if hasattr(self, "pre_render_scheduler"):
+            self.pre_render_scheduler.note_activity("activity")
 
-    def _schedule_background_pre_render(self, delay_ms: int = 6000):
-        if not self._background_pre_render_enabled():
-            self._cancel_background_pre_render()
+    def _schedule_background_pre_render(self, delay_ms: int | None = None):
+        if not hasattr(self, "pre_render_scheduler"):
             return
-        if self._slider_dragging:
+        enabled = bool(self.app_settings.get('background_pre_render', False))
+        if not enabled:
+            self.pre_render_scheduler.shutdown(emit_idle=True)
             return
-        if hasattr(self, "pre_render_pool"):
-            self.pre_render_pool.clear()
-        if hasattr(self, "pre_render_timer"):
-            self.pre_render_timer.start(delay_ms)
-
-    def _iter_pre_render_candidates(self):
-        seen = set()
-        active_folder = getattr(self.ui_view_state, "active_folder", None)
-        folders = []
-
-        if active_folder:
-            folders.append(Path(active_folder))
-        folders.extend(folder for folder in self.selected_folders if folder not in folders)
-
-        for folder in folders:
-            if not folder.exists():
-                continue
-            try:
-                for img_path in folder.iterdir():
-                    if not img_path.is_file() or img_path.suffix.lower() != ".png":
-                        continue
-                    resolved = str(img_path.resolve())
-                    if resolved in seen:
-                        continue
-                    seen.add(resolved)
-                    yield img_path
-            except OSError:
-                continue
-
-    def _start_background_pre_render(self):
-        """Analyze selected folders and queue images for background rendering."""
-        if not self._background_pre_render_enabled():
-            self._cancel_background_pre_render()
-            return
-
-        # Don't pre-render if the app is busy with interactive or export work.
-        export_running = (
-            (hasattr(self, "worker") and self.worker and self.worker.isRunning())
-            or (hasattr(self, "queue_worker") and self.queue_worker and self.queue_worker.isRunning())
-        )
-        if (
-            not self.selected_folders
-            or export_running
-            or self._slider_dragging
-            or self.preview_pool.activeThreadCount() > 0
-            or self.pre_render_pool.activeThreadCount() > 0
-        ):
-            self._schedule_background_pre_render(12000)
-            return
-             
-        settings_dict = self._get_shadow_settings().model_dump()
-        curve_dict = self.scale_curve.model_dump() if self.scale_curve else None
-        target_size = (self.app_settings.get('output_width', 1800), 
-                      self.app_settings.get('output_height', 2400))
-             
-        batch_size = max(1, min(int(self.app_settings.get('background_pre_render_batch_size', 1)), 3))
-        queued = 0
-        checked = 0
-        for img_path in self._iter_pre_render_candidates():
-            if queued >= batch_size:
-                break
-            checked += 1
-            if checked > 200:
-                break
-             
-            local_key = override_key(img_path)
-            local_override = self.image_overrides.get(local_key, {})
-             
-            key = self.render_cache.get_cache_key(
-                str(img_path),
-                settings_dict,
-                curve_dict,
-                target_size,
-                local_override,
+        try:
+            export_config = self._build_export_config_from_settings()
+            settings = self._get_shadow_settings()
+            settings.transparent_bg = export_config.transparent_bg
+            settings.bg_color = export_config.bg_color
+            max_cache_mb = int(self.app_settings.get('background_pre_render_cache_mb', 2048))
+            self.pre_render_scheduler.update_context(
+                enabled=True,
+                folders=list(self.selected_folders),
+                active_folder=getattr(self.ui_view_state, "active_folder", None),
+                current_image_path=self.current_custom_path if self.current_mock == 'custom_drop' else None,
+                settings_dict=settings.model_dump(),
+                curve_dict=self.scale_curve.model_dump() if self.scale_curve else None,
+                target_size=(export_config.output_width, export_config.output_height),
+                export_format=export_config.format,
+                image_overrides=self.image_overrides,
+                idle_ms=int(self.app_settings.get('background_pre_render_idle_ms', 8000)),
+                max_cache_bytes=max_cache_mb * 1024 * 1024,
             )
-            if self.render_cache.exists(key) or key in self._pre_render_inflight_keys:
-                continue
+            if delay_ms is not None:
+                self.pre_render_scheduler.schedule(delay_ms)
+        except Exception as exc:
+            self._log_error(f"[pre-render-schedule-error] {exc}")
 
-            cache_path = self.render_cache.get_cached_path(key)
-            worker = PreRenderWorker(
-                key, str(img_path), settings_dict, curve_dict,
-                target_size, cache_path, local_override
-            )
-            self._active_pre_render_workers.add(worker)
-            self._pre_render_inflight_keys.add(key)
-            worker.signals.finished.connect(
-                lambda finished_key, success, w=worker: self._on_pre_render_finished(w, finished_key, success)
-            )
-            worker.signals.error.connect(self._on_pre_render_error)
-            self.pre_render_pool.start(worker)
-            queued += 1
+    def _on_pre_render_status(self, state: str, prepared: int, total: int):
+        if not hasattr(self, "lbl_progress_status"):
+            return
+        if (self.worker and self.worker.isRunning()) or (self.queue_worker and self.queue_worker.isRunning()):
+            return
 
-        if queued > 0:
-            self._schedule_background_pre_render(30000)
+        if state == "idle" or total <= 0:
+            self.lbl_progress_status.hide()
+            self.progress_bar.setValue(0)
+            return
 
-    def _on_pre_render_finished(self, worker: PreRenderWorker, key: str, success: bool):
-        self._active_pre_render_workers.discard(worker)
-        self._pre_render_inflight_keys.discard(key)
-        if self._background_pre_render_enabled() and success:
-            self._schedule_background_pre_render(30000)
+        if state == "preparing":
+            text = f"Preparando exportación {prepared}/{total}"
+        elif state == "ready":
+            text = f"Listo para exportar {prepared}/{total}"
+        elif state == "partial":
+            text = f"Caché parcial {prepared}/{total}"
+        else:
+            text = "Pausado por actividad" if prepared <= 0 else f"Caché parcial {prepared}/{total}"
 
-    def _on_pre_render_error(self, message: str):
-        self._log_error(message)
+        self.lbl_progress_status.setText(text)
+        self.lbl_progress_status.setToolTip("Se pausa automáticamente mientras usas la app.")
+        self.lbl_progress_status.show()
+        self.progress_bar.setValue(int((prepared / total) * 100) if total else 0)
     
     def _start_preview_thread(self):
         """Start an asynchronous preview render using cached assets."""
@@ -2933,9 +2909,10 @@ class MainWindow(QMainWindow):
             if hasattr(self, "lbl_destination_summary") else "Subcarpeta en origen",
         )
         self._update_batch_header()
-        
+         
         self._sync_grid_preview_with_folders()
         self._sync_folder_watcher()
+        self._schedule_background_pre_render()
     
     def _on_dest_custom_toggled(self, checked: bool):
         """Handle custom destination radio button toggle."""
@@ -3084,11 +3061,9 @@ class MainWindow(QMainWindow):
         if not self.selected_folders:
             return
 
-        # Stop background work to free resources
-        if hasattr(self, "pre_render_pool"):
-            self.pre_render_pool.clear()
-        if hasattr(self, "pre_render_timer"):
-            self.pre_render_timer.stop()
+        # Stop opportunistic background work to free resources
+        if hasattr(self, "pre_render_scheduler"):
+            self.pre_render_scheduler.shutdown()
 
         # Ensure we are working with the latest on-disk images before exporting.
         self._update_folder_ui()
@@ -3265,6 +3240,7 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(0)
         self.lbl_progress_status.setText("Listo")
         self.lbl_progress_status.hide()
+        self._schedule_background_pre_render()
             
     def _on_export_finished(self, success: bool, processed: int = 0, total: int = 0, duration: float = 0.0):
         """Called when single-folder export finishes."""
@@ -3611,6 +3587,9 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         """Save session state before closing and stop background preview tasks."""
         try:
+            app = QApplication.instance()
+            if app is not None:
+                app.removeEventFilter(self)
             if self.queue_worker and self.queue_worker.isRunning():
                 self.queue_worker.stop()
                 self.queue_worker.wait(3000)
@@ -3656,11 +3635,12 @@ class MainWindow(QMainWindow):
             try:
                 self.app_settings['splitter_sizes'] = self.splitter.sizes()
                 self._save_app_settings()
-                if hasattr(self, "pre_render_pool"):
-                    self.pre_render_pool.clear()
-                    self.pre_render_pool.waitForDone(500)
-                if hasattr(self, "render_cache"):
-                    self.render_cache.prune(max_files=500)
+                if hasattr(self, "pre_render_scheduler"):
+                    self.pre_render_scheduler.shutdown()
+                    self.pre_render_scheduler.cache.prune(
+                        max_files=1000,
+                        max_bytes=int(self.app_settings.get('background_pre_render_cache_mb', 2048)) * 1024 * 1024,
+                    )
             except Exception:
                 pass
             

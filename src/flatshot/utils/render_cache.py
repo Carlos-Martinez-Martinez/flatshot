@@ -3,11 +3,14 @@ import json
 from pathlib import Path
 import tempfile
 import shutil
+from typing import Iterable
+
+from PIL import Image, UnidentifiedImageError
 
 class RenderCache:
     """Manages cached full-resolution renders to speed up export."""
 
-    CACHE_VERSION = 2
+    CACHE_VERSION = 3
     
     def __init__(self):
         self.cache_dir = Path(tempfile.gettempdir()) / "flatshot_render_cache"
@@ -29,6 +32,15 @@ class RenderCache:
                 "mtime_ns": None,
             }
 
+    @staticmethod
+    def normalize_format(fmt: str | None) -> str:
+        normalized = (fmt or "png").lower().lstrip(".")
+        if normalized == "jpeg":
+            return "jpg"
+        if normalized not in {"jpg", "png"}:
+            return "png"
+        return normalized
+
     def get_cache_key(
         self,
         image_path: str,
@@ -36,6 +48,7 @@ class RenderCache:
         curve_dict: dict,
         target_size: tuple,
         local_override: dict | None = None,
+        export_format: str | None = None,
     ) -> str:
         """Generate a unique key for a specific render configuration."""
         # Use a stable representation of the inputs
@@ -47,6 +60,7 @@ class RenderCache:
             "curve": curve_dict,
             "size": target_size,
             "local_override": local_override or {},
+            "format": self.normalize_format(export_format),
         }
         
         # Normalize floating point values to strings with fixed precision if necessary
@@ -56,12 +70,26 @@ class RenderCache:
         
     def get_cached_path(self, key: str, fmt: str = "png") -> Path:
         """Return the path where a cached render would be stored."""
-        return self.cache_dir / f"{key}.{fmt}"
-        
-    def exists(self, key: str, fmt: str = "png") -> bool:
+        return self.cache_dir / f"{key}.{self.normalize_format(fmt)}"
+
+    def get_temp_path(self, cache_path: Path, token: str) -> Path:
+        """Return a sidecar temp path for atomic cache writes."""
+        safe_token = "".join(ch for ch in str(token) if ch.isalnum() or ch in ("-", "_"))
+        return cache_path.with_name(f".{cache_path.name}.{safe_token}.tmp")
+         
+    def exists(self, key: str, fmt: str = "png", validate: bool = False) -> bool:
         """Check if a cached render exists and is valid."""
         path = self.get_cached_path(key, fmt)
-        return path.exists() and path.stat().st_size > 0
+        try:
+            if not path.exists() or path.stat().st_size <= 0:
+                return False
+            if not validate:
+                return True
+            with Image.open(path) as img:
+                img.verify()
+            return True
+        except (OSError, UnidentifiedImageError):
+            return False
         
     def clear(self):
         """Clear all cached renders."""
@@ -69,14 +97,39 @@ class RenderCache:
             shutil.rmtree(self.cache_dir)
             self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-    def prune(self, max_files=500):
-        """Remove oldest files if cache exceeds limit."""
-        files = list(self.cache_dir.glob("*.*"))
-        if len(files) > max_files:
-            # Sort by access time
-            files.sort(key=lambda x: x.stat().st_atime)
-            for f in files[:len(files) - max_files]:
+    def _cache_files(self) -> Iterable[Path]:
+        return (
+            path for path in self.cache_dir.glob("*.*")
+            if path.is_file() and not path.name.startswith(".") and path.suffix.lower() in {".jpg", ".png"}
+        )
+
+    def prune(self, max_files=1000, max_bytes: int | None = 2 * 1024 * 1024 * 1024):
+        """Remove oldest files if cache exceeds file or byte limits."""
+        for pattern in ("*.tmp", ".*.tmp"):
+            for temp_file in self.cache_dir.glob(pattern):
                 try:
-                    f.unlink()
-                except:
+                    temp_file.unlink()
+                except OSError:
                     pass
+
+        files = []
+        total_size = 0
+        for path in self._cache_files():
+            try:
+                stat = path.stat()
+            except OSError:
+                continue
+            files.append((path, stat.st_atime, stat.st_size))
+            total_size += stat.st_size
+
+        files.sort(key=lambda item: item[1])
+        while files and (
+            (max_files is not None and len(files) > max_files)
+            or (max_bytes is not None and total_size > max_bytes)
+        ):
+            path, _atime, size = files.pop(0)
+            try:
+                path.unlink()
+                total_size -= size
+            except OSError:
+                pass

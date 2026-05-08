@@ -1,0 +1,91 @@
+from PIL import Image
+
+from flatshot.core.models import CurveData, ExportConfig, ShadowSettings
+from flatshot.utils.render_cache import RenderCache
+from flatshot.workers import export_worker
+from flatshot.workers.export_worker import ExportWorker
+
+
+def _use_isolated_cache(monkeypatch, cache_dir):
+    def init(self):
+        self.cache_dir = cache_dir
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr(RenderCache, "__init__", init)
+
+
+def _curve():
+    return CurveData(xp=[0.0, 1.0], fp=[1.0, 1.0])
+
+
+def _source(folder):
+    source = folder / "source.png"
+    Image.new("RGBA", (8, 8), (120, 80, 40, 255)).save(source)
+    return source
+
+
+def _cache_key(source, settings, config, curve):
+    settings.transparent_bg = config.transparent_bg
+    settings.bg_color = config.bg_color
+    return RenderCache().get_cache_key(
+        str(source),
+        settings.model_dump(),
+        curve.model_dump(),
+        (config.output_width, config.output_height),
+        {},
+        config.format,
+    )
+
+
+def test_export_uses_valid_export_ready_cache(monkeypatch, tmp_path):
+    _use_isolated_cache(monkeypatch, tmp_path / "cache")
+    source = _source(tmp_path)
+    settings = ShadowSettings(opacity=0, blur=0, noise=0)
+    config = ExportConfig(format="PNG", output_width=8, output_height=8)
+    curve = _curve()
+    key = _cache_key(source, settings, config, curve)
+    cache_path = RenderCache().get_cached_path(key, "png")
+    Image.new("RGBA", (8, 8), (1, 2, 3, 255)).save(cache_path)
+
+    def fail_process(_args):
+        raise AssertionError("normal render should not run for valid cache")
+
+    monkeypatch.setattr(export_worker, "process_single_image", fail_process)
+
+    worker = ExportWorker(str(tmp_path), settings, config, curve)
+    worker.run()
+
+    output = tmp_path / "_SALIDA_PRO" / "source_PRO.png"
+    assert output.exists()
+    with Image.open(output) as img:
+        assert img.getpixel((0, 0)) == (1, 2, 3, 255)
+
+
+def test_export_falls_back_to_normal_render_when_cache_copy_fails(monkeypatch, tmp_path):
+    _use_isolated_cache(monkeypatch, tmp_path / "cache")
+    source = _source(tmp_path)
+    settings = ShadowSettings(opacity=0, blur=0, noise=0)
+    config = ExportConfig(format="PNG", output_width=8, output_height=8)
+    curve = _curve()
+    key = _cache_key(source, settings, config, curve)
+    cache_path = RenderCache().get_cached_path(key, "png")
+    Image.new("RGBA", (8, 8), (1, 2, 3, 255)).save(cache_path)
+
+    def fail_copy(_src, _dest):
+        raise OSError("copy failed")
+
+    def fake_process(args):
+        img_path, output_folder, _settings, _target_size, _template, suffix, _folder, _index, fmt, _curve, _override = args
+        Image.new("RGBA", (8, 8), (4, 5, 6, 255)).save(output_folder / f"{img_path.stem}{suffix}.{fmt}")
+        return True, img_path.name, None
+
+    monkeypatch.setattr(export_worker.shutil, "copy2", fail_copy)
+    monkeypatch.setattr(export_worker, "process_single_image", fake_process)
+
+    worker = ExportWorker(str(tmp_path), settings, config, curve)
+    worker.run()
+
+    output = tmp_path / "_SALIDA_PRO" / "source_PRO.png"
+    assert output.exists()
+    with Image.open(output) as img:
+        assert img.getpixel((0, 0)) == (4, 5, 6, 255)

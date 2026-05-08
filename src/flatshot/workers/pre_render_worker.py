@@ -25,6 +25,7 @@ class PreRenderWorker(QRunnable):
         self.cache_path = cache_path
         self.local_override = local_override or {}
         self.signals = PreRenderSignals()
+        self.setAutoDelete(False)
         
     def run(self):
         try:

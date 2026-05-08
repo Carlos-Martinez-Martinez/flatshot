@@ -226,7 +226,9 @@ class MainWindow(QMainWindow):
         # --- Background Pre-rendering ---
         self.render_cache = RenderCache()
         self.pre_render_pool = QThreadPool()
-        self.pre_render_pool.setMaxThreadCount(max(1, (os.cpu_count() or 4) // 2))
+        self.pre_render_pool.setMaxThreadCount(1)
+        self._active_pre_render_workers = set()
+        self._pre_render_inflight_keys = set()
         
         self.pre_render_timer = QTimer()
         self.pre_render_timer.setSingleShot(True)
@@ -1827,6 +1829,8 @@ class MainWindow(QMainWindow):
             },
             'grid_columns': 3,
             'grid_folder_index': 0,
+            'background_pre_render': False,
+            'background_pre_render_batch_size': 1,
         }
         if self.settings_file.exists():
             try:
@@ -2169,13 +2173,7 @@ class MainWindow(QMainWindow):
             # Immediate grid sync (debounced inside grid widget already)
             self._grid_sync_timer.start(150)
         
-        # Also schedule background pre-rendering (idle task)
-        # We wait 2.5 seconds of inactivity before starting heavy background renders
-        if hasattr(self, "pre_render_timer"):
-            self.pre_render_timer.start(2500)
-            # Cancel current background work if settings changed
-            if hasattr(self, "pre_render_pool"):
-                self.pre_render_pool.clear()
+        self._schedule_background_pre_render()
 
     def _schedule_canvas_only_preview(self, *args):
         """Schedule preview update for canvas only (not grid)."""
@@ -2192,47 +2190,125 @@ class MainWindow(QMainWindow):
             self.grid_preview.set_settings(settings, self.scale_curve)
             self.grid_preview.set_image_overrides(self.image_overrides)
 
+    def _background_pre_render_enabled(self) -> bool:
+        return bool(self.app_settings.get('background_pre_render', False))
+
+    def _cancel_background_pre_render(self):
+        if hasattr(self, "pre_render_timer"):
+            self.pre_render_timer.stop()
+        if hasattr(self, "pre_render_pool"):
+            self.pre_render_pool.clear()
+        self._pre_render_inflight_keys.clear()
+
+    def _schedule_background_pre_render(self, delay_ms: int = 6000):
+        if not self._background_pre_render_enabled():
+            self._cancel_background_pre_render()
+            return
+        if self._slider_dragging:
+            return
+        if hasattr(self, "pre_render_pool"):
+            self.pre_render_pool.clear()
+        if hasattr(self, "pre_render_timer"):
+            self.pre_render_timer.start(delay_ms)
+
+    def _iter_pre_render_candidates(self):
+        seen = set()
+        active_folder = getattr(self.ui_view_state, "active_folder", None)
+        folders = []
+
+        if active_folder:
+            folders.append(Path(active_folder))
+        folders.extend(folder for folder in self.selected_folders if folder not in folders)
+
+        for folder in folders:
+            if not folder.exists():
+                continue
+            try:
+                for img_path in folder.iterdir():
+                    if not img_path.is_file() or img_path.suffix.lower() != ".png":
+                        continue
+                    resolved = str(img_path.resolve())
+                    if resolved in seen:
+                        continue
+                    seen.add(resolved)
+                    yield img_path
+            except OSError:
+                continue
+
     def _start_background_pre_render(self):
         """Analyze selected folders and queue images for background rendering."""
-        # Don't pre-render if an export is already running
-        if not self.selected_folders or (hasattr(self, "worker") and self.worker and self.worker.isRunning()):
+        if not self._background_pre_render_enabled():
+            self._cancel_background_pre_render()
             return
-            
+
+        # Don't pre-render if the app is busy with interactive or export work.
+        export_running = (
+            (hasattr(self, "worker") and self.worker and self.worker.isRunning())
+            or (hasattr(self, "queue_worker") and self.queue_worker and self.queue_worker.isRunning())
+        )
+        if (
+            not self.selected_folders
+            or export_running
+            or self._slider_dragging
+            or self.preview_pool.activeThreadCount() > 0
+            or self.pre_render_pool.activeThreadCount() > 0
+        ):
+            self._schedule_background_pre_render(12000)
+            return
+             
         settings_dict = self._get_shadow_settings().model_dump()
         curve_dict = self.scale_curve.model_dump() if self.scale_curve else None
         target_size = (self.app_settings.get('output_width', 1800), 
                       self.app_settings.get('output_height', 2400))
-
-        all_images = []
-        for folder in self.selected_folders:
-            if folder.exists():
-                all_images.extend(list(folder.glob("*.png")))
-        
-        if not all_images:
-            return
-            
-        # Prioritize images in the currently visible grid
-        # For now we just process all of them in order
+             
+        batch_size = max(1, min(int(self.app_settings.get('background_pre_render_batch_size', 1)), 3))
         queued = 0
-        for img_path in all_images:
-            if queued >= 15: break # Batch of 15 at a time
-            
+        checked = 0
+        for img_path in self._iter_pre_render_candidates():
+            if queued >= batch_size:
+                break
+            checked += 1
+            if checked > 200:
+                break
+             
             local_key = override_key(img_path)
             local_override = self.image_overrides.get(local_key, {})
-            
-            key = self.render_cache.get_cache_key(str(img_path), settings_dict, curve_dict, target_size)
-            if not self.render_cache.exists(key):
-                cache_path = self.render_cache.get_cached_path(key)
-                worker = PreRenderWorker(
-                    key, str(img_path), settings_dict, curve_dict, 
-                    target_size, cache_path, local_override
-                )
-                self.pre_render_pool.start(worker)
-                queued += 1
-        
-        # Check again in 8s if there's more work
+             
+            key = self.render_cache.get_cache_key(
+                str(img_path),
+                settings_dict,
+                curve_dict,
+                target_size,
+                local_override,
+            )
+            if self.render_cache.exists(key) or key in self._pre_render_inflight_keys:
+                continue
+
+            cache_path = self.render_cache.get_cached_path(key)
+            worker = PreRenderWorker(
+                key, str(img_path), settings_dict, curve_dict,
+                target_size, cache_path, local_override
+            )
+            self._active_pre_render_workers.add(worker)
+            self._pre_render_inflight_keys.add(key)
+            worker.signals.finished.connect(
+                lambda finished_key, success, w=worker: self._on_pre_render_finished(w, finished_key, success)
+            )
+            worker.signals.error.connect(self._on_pre_render_error)
+            self.pre_render_pool.start(worker)
+            queued += 1
+
         if queued > 0:
-            self.pre_render_timer.start(8000)
+            self._schedule_background_pre_render(30000)
+
+    def _on_pre_render_finished(self, worker: PreRenderWorker, key: str, success: bool):
+        self._active_pre_render_workers.discard(worker)
+        self._pre_render_inflight_keys.discard(key)
+        if self._background_pre_render_enabled() and success:
+            self._schedule_background_pre_render(30000)
+
+    def _on_pre_render_error(self, message: str):
+        self._log_error(message)
     
     def _start_preview_thread(self):
         """Start an asynchronous preview render using cached assets."""
@@ -3293,16 +3369,14 @@ class MainWindow(QMainWindow):
     def _on_slider_drag_started(self):
         """Called when a slider interaction starts."""
         self._slider_dragging = True
-        if hasattr(self, "pre_render_pool"):
-            self.pre_render_pool.clear()
+        self._cancel_background_pre_render()
 
     def _on_slider_drag_ended(self):
         """Called when a slider interaction ends."""
         self._slider_dragging = False
         # Sync grid and check for background render
         self._deferred_grid_sync()
-        if hasattr(self, "pre_render_timer"):
-            self.pre_render_timer.start(2500)
+        self._schedule_background_pre_render()
     
     def _action_undo(self):
         """Undo to previous settings state."""

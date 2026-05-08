@@ -169,10 +169,10 @@ class ExportWorker(QThread):
                 for src in source_files:
                     dest = snap_dir / src.name
                     if self._copy_stable(src, dest):
-                        image_items.append((dest, override_key(src)))
+                        image_items.append((dest, override_key(src), src))
             else:
                 image_items = [
-                    (f, override_key(f))
+                    (f, override_key(f), f)
                     for f in self.input_folder.iterdir()
                     if f.is_file() and f.suffix.lower() == '.png'
                 ]
@@ -219,14 +219,20 @@ class ExportWorker(QThread):
             tasks = []
             cached_tasks = []
             
-            for index, (img_path, local_key) in enumerate(
+            for index, (img_path, local_key, cache_identity_path) in enumerate(
                 sorted(image_items, key=lambda item: item[0].name),
                 start=1,
             ):
                 local_override = self.image_overrides.get(local_key, {})
                 
                 # Check for cache
-                key = cache.get_cache_key(str(img_path), settings_dict, curve_data_dict, target_size)
+                key = cache.get_cache_key(
+                    str(cache_identity_path),
+                    settings_dict,
+                    curve_data_dict,
+                    target_size,
+                    local_override,
+                )
                 if cache.exists(key):
                     cached_tasks.append((img_path, key, index, local_override))
                 else:

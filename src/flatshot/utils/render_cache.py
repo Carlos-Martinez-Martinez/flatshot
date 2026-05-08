@@ -6,20 +6,47 @@ import shutil
 
 class RenderCache:
     """Manages cached full-resolution renders to speed up export."""
+
+    CACHE_VERSION = 2
     
     def __init__(self):
         self.cache_dir = Path(tempfile.gettempdir()) / "flatshot_render_cache"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         
-    def get_cache_key(self, image_path: str, settings_dict: dict, curve_dict: dict, target_size: tuple) -> str:
+    def _file_fingerprint(self, image_path: str) -> dict:
+        path = Path(image_path)
+        try:
+            stat = path.stat()
+            return {
+                "path": str(path.resolve()),
+                "size": stat.st_size,
+                "mtime_ns": stat.st_mtime_ns,
+            }
+        except OSError:
+            return {
+                "path": str(path.resolve()),
+                "size": None,
+                "mtime_ns": None,
+            }
+
+    def get_cache_key(
+        self,
+        image_path: str,
+        settings_dict: dict,
+        curve_dict: dict,
+        target_size: tuple,
+        local_override: dict | None = None,
+    ) -> str:
         """Generate a unique key for a specific render configuration."""
         # Use a stable representation of the inputs
         # Settings and curve are sorted to ensure consistent hashing
         data = {
-            "path": str(Path(image_path).resolve()),
+            "version": self.CACHE_VERSION,
+            "source": self._file_fingerprint(image_path),
             "settings": settings_dict,
             "curve": curve_dict,
-            "size": target_size
+            "size": target_size,
+            "local_override": local_override or {},
         }
         
         # Normalize floating point values to strings with fixed precision if necessary

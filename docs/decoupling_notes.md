@@ -257,3 +257,68 @@
   - verified exported files exist and progress/button state resets.
 - Smoke used an inline executor to avoid Windows multiprocessing-from-stdin issues while preserving `process_single_image` and the export runner path.
 - Observed risk: in offscreen smoke, the visual `export_bar_mode == "paused"` can race with a queued `job_started` signal if pause is toggled immediately as the first job starts. The underlying queue pause flag and resume path worked; this should be revisited when extracting `QueueRunner`.
+
+## Batch 5 implementation
+
+- Scope: Phase 5, queue execution runner.
+- Added queue contracts to `flatshot.application.contracts`:
+  - `QueueRunRequest`;
+  - `QueueRunResult`.
+- Added neutral queue events to `flatshot.application.events`:
+  - `QueueStartedEvent`;
+  - `QueueJobStartedEvent`;
+  - `QueueJobProgressEvent`;
+  - `QueueJobCompletedEvent`;
+  - `QueueFinishedEvent`;
+  - `QueuePausedEvent`;
+  - `QueueResumedEvent`;
+  - `QueueCancelledEvent`.
+- Added `QueueRunner` in `flatshot.application.queue_runner`.
+- Moved the reusable queue orchestration out of `QueueWorker`:
+  - sequential folder processing;
+  - per-job PNG counting;
+  - `JobItem` status/progress updates;
+  - per-job success/error/cancel decisions;
+  - queue counters;
+  - pause/resume/stop tokens;
+  - queue logging hooks.
+- Adapted `QueueWorker(QThread)` into a PyQt adapter that:
+  - builds `QueueRunRequest`;
+  - creates `QueueRunner`;
+  - translates queue/export events back to existing Qt signals;
+  - preserves public `pause()`, `resume()`, `stop()` and `count_images_in_folder()`;
+  - keeps the export runner factory wired through the existing export worker module for current monkeypatch/test compatibility.
+- Preserved the existing multi-folder sequence, `JobItem` statuses, progress semantics, log messages and processed-image totals.
+- Did not touch `ShadowEngine`, preview rendering, presets, settings persistence, export naming, cache or image output parameters.
+
+## Batch 5 validation
+
+- Added `tests/test_queue_runner.py` with coverage for:
+  - `QueueRunner` staying free of PyQt imports;
+  - empty queue;
+  - one folder;
+  - multiple folders in order;
+  - empty folder inside a queue;
+  - folder with failed image;
+  - cancellation before run;
+  - pause/resume events.
+- `pytest tests/test_queue_runner.py tests/test_export_runner.py tests/test_export_cache.py tests/test_export_variants.py -q` -> 20 passed.
+- `pytest` -> 147 passed.
+- `python -m compileall -q src/flatshot/application src/flatshot/workers/queue_worker.py` -> passed.
+- `git diff --check` -> passed, with only expected line-ending warnings from Git.
+- `rg -n "PyQt6|QThread|pyqtSignal" src/flatshot/application/queue_runner.py` -> no matches.
+- PyQt offscreen smoke:
+  - instantiated `MainWindow`;
+  - added a temporary folder through `_add_folder_to_list`;
+  - verified PNG count and batch summary;
+  - selected a preset;
+  - adjusted an essential slider;
+  - selected an image through the grid handler;
+  - rendered a preview;
+  - processed one folder through `ExportWorker`;
+  - processed two folders through the new `QueueRunner` via `QueueWorker`;
+  - exercised pause/resume on the active queue;
+  - exercised stop on a running queue;
+  - verified exported files exist and progress/button state resets.
+- Smoke used an inline executor to avoid Windows multiprocessing-from-stdin issues while preserving `process_single_image` and the production queue/export runner path.
+- Remaining risk: `QueueWorker.current_worker` now references the active `ExportRunner` instead of the old nested `ExportWorker`; no app code depends on `ExportWorker`-specific methods there, but external callers should use `QueueWorker.pause()/resume()/stop()` rather than reaching into that attribute.

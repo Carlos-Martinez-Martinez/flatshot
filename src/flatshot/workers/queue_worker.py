@@ -1,25 +1,44 @@
 """
-Queue Worker for FlatShot
-Manages a queue of folders for batch processing.
+Queue Worker for FlatShot.
+
+Qt adapter for the application queue runner.
 """
 from pathlib import Path
 from typing import List
-from time import time
+
 from PyQt6.QtCore import QThread, pyqtSignal
-from flatshot.core.models import (
-    ShadowSettings,
-    ExportConfig,
-    CurveData,
-    JobItem,
-    normalize_export_variants,
+
+from flatshot.application.contracts import QueueRunRequest
+from flatshot.application.events import (
+    ExportLogEvent,
+    QueueCancelledEvent,
+    QueueFinishedEvent,
+    QueueJobCompletedEvent,
+    QueueJobProgressEvent,
+    QueueJobStartedEvent,
+    QueuePausedEvent,
+    QueueResumedEvent,
+    QueueStartedEvent,
 )
-from flatshot.workers.export_worker import ExportWorker
+from flatshot.application.execution_control import CancellationToken, PauseToken
+from flatshot.application.export_runner import ExportRunner
+from flatshot.application.queue_runner import QueueRunner
+from flatshot.core.models import CurveData, ExportConfig, JobItem, ShadowSettings
 from flatshot.utils.log_manager import LogManager
+from flatshot.workers import export_worker as export_worker_module
+
+
+class _QtQueueEventSink:
+    def __init__(self, worker: "QueueWorker") -> None:
+        self.worker = worker
+
+    def emit(self, event) -> None:
+        self.worker._handle_queue_event(event)
 
 
 class QueueWorker(QThread):
     """Worker thread that processes a queue of folder jobs sequentially."""
-    
+
     # Signals for queue status
     queue_started = pyqtSignal(int)  # total_jobs
     job_started = pyqtSignal(int, str)  # job_index, folder_path
@@ -27,10 +46,16 @@ class QueueWorker(QThread):
     job_completed = pyqtSignal(int, bool, int, int, float)  # index, success, processed, total, duration
     queue_finished = pyqtSignal(int, int, int)  # completed_jobs, errors, total_images
     log_message = pyqtSignal(str)  # log messages
-    
-    def __init__(self, jobs: List[JobItem], shadow_settings: ShadowSettings,
-                 export_config: ExportConfig, curve_data: CurveData,
-                 preset_name: str = None, image_overrides: dict | None = None):
+
+    def __init__(
+        self,
+        jobs: List[JobItem],
+        shadow_settings: ShadowSettings,
+        export_config: ExportConfig,
+        curve_data: CurveData,
+        preset_name: str = None,
+        image_overrides: dict | None = None,
+    ):
         super().__init__()
         self.jobs = jobs
         self.settings = shadow_settings
@@ -42,137 +67,96 @@ class QueueWorker(QThread):
         self.is_paused = False
         self.current_worker = None
         self.logger = LogManager.get_instance()
-    
+        self._cancellation_token = CancellationToken()
+        self._pause_token = PauseToken()
+        self._runner: QueueRunner | None = None
+
     def run(self):
         """Process all jobs in the queue."""
-        total_jobs = len(self.jobs)
-        if total_jobs == 0:
-            self.queue_finished.emit(0, 0, 0)
-            return
-        
-        self.logger.log_queue_start(total_jobs)
-        self.queue_started.emit(total_jobs)
-        
-        completed = 0
-        errors = 0
-        total_images = 0
-        
-        for index, job in enumerate(self.jobs):
-            if not self.is_running:
-                # Mark remaining jobs as cancelled
-                job.status = "cancelled"
-                continue
-            
-            # Wait if paused
-            while self.is_paused and self.is_running:
-                self.msleep(100)
-            
-            if not self.is_running:
-                job.status = "cancelled"
-                continue
-            
-            # Process this job
-            job.status = "processing"
-            folder_path = Path(job.folder_path)
-            
-            # Count images (use snapshot list if available)
-            if job.input_files:
-                images = [Path(p) for p in job.input_files if Path(p).suffix.lower() == ".png"]
-            else:
-                images = list(folder_path.glob("*.png"))
-            active_variant_count = len(
-                [variant for variant in normalize_export_variants(self.export_config) if variant.enabled]
+        self._runner = QueueRunner(
+            export_runner_factory=self._create_export_runner,
+            event_sink=_QtQueueEventSink(self),
+            cancellation_token=self._cancellation_token,
+            pause_token=self._pause_token,
+            logger=self.logger,
+        )
+        self._runner.run(
+            QueueRunRequest(
+                jobs=self.jobs,
+                settings=self.settings,
+                export_config=self.export_config,
+                curve_data=self.curve_data,
+                preset_name=self.preset_name,
+                image_overrides=self.image_overrides,
             )
-            job.total_images = len(images) * max(1, active_variant_count)
-            
-            self.job_started.emit(index, str(folder_path))
-            self.logger.log_export_start(folder_path.name, job.total_images, self.preset_name)
-            
-            if job.total_images == 0:
-                job.status = "completed"
-                job.progress = 100
-                self.job_completed.emit(index, True, 0, 0, 0.0)
-                completed += 1
-                continue
-            
-            # Create worker for this job
-            start_time = time()
-            self.current_worker = ExportWorker(
-                str(folder_path),
-                self.settings,
-                self.export_config,
-                self.curve_data,
-                self.preset_name,
-                input_files=[str(p) for p in images] if images else None,
-                image_overrides=self.image_overrides
-            )
-            
-            # Connect signals
-            processed_ok = [0]   # Use list to allow modification in closure
-            processed_err = [0]
-            
-            def on_progress(p):
-                job.progress = p
-                self.job_progress.emit(index, p)
-            
-            def on_image_completed(name, success):
-                if success:
-                    processed_ok[0] += 1
-                else:
-                    processed_err[0] += 1
-                job.processed_images = processed_ok[0]
-            
-            def on_error(msg):
-                self.log_message.emit(msg)
-            
-            self.current_worker.progress_updated.connect(on_progress)
-            self.current_worker.image_completed.connect(on_image_completed)
-            self.current_worker.log_updated.connect(on_error)
-            
-            # Run synchronously within this thread
-            self.current_worker.run()
-            
-            duration = time() - start_time
-            
-            if not self.is_running:
-                job.status = "cancelled"
-                self.logger.log_export_cancelled(folder_path.name, processed_ok[0], job.total_images)
-            elif processed_err[0] == 0 and processed_ok[0] == job.total_images:
-                job.status = "completed"
-                completed += 1
-                self.logger.log_export_complete(folder_path.name, processed_ok[0], job.total_images, duration)
-            else:
-                job.status = "error"
-                job.error_message = f"Procesadas OK: {processed_ok[0]} / Errores: {processed_err[0]} / Total: {job.total_images}"
-                errors += 1
-            
-            total_images += processed_ok[0]
-            self.job_completed.emit(index, job.status == "completed", processed_ok[0], job.total_images, duration)
-            
-            self.current_worker = None
-        
-        self.logger.log_queue_complete(completed, errors, total_images)
-        self.queue_finished.emit(completed, errors, total_images)
-    
+        )
+        self.current_worker = None
+
     def pause(self):
-        """Pause queue progression and current export worker when possible."""
+        """Pause queue progression and current export runner when possible."""
         self.is_paused = True
-        if self.current_worker:
-            self.current_worker.pause()
+        if self._runner:
+            self._runner.pause()
+        else:
+            self._pause_token.pause()
 
     def resume(self):
-        """Resume queue progression and current export worker."""
+        """Resume queue progression and current export runner."""
         self.is_paused = False
-        if self.current_worker:
-            self.current_worker.resume()
-    
+        if self._runner:
+            self._runner.resume()
+        else:
+            self._pause_token.resume()
+
     def stop(self):
         """Stop the queue and current job."""
         self.is_running = False
-        if self.current_worker:
-            self.current_worker.stop()
-    
+        if self._runner:
+            self._runner.stop()
+        else:
+            self._cancellation_token.cancel()
+            self._pause_token.resume()
+
     @staticmethod
     def count_images_in_folder(folder_path: str) -> int:
         """Count PNG images in a folder."""
         return len(list(Path(folder_path).glob("*.png")))
+
+    def _create_export_runner(self, **kwargs) -> ExportRunner:
+        runner = ExportRunner(
+            event_sink=kwargs.get("event_sink"),
+            cancellation_token=kwargs.get("cancellation_token"),
+            pause_token=kwargs.get("pause_token"),
+            executor_factory=export_worker_module.ProcessPoolExecutor,
+            image_processor=export_worker_module.process_single_image,
+            copy_file=export_worker_module.shutil.copy2,
+        )
+        self.current_worker = runner
+        return runner
+
+    def _handle_queue_event(self, event) -> None:
+        if isinstance(event, QueueStartedEvent):
+            self.queue_started.emit(event.total_jobs)
+        elif isinstance(event, QueueJobStartedEvent):
+            self.job_started.emit(event.job_index, str(event.folder_path))
+        elif isinstance(event, QueueJobProgressEvent):
+            self.job_progress.emit(event.job_index, event.progress_percent)
+        elif isinstance(event, QueueJobCompletedEvent):
+            self.current_worker = None
+            self.job_completed.emit(
+                event.job_index,
+                event.success,
+                event.processed,
+                event.total,
+                event.duration,
+            )
+        elif isinstance(event, QueueFinishedEvent):
+            self.queue_finished.emit(event.completed_jobs, event.errors, event.total_images)
+        elif isinstance(event, ExportLogEvent):
+            self.log_message.emit(event.message)
+        elif isinstance(event, QueuePausedEvent):
+            self.is_paused = True
+        elif isinstance(event, QueueResumedEvent):
+            self.is_paused = False
+        elif isinstance(event, QueueCancelledEvent):
+            self.is_running = False

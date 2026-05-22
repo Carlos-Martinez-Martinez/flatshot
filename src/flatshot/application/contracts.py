@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from flatshot.core.models import CurveData, ExportConfig, ShadowSettings
+from flatshot.core.models import CurveData, ExportConfig, JobItem, ShadowSettings
 
 
 @dataclass(frozen=True)
@@ -54,3 +54,21 @@ class ExportJobResult:
     errors: int
     duration: float
     destinations: list[Path] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class QueueRunRequest:
+    jobs: list[JobItem]
+    settings: ShadowSettings
+    export_config: ExportConfig
+    curve_data: CurveData | None = None
+    preset_name: str | None = None
+    image_overrides: dict | None = None
+
+
+@dataclass(frozen=True)
+class QueueRunResult:
+    completed_jobs: int
+    errors: int
+    total_images: int
+    cancelled: bool = False

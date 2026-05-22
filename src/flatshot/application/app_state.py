@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Iterable
 
 from flatshot.application import presenters
 from flatshot.application.contracts import BatchScanResult
@@ -43,8 +44,18 @@ class ProcessingState:
 
 
 @dataclass
+class ExportState:
+    destinations: list[str] = field(default_factory=list)
+    variant_labels: list[str] = field(default_factory=list)
+    source_count: int = 0
+    file_total: int = 0
+    error_message: str = ""
+
+
+@dataclass
 class FlatshotAppState:
     batch: BatchSummary = field(default_factory=BatchSummary)
+    export: ExportState = field(default_factory=ExportState)
     view: UiViewState = field(default_factory=UiViewState)
     processing: ProcessingState = field(default_factory=ProcessingState)
     selected_image: str | None = None
@@ -95,6 +106,72 @@ def processing_mode_for_batch(batch: BatchSummary, current_mode: str) -> str:
     if int(batch.folders_count) > 0 and int(batch.images_count) > 0:
         return "ready"
     return "idle"
+
+
+def build_export_state(
+    *,
+    destinations: Iterable[str],
+    variant_labels: Iterable[str],
+    source_count: int,
+    error_message: str = "",
+) -> ExportState:
+    labels = [str(label) for label in variant_labels]
+    sources = max(0, int(source_count))
+    return ExportState(
+        destinations=sorted(str(destination) for destination in destinations),
+        variant_labels=labels,
+        source_count=sources,
+        file_total=sources * len(labels),
+        error_message=str(error_message),
+    )
+
+
+def format_export_variant_labels(labels: Iterable[str]) -> str:
+    return ", ".join(str(label) for label in labels) or "ninguna"
+
+
+def build_single_export_summary_lines(
+    export: ExportState,
+    *,
+    success: bool,
+    processed: int,
+    total: int,
+    duration: float,
+) -> list[str]:
+    duration_text = f"{float(duration):.1f}s"
+    if success:
+        return [
+            f"{int(export.source_count)} imágenes procesadas",
+            f"{int(processed)}/{int(total)} archivos exportados en {duration_text}",
+            f"Salidas: {format_export_variant_labels(export.variant_labels)}",
+        ]
+    return [
+        "Se detuvo o falló el proceso",
+        f"{int(processed)}/{int(total)} archivos exportados en {duration_text}",
+        export.error_message,
+    ]
+
+
+def build_queue_export_summary_lines(
+    export: ExportState,
+    *,
+    completed: int,
+    errors: int,
+    total_images: int,
+) -> list[str]:
+    if int(errors) == 0:
+        return [
+            f"\u2713 {int(completed)} carpetas procesadas",
+            f"{int(export.source_count)} imágenes procesadas",
+            f"{int(total_images)} archivos exportados",
+            f"Salidas: {format_export_variant_labels(export.variant_labels)}",
+        ]
+    return [
+        f"\u2713 {int(completed)} carpetas completadas",
+        f"\u2717 {int(errors)} carpetas con errores",
+        f"{int(total_images)} archivos exportados",
+        export.error_message,
+    ]
 
 
 def build_export_bar_state(

@@ -3,12 +3,17 @@ from pathlib import Path
 import flatshot.application.app_state as app_state_module
 from flatshot.application.app_state import (
     BatchSummary,
+    ExportState,
     FlatshotAppState,
     ProcessingState,
     UiViewState,
     build_batch_summary,
+    build_export_state,
     build_export_bar_state,
+    build_queue_export_summary_lines,
+    build_single_export_summary_lines,
     format_batch_count_text,
+    format_export_variant_labels,
     processing_mode_for_batch,
 )
 from flatshot.application.contracts import BatchScanResult
@@ -29,6 +34,7 @@ def test_flatshot_app_state_groups_existing_ui_state_without_widgets():
 
     state = FlatshotAppState(
         batch=batch,
+        export=ExportState(destinations=["C:/out"]),
         view=view,
         processing=processing,
         selected_image=view.selected_image,
@@ -36,6 +42,7 @@ def test_flatshot_app_state_groups_existing_ui_state_without_widgets():
     )
 
     assert state.batch.images_count == 2
+    assert state.export.destinations == ["C:/out"]
     assert state.view.active_folder == "folder"
     assert state.processing.mode == "ready"
     assert state.selected_image == "image.png"
@@ -75,6 +82,87 @@ def test_processing_mode_for_batch_keeps_busy_modes_and_derives_idle_ready():
     assert processing_mode_for_batch(empty, "processing") == "processing"
     assert processing_mode_for_batch(empty, "paused") == "paused"
     assert processing_mode_for_batch(empty, "stopping") == "stopping"
+
+
+def test_build_export_state_sorts_destinations_and_counts_total_outputs():
+    state = build_export_state(
+        destinations=["C:/z", "C:/a"],
+        variant_labels=["Web", "Blanco"],
+        source_count=3,
+    )
+
+    assert state.destinations == ["C:/a", "C:/z"]
+    assert state.variant_labels == ["Web", "Blanco"]
+    assert state.source_count == 3
+    assert state.file_total == 6
+    assert state.error_message == ""
+
+
+def test_export_variant_labels_fallback():
+    assert format_export_variant_labels(["Web", "Blanco"]) == "Web, Blanco"
+    assert format_export_variant_labels([]) == "ninguna"
+
+
+def test_single_export_summary_lines_preserve_existing_texts():
+    state = ExportState(
+        variant_labels=["Web"],
+        source_count=4,
+        error_message="falló",
+    )
+
+    assert build_single_export_summary_lines(
+        state,
+        success=True,
+        processed=4,
+        total=4,
+        duration=1.25,
+    ) == [
+        "4 imágenes procesadas",
+        "4/4 archivos exportados en 1.2s",
+        "Salidas: Web",
+    ]
+    assert build_single_export_summary_lines(
+        state,
+        success=False,
+        processed=1,
+        total=4,
+        duration=2.0,
+    ) == [
+        "Se detuvo o falló el proceso",
+        "1/4 archivos exportados en 2.0s",
+        "falló",
+    ]
+
+
+def test_queue_export_summary_lines_preserve_existing_texts():
+    state = ExportState(
+        variant_labels=["Web", "Blanco"],
+        source_count=8,
+        error_message="error de cola",
+    )
+
+    assert build_queue_export_summary_lines(
+        state,
+        completed=2,
+        errors=0,
+        total_images=16,
+    ) == [
+        "✓ 2 carpetas procesadas",
+        "8 imágenes procesadas",
+        "16 archivos exportados",
+        "Salidas: Web, Blanco",
+    ]
+    assert build_queue_export_summary_lines(
+        state,
+        completed=1,
+        errors=1,
+        total_images=8,
+    ) == [
+        "✓ 1 carpetas completadas",
+        "✗ 1 carpetas con errores",
+        "8 archivos exportados",
+        "error de cola",
+    ]
 
 
 def test_export_bar_state_for_empty_batch_disables_processing():

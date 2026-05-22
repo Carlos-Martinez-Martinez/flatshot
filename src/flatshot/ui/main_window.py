@@ -47,11 +47,15 @@ from flatshot.core.overrides import (
 from flatshot.core.scaling import DEFAULT_SCALE_CURVE, normalize_curve_data
 from flatshot.application.app_state import (
     BatchSummary,
+    ExportState,
     FlatshotAppState,
     ProcessingState,
     UiViewState,
     build_batch_summary,
     build_export_bar_state,
+    build_export_state,
+    build_queue_export_summary_lines,
+    build_single_export_summary_lines,
     format_batch_count_text,
     processing_mode_for_batch,
 )
@@ -226,7 +230,7 @@ class MainWindow(QMainWindow):
         # Queue worker reference
         self.queue_worker = None
         self.worker = None
-        self._last_export_destinations = []
+        self.export_state = ExportState()
         self.current_custom_path = None
         self._watched_folders = set()
         self._pending_folder_updates = set()
@@ -252,10 +256,6 @@ class MainWindow(QMainWindow):
             saved_preview_variant if saved_preview_variant in variant_ids else self.export_variants[0].id
         )
         self.app_settings['current_preview_variant_id'] = self.current_preview_variant_id
-        self._last_export_variant_labels = []
-        self._last_export_source_count = 0
-        self._last_export_file_total = 0
-        self._last_export_error_message = ""
         self.export_bar_mode = "idle"
         self._export_bar_status_text = ""
         self._pre_render_bar_status = None
@@ -266,7 +266,11 @@ class MainWindow(QMainWindow):
             advanced_open=bool(self.app_settings.get('section_visibility', {}).get('advanced', False)),
         )
         self.batch_summary = BatchSummary()
-        self.app_state = FlatshotAppState(batch=self.batch_summary, view=self.ui_view_state)
+        self.app_state = FlatshotAppState(
+            batch=self.batch_summary,
+            export=self.export_state,
+            view=self.ui_view_state,
+        )
 
         # --- Background Pre-rendering ---
         self.pre_render_scheduler = PreRenderScheduler(
@@ -2039,6 +2043,7 @@ class MainWindow(QMainWindow):
         progress_value = self.progress_bar.value() if hasattr(self, "progress_bar") else 0
         active_preset = self.combo_presets.currentText() if hasattr(self, "combo_presets") else None
         self.app_state.batch = self.batch_summary
+        self.app_state.export = self.export_state
         self.app_state.view = self.ui_view_state
         self.app_state.processing = ProcessingState(
             mode=self.export_bar_mode,
@@ -2652,7 +2657,8 @@ class MainWindow(QMainWindow):
         logger.error(message)
 
     def _on_export_log(self, message: str):
-        self._last_export_error_message = str(message)
+        self.export_state.error_message = str(message)
+        self._sync_app_state()
         self._log_error(message)
 
     def _on_angle_changed(self, angle: int):
@@ -3292,7 +3298,8 @@ class MainWindow(QMainWindow):
         # Stop opportunistic background work to free resources
         if hasattr(self, "pre_render_scheduler"):
             self.pre_render_scheduler.shutdown()
-        self._last_export_error_message = ""
+        self.export_state.error_message = ""
+        self._sync_app_state()
 
         # Ensure we are working with the latest on-disk images before exporting.
         self._update_folder_ui()
@@ -3327,24 +3334,23 @@ class MainWindow(QMainWindow):
             self._reset_export_ui()
             return
 
-        self._last_export_destinations = sorted(
-            {
-                str(destination)
-                for destination in self.export_config_service.destinations_for_folders(
-                    self.selected_folders,
-                    export_config,
-                )
-            }
-        )
-        self._last_export_variant_labels = [variant.label for variant in active_variants]
-        
         # Snapshot image lists at start to keep export consistent.
         snapshot_files = {
             folder: sorted(folder.glob("*.png"))
             for folder in self.selected_folders
         }
-        self._last_export_source_count = sum(len(files) for files in snapshot_files.values())
-        self._last_export_file_total = self._last_export_source_count * len(active_variants)
+        self.export_state = build_export_state(
+            destinations={
+                str(destination)
+                for destination in self.export_config_service.destinations_for_folders(
+                    self.selected_folders,
+                    export_config,
+                )
+            },
+            variant_labels=[variant.label for variant in active_variants],
+            source_count=sum(len(files) for files in snapshot_files.values()),
+        )
+        self._sync_app_state()
 
         self.export_bar_mode = "processing"
         self._pre_render_bar_status = None
@@ -3417,29 +3423,28 @@ class MainWindow(QMainWindow):
         self._reset_export_ui()
 
         if errors == 0:
-            labels = ", ".join(self._last_export_variant_labels) or "ninguna"
             self._show_export_result_dialog(
                 title="Cola completada",
                 success=True,
-                summary_lines=[
-                    f"✓ {completed} carpetas procesadas",
-                    f"{self._last_export_source_count} imágenes procesadas",
-                    f"{total_images} archivos exportados",
-                    f"Salidas: {labels}",
-                ],
-                destinations=self._last_export_destinations,
+                summary_lines=build_queue_export_summary_lines(
+                    self.export_state,
+                    completed=completed,
+                    errors=errors,
+                    total_images=total_images,
+                ),
+                destinations=self.export_state.destinations,
             )
         else:
             self._show_export_result_dialog(
                 title="Cola completada con errores",
                 success=False,
-                summary_lines=[
-                    f"✓ {completed} carpetas completadas",
-                    f"✗ {errors} carpetas con errores",
-                    f"{total_images} archivos exportados",
-                    self._last_export_error_message,
-                ],
-                destinations=self._last_export_destinations,
+                summary_lines=build_queue_export_summary_lines(
+                    self.export_state,
+                    completed=completed,
+                    errors=errors,
+                    total_images=total_images,
+                ),
+                destinations=self.export_state.destinations,
             )
         
     def _toggle_pause(self):
@@ -3493,27 +3498,30 @@ class MainWindow(QMainWindow):
         self._reset_export_ui()
 
         if success:
-            labels = ", ".join(self._last_export_variant_labels) or "ninguna"
             self._show_export_result_dialog(
                 title="Proceso completado",
                 success=True,
-                summary_lines=[
-                    f"{self._last_export_source_count} imágenes procesadas",
-                    f"{processed}/{total} archivos exportados en {duration:.1f}s",
-                    f"Salidas: {labels}",
-                ],
-                destinations=self._last_export_destinations,
+                summary_lines=build_single_export_summary_lines(
+                    self.export_state,
+                    success=True,
+                    processed=processed,
+                    total=total,
+                    duration=duration,
+                ),
+                destinations=self.export_state.destinations,
             )
         else:
             self._show_export_result_dialog(
                 title="Proceso incompleto",
                 success=False,
-                summary_lines=[
-                    "Se detuvo o falló el proceso",
-                    f"{processed}/{total} archivos exportados en {duration:.1f}s",
-                    self._last_export_error_message,
-                ],
-                destinations=self._last_export_destinations,
+                summary_lines=build_single_export_summary_lines(
+                    self.export_state,
+                    success=False,
+                    processed=processed,
+                    total=total,
+                    duration=duration,
+                ),
+                destinations=self.export_state.destinations,
             )
 
     def _on_single_worker_thread_finished(self):

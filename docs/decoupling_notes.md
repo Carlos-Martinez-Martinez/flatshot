@@ -621,3 +621,49 @@
   - cleared folders and verified `idle`, disabled process button and `0 imágenes`.
 - Smoke used a thread-backed executor for export to avoid Windows multiprocessing-from-stdin issues while preserving the worker/runner path.
 - Remaining risk: batch-state extraction is still partial. `MainWindow` still owns several direct state mutations for queue/export transitions and preview state, which should be moved only in small follow-up batches.
+
+## Batch 12 implementation
+
+- Scope: Phase 8 partial, export result state extraction.
+- Added `ExportState` to `flatshot.application.app_state`.
+- Added Qt-free helpers for export result state and result-dialog summaries:
+  - `build_export_state()`;
+  - `format_export_variant_labels()`;
+  - `build_single_export_summary_lines()`;
+  - `build_queue_export_summary_lines()`.
+- Replaced the internal `MainWindow` fields `_last_export_destinations`, `_last_export_variant_labels`, `_last_export_source_count`, `_last_export_file_total` and `_last_export_error_message` with `self.export_state`.
+- Synced `self.app_state.export` from `MainWindow._sync_app_state()`.
+- Adapted `_start_export()` to build `ExportState` after the existing snapshot and destination planning.
+- Adapted `_on_export_finished()` and `_on_queue_finished()` to use pure summary helpers while preserving titles, line text and destination lists.
+- Preserved snapshot timing, destination calculation, active output labels, export naming, output files, worker behavior and queue behavior.
+- Did not touch `ShadowEngine`, image output code, preview rendering, presets, settings, session format or UI styling.
+
+## Batch 12 validation
+
+- Extended `tests/test_app_state.py` with coverage for:
+  - `ExportState` inside `FlatshotAppState`;
+  - sorted export destinations and `file_total` calculation;
+  - active output label fallback to `ninguna`;
+  - single-folder success/failure summary lines;
+  - queue success/error summary lines.
+- `pytest tests/test_app_state.py -q` -> 15 passed.
+- `pytest tests/test_app_state.py tests/test_export_runner.py tests/test_queue_runner.py tests/test_export_config_service.py -q` -> 38 passed.
+- `python -m compileall -q src/flatshot/application src/flatshot/ui/main_window.py` -> passed.
+- `pytest` -> 189 passed.
+- `rg -n "PyQt6|QWidget|QApplication|QThread|QPixmap|QImage" src/flatshot/application/app_state.py` -> no matches.
+- PyQt offscreen smoke with temporary config and session:
+  - launched `MainWindow`;
+  - restored one folder and preset from session;
+  - added a second folder and verified PNG count;
+  - selected a preset;
+  - instantiated `ExportConfigDialog`;
+  - adjusted an essential slider;
+  - selected an image through the grid;
+  - rendered central preview;
+  - processed one folder and captured the result dialog lines;
+  - processed two folders through the queue and captured the result dialog lines;
+  - exercised pause/resume after first queue job signal settled;
+  - exercised stop;
+  - verified `export_state.source_count`, `file_total`, destinations, ready mode, enabled process button and progress reset.
+- Smoke used a thread-backed executor for export to avoid Windows multiprocessing-from-stdin issues while preserving the worker/runner path.
+- Remaining risk: export result state is now central, but `MainWindow` still owns the actual lifecycle transitions and dialog display. A later small batch can extract preview state or export lifecycle state without changing worker behavior.

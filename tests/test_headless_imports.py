@@ -25,6 +25,7 @@ HEADLESS_MODULES = [
     "flatshot.application.folder_scanner",
     "flatshot.application.log_service",
     "flatshot.application.presenters",
+    "flatshot.application.pre_render_planner",
     "flatshot.application.preset_service",
     "flatshot.application.preview_service",
     "flatshot.application.queue_runner",

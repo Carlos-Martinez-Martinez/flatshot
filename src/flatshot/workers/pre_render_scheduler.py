@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import multiprocessing as mp
 from pathlib import Path
 from queue import Empty
@@ -11,7 +10,11 @@ from typing import Callable
 
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
-from flatshot.core.overrides import override_key
+from flatshot.application.pre_render_planner import (
+    build_pre_render_context_signature,
+    build_pre_render_jobs,
+    ordered_pre_render_candidates,
+)
 from flatshot.utils.render_cache import RenderCache
 from flatshot.workers.pre_render_process import run_pre_render_job
 
@@ -120,17 +123,16 @@ class PreRenderScheduler(QObject):
             self.schedule()
 
     def _make_context_signature(self) -> str:
-        data = {
-            "folders": [str(path) for path in self._folders],
-            "active_folder": str(self._active_folder) if self._active_folder else None,
-            "current_image_path": str(self._current_image_path) if self._current_image_path else None,
-            "settings": self._settings_dict,
-            "curve": self._curve_dict,
-            "target_size": self._target_size,
-            "format": self._export_format,
-            "overrides": self._image_overrides,
-        }
-        return json.dumps(data, sort_keys=True, default=str)
+        return build_pre_render_context_signature(
+            folders=self._folders,
+            active_folder=self._active_folder,
+            current_image_path=self._current_image_path,
+            settings_dict=self._settings_dict,
+            curve_dict=self._curve_dict,
+            target_size=self._target_size,
+            export_format=self._export_format,
+            image_overrides=self._image_overrides,
+        )
 
     def note_activity(self, reason: str = "activity") -> None:
         if not self.enabled:
@@ -199,78 +201,22 @@ class PreRenderScheduler(QObject):
         self._start_process(jobs[0])
 
     def _ordered_candidates(self) -> list[Path]:
-        seen: set[str] = set()
-        folders = [folder for folder in self._folders if folder.exists()]
-        paths_by_folder: dict[str, list[Path]] = {}
-        all_paths: list[Path] = []
-
-        for folder in folders:
-            try:
-                images = sorted(path for path in folder.iterdir() if path.is_file() and path.suffix.lower() == ".png")
-            except OSError:
-                images = []
-            paths_by_folder[str(folder.resolve())] = images
-            all_paths.extend(images)
-
-        ordered: list[Path] = []
-        if self._current_image_path and self._current_image_path.exists():
-            ordered.append(self._current_image_path)
-
-        if self._active_folder and self._active_folder.exists():
-            try:
-                active_key = str(self._active_folder.resolve())
-                ordered.extend(paths_by_folder.get(active_key, []))
-            except OSError:
-                pass
-
-        ordered.extend(all_paths)
-
-        deduped: list[Path] = []
-        for path in ordered:
-            try:
-                key = str(path.resolve())
-            except OSError:
-                key = str(path)
-            if key in seen:
-                continue
-            seen.add(key)
-            deduped.append(path)
-        return deduped
+        return ordered_pre_render_candidates(
+            folders=self._folders,
+            active_folder=self._active_folder,
+            current_image_path=self._current_image_path,
+        )
 
     def _build_jobs(self) -> tuple[list[dict], int, int]:
-        jobs: list[dict] = []
-        prepared = 0
-        total = 0
-        for img_path in self._ordered_candidates():
-            if not img_path.exists():
-                continue
-            local_override = self._image_overrides.get(override_key(str(img_path)), {})
-            key = self.cache.get_cache_key(
-                str(img_path),
-                self._settings_dict,
-                self._curve_dict,
-                self._target_size,
-                local_override,
-                self._export_format,
-            )
-            total += 1
-            if self.cache.exists(key, self._export_format):
-                prepared += 1
-                continue
-            cache_path = self.cache.get_cached_path(key, self._export_format)
-            jobs.append(
-                {
-                    "key": key,
-                    "image_path": str(img_path),
-                    "settings_dict": self._settings_dict,
-                    "curve_dict": self._curve_dict,
-                    "target_size": self._target_size,
-                    "cache_path": str(cache_path),
-                    "local_override": local_override,
-                    "format": self._export_format,
-                }
-            )
-        return jobs, prepared, total
+        return build_pre_render_jobs(
+            candidates=self._ordered_candidates(),
+            cache=self.cache,
+            settings_dict=self._settings_dict,
+            curve_dict=self._curve_dict,
+            target_size=self._target_size,
+            export_format=self._export_format,
+            image_overrides=self._image_overrides,
+        )
 
     def _start_process(self, job: dict) -> None:
         self._current_job = job

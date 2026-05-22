@@ -14,6 +14,16 @@ Estado actual:
 
 ## Como arrancar
 
+Opcion recomendada para revision visual completa:
+
+```bash
+python apps/flatshot-desktop/run_dev.py --open
+```
+
+Ese comando arranca este bridge y el frontend estatico, comprueba `/health` y muestra las URLs.
+
+Para arrancar solo el bridge manualmente:
+
 Desde la raiz del repositorio:
 
 ```bash

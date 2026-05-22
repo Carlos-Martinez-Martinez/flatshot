@@ -133,6 +133,8 @@ const state = {
   bridgeUrl: defaultBridgeUrl,
   bridgeStatus: "idle",
   bridgeMessage: "Modo mock activo",
+  bridgeLastResponse: "Mock activo",
+  bridgeCapabilitiesSummary: "Sin comprobar",
   bridgeCapabilities: null,
   bridgePresets: [],
   bridgeScanPath: "",
@@ -402,7 +404,7 @@ function showEmptyFolder() {
 }
 
 function selectImage(imageId) {
-  const image = mockImages.find((item) => item.id === imageId);
+  const image = activeImages().find((item) => item.id === imageId);
   if (!image) {
     return;
   }
@@ -553,6 +555,7 @@ async function checkBridge() {
   state.bridgeMode = "bridge";
   state.bridgeStatus = "checking";
   state.bridgeMessage = "Comprobando bridge";
+  state.bridgeLastResponse = "Solicitando /health";
   state.statusText = "Comprobando bridge";
   render();
 
@@ -562,13 +565,18 @@ async function checkBridge() {
     const presetPayload = await bridgeRequest("/presets");
     state.bridgeStatus = "connected";
     state.bridgeCapabilities = capabilities;
+    state.bridgeCapabilitiesSummary = capabilitiesSummary(capabilities);
     state.bridgeMessage = `${health.service} conectado`;
+    state.bridgeLastResponse = "health OK";
     state.statusText = "Bridge conectado";
     applyBridgePresets(presetPayload);
   } catch (error) {
+    const message = bridgeErrorMessage(error);
     state.bridgeStatus = "disconnected";
     state.bridgeCapabilities = null;
-    state.bridgeMessage = bridgeErrorMessage(error);
+    state.bridgeCapabilitiesSummary = "Sin comprobar";
+    state.bridgeMessage = message;
+    state.bridgeLastResponse = `error: ${message}`;
     state.statusText = "Bridge sin conexión";
   }
 
@@ -606,6 +614,7 @@ async function scanBridgeFolder() {
     errors: [],
     statusText: "Escaneando ruta",
   });
+  state.bridgeLastResponse = "Solicitando /folders/scan";
   render();
 
   try {
@@ -615,13 +624,15 @@ async function scanBridgeFolder() {
     });
     applyBridgeScanResult(response);
   } catch (error) {
+    const message = bridgeErrorMessage(error);
     Object.assign(state, {
       batch: "none",
       selectedImageId: null,
       previewStatus: "empty",
       exportStatus: "blocked",
       bridgeStatus: "disconnected",
-      bridgeMessage: bridgeErrorMessage(error),
+      bridgeMessage: message,
+      bridgeLastResponse: `error: ${message}`,
       statusText: "No se pudo escanear",
     });
   }
@@ -636,6 +647,7 @@ function applyBridgeScanResult(response) {
   );
   state.bridgeStatus = "connected";
   state.bridgeMessage = `${response.totalImages || 0} imágenes encontradas`;
+  state.bridgeLastResponse = `scan OK · ${response.totalImages || 0} imágenes`;
 
   if (state.realImages.length) {
     state.batch = "ready";
@@ -706,6 +718,26 @@ function bridgeErrorMessage(error) {
   return error?.message || "Bridge no disponible";
 }
 
+function capabilitiesSummary(capabilities) {
+  if (!capabilities) {
+    return "Sin comprobar";
+  }
+  const available = [];
+  if (capabilities.folderScan) {
+    available.push("scan");
+  }
+  if (capabilities.presetsRead) {
+    available.push("presets");
+  }
+  return available.length ? available.join(" · ") : "Sin capacidades activas";
+}
+
+function showReviewScenario(scenario) {
+  state.bridgeMode = "mock";
+  state.bridgeLastResponse = `Estado mock: ${scenarioLabels[scenario] || scenario}`;
+  setScenario(scenario);
+}
+
 function primaryAction() {
   if (!hasBatch()) {
     loadBatch();
@@ -733,12 +765,20 @@ function statusMode() {
 
 function render() {
   renderTop();
+  renderDevelopmentStatus();
   renderBridge();
   renderBatch();
   renderPreview();
   renderSettings();
   renderExport();
   renderFooter();
+}
+
+function renderDevelopmentStatus() {
+  $("#dev-mode-label").textContent = state.bridgeMode === "bridge" ? "Bridge local" : "Mock";
+  $("#dev-bridge-label").textContent = bridgeStatusLabel();
+  $("#dev-bridge-url-label").textContent = state.bridgeUrl || defaultBridgeUrl;
+  $("#dev-last-response").textContent = state.bridgeLastResponse;
 }
 
 function renderTop() {
@@ -766,6 +806,8 @@ function renderBridge() {
   $("#bridge-panel-status").textContent = bridgeStatusLabel();
   $("#bridge-scan-path").value = state.bridgeScanPath;
   $("#bridge-scan-folder").disabled = state.bridgeStatus === "checking";
+  $("#bridge-last-response").textContent = state.bridgeLastResponse;
+  $("#bridge-capabilities").textContent = state.bridgeCapabilitiesSummary;
   message.textContent = state.bridgeMessage;
   message.className = `bridge-message ${state.bridgeStatus === "connected" ? "ready" : state.bridgeStatus === "disconnected" ? "error" : ""}`;
 }
@@ -812,11 +854,12 @@ function renderBatch() {
 
   if (state.batch === "scanning") {
     $("#batch-count").textContent = "Escaneando";
-    $("#batch-pill").textContent = "Carpeta mock";
+    $("#batch-pill").textContent = state.bridgeMode === "bridge" ? "Bridge local" : "Carpeta mock";
     $("#folder-list").innerHTML = folderItemHtml({
       id: "scan",
-      name: "Camisetas Mayo",
-      detail: "Leyendo PNG",
+      name: state.bridgeMode === "bridge" ? basename(state.bridgeScanPath) || "Ruta bridge" : "Camisetas Mayo",
+      path: state.bridgeScanPath,
+      detail: state.bridgeMode === "bridge" ? "Leyendo PNG reales" : "Leyendo PNG",
       count: "...",
       status: "ready",
     });
@@ -1172,6 +1215,12 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  const reviewTarget = event.target.closest("[data-review-scenario]");
+  if (reviewTarget) {
+    showReviewScenario(reviewTarget.dataset.reviewScenario);
+    return;
+  }
+
   const filterTarget = event.target.closest("[data-filter]");
   if (filterTarget) {
     state.filter = filterTarget.dataset.filter;
@@ -1206,12 +1255,14 @@ document.addEventListener("click", (event) => {
 
 $("#demo-scenario").addEventListener("change", (event) => {
   state.bridgeMode = "mock";
+  state.bridgeLastResponse = `Estado mock: ${scenarioLabels[event.target.value] || event.target.value}`;
   setScenario(event.target.value);
 });
 
 $("#app-mode").addEventListener("change", (event) => {
   state.bridgeMode = event.target.value;
   state.statusText = state.bridgeMode === "bridge" ? "Bridge local" : "Modo mock";
+  state.bridgeLastResponse = state.bridgeMode === "bridge" ? "Bridge pendiente" : "Mock activo";
   render();
 });
 
@@ -1219,6 +1270,7 @@ $("#bridge-url").addEventListener("input", (event) => {
   state.bridgeUrl = event.target.value || defaultBridgeUrl;
   state.bridgeStatus = "idle";
   state.bridgeMessage = "Comprueba conexión";
+  state.bridgeLastResponse = "URL pendiente";
   render();
 });
 

@@ -1,0 +1,50 @@
+# Checklist revisión visual nueva app FlatShot
+
+Usar antes de cerrar cada tanda visual de la nueva app.
+
+## Arranque
+
+- [ ] `python apps/flatshot-desktop/run_dev.py --open` arranca sin errores.
+- [ ] El navegador abre la app.
+- [ ] La UI indica modo mock/bridge.
+- [ ] El bridge aparece conectado si está activo.
+- [ ] `Ctrl+C` detiene bridge y frontend.
+
+## Layout
+
+- [ ] La preview tiene protagonismo.
+- [ ] El panel de lote es claro.
+- [ ] El panel de ajustes no satura.
+- [ ] La exportación se entiende de un vistazo.
+- [ ] La barra inferior aporta estado real.
+- [ ] La franja de desarrollo no compite con el flujo principal.
+
+## Flujo mock
+
+- [ ] Sin lote.
+- [ ] Lote cargado.
+- [ ] Selección de imagen.
+- [ ] Preview lista.
+- [ ] Preview con error.
+- [ ] Exportación lista.
+- [ ] Exportación completada.
+- [ ] Exportación con errores.
+
+## Bridge
+
+- [ ] Health OK.
+- [ ] Capabilities visibles.
+- [ ] Presets cargan o fallback claro.
+- [ ] Escaneo real por ruta funciona.
+- [ ] Error de ruta se muestra bien.
+- [ ] La UI diferencia claramente escaneo real de estados simulados.
+
+## Feedback a revisar
+
+- [ ] Jerarquía visual.
+- [ ] Claridad de acciones.
+- [ ] Textos demasiado largos.
+- [ ] Estados confusos.
+- [ ] Información redundante.
+- [ ] Elementos que sobran.
+- [ ] Controles que parecen reales pero siguen siendo mock.

@@ -10,52 +10,61 @@
   <body>
     <main class="app-shell" aria-label="FlatShot nueva app">
       <header class="top-bar">
-        <div class="brand-block">
-          <div class="brand-mark" aria-hidden="true">F</div>
-          <div class="brand-copy">
-            <strong>FlatShot</strong>
-            <span id="active-batch-label">Sin lote</span>
+        <div class="top-bar-main">
+          <div class="brand-block">
+            <div class="brand-mark" aria-hidden="true">F</div>
+            <div class="brand-copy">
+              <strong>FlatShot</strong>
+              <span id="active-batch-label">Sin lote</span>
+            </div>
+          </div>
+
+          <div class="top-summary" aria-live="polite">
+            <span class="status-dot" id="status-dot"></span>
+            <span id="top-status-text">Añade una carpeta</span>
+          </div>
+
+          <div class="top-actions">
+            <label class="demo-switcher">
+              <span>Demo</span>
+              <select id="demo-scenario" aria-label="Escenario de demo">
+                <option value="initial">Sin lote</option>
+                <option value="batch-ready">Lote listo</option>
+                <option value="empty-folder">Carpeta vacía</option>
+                <option value="preview-loading">Preview cargando</option>
+                <option value="preview-warning">Preview con aviso</option>
+                <option value="preview-error">Error de preview</option>
+                <option value="export-blocked">Destino sin configurar</option>
+                <option value="export-ready">Exportación lista</option>
+                <option value="export-running">Exportación en curso</option>
+                <option value="export-completed">Exportación completada</option>
+                <option value="export-partial">Completada con errores</option>
+                <option value="export-failed">Exportación fallida</option>
+              </select>
+            </label>
+            <label class="mode-switcher">
+              <span>Modo</span>
+              <select id="app-mode" aria-label="Modo de datos">
+                <option value="mock">Mock</option>
+                <option value="bridge">Bridge local</option>
+              </select>
+            </label>
+            <label class="bridge-url-field">
+              <span>Bridge</span>
+              <input id="bridge-url" type="url" value="http://127.0.0.1:8765" />
+            </label>
+            <button type="button" data-action="check-bridge">Comprobar bridge</button>
+            <span class="bridge-chip idle" id="bridge-status">Mock</span>
+            <button type="button" data-action="load-batch">Añadir carpeta</button>
+            <button type="button" data-action="clear-batch">Limpiar lote</button>
           </div>
         </div>
 
-        <div class="top-summary" aria-live="polite">
-          <span class="status-dot" id="status-dot"></span>
-          <span id="top-status-text">Añade una carpeta</span>
-        </div>
-
-        <div class="top-actions">
-          <label class="demo-switcher">
-            <span>Demo</span>
-            <select id="demo-scenario" aria-label="Escenario de demo">
-              <option value="initial">Sin lote</option>
-              <option value="batch-ready">Lote listo</option>
-              <option value="empty-folder">Carpeta vacía</option>
-              <option value="preview-loading">Preview cargando</option>
-              <option value="preview-warning">Preview con aviso</option>
-              <option value="preview-error">Error de preview</option>
-              <option value="export-blocked">Destino sin configurar</option>
-              <option value="export-ready">Exportación lista</option>
-              <option value="export-running">Exportación en curso</option>
-              <option value="export-completed">Exportación completada</option>
-              <option value="export-partial">Completada con errores</option>
-              <option value="export-failed">Exportación fallida</option>
-            </select>
-          </label>
-          <label class="mode-switcher">
-            <span>Modo</span>
-            <select id="app-mode" aria-label="Modo de datos">
-              <option value="mock">Mock</option>
-              <option value="bridge">Bridge local</option>
-            </select>
-          </label>
-          <label class="bridge-url-field">
-            <span>Bridge</span>
-            <input id="bridge-url" type="url" value="http://127.0.0.1:8765" />
-          </label>
-          <button type="button" data-action="check-bridge">Comprobar bridge</button>
-          <span class="bridge-chip idle" id="bridge-status">Mock</span>
-          <button type="button" data-action="load-batch">Añadir carpeta</button>
-          <button type="button" data-action="clear-batch">Limpiar lote</button>
+        <div class="dev-status-strip" aria-live="polite">
+          <span><strong>Modo</strong><em id="dev-mode-label">Mock</em></span>
+          <span><strong>Bridge</strong><em id="dev-bridge-label">No activo</em></span>
+          <span><strong>URL</strong><em id="dev-bridge-url-label">http://127.0.0.1:8765</em></span>
+          <span><strong>Última respuesta</strong><em id="dev-last-response">Mock activo</em></span>
         </div>
       </header>
 
@@ -87,8 +96,38 @@
               <button type="button" data-action="check-bridge">Comprobar</button>
               <button type="button" id="bridge-scan-folder" data-action="scan-bridge-folder">Escanear ruta</button>
             </div>
+            <div class="bridge-meta">
+              <div>
+                <span>Última respuesta</span>
+                <strong id="bridge-last-response">Sin comprobar</strong>
+              </div>
+              <div>
+                <span>Capabilities</span>
+                <strong id="bridge-capabilities">Sin comprobar</strong>
+              </div>
+            </div>
             <div class="bridge-message" id="bridge-message">Arranca el bridge y comprueba conexión.</div>
           </div>
+
+          <details class="review-panel" open>
+            <summary>Revisión visual</summary>
+            <div class="review-grid" aria-label="Estados de revisión">
+              <button type="button" data-review-scenario="initial">Sin lote</button>
+              <button type="button" data-review-scenario="batch-ready">Lote listo</button>
+              <button type="button" data-review-scenario="empty-folder">Carpeta vacía</button>
+              <button type="button" data-review-scenario="preview-loading">Preview loading</button>
+              <button type="button" data-review-scenario="preview-error">Preview error</button>
+              <button type="button" data-review-scenario="export-ready">Exportación lista</button>
+              <button type="button" data-review-scenario="export-running">En curso</button>
+              <button type="button" data-review-scenario="export-completed">Completada</button>
+              <button type="button" data-review-scenario="export-partial">Con errores</button>
+            </div>
+            <div class="review-actions">
+              <button type="button" data-action="check-bridge">Bridge health</button>
+              <button type="button" data-action="scan-bridge-folder">Escaneo real</button>
+            </div>
+            <p>Los estados de revisión son simulados salvo el health y el escaneo por ruta.</p>
+          </details>
 
           <label class="search-field">
             <span>Buscar</span>

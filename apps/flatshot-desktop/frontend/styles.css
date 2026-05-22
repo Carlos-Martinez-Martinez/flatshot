@@ -100,10 +100,17 @@ input[type="range"] {
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-rows: 64px minmax(0, 1fr) 78px;
+  grid-template-rows: 104px minmax(0, 1fr) 78px;
 }
 
-.top-bar,
+.top-bar {
+  display: grid;
+  grid-template-rows: 64px 40px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.top-bar-main,
 .bottom-bar {
   display: flex;
   align-items: center;
@@ -111,12 +118,43 @@ input[type="range"] {
   gap: 18px;
   padding: 0 18px;
   background: var(--surface);
-  border-bottom: 1px solid var(--line);
 }
 
 .bottom-bar {
   border-top: 1px solid var(--line);
   border-bottom: 0;
+}
+
+.dev-status-strip {
+  display: grid;
+  grid-template-columns: 120px 150px minmax(210px, 0.9fr) minmax(260px, 1.4fr);
+  align-items: center;
+  gap: 14px;
+  padding: 0 18px;
+  border-top: 1px solid var(--line);
+  background: var(--surface-muted);
+  color: var(--muted);
+}
+
+.dev-status-strip span {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.dev-status-strip strong {
+  color: var(--text);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.dev-status-strip em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-style: normal;
 }
 
 .brand-block,
@@ -130,6 +168,16 @@ input[type="range"] {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.top-bar-main,
+.top-actions,
+.top-summary {
+  min-width: 0;
+}
+
+.top-actions {
+  justify-content: flex-end;
 }
 
 .brand-mark {
@@ -358,6 +406,33 @@ small {
   color: var(--muted);
 }
 
+.bridge-meta {
+  display: grid;
+  gap: 6px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.bridge-meta div {
+  display: grid;
+  grid-template-columns: 108px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.bridge-meta span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.bridge-meta strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 650;
+}
+
 .bridge-message {
   min-height: 18px;
   font-size: 13px;
@@ -369,6 +444,48 @@ small {
 
 .bridge-message.ready {
   color: var(--accent-strong);
+}
+
+.review-panel {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+
+.review-panel summary {
+  cursor: pointer;
+  padding: 10px 12px;
+  font-weight: 750;
+}
+
+.review-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 0 12px 10px;
+}
+
+.review-grid button,
+.review-actions button {
+  min-height: 30px;
+  padding: 0 8px;
+  font-size: 13px;
+}
+
+.review-actions {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--surface-muted);
+}
+
+.review-panel p {
+  margin: 0;
+  padding: 0 12px 12px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .wide {

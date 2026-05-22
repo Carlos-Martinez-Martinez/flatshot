@@ -66,6 +66,21 @@ class SettingsService:
             return self.default_settings()
         return self.normalize(loaded)
 
+    def load_existing(self, fallback: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        """Load settings only when an existing file contains a JSON object."""
+        if not self.settings_file.exists():
+            return dict(fallback or {})
+
+        try:
+            with self.settings_file.open("r", encoding="utf-8") as handle:
+                loaded = json.load(handle)
+        except Exception:
+            return dict(fallback or {})
+
+        if not isinstance(loaded, Mapping):
+            return dict(fallback or {})
+        return self.normalize(loaded)
+
     def save(self, settings: Mapping[str, Any]) -> None:
         self.settings_file.parent.mkdir(parents=True, exist_ok=True)
         with self.settings_file.open("w", encoding="utf-8") as handle:

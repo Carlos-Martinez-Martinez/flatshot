@@ -7,6 +7,11 @@ import sys
 from pathlib import Path
 from time import time
 
+from flatshot.application.config_paths import ConfigPathResolver
+from flatshot.application.log_service import ActivityLogService
+from flatshot.application.preset_service import PresetService
+from flatshot.application.settings_service import SettingsService
+from flatshot.application.export_runner import apply_naming_template
 from flatshot.core.engine import ShadowEngine
 from flatshot.core.models import (
     ExportConfig,
@@ -17,14 +22,25 @@ from flatshot.core.models import (
     normalize_shadow_settings,
 )
 from flatshot.core.scaling import DEFAULT_SCALE_CURVE, normalize_curve_data
-from flatshot.utils.config import ConfigManager
-from flatshot.utils.log_manager import LogManager
+
+
+def _path_resolver() -> ConfigPathResolver:
+    return ConfigPathResolver()
+
+
+def _preset_service() -> PresetService:
+    return PresetService(_path_resolver().config_dir())
+
+
+def _log_service() -> ActivityLogService:
+    return ActivityLogService.from_config_dir(_path_resolver().config_dir())
 
 
 def list_presets():
     """List all available presets."""
-    presets = ConfigManager.load_categorized_presets()
-    flat = ConfigManager.get_flat_presets_from_categorized(presets)
+    service = _preset_service()
+    presets = service.load_categorized_presets()
+    flat = service.get_flat_presets_from_categorized(presets)
     
     if not flat:
         print("No presets found.")
@@ -49,8 +65,9 @@ def list_presets():
 
 def get_preset_settings(preset_name: str) -> ShadowSettings:
     """Get ShadowSettings from a preset name."""
-    presets = ConfigManager.load_categorized_presets()
-    flat = ConfigManager.get_flat_presets_from_categorized(presets)
+    service = _preset_service()
+    presets = service.load_categorized_presets()
+    flat = service.get_flat_presets_from_categorized(presets)
     
     if preset_name not in flat:
         print(f"Error: Preset '{preset_name}' not found.")
@@ -65,18 +82,7 @@ def get_preset_settings(preset_name: str) -> ShadowSettings:
 
 def _load_app_settings() -> dict:
     """Load app settings for CLI defaults without changing old visual output."""
-    settings_file = ConfigManager.get_config_dir() / "settings.json"
-    if not settings_file.exists():
-        return {}
-    try:
-        import json
-        with open(settings_file, 'r') as f:
-            loaded = json.load(f)
-        if isinstance(loaded, dict) and 'shadow_engine' not in loaded:
-            loaded['shadow_engine'] = SHADOW_ENGINE_COMPAT
-        return loaded if isinstance(loaded, dict) else {}
-    except Exception:
-        return {}
+    return SettingsService(_path_resolver().settings_file()).load_existing(fallback={})
 
 
 def process_folder(args):
@@ -154,9 +160,8 @@ def process_folder(args):
     
     # Process images
     from PIL import Image
-    from flatshot.workers.export_worker import apply_naming_template
     
-    logger = LogManager.get_instance()
+    logger = _log_service()
     logger.log_export_start(str(input_folder), total, args.preset)
     
     target_size = (width, height)

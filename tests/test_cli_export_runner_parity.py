@@ -72,7 +72,7 @@ def _cli_args(source: Path, *, dry_run: bool = False) -> Namespace:
 
 def _patch_cli_user_state(monkeypatch):
     monkeypatch.setattr(cli, "_load_app_settings", lambda: {})
-    monkeypatch.setattr(cli.LogManager, "get_instance", lambda: StubLogger())
+    monkeypatch.setattr(cli, "_log_service", lambda: StubLogger())
 
 
 def _run_cli(monkeypatch, source: Path) -> Path:

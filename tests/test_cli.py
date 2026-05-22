@@ -3,6 +3,7 @@ Tests for FlatShot CLI
 """
 import pytest
 import sys
+import ast
 from io import StringIO
 from unittest.mock import patch, MagicMock
 from pathlib import Path
@@ -20,6 +21,22 @@ class TestCLIHelp:
                 main()
             # argparse exits with 0 on --help
             assert exc_info.value.code == 0
+
+    def test_cli_does_not_import_qt_bound_persistence_or_worker_helpers(self):
+        """CLI should not import Qt-bound persistence or worker adapters."""
+        import flatshot.cli as cli
+
+        tree = ast.parse(Path(cli.__file__).read_text(encoding="utf-8"))
+        imports = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imports.extend(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imports.append(node.module)
+
+        assert "flatshot.utils.config" not in imports
+        assert "flatshot.utils.log_manager" not in imports
+        assert "flatshot.workers.export_worker" not in imports
     
     def test_process_help_runs(self):
         """Test that process subcommand help works."""

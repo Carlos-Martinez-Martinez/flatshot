@@ -55,6 +55,33 @@ def test_load_invalid_json_returns_defaults(tmp_path):
     assert settings == SettingsService.default_settings()
 
 
+def test_load_existing_returns_fallback_for_missing_invalid_or_non_object_json(tmp_path):
+    missing = SettingsService(tmp_path / "missing.json")
+    assert missing.load_existing(fallback={}) == {}
+
+    invalid_path = tmp_path / "invalid.json"
+    invalid_path.write_text("{invalid", encoding="utf-8")
+    assert SettingsService(invalid_path).load_existing(fallback={}) == {}
+
+    list_path = tmp_path / "list.json"
+    list_path.write_text(json.dumps(["not", "an", "object"]), encoding="utf-8")
+    assert SettingsService(list_path).load_existing(fallback={}) == {}
+
+
+def test_load_existing_normalizes_valid_settings_file(tmp_path):
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(
+        json.dumps({"format": "PNG", "bg_color": [4, 5, 6]}),
+        encoding="utf-8",
+    )
+
+    settings = SettingsService(settings_file).load_existing(fallback={})
+
+    assert settings["format"] == "PNG"
+    assert settings["bg_color"] == (4, 5, 6)
+    assert settings["shadow_engine"] == SHADOW_ENGINE_COMPAT
+
+
 def test_load_non_object_json_returns_defaults(tmp_path):
     settings_file = tmp_path / "settings.json"
     settings_file.write_text(json.dumps(["not", "an", "object"]), encoding="utf-8")

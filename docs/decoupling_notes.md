@@ -205,3 +205,55 @@
   - processed two folders through the existing subfolder queue path;
   - verified output files exist and progress/button reset.
 - Pause/resume/stop were not exercised because queue controls were not changed in this phase.
+
+## Batch 4 implementation
+
+- Scope: Phase 4, export execution runner.
+- Added Qt-free export contracts to `flatshot.application.contracts`:
+  - `ExportJobRequest`;
+  - `ExportJobResult`.
+- Added Qt-free export events in `flatshot.application.events`.
+- Added Qt-free cancellation and pause primitives in `flatshot.application.execution_control`.
+- Added `ExportRunner` in `flatshot.application.export_runner`.
+- Moved the reusable export planning/execution helpers out of `ExportWorker`:
+  - naming template formatting;
+  - enabled variant filtering;
+  - variant output path planning;
+  - output path collision validation;
+  - stable snapshot copying;
+  - single-image processing.
+- Adapted `ExportWorker(QThread)` into a PyQt adapter that:
+  - builds an `ExportJobRequest`;
+  - delegates execution to `ExportRunner`;
+  - translates runner events back to the existing Qt signals;
+  - keeps the existing public imports used by UI, CLI and tests.
+- Preserved the existing cache, naming, output format, destination, process-pool and snapshot behavior.
+- Did not touch `ShadowEngine`, presets, preview logic, queue orchestration, settings persistence or image output parameters.
+
+## Batch 4 validation
+
+- Added `tests/test_export_runner.py` with coverage for:
+  - `ExportRunner` staying free of PyQt imports;
+  - empty folder result;
+  - subfolder export;
+  - custom destination export;
+  - cancellation before rendering;
+  - pause token blocking/resume behavior.
+- `pytest tests/test_export_runner.py tests/test_export_cache.py tests/test_export_variants.py tests/test_overrides.py -q` -> 16 passed.
+- `pytest` -> 139 passed.
+- PyQt offscreen smoke:
+  - instantiated `MainWindow`;
+  - added a temporary folder through `_add_folder_to_list`;
+  - verified PNG count and batch summary;
+  - selected a preset;
+  - adjusted an essential slider;
+  - selected an image through the grid handler;
+  - rendered a preview;
+  - configured subfolder export settings in memory;
+  - processed one folder through `ExportWorker`;
+  - processed two folders through the existing `QueueWorker`;
+  - exercised pause/resume on the active queue worker;
+  - exercised stop on a running queue;
+  - verified exported files exist and progress/button state resets.
+- Smoke used an inline executor to avoid Windows multiprocessing-from-stdin issues while preserving `process_single_image` and the export runner path.
+- Observed risk: in offscreen smoke, the visual `export_bar_mode == "paused"` can race with a queued `job_started` signal if pause is toggled immediately as the first job starts. The underlying queue pause flag and resume path worked; this should be revisited when extracting `QueueRunner`.

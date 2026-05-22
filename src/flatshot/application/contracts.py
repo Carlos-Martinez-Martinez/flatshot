@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from flatshot.core.models import CurveData, ExportConfig, ShadowSettings
+
 
 @dataclass(frozen=True)
 class ImageFileInfo:
@@ -31,3 +33,24 @@ class BatchScanResult:
     total_images: int = 0
     adjusted_images: int = 0
     errors: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class ExportJobRequest:
+    input_folder: Path
+    settings: ShadowSettings
+    export_config: ExportConfig
+    curve_data: CurveData | None = None
+    preset_name: str | None = None
+    input_files: list[Path] | None = None
+    image_overrides: dict | None = None
+
+
+@dataclass(frozen=True)
+class ExportJobResult:
+    success: bool
+    processed: int
+    total: int
+    errors: int
+    duration: float
+    destinations: list[Path] = field(default_factory=list)

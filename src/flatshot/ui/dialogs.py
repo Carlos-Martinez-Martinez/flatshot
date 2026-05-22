@@ -4,11 +4,12 @@ from PIL import Image
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QFrame, 
                              QSlider, QDoubleSpinBox, QSpinBox, QDialogButtonBox, QFileDialog, 
                              QFormLayout, QLineEdit, QComboBox, QCheckBox, QGroupBox,
-                             QGridLayout, QRadioButton)
+                             QGridLayout, QRadioButton, QListWidget, QListWidgetItem,
+                             QMessageBox)
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QPixmap, QImage, QPainter, QColor, QPen
 from flatshot.ui.widgets import CurveGraphWidget
-from flatshot.core.models import ExportConfig
+from flatshot.core.models import ExportConfig, ExportVariant, WEB_RGB230, WHITE_RGB255, normalize_export_variants
 from flatshot.core.scaling import (
     DEFAULT_SCALE_CURVE,
     build_curve_from_controls,
@@ -275,6 +276,7 @@ class ExportConfigDialog(QDialog):
         self.setWindowTitle("Configuración de exportación")
         self.setMinimumWidth(620)
         self.settings = current_settings
+        self.variants = normalize_export_variants(current_settings)
         self.current_color = tuple(self.settings.bg_color) if isinstance(self.settings.bg_color, list) else self.settings.bg_color
         self.custom_output_path = Path(self.settings.custom_output_path) if self.settings.custom_output_path else None
         self._updating_size_fields = False
@@ -291,7 +293,7 @@ class ExportConfigDialog(QDialog):
         layout.addWidget(header)
 
         subtitle = QLabel(
-            "Configura tamaño, destino, nombre de archivo y fondo en un único panel."
+            "Configura tamaño, destino y nomenclatura base. Las versiones de salida se editan aparte."
         )
         subtitle.setProperty("class", "dialog-text")
         subtitle.setWordWrap(True)
@@ -364,7 +366,7 @@ class ExportConfigDialog(QDialog):
         self.txt_template.textChanged.connect(self._update_naming_preview)
         naming_layout.addRow("Plantilla:", self.txt_template)
         
-        help_text = QLabel("Tokens: {original}, {suffix}, {folder}, {index}")
+        help_text = QLabel("Tokens: {original}, {suffix}, {folder}, {index}, {variant}, {variant_id}, {bg}")
         help_text.setProperty("class", "muted")
         naming_layout.addRow("", help_text)
         
@@ -403,7 +405,7 @@ class ExportConfigDialog(QDialog):
         layout.addWidget(destination_group)
         
         # === FORMAT ===
-        format_group = QGroupBox("🖼️ Formato")
+        format_group = QGroupBox("🖼️ Formato y fondo base")
         format_layout = QFormLayout(format_group)
         format_layout.setSpacing(10)
         
@@ -416,6 +418,7 @@ class ExportConfigDialog(QDialog):
         
         self.chk_transparent = QCheckBox("Fondo transparente (solo PNG)")
         self.chk_transparent.setChecked(self.settings.transparent_bg)
+        self.chk_transparent.setToolTip("Afecta a la salida única/base. Las versiones se editan en Versiones de salida.")
         self.chk_transparent.toggled.connect(self._toggle_color)
         format_layout.addRow("", self.chk_transparent)
         
@@ -423,6 +426,7 @@ class ExportConfigDialog(QDialog):
         self.btn_color = QPushButton()
         self.btn_color.setFixedSize(110, 30)
         self.btn_color.setProperty("class", "swatch")
+        self.btn_color.setToolTip("Fondo base. Las versiones de salida pueden tener su propio fondo.")
         self.lbl_color_value = QLabel("")
         self.lbl_color_value.setProperty("class", "muted")
         self.swatch_buttons = []
@@ -431,7 +435,7 @@ class ExportConfigDialog(QDialog):
         color_row.addWidget(self.btn_color)
         color_row.addWidget(self.lbl_color_value)
         color_row.addStretch()
-        format_layout.addRow("Color fondo:", color_row)
+        format_layout.addRow("Fondo base:", color_row)
 
         swatch_container = QFrame()
         swatch_container.setProperty("class", "swatch-group")
@@ -458,6 +462,19 @@ class ExportConfigDialog(QDialog):
         format_layout.addRow("Colores rápidos:", swatch_container)
         
         layout.addWidget(format_group)
+
+        variants_group = QGroupBox("Versiones de salida")
+        variants_layout = QHBoxLayout(variants_group)
+        variants_layout.setSpacing(8)
+        self.lbl_variants_summary = QLabel("")
+        self.lbl_variants_summary.setProperty("class", "dialog-text")
+        self.lbl_variants_summary.setWordWrap(True)
+        variants_layout.addWidget(self.lbl_variants_summary, 1)
+        self.btn_edit_variants = QPushButton("Editar variantes...")
+        self.btn_edit_variants.setProperty("class", "secondary")
+        self.btn_edit_variants.clicked.connect(self._edit_variants)
+        variants_layout.addWidget(self.btn_edit_variants)
+        layout.addWidget(variants_group)
         
         # Buttons
         layout.addStretch()
@@ -481,6 +498,7 @@ class ExportConfigDialog(QDialog):
         self._toggle_transparency(self.settings.format)
         self._toggle_destination_mode()
         self._update_naming_preview()
+        self._update_variants_summary()
     
     def _detect_size_preset(self):
         current = (self.settings.output_width, self.settings.output_height)
@@ -610,9 +628,9 @@ class ExportConfigDialog(QDialog):
         size_text = f"{self.spin_width.value()} × {self.spin_height.value()} px"
         format_text = self.cmb_format.currentText()
         if self.chk_transparent.isChecked():
-            bg_text = "Fondo transparente"
+            bg_text = "Fondo base transparente"
         else:
-            bg_text = f"Fondo {self._color_to_hex(self.current_color)}"
+            bg_text = f"Fondo base {self._color_to_hex(self.current_color)}"
         if self.rb_dest_custom.isChecked():
             if self.custom_output_path:
                 destination_text = f"Carpeta fija: {self.custom_output_path}"
@@ -627,6 +645,38 @@ class ExportConfigDialog(QDialog):
         )
         self.lbl_summary_example.setText(f"Salida de ejemplo: {self.lbl_naming_preview.text()}")
 
+    def _update_variants_summary(self):
+        if not hasattr(self, "lbl_variants_summary"):
+            return
+        active = [variant.label for variant in self.variants if variant.enabled]
+        all_labels = [variant.label for variant in self.variants]
+        if active:
+            text = "Activas: " + ", ".join(active)
+        else:
+            text = "Sin variantes activas"
+        if all_labels:
+            text += f" · Configuradas: {', '.join(all_labels)}"
+        self.lbl_variants_summary.setText(text)
+
+    def _edit_variants(self):
+        dlg = ExportVariantsDialog(self.variants, self)
+        if dlg.exec():
+            self.variants = dlg.get_variants()
+            self._update_variants_summary()
+            self._update_summary()
+
+    def _variants_for_settings(self) -> list[ExportVariant]:
+        variants = list(self.variants)
+        if len(variants) == 1:
+            variants[0] = variants[0].model_copy(
+                update={
+                    "suffix": self.txt_suffix.text(),
+                    "transparent_bg": self.chk_transparent.isChecked(),
+                    "bg_color": self.current_color,
+                }
+            )
+        return variants
+
     @staticmethod
     def _color_to_hex(color: tuple[int, int, int]) -> str:
         return "#{:02X}{:02X}{:02X}".format(*color)
@@ -638,12 +688,332 @@ class ExportConfigDialog(QDialog):
             format=self.cmb_format.currentText(),
             transparent_bg=self.chk_transparent.isChecked(),
             bg_color=self.current_color,
+            variants=self._variants_for_settings(),
             output_width=self.spin_width.value(),
             output_height=self.spin_height.value(),
             naming_template=self.txt_template.text() or "{original}{suffix}",
             output_destination="custom" if self.rb_dest_custom.isChecked() else "subfolder",
             custom_output_path=str(self.custom_output_path) if self.custom_output_path else None,
         )
+
+
+class ExportVariantsDialog(QDialog):
+    """Compact editor for output versions."""
+
+    def __init__(self, variants: list[ExportVariant], parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Versiones de salida")
+        self.setMinimumWidth(720)
+        self.variants = [variant.model_copy(deep=True) for variant in normalize_export_variants({"variants": [v.model_dump() for v in variants]})]
+        self.current_index = 0
+        self.current_color = self.variants[0].bg_color
+        self._loading = False
+        self.swatch_buttons = []
+        self.init_ui()
+        self._populate_list()
+        self.variant_list.setCurrentRow(0)
+        self._load_current_variant()
+
+    def init_ui(self):
+        self.setProperty("class", "dialog")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
+
+        title = QLabel("Versiones de salida")
+        title.setProperty("class", "dialog-title")
+        layout.addWidget(title)
+
+        body = QHBoxLayout()
+        body.setSpacing(12)
+
+        left = QVBoxLayout()
+        left.setSpacing(8)
+        self.variant_list = QListWidget()
+        self.variant_list.setMinimumWidth(210)
+        self.variant_list.currentRowChanged.connect(self._on_variant_row_changed)
+        left.addWidget(self.variant_list, 1)
+
+        template_row = QHBoxLayout()
+        self.btn_add_web = QPushButton("Web RGB230")
+        self.btn_add_web.setProperty("class", "secondary")
+        self.btn_add_web.clicked.connect(lambda: self._add_template(WEB_RGB230.model_copy(update={"enabled": True})))
+        template_row.addWidget(self.btn_add_web)
+        self.btn_add_white = QPushButton("Blanco RGB255")
+        self.btn_add_white.setProperty("class", "secondary")
+        self.btn_add_white.clicked.connect(lambda: self._add_template(WHITE_RGB255.model_copy(update={"enabled": True})))
+        template_row.addWidget(self.btn_add_white)
+        left.addLayout(template_row)
+
+        action_row = QHBoxLayout()
+        self.btn_duplicate = QPushButton("Duplicar")
+        self.btn_duplicate.setProperty("class", "ghost")
+        self.btn_duplicate.clicked.connect(self._duplicate_current)
+        action_row.addWidget(self.btn_duplicate)
+        self.btn_delete = QPushButton("Eliminar")
+        self.btn_delete.setProperty("class", "ghost")
+        self.btn_delete.clicked.connect(self._delete_current)
+        action_row.addWidget(self.btn_delete)
+        left.addLayout(action_row)
+        body.addLayout(left, 0)
+
+        form_group = QGroupBox("Ajustes")
+        form = QFormLayout(form_group)
+        form.setSpacing(10)
+
+        self.chk_enabled = QCheckBox("Exportar esta versión")
+        form.addRow("", self.chk_enabled)
+
+        self.txt_label = QLineEdit()
+        form.addRow("Nombre:", self.txt_label)
+
+        self.txt_suffix = QLineEdit()
+        form.addRow("Sufijo:", self.txt_suffix)
+
+        self.txt_subfolder = QLineEdit()
+        self.txt_subfolder.setPlaceholderText("Opcional")
+        form.addRow("Subcarpeta:", self.txt_subfolder)
+
+        self.cmb_format = QComboBox()
+        self.cmb_format.addItem("Heredar", None)
+        self.cmb_format.addItem("JPG", "JPG")
+        self.cmb_format.addItem("PNG", "PNG")
+        form.addRow("Formato:", self.cmb_format)
+
+        self.chk_transparent = QCheckBox("Fondo transparente")
+        self.chk_transparent.toggled.connect(self._toggle_color_controls)
+        form.addRow("", self.chk_transparent)
+
+        color_row = QHBoxLayout()
+        self.btn_color = QPushButton("Color")
+        self.btn_color.setFixedSize(110, 30)
+        self.btn_color.clicked.connect(self._pick_color)
+        color_row.addWidget(self.btn_color)
+        self.lbl_color = QLabel("")
+        self.lbl_color.setProperty("class", "muted")
+        color_row.addWidget(self.lbl_color)
+        color_row.addStretch()
+        form.addRow("Fondo exportado:", color_row)
+
+        swatches = QFrame()
+        swatches.setProperty("class", "swatch-group")
+        swatch_layout = QGridLayout(swatches)
+        swatch_layout.setContentsMargins(8, 8, 8, 8)
+        swatch_layout.setHorizontalSpacing(6)
+        swatch_layout.setVerticalSpacing(6)
+        for index, (label, color) in enumerate(ExportConfigDialog.COLOR_SWATCHES):
+            btn = QPushButton("")
+            btn.setCheckable(True)
+            btn.setToolTip(label)
+            btn.setProperty("class", "swatch-btn")
+            btn.setFixedSize(28, 28)
+            btn.setStyleSheet(
+                "QPushButton {"
+                f"background-color: rgb({color[0]}, {color[1]}, {color[2]});"
+                f"border: 1px solid {COLORS['border']};"
+                "border-radius: 6px;"
+                "}"
+            )
+            btn.clicked.connect(lambda _checked=False, swatch=color: self._set_color(swatch))
+            self.swatch_buttons.append((btn, color))
+            swatch_layout.addWidget(btn, index // 4, index % 4)
+        form.addRow("Colores:", swatches)
+
+        self.spin_shadow_delta = QSpinBox()
+        self.spin_shadow_delta.setRange(-100, 100)
+        self.spin_shadow_delta.setSuffix(" %")
+        form.addRow("Sombra +/-:", self.spin_shadow_delta)
+
+        override_row = QHBoxLayout()
+        self.chk_shadow_override = QCheckBox("Opacidad fija")
+        override_row.addWidget(self.chk_shadow_override)
+        self.spin_shadow_override = QSpinBox()
+        self.spin_shadow_override.setRange(0, 100)
+        self.spin_shadow_override.setSuffix(" %")
+        override_row.addWidget(self.spin_shadow_override)
+        override_row.addStretch()
+        form.addRow("", override_row)
+
+        body.addWidget(form_group, 1)
+        layout.addLayout(body, 1)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        btn_ok = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        if btn_ok:
+            btn_ok.setProperty("class", "primary")
+        btn_cancel = buttons.button(QDialogButtonBox.StandardButton.Cancel)
+        if btn_cancel:
+            btn_cancel.setProperty("class", "ghost")
+        layout.addWidget(buttons)
+
+    def _populate_list(self):
+        self.variant_list.blockSignals(True)
+        self.variant_list.clear()
+        for variant in self.variants:
+            state = "✓" if variant.enabled else "–"
+            item = QListWidgetItem(f"{state} {variant.label}")
+            item.setToolTip(variant.id)
+            self.variant_list.addItem(item)
+        self.variant_list.blockSignals(False)
+
+    def _on_variant_row_changed(self, row: int):
+        if self._loading or row < 0 or row == self.current_index:
+            return
+        previous = self.current_index
+        if not self._save_current_variant():
+            self.variant_list.blockSignals(True)
+            self.variant_list.setCurrentRow(previous)
+            self.variant_list.blockSignals(False)
+            return
+        self.current_index = row
+        self._load_current_variant()
+
+    def _load_current_variant(self):
+        if not self.variants:
+            return
+        variant = self.variants[self.current_index]
+        self._loading = True
+        try:
+            self.chk_enabled.setChecked(variant.enabled)
+            self.txt_label.setText(variant.label)
+            self.txt_suffix.setText(variant.suffix)
+            self.txt_subfolder.setText(variant.output_subfolder or "")
+            self.chk_transparent.setChecked(variant.transparent_bg)
+            self._set_color(variant.bg_color)
+            self.spin_shadow_delta.setValue(variant.shadow_opacity_delta)
+            self.chk_shadow_override.setChecked(variant.shadow_opacity_override is not None)
+            self.spin_shadow_override.setValue(int(variant.shadow_opacity_override or 0))
+            target_format = variant.format
+            index = self.cmb_format.findData(target_format)
+            self.cmb_format.setCurrentIndex(index if index >= 0 else 0)
+            self._toggle_color_controls()
+        finally:
+            self._loading = False
+
+    def _save_current_variant(self) -> bool:
+        if not self.variants:
+            return True
+        current = self.variants[self.current_index]
+        try:
+            self.variants[self.current_index] = ExportVariant(
+                id=current.id,
+                label=self.txt_label.text(),
+                enabled=self.chk_enabled.isChecked(),
+                transparent_bg=self.chk_transparent.isChecked(),
+                bg_color=self.current_color,
+                suffix=self.txt_suffix.text(),
+                output_subfolder=self.txt_subfolder.text() or None,
+                format=self.cmb_format.currentData(),
+                shadow_opacity_delta=self.spin_shadow_delta.value(),
+                shadow_opacity_override=(
+                    self.spin_shadow_override.value() if self.chk_shadow_override.isChecked() else None
+                ),
+            )
+        except Exception as exc:
+            QMessageBox.warning(self, "Variante no válida", str(exc))
+            return False
+        self._populate_list()
+        self.variant_list.blockSignals(True)
+        self.variant_list.setCurrentRow(self.current_index)
+        self.variant_list.blockSignals(False)
+        return True
+
+    def _set_color(self, color: tuple[int, int, int]):
+        self.current_color = tuple(color)
+        self.btn_color.setStyleSheet(
+            "QPushButton {"
+            f"background-color: rgb({color[0]},{color[1]},{color[2]});"
+            f"border: 1px solid {COLORS['border']};"
+            "border-radius: 6px;"
+            f"color: {'#111111' if sum(color) > 540 else COLORS['text_primary']};"
+            "font-weight: 600;"
+            "}"
+        )
+        self.lbl_color.setText(ExportConfigDialog._color_to_hex(color))
+        for btn, swatch in self.swatch_buttons:
+            btn.setChecked(tuple(swatch) == tuple(color))
+
+    def _pick_color(self):
+        dialog = ColorPickerDialog(self.current_color, self)
+        if dialog.exec():
+            self._set_color(dialog.get_color())
+
+    def _toggle_color_controls(self):
+        enabled = not self.chk_transparent.isChecked()
+        self.btn_color.setEnabled(enabled)
+        self.lbl_color.setEnabled(enabled)
+        for btn, _swatch in self.swatch_buttons:
+            btn.setEnabled(enabled)
+
+    def _unique_id(self, base: str) -> str:
+        existing = {variant.id for variant in self.variants}
+        candidate = base
+        counter = 2
+        while candidate in existing:
+            candidate = f"{base}_{counter}"
+            counter += 1
+        return candidate
+
+    def _add_template(self, template: ExportVariant):
+        if not self._save_current_variant():
+            return
+        for index, variant in enumerate(self.variants):
+            if variant.id == template.id:
+                self.variants[index] = template
+                self.current_index = index
+                self._populate_list()
+                self.variant_list.setCurrentRow(index)
+                self._load_current_variant()
+                return
+        self.variants.append(template)
+        self.current_index = len(self.variants) - 1
+        self._populate_list()
+        self.variant_list.setCurrentRow(self.current_index)
+        self._load_current_variant()
+
+    def _duplicate_current(self):
+        if not self._save_current_variant():
+            return
+        current = self.variants[self.current_index]
+        duplicate = current.model_copy(
+            update={
+                "id": self._unique_id(f"{current.id}_copy"),
+                "label": f"{current.label} copia",
+            }
+        )
+        self.variants.append(duplicate)
+        self.current_index = len(self.variants) - 1
+        self._populate_list()
+        self.variant_list.setCurrentRow(self.current_index)
+        self._load_current_variant()
+
+    def _delete_current(self):
+        if len(self.variants) <= 1:
+            QMessageBox.warning(self, "No se puede eliminar", "Debe quedar al menos una variante de salida.")
+            return
+        current = self.variants[self.current_index]
+        if current.enabled and sum(1 for variant in self.variants if variant.enabled) <= 1:
+            QMessageBox.warning(
+                self,
+                "No se puede eliminar",
+                "No puedes eliminar la única variante activa.",
+            )
+            return
+        del self.variants[self.current_index]
+        self.current_index = min(self.current_index, len(self.variants) - 1)
+        self._populate_list()
+        self.variant_list.setCurrentRow(self.current_index)
+        self._load_current_variant()
+
+    def accept(self):
+        if not self._save_current_variant():
+            return
+        super().accept()
+
+    def get_variants(self) -> list[ExportVariant]:
+        return [variant.model_copy(deep=True) for variant in self.variants]
 
 
 class ColorPickerDialog(QDialog):

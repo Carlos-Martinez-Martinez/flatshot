@@ -75,8 +75,8 @@ def test_export_falls_back_to_normal_render_when_cache_copy_fails(monkeypatch, t
         raise OSError("copy failed")
 
     def fake_process(args):
-        img_path, output_folder, _settings, _target_size, _template, suffix, _folder, _index, fmt, _curve, _override = args
-        Image.new("RGBA", (8, 8), (4, 5, 6, 255)).save(output_folder / f"{img_path.stem}{suffix}.{fmt}")
+        img_path, save_path, _settings, _target_size, _fmt, _curve, _override, _display_name = args
+        Image.new("RGBA", (8, 8), (4, 5, 6, 255)).save(save_path)
         return True, img_path.name, None
 
     monkeypatch.setattr(export_worker.shutil, "copy2", fail_copy)

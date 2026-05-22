@@ -796,24 +796,26 @@ class FloatingToolbar(QFrame):
         divider.setFixedSize(1, 20)
         layout.addWidget(divider)
 
-        # --- Canvas background section ---
-        bg_label = QLabel("Canvas")
+        # --- View background section ---
+        bg_hint = "Solo cambia el fondo de visualización del canvas. No modifica el fondo exportado."
+        bg_label = QLabel("Vista")
         bg_label.setProperty("class", "toolbar-section-label")
+        bg_label.setToolTip(bg_hint)
         layout.addWidget(bg_label, 0, Qt.AlignmentFlag.AlignVCenter)
 
         self._bg_group = QButtonGroup(self)
         self._bg_group.setExclusive(True)
         self._bg_buttons = []
         for i, (color, text, name) in enumerate([
-            ("#FFFFFF", "Claro", "Fondo blanco"),
-            ("#E6E6E6", "Neutro", "Fondo gris"),
-            ("#2A2A2A", "Oscuro", "Fondo oscuro"),
+            ("#FFFFFF", "Claro", "Fondo de vista blanco"),
+            ("#E6E6E6", "Neutro", "Fondo de vista gris"),
+            ("#2A2A2A", "Oscuro", "Fondo de vista oscuro"),
         ]):
             seg_class = "segment-left" if i == 0 else ("segment-right" if i == 2 else "segment-middle")
             btn = QPushButton(text)
             btn.setProperty("class", seg_class)
             btn.setCheckable(True)
-            btn.setToolTip(name)
+            btn.setToolTip(f"{name}. {bg_hint}")
             btn.clicked.connect(lambda checked, c=color: self._select_background(c))
             self._bg_group.addButton(btn)
             layout.addWidget(btn, 0, Qt.AlignmentFlag.AlignVCenter)

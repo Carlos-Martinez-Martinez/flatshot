@@ -30,8 +30,13 @@ from flatshot.core.models import (
     SHADOW_ENGINE_REALISTIC_V2,
     ShadowSettings,
     ExportConfig,
+    ExportVariant,
     CurveData,
     JobItem,
+    WEB_RGB230,
+    WHITE_RGB255,
+    build_variant_settings,
+    normalize_export_variants,
     normalize_shadow_settings,
 )
 from flatshot.core.overrides import (
@@ -46,13 +51,18 @@ from flatshot.utils.config import ConfigManager
 from flatshot.utils.history_manager import HistoryManager
 from flatshot.utils.log_manager import LogManager
 from flatshot.utils.session_manager import SessionManager
-from flatshot.ui.dialogs import CurveEditorDialog, ExportConfigDialog
+from flatshot.ui.dialogs import CurveEditorDialog, ExportConfigDialog, ExportVariantsDialog
 from flatshot.ui.styles import scale_stylesheet, COLORS
 from flatshot.ui.shell import AppShell, WorkflowPanel, CanvasWorkbench, BatchPanel, ExportBar, CommandBar, UiViewState, BatchSummary
 from flatshot.ui.widgets import SmartSlider, LightAngleWidget, ComparisonCanvas, FloatingToolbar, ModernSplashScreen, CollapsibleSection
 from flatshot.ui.queue_widget import QueueWidget
 from flatshot.ui.grid_preview import GridPreviewWidget
-from flatshot.workers.export_worker import ExportWorker
+from flatshot.workers.export_worker import (
+    ExportWorker,
+    get_enabled_export_variants,
+    variant_export_format,
+    variant_output_folder,
+)
 from flatshot.workers.queue_worker import QueueWorker
 from flatshot.workers.pre_render_scheduler import PreRenderScheduler
 
@@ -90,7 +100,7 @@ def _render_preview_task(pil_img: Image.Image, target_size, settings_dict: dict,
         is_preview=is_preview
     )
     if final_pil.mode == "RGBA":
-        bg = Image.new("RGB", final_pil.size, (230, 230, 230))
+        bg = Image.new("RGB", final_pil.size, settings.bg_color)
         bg.paste(final_pil, (0, 0), mask=final_pil)
         final_for_display = bg
     else:
@@ -228,6 +238,21 @@ class MainWindow(QMainWindow):
             
         self.settings_file = ConfigManager.get_config_dir() / "settings.json"
         self.app_settings = self._load_app_settings()
+        self.export_variants = normalize_export_variants(self.app_settings)
+        self.app_settings['variants'] = [variant.model_dump() for variant in self.export_variants]
+        saved_preview_variant = self.app_settings.get('current_preview_variant_id')
+        variant_ids = {variant.id for variant in self.export_variants}
+        self.current_preview_variant_id = (
+            saved_preview_variant if saved_preview_variant in variant_ids else self.export_variants[0].id
+        )
+        self.app_settings['current_preview_variant_id'] = self.current_preview_variant_id
+        self._last_export_variant_labels = []
+        self._last_export_source_count = 0
+        self._last_export_file_total = 0
+        self._last_export_error_message = ""
+        self.export_bar_mode = "idle"
+        self._export_bar_status_text = ""
+        self._pre_render_bar_status = None
         self.ui_view_state = UiViewState(
             grid_columns=int(self.app_settings.get('grid_columns', 3)),
             preview_background=self.app_settings.get('preview_bg_color', "#E6E6E6"),
@@ -913,173 +938,248 @@ class MainWindow(QMainWindow):
         """Create the persistent bottom export bar."""
         bar = ExportBar()
         bar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        bar.setFixedHeight(self._px(76))
+        bar.setMinimumHeight(self._px(88))
+        bar.setMaximumHeight(self._px(104))
 
         layout = QHBoxLayout(bar)
-        layout.setContentsMargins(self._px(16), self._px(10), self._px(16), self._px(10))
-        layout.setSpacing(self._px(16))
+        layout.setContentsMargins(self._px(14), self._px(8), self._px(14), self._px(8))
+        layout.setSpacing(self._px(12))
+        layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+
+        layout.addWidget(self._create_export_input_cluster(), 0)
+        layout.addWidget(self._create_export_batch_cluster(), 0)
+        layout.addWidget(self._create_export_config_cluster(), 1)
+        layout.addWidget(self._create_export_progress_cluster(), 0)
+        layout.addWidget(self._create_export_action_cluster(), 0)
+
+        self._create_hidden_export_state_controls(bar)
+
+        self.selected_folders = []
+        self.custom_output_path = None
+        self.export_details_visible = False
+        self._refresh_export_variants_ui()
+        self._update_export_bar_state()
+
+        return bar
+
+    def _create_export_input_cluster(self) -> QFrame:
+        cluster = QFrame()
+        cluster.setProperty("class", "export-cluster")
+        cluster.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        layout = QHBoxLayout(cluster)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(self._px(8))
 
         icon_color = COLORS['text_muted']
-
-        import_cluster = QFrame()
-        import_cluster.setProperty("class", "export-cluster")
-        import_layout = QHBoxLayout(import_cluster)
-        import_layout.setContentsMargins(0, 0, 0, 0)
-        import_layout.setSpacing(self._px(8))
-
         self.btn_add_folder = QPushButton(qta.icon('fa5s.folder-plus', color=icon_color), "Añadir carpeta")
         self.btn_add_folder.setProperty("class", "secondary")
         self.btn_add_folder.setToolTip("Añadir carpeta · Click derecho: carpetas recientes")
+        self.btn_add_folder.setAccessibleName("Añadir carpeta")
         self.btn_add_folder.clicked.connect(self._add_folders)
         self.btn_add_folder.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.btn_add_folder.customContextMenuRequested.connect(self._show_recent_folders_menu)
         self.recent_folders_menu = QMenu(self)
         self._update_recent_folders_menu()
-        import_layout.addWidget(self.btn_add_folder)
+        layout.addWidget(self.btn_add_folder)
 
         self.btn_clear_folders = QPushButton(qta.icon('fa5s.trash-alt', color=COLORS['error']), "Limpiar")
         self.btn_clear_folders.setProperty("class", "ghost")
-        self.btn_clear_folders.setToolTip("Limpiar lista de carpetas")
+        self.btn_clear_folders.setToolTip("Limpiar lote cargado")
+        self.btn_clear_folders.setAccessibleName("Limpiar lote")
         self.btn_clear_folders.clicked.connect(self._clear_folders)
         self.btn_clear_folders.setEnabled(False)
-        import_layout.addWidget(self.btn_clear_folders)
+        layout.addWidget(self.btn_clear_folders)
+        return cluster
 
-        self.btn_export_details = QPushButton(qta.icon('fa5s.list-alt', color=icon_color), "Lote y destino")
+    def _create_export_batch_cluster(self) -> QFrame:
+        cluster = QFrame()
+        cluster.setProperty("class", "export-summary")
+        cluster.setMinimumWidth(self._px(260))
+        cluster.setMaximumWidth(self._px(360))
+        layout = QVBoxLayout(cluster)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(self._px(3))
+
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.setSpacing(self._px(6))
+        title = QLabel("Lote")
+        title.setProperty("class", "toolbar-section-label")
+        header.addWidget(title)
+        header.addStretch(1)
+
+        self.btn_export_details = QPushButton(qta.icon('fa5s.list-alt', color=COLORS['text_muted']), "Ver lote")
         self.btn_export_details.setProperty("class", "ghost")
-        self.btn_export_details.setToolTip("Ver carpetas seleccionadas y destino de exportación")
+        self.btn_export_details.setFixedHeight(self._px(26))
+        self.btn_export_details.setToolTip("Ver carpetas seleccionadas y destino")
+        self.btn_export_details.setAccessibleName("Ver lote")
         self.btn_export_details.clicked.connect(self._open_export_details_dialog)
         self.btn_export_details.setEnabled(False)
-        import_layout.addWidget(self.btn_export_details)
-        layout.addWidget(import_cluster, 0)
-
-        summary_cluster = QFrame()
-        summary_cluster.setProperty("class", "export-summary")
-        summary_layout = QVBoxLayout(summary_cluster)
-        summary_layout.setContentsMargins(0, 0, 0, 0)
-        summary_layout.setSpacing(self._px(2))
+        header.addWidget(self.btn_export_details)
+        layout.addLayout(header)
 
         self.lbl_folder_summary = QLabel("Sin lote cargado")
         self.lbl_folder_summary.setProperty("class", "export-summary-title")
-        summary_layout.addWidget(self.lbl_folder_summary)
+        self.lbl_folder_summary.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        layout.addWidget(self.lbl_folder_summary)
+        return cluster
 
-        self.lbl_destination_summary = QLabel("Destino: subcarpeta en origen")
+    def _create_export_config_cluster(self) -> QFrame:
+        cluster = QFrame()
+        cluster.setProperty("class", "export-config")
+        cluster.setMinimumWidth(self._px(420))
+        cluster.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        layout = QVBoxLayout(cluster)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(self._px(3))
+
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.setSpacing(self._px(6))
+        title = QLabel("Exportación")
+        title.setProperty("class", "toolbar-section-label")
+        header.addWidget(title)
+        header.addStretch(1)
+
+        self.btn_outputs = QPushButton("Salidas")
+        self.btn_outputs.setProperty("class", "ghost")
+        self.btn_outputs.setFixedHeight(self._px(26))
+        self.btn_outputs.setToolTip("Editar versiones de salida")
+        self.btn_outputs.setAccessibleName("Editar salidas")
+        self.btn_outputs.clicked.connect(self._open_export_variants_dialog)
+        header.addWidget(self.btn_outputs)
+
+        self.btn_export_config = QPushButton("Configurar")
+        self.btn_export_config.setProperty("class", "secondary")
+        self.btn_export_config.setFixedHeight(self._px(26))
+        self.btn_export_config.setToolTip("Configurar tamaño, formato, destino y nomenclatura")
+        self.btn_export_config.setAccessibleName("Configurar exportación")
+        self.btn_export_config.clicked.connect(self._open_export_config)
+        header.addWidget(self.btn_export_config)
+        layout.addLayout(header)
+
+        self.lbl_export_config_summary = QLabel("")
+        self.lbl_export_config_summary.setProperty("class", "export-summary-title")
+        self.lbl_export_config_summary.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        layout.addWidget(self.lbl_export_config_summary)
+
+        self.lbl_destination_summary = QLabel("")
         self.lbl_destination_summary.setProperty("class", "export-summary-subtitle")
-        summary_layout.addWidget(self.lbl_destination_summary)
-        layout.addWidget(summary_cluster, 1)
+        self.lbl_destination_summary.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        layout.addWidget(self.lbl_destination_summary)
 
-        progress_cluster = QFrame()
-        progress_cluster.setProperty("class", "export-progress")
-        progress_layout = QVBoxLayout(progress_cluster)
-        progress_layout.setContentsMargins(0, 0, 0, 0)
-        progress_layout.setSpacing(self._px(5))
+        self.lbl_outputs_summary = QLabel("")
+        self.lbl_outputs_summary.setProperty("class", "export-summary-subtitle")
+        self.lbl_outputs_summary.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        layout.addWidget(self.lbl_outputs_summary)
+        return cluster
 
-        self.lbl_progress_status = QLabel("Listo")
-        self.lbl_progress_status.setProperty("class", "muted")
-        self.lbl_progress_status.hide()
-        progress_layout.addWidget(self.lbl_progress_status)
+    def _create_export_progress_cluster(self) -> QFrame:
+        cluster = QFrame()
+        cluster.setProperty("class", "export-progress")
+        cluster.setMinimumWidth(self._px(260))
+        cluster.setMaximumWidth(self._px(320))
+        layout = QVBoxLayout(cluster)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(self._px(5))
+
+        state_title = QLabel("Estado")
+        state_title.setProperty("class", "toolbar-section-label")
+        layout.addWidget(state_title)
+
+        self.lbl_progress_status = QLabel("Añade una carpeta para procesar")
+        self.lbl_progress_status.setProperty("class", "export-summary-subtitle")
+        self.lbl_progress_status.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        layout.addWidget(self.lbl_progress_status)
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setTextVisible(False)
-        self.progress_bar.setFixedHeight(self._px(6))
-        self.progress_bar.setFixedWidth(self._px(260))
-        progress_layout.addWidget(self.progress_bar)
-        layout.addWidget(progress_cluster, 0)
+        self.progress_bar.setFixedHeight(self._px(8))
+        self.progress_bar.setMinimumWidth(self._px(220))
+        self.progress_bar.setMaximumWidth(self._px(300))
+        self.progress_bar.hide()
+        layout.addWidget(self.progress_bar)
+        return cluster
 
-        action_cluster = QFrame()
-        action_cluster.setProperty("class", "export-actions")
-        action_layout = QHBoxLayout(action_cluster)
-        action_layout.setContentsMargins(0, 0, 0, 0)
-        action_layout.setSpacing(self._px(8))
+    def _create_export_action_cluster(self) -> QFrame:
+        cluster = QFrame()
+        cluster.setProperty("class", "export-actions")
+        cluster.setMinimumWidth(self._px(190))
+        cluster.setMaximumWidth(self._px(270))
+        layout = QHBoxLayout(cluster)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(self._px(8))
 
         self.btn_process = QPushButton(qta.icon('fa5s.play', color='white'), "Procesar lote")
         self.btn_process.setProperty("class", "primary")
         self.btn_process.setEnabled(False)
-        self.btn_process.setMinimumWidth(self._px(170))
-        self.btn_process.setToolTip("Iniciar el procesamiento de todas las imágenes (Ctrl+Enter)")
+        self.btn_process.setMinimumWidth(self._px(185))
+        self.btn_process.setToolTip("Iniciar el procesamiento del lote (Ctrl+Enter)")
+        self.btn_process.setAccessibleName("Procesar lote")
         self.btn_process.clicked.connect(self._start_export)
-        action_layout.addWidget(self.btn_process)
 
-        self.process_controls_layout = QHBoxLayout()
-        self.process_controls_layout.setSpacing(self._px(6))
+        process_controls_widget = QWidget()
+        process_controls_layout = QHBoxLayout(process_controls_widget)
+        process_controls_layout.setContentsMargins(0, 0, 0, 0)
+        process_controls_layout.setSpacing(self._px(6))
 
         self.btn_pause = QPushButton(qta.icon('fa5s.pause', color='white'), "Pausar")
         self.btn_pause.setProperty("class", "warning-solid")
         self.btn_pause.setToolTip("Pausar/Reanudar el procesamiento (Ctrl+Shift+P)")
+        self.btn_pause.setAccessibleName("Pausar procesamiento")
         self.btn_pause.clicked.connect(self._toggle_pause)
-        self.process_controls_layout.addWidget(self.btn_pause)
+        process_controls_layout.addWidget(self.btn_pause)
 
         self.btn_stop = QPushButton(qta.icon('fa5s.stop', color='white'), "Detener")
         self.btn_stop.setProperty("class", "danger-solid")
         self.btn_stop.setToolTip("Detener el procesamiento en curso (Esc)")
+        self.btn_stop.setAccessibleName("Detener procesamiento")
         self.btn_stop.clicked.connect(self._stop_export)
-        self.process_controls_layout.addWidget(self.btn_stop)
+        process_controls_layout.addWidget(self.btn_stop)
 
-        self.process_controls_widget = QWidget()
-        self.process_controls_widget.setLayout(self.process_controls_layout)
-        self.process_controls_widget.hide()
-        action_layout.addWidget(self.process_controls_widget)
-        layout.addWidget(action_cluster, 0)
+        self.process_controls_widget = process_controls_widget
+        self.export_action_stack = QStackedWidget()
+        self.export_action_stack.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.export_action_stack.setMinimumWidth(self._px(185))
+        self.export_action_stack.addWidget(self.btn_process)
+        self.export_action_stack.addWidget(self.process_controls_widget)
+        layout.addWidget(self.export_action_stack)
+        return cluster
 
-        details_container = QWidget(bar)
-        details_layout = QVBoxLayout(details_container)
-        details_layout.setContentsMargins(0, 0, 0, 0)
-        details_layout.setSpacing(self._px(4))
-
+    def _create_hidden_export_state_controls(self, parent: QWidget):
+        """Keep existing destination/detail state holders without rendering them in the bar."""
         from PyQt6.QtWidgets import QListWidget, QAbstractItemView
-        self.folder_list = QListWidget()
-        self.folder_list.setMaximumHeight(self._px(90))
+
+        self.folder_list = QListWidget(parent)
         self.folder_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.folder_list.setProperty("class", "list-compact")
         self.folder_list.itemDoubleClicked.connect(self._remove_folder_item)
         self.folder_list.hide()
-        details_layout.addWidget(self.folder_list)
 
-        dest_group = QFrame()
-        dest_layout = QVBoxLayout(dest_group)
-        dest_layout.setContentsMargins(0, self._px(4), 0, self._px(4))
-        dest_layout.setSpacing(self._px(4))
+        self.export_details_container = QWidget(parent)
+        self.export_details_container.hide()
+        self.dest_group = QFrame(parent)
+        self.dest_group.hide()
 
         self.dest_btn_group = QButtonGroup(self)
-
-        self.rb_dest_subfolder = QRadioButton("Subcarpeta en origen")
+        self.rb_dest_subfolder = QRadioButton("Subcarpeta en origen", parent)
         self.rb_dest_subfolder.setChecked(True)
-        self.rb_dest_subfolder.setToolTip("Crea una subcarpeta dentro de cada carpeta de origen")
-        self.dest_btn_group.addButton(self.rb_dest_subfolder)
+        self.rb_dest_subfolder.hide()
         self.rb_dest_subfolder.toggled.connect(lambda checked: checked and self._update_export_destination_label())
-        dest_layout.addWidget(self.rb_dest_subfolder)
+        self.dest_btn_group.addButton(self.rb_dest_subfolder)
 
-        custom_row = QHBoxLayout()
-        self.rb_dest_custom = QRadioButton("Carpeta personalizada:")
-        self.rb_dest_custom.setToolTip("Exportar todas las imágenes a una única carpeta")
+        self.rb_dest_custom = QRadioButton("Carpeta personalizada", parent)
+        self.rb_dest_custom.hide()
         self.rb_dest_custom.toggled.connect(self._on_dest_custom_toggled)
         self.dest_btn_group.addButton(self.rb_dest_custom)
-        custom_row.addWidget(self.rb_dest_custom)
 
-        self.btn_choose_dest = QPushButton("Elegir...")
-        self.btn_choose_dest.setFixedWidth(self._px(80))
-        self.btn_choose_dest.setEnabled(False)
+        self.btn_choose_dest = QPushButton("Elegir...", parent)
+        self.btn_choose_dest.hide()
         self.btn_choose_dest.clicked.connect(self._choose_custom_dest)
-        custom_row.addWidget(self.btn_choose_dest)
-        custom_row.addStretch()
-        dest_layout.addLayout(custom_row)
 
-        self.lbl_custom_dest = QLabel("")
+        self.lbl_custom_dest = QLabel("", parent)
         self.lbl_custom_dest.setProperty("class", "muted")
-        self.lbl_custom_dest.setContentsMargins(self._px(20), 0, 0, 0)
         self.lbl_custom_dest.hide()
-        dest_layout.addWidget(self.lbl_custom_dest)
-
-        dest_group.hide()
-        self.dest_group = dest_group
-        details_layout.addWidget(dest_group)
-        details_container.hide()
-        self.export_details_container = details_container
-
-        self.selected_folders = []
-        self.custom_output_path = None
-        self.export_details_visible = False
-
-        return bar
     
     def _create_preview_panel(self) -> QWidget:
         """Create the central canvas workbench with a single unified toolbar."""
@@ -1479,7 +1579,7 @@ class MainWindow(QMainWindow):
         self.ui_view_state.active_folder = str(folder)
         self.grid_preview.set_folder(str(folder))
         self.grid_preview.set_image_overrides(self.image_overrides)
-        settings = self._get_shadow_settings()
+        settings = self._get_effective_preview_settings()
         self.grid_preview.set_settings(settings, self.scale_curve)
         label = folder.name
         if hasattr(self, "_grid_folder_labels"):
@@ -1670,7 +1770,7 @@ class MainWindow(QMainWindow):
         self.ui_view_state.active_folder = str(folder)
         self.grid_preview.set_folder(str(folder))
         self.grid_preview.set_image_overrides(self.image_overrides)
-        settings = self._get_shadow_settings()
+        settings = self._get_effective_preview_settings()
         self.grid_preview.set_settings(settings, self.scale_curve)
         label = folder.name
         if hasattr(self, "_grid_folder_labels"):
@@ -1924,6 +2024,7 @@ class MainWindow(QMainWindow):
             format=self.app_settings.get('format', 'JPG'),
             transparent_bg=self.app_settings.get('transparent_bg', False),
             bg_color=self.app_settings.get('bg_color', (230, 230, 230)),
+            variants=self.export_variants,
             output_width=self.app_settings.get('output_width', 1800),
             output_height=self.app_settings.get('output_height', 2400),
             naming_template=self.app_settings.get('naming_template', '{original}{suffix}'),
@@ -1932,6 +2033,7 @@ class MainWindow(QMainWindow):
         )
 
     def _apply_export_preferences(self, config: ExportConfig):
+        self._store_export_variants(normalize_export_variants(config), save=False)
         self.custom_output_path = Path(config.custom_output_path) if config.custom_output_path else None
         is_custom = config.output_destination == 'custom'
         self.app_settings['output_destination'] = 'custom' if is_custom else 'subfolder'
@@ -1949,19 +2051,288 @@ class MainWindow(QMainWindow):
 
     def _update_export_destination_label(self):
         """Keep the persistent export bar destination summary in sync."""
-        if not hasattr(self, 'lbl_destination_summary'):
-            return
         if hasattr(self, 'rb_dest_custom') and self.rb_dest_custom.isChecked():
             if self.custom_output_path:
-                text = f"Destino: {self.custom_output_path}"
+                text = f"carpeta personalizada: {self.custom_output_path}"
             else:
-                text = "Destino: carpeta personalizada sin elegir"
+                text = "carpeta personalizada sin elegir"
         else:
             folder_name = self.app_settings.get('output_folder_name', '_SALIDA_PRO')
-            text = f"Destino: subcarpeta en origen ({folder_name})"
-        self.lbl_destination_summary.setText(text)
+            text = f"origen / {folder_name}"
         if hasattr(self, 'batch_summary'):
-            self.batch_summary.destination_label = text.replace("Destino: ", "", 1)
+            self.batch_summary.destination_label = text
+        self._update_export_bar_state()
+
+    def _elide_text(self, label: QLabel, text: str, minimum_width: int = 80) -> str:
+        width = max(label.width(), self._px(minimum_width))
+        return label.fontMetrics().elidedText(str(text), Qt.TextElideMode.ElideRight, width)
+
+    def _set_elided_label(self, label: QLabel, text: str, tooltip: str | None = None, minimum_width: int = 80):
+        label.setProperty("full_text", str(text))
+        label.setProperty("full_tooltip", str(tooltip or text))
+        label.setText(self._elide_text(label, text, minimum_width))
+        label.setToolTip(str(tooltip or text))
+
+    def _refresh_elided_export_labels(self):
+        for label in (
+            getattr(self, "lbl_folder_summary", None),
+            getattr(self, "lbl_export_config_summary", None),
+            getattr(self, "lbl_destination_summary", None),
+            getattr(self, "lbl_outputs_summary", None),
+            getattr(self, "lbl_progress_status", None),
+        ):
+            if label is None:
+                continue
+            text = label.property("full_text")
+            if text:
+                self._set_elided_label(label, str(text), str(label.property("full_tooltip") or text))
+
+    def _plural(self, count: int, singular: str, plural: str) -> str:
+        return singular if int(count) == 1 else plural
+
+    def _format_batch_summary_text(self) -> str:
+        folders = int(getattr(self.batch_summary, "folders_count", 0))
+        images = int(getattr(self.batch_summary, "images_count", 0))
+        adjusted = int(getattr(self.batch_summary, "adjusted_count", 0))
+        if folders <= 0:
+            return "Sin lote cargado"
+        folder_text = f"{folders} {self._plural(folders, 'carpeta', 'carpetas')}"
+        image_text = f"{images} {self._plural(images, 'imagen', 'imágenes')}"
+        if adjusted:
+            return f"{folder_text} · {image_text} · {adjusted} ajustadas"
+        return f"{folder_text} · {image_text}"
+
+    def _format_destination_summary(self) -> tuple[str, str]:
+        if hasattr(self, 'rb_dest_custom') and self.rb_dest_custom.isChecked():
+            if self.custom_output_path:
+                return "Destino: carpeta personalizada", str(self.custom_output_path)
+            return "Destino: personalizada sin elegir", "Elige una carpeta personalizada o usa subcarpeta en origen."
+        folder_name = self.app_settings.get('output_folder_name', '_SALIDA_PRO')
+        return f"Destino: origen / {folder_name}", f"Se creará {folder_name} dentro de cada carpeta de origen."
+
+    def _format_export_config_summary(self) -> tuple[str, str]:
+        config = self._build_export_config_from_settings()
+        fmt = str(config.format).upper()
+        size = f"{config.output_width}×{config.output_height}"
+        active = self._active_export_variants()
+        if active:
+            first = active[0]
+            bg_text = "transparente" if first.transparent_bg else self._variant_hex(first)
+            output_count = f"{len(active)} {self._plural(len(active), 'salida', 'salidas')}"
+        else:
+            bg_text = "sin salida activa"
+            output_count = "0 salidas"
+        summary = f"{fmt} · {size} · {bg_text} · {output_count}"
+        tooltip = (
+            f"Formato general: {fmt}\n"
+            f"Tamaño: {size} px\n"
+            f"Fondo mostrado: {bg_text}\n"
+            f"Plantilla: {config.naming_template}"
+        )
+        return summary, tooltip
+
+    def _format_outputs_summary(self) -> tuple[str, str]:
+        active = self._active_export_variants()
+        if not active:
+            return "Salidas: ninguna activa", "Activa al menos una versión de salida."
+        compact = " + ".join(variant.label for variant in active)
+        detail_lines = []
+        for variant in active:
+            bg = "transparente" if variant.transparent_bg else self._variant_hex(variant)
+            suffix = variant.suffix or "(sin sufijo)"
+            shadow = ""
+            if variant.shadow_opacity_override is not None:
+                shadow = f" · sombra {variant.shadow_opacity_override}"
+            elif variant.shadow_opacity_delta:
+                shadow = f" · sombra {variant.shadow_opacity_delta:+d}"
+            detail_lines.append(f"{variant.label}: {bg} · {suffix}{shadow}")
+        return f"Salidas: {compact}", "\n".join(detail_lines)
+
+    def _process_button_text(self) -> str:
+        images = int(getattr(self.batch_summary, "images_count", 0))
+        if images == 1:
+            return "Procesar 1 imagen"
+        if images > 1:
+            return f"Procesar {images} imágenes"
+        return "Procesar lote"
+
+    def _update_export_bar_state(self):
+        if not hasattr(self, "btn_process"):
+            return
+
+        folders = int(getattr(self.batch_summary, "folders_count", 0))
+        images = int(getattr(self.batch_summary, "images_count", 0))
+        active_outputs = self._active_export_variants()
+        processing = self.export_bar_mode in {"processing", "paused", "stopping"}
+
+        self._set_elided_label(self.lbl_folder_summary, self._format_batch_summary_text())
+
+        export_text, export_tooltip = self._format_export_config_summary()
+        self._set_elided_label(self.lbl_export_config_summary, export_text, export_tooltip)
+
+        dest_text, dest_tooltip = self._format_destination_summary()
+        self._set_elided_label(self.lbl_destination_summary, dest_text, dest_tooltip)
+
+        outputs_text, outputs_tooltip = self._format_outputs_summary()
+        self._set_elided_label(self.lbl_outputs_summary, outputs_text, outputs_tooltip)
+
+        can_process = folders > 0 and images > 0 and bool(active_outputs)
+        self.btn_clear_folders.setEnabled(folders > 0 and not processing)
+        self.btn_export_details.setEnabled(folders > 0 and not processing)
+        self.btn_add_folder.setEnabled(not processing)
+        self.btn_export_config.setEnabled(not processing)
+        self.btn_outputs.setEnabled(not processing)
+        self.btn_process.setEnabled(can_process and not processing)
+        self.btn_process.setText(self._process_button_text())
+
+        if folders <= 0:
+            status = "Añade una carpeta para procesar"
+            show_progress = False
+        elif images <= 0:
+            status = "No hay PNG válidos"
+            show_progress = False
+        elif self.export_bar_mode == "processing":
+            status = self._export_bar_status_text or "Procesando..."
+            show_progress = True
+        elif self.export_bar_mode == "paused":
+            status = "Pausado"
+            show_progress = True
+        elif self.export_bar_mode == "stopping":
+            status = "Deteniendo..."
+            show_progress = True
+        elif self._pre_render_bar_status:
+            status, prepared, total = self._pre_render_bar_status
+            show_progress = total > 0
+            if total > 0:
+                self.progress_bar.setValue(int((prepared / total) * 100))
+        else:
+            status = "Listo para procesar"
+            show_progress = False
+
+        self._set_elided_label(self.lbl_progress_status, status)
+        self.progress_bar.setVisible(show_progress)
+        if not show_progress:
+            self.progress_bar.setValue(0)
+
+        self.export_action_stack.setCurrentIndex(1 if processing else 0)
+        if hasattr(self, "btn_pause"):
+            self.btn_pause.setVisible(processing and len(self.selected_folders) > 1)
+        if hasattr(self, "btn_stop"):
+            self.btn_stop.setVisible(processing)
+
+        tooltip = self._format_outputs_summary()[1]
+        self.btn_process.setToolTip(
+            f"{self._process_button_text()}\n{tooltip}" if can_process else status
+        )
+
+    def _variant_hex(self, variant: ExportVariant) -> str:
+        return "#{:02X}{:02X}{:02X}".format(*variant.bg_color)
+
+    def _variant_short_label(self, variant: ExportVariant) -> str:
+        if variant.id == "web_rgb230":
+            return "Web"
+        if variant.id == "white_rgb255":
+            return "Blanco"
+        return variant.label.split()[0] if variant.label else variant.id
+
+    def _format_variant_chip_text(self, variant: ExportVariant) -> str:
+        bg_text = "Transp." if variant.transparent_bg else self._variant_hex(variant)
+        parts = [self._variant_short_label(variant), bg_text]
+        if variant.suffix:
+            parts.append(variant.suffix)
+        if variant.shadow_opacity_override is not None:
+            parts.append(f"sombra {variant.shadow_opacity_override}")
+        elif variant.shadow_opacity_delta:
+            parts.append(f"sombra {variant.shadow_opacity_delta:+d}")
+        return " · ".join(parts)
+
+    def _active_export_variants(self) -> list[ExportVariant]:
+        return [variant for variant in self.export_variants if variant.enabled]
+
+    def _active_variant_labels(self) -> list[str]:
+        return [variant.label for variant in self._active_export_variants()]
+
+    def _refresh_output_summary_label(self):
+        self._update_export_bar_state()
+
+    def _sync_legacy_export_fields_from_variants(self):
+        variants = self.export_variants or normalize_export_variants(self.app_settings)
+        primary = variants[0]
+        self.app_settings['transparent_bg'] = primary.transparent_bg
+        self.app_settings['bg_color'] = primary.bg_color
+        self.app_settings['suffix'] = primary.suffix
+
+    def _store_export_variants(self, variants: list[ExportVariant], *, save: bool = True):
+        self.export_variants = normalize_export_variants({"variants": [variant.model_dump() for variant in variants]})
+        if not any(variant.id == self.current_preview_variant_id for variant in self.export_variants):
+            self.current_preview_variant_id = self.export_variants[0].id
+        self.app_settings['variants'] = [variant.model_dump() for variant in self.export_variants]
+        self.app_settings['current_preview_variant_id'] = self.current_preview_variant_id
+        self._sync_legacy_export_fields_from_variants()
+        if save:
+            self._save_app_settings()
+        self._refresh_export_variants_ui()
+        self._refresh_output_summary_label()
+
+    def _refresh_export_variants_ui(self):
+        self._update_export_bar_state()
+
+    def _set_variant_enabled(self, variant_id: str, enabled: bool):
+        variants = [
+            variant.model_copy(update={"enabled": bool(enabled)}) if variant.id == variant_id else variant
+            for variant in self.export_variants
+        ]
+        self._store_export_variants(variants)
+
+    def _select_preview_variant(self, variant_id: str):
+        if not any(variant.id == variant_id for variant in self.export_variants):
+            return
+        self.current_preview_variant_id = variant_id
+        self.app_settings['current_preview_variant_id'] = variant_id
+        self._save_app_settings()
+        self._refresh_export_variants_ui()
+        self._schedule_preview()
+
+    def _add_or_enable_white_variant(self):
+        self._add_or_enable_template_variant(WHITE_RGB255.model_copy(update={"enabled": True}))
+
+    def _add_or_enable_web_variant(self):
+        self._add_or_enable_template_variant(WEB_RGB230.model_copy(update={"enabled": True}))
+
+    def _add_or_enable_template_variant(self, template: ExportVariant):
+        variants = []
+        found = False
+        for variant in self.export_variants:
+            if variant.id == template.id:
+                variants.append(variant.model_copy(update={"enabled": True}))
+                found = True
+            else:
+                variants.append(variant)
+        if not found:
+            variants.append(template)
+        self.current_preview_variant_id = template.id
+        self._store_export_variants(variants)
+        self._schedule_preview()
+
+    def _current_preview_variant(self) -> ExportVariant:
+        for variant in self.export_variants:
+            if variant.id == self.current_preview_variant_id:
+                return variant
+        self.current_preview_variant_id = self.export_variants[0].id
+        return self.export_variants[0]
+
+    def _get_effective_preview_settings(self, path: str | None = None) -> ShadowSettings:
+        return build_variant_settings(
+            self._get_effective_shadow_settings(path),
+            self._current_preview_variant(),
+        )
+
+    def _open_export_variants_dialog(self):
+        dlg = ExportVariantsDialog(self.export_variants, self)
+        if dlg.exec():
+            self._store_export_variants(dlg.get_variants())
+            self._schedule_preview()
+            self._show_feedback("Salidas actualizadas")
 
     def _refresh_presets_combo(self, preferred_name: str | None = None):
         current_name = preferred_name or self.combo_presets.currentText()
@@ -2209,7 +2580,7 @@ class MainWindow(QMainWindow):
     def _deferred_grid_sync(self):
         """Push current settings to the grid preview widget (heavy operation)."""
         if hasattr(self, 'grid_preview'):
-            settings = self._get_shadow_settings()
+            settings = self._get_effective_preview_settings()
             self.grid_preview.set_settings(settings, self.scale_curve)
             self.grid_preview.set_image_overrides(self.image_overrides)
 
@@ -2239,9 +2610,7 @@ class MainWindow(QMainWindow):
             return
         try:
             export_config = self._build_export_config_from_settings()
-            settings = self._get_shadow_settings()
-            settings.transparent_bg = export_config.transparent_bg
-            settings.bg_color = export_config.bg_color
+            settings = self._get_effective_preview_settings()
             max_cache_mb = int(self.app_settings.get('background_pre_render_cache_mb', 2048))
             self.pre_render_scheduler.update_context(
                 enabled=True,
@@ -2251,7 +2620,7 @@ class MainWindow(QMainWindow):
                 settings_dict=settings.model_dump(),
                 curve_dict=self.scale_curve.model_dump() if self.scale_curve else None,
                 target_size=(export_config.output_width, export_config.output_height),
-                export_format=export_config.format,
+                export_format=variant_export_format(export_config, self._current_preview_variant()),
                 image_overrides=self.image_overrides,
                 idle_ms=int(self.app_settings.get('background_pre_render_idle_ms', 8000)),
                 max_cache_bytes=max_cache_mb * 1024 * 1024,
@@ -2268,8 +2637,8 @@ class MainWindow(QMainWindow):
             return
 
         if state == "idle" or total <= 0:
-            self.lbl_progress_status.hide()
-            self.progress_bar.setValue(0)
+            self._pre_render_bar_status = None
+            self._update_export_bar_state()
             return
 
         if state == "preparing":
@@ -2281,10 +2650,8 @@ class MainWindow(QMainWindow):
         else:
             text = "Pausado por actividad" if prepared <= 0 else f"Caché parcial {prepared}/{total}"
 
-        self.lbl_progress_status.setText(text)
-        self.lbl_progress_status.setToolTip("Se pausa automáticamente mientras usas la app.")
-        self.lbl_progress_status.show()
-        self.progress_bar.setValue(int((prepared / total) * 100) if total else 0)
+        self._pre_render_bar_status = (text, int(prepared), int(total))
+        self._update_export_bar_state()
     
     def _start_preview_thread(self):
         """Start an asynchronous preview render using cached assets."""
@@ -2308,7 +2675,7 @@ class MainWindow(QMainWindow):
             worker = PreviewWorker(
                 self.current_base_pil,
                 self.preview_size,
-                self._get_effective_shadow_settings().model_dump(),
+                self._get_effective_preview_settings().model_dump(),
                 self.scale_curve.model_dump(),
                 self.preview_scale_ratio,
                 quality_level=1
@@ -2409,6 +2776,10 @@ class MainWindow(QMainWindow):
         """Append errors to a local log file for debugging."""
         logger = self._setup_logger()
         logger.error(message)
+
+    def _on_export_log(self, message: str):
+        self._last_export_error_message = str(message)
+        self._log_error(message)
 
     def _on_angle_changed(self, angle: int):
         self.angle_spinbox.blockSignals(True)
@@ -2876,30 +3247,7 @@ class MainWindow(QMainWindow):
         # Show/hide elements in panel (details live in a dialog; keep hidden to avoid resizing)
         self.folder_list.setVisible(False)
         self.dest_group.setVisible(False)
-        self.btn_clear_folders.setEnabled(has_folders)
-        self.btn_process.setEnabled(has_folders and total_images > 0)
         self.export_details_container.setVisible(False)
-        self.btn_export_details.setEnabled(has_folders)
-        
-        # Update summary label
-        if not has_folders:
-            self.lbl_folder_summary.setText("Sin lote cargado")
-            self.lbl_folder_summary.show()
-        elif len(self.selected_folders) == 1:
-            adjusted_text = f" · {adjusted_count} ajustadas" if adjusted_count else ""
-            self.lbl_folder_summary.setText(f"1 carpeta · {total_images} imágenes{adjusted_text}")
-            self.lbl_folder_summary.show()
-        else:
-            adjusted_text = f" · {adjusted_count} ajustadas" if adjusted_count else ""
-            self.lbl_folder_summary.setText(f"{len(self.selected_folders)} carpetas · {total_images} imágenes{adjusted_text}")
-            self.lbl_folder_summary.show()
-        
-        # Update process button text
-        if total_images > 0:
-            self.btn_process.setText(f"Procesar {total_images} imágenes")
-        else:
-            self.btn_process.setText("Procesar lote")
-        # Keep details button text/icon unchanged
 
         self.batch_summary = BatchSummary(
             folders_count=len(self.selected_folders),
@@ -2909,6 +3257,9 @@ class MainWindow(QMainWindow):
             if hasattr(self, "lbl_destination_summary") else "Subcarpeta en origen",
         )
         self._update_batch_header()
+        if self.export_bar_mode not in {"processing", "paused", "stopping"}:
+            self.export_bar_mode = "ready" if has_folders and total_images > 0 else "idle"
+        self._update_export_bar_state()
          
         self._sync_grid_preview_with_folders()
         self._sync_folder_watcher()
@@ -2948,7 +3299,7 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(self._px(16), self._px(12), self._px(16), self._px(12))
         layout.setSpacing(self._px(10))
 
-        summary = QLabel(self.lbl_folder_summary.text())
+        summary = QLabel(str(self.lbl_folder_summary.property("full_text") or self.lbl_folder_summary.text()))
         summary.setProperty("class", "dialog-text")
         layout.addWidget(summary)
 
@@ -3064,27 +3415,11 @@ class MainWindow(QMainWindow):
         # Stop opportunistic background work to free resources
         if hasattr(self, "pre_render_scheduler"):
             self.pre_render_scheduler.shutdown()
+        self._last_export_error_message = ""
 
         # Ensure we are working with the latest on-disk images before exporting.
         self._update_folder_ui()
-        
-        self.btn_process.hide()
-        self.btn_add_folder.setEnabled(False)
-        self.btn_clear_folders.setEnabled(False)
-        self.process_controls_widget.show()
-        self.lbl_progress_status.show()
-        
-        # Reset pause button state
-        self.btn_pause.setText("Pausar")
-        self.btn_pause.setIcon(qta.icon('fa5s.pause', color='white'))
-        self._set_widget_class(self.btn_pause, "warning-solid")
-        
-        # Only show pause button for queue (multiple folders)
-        if len(self.selected_folders) > 1:
-            self.btn_pause.show()
-        else:
-            self.btn_pause.hide()
-        
+
         # Build export config
         use_custom_dest = self.rb_dest_custom.isChecked()
         custom_output = str(self.custom_output_path) if self.custom_output_path else None
@@ -3104,6 +3439,7 @@ class MainWindow(QMainWindow):
             format=self.app_settings.get('format', 'JPG'),
             transparent_bg=self.app_settings.get('transparent_bg', False),
             bg_color=self.app_settings.get('bg_color', (230, 230, 230)),
+            variants=self.export_variants,
             output_width=self.app_settings.get('output_width', 1800),
             output_height=self.app_settings.get('output_height', 2400),
             naming_template=self.app_settings.get('naming_template', '{original}{suffix}'),
@@ -3111,19 +3447,46 @@ class MainWindow(QMainWindow):
             custom_output_path=custom_output
         )
 
+        active_variants = get_enabled_export_variants(export_config)
+        if not active_variants:
+            QMessageBox.warning(
+                self,
+                "Sin salidas activas",
+                "Activa al menos una variante de salida antes de procesar."
+            )
+            self._reset_export_ui()
+            return
+
         if export_config.output_destination == 'custom':
-            self._last_export_destinations = [str(Path(export_config.custom_output_path))]
+            base_destinations = [Path(export_config.custom_output_path)]
         else:
-            self._last_export_destinations = [
-                str(Path(folder) / export_config.output_folder_name)
-                for folder in self.selected_folders
-            ]
+            base_destinations = [Path(folder) / export_config.output_folder_name for folder in self.selected_folders]
+
+        destination_paths = []
+        for destination in base_destinations:
+            for variant in active_variants:
+                destination_paths.append(str(variant_output_folder(destination, variant)))
+        self._last_export_destinations = sorted(set(destination_paths))
+        self._last_export_variant_labels = [variant.label for variant in active_variants]
         
         # Snapshot image lists at start to keep export consistent.
         snapshot_files = {
             folder: sorted(folder.glob("*.png"))
             for folder in self.selected_folders
         }
+        self._last_export_source_count = sum(len(files) for files in snapshot_files.values())
+        self._last_export_file_total = self._last_export_source_count * len(active_variants)
+
+        self.export_bar_mode = "processing"
+        self._pre_render_bar_status = None
+        self._export_bar_status_text = "Procesando..."
+        self.progress_bar.setValue(0)
+        self.btn_pause.setText("Pausar")
+        self.btn_pause.setIcon(qta.icon('fa5s.pause', color='white'))
+        self._set_widget_class(self.btn_pause, "warning-solid")
+        self.btn_stop.setText("Detener")
+        self.btn_stop.setEnabled(True)
+        self._update_export_bar_state()
 
         # Single folder - use simple ExportWorker
         if len(self.selected_folders) == 1:
@@ -3136,10 +3499,11 @@ class MainWindow(QMainWindow):
                 image_overrides=self.image_overrides
             )
             self.worker.progress_updated.connect(self.progress_bar.setValue)
-            self.worker.log_updated.connect(self._log_error)
+            self.worker.log_updated.connect(self._on_export_log)
             self.worker.finished_process.connect(self._on_export_finished)
             self.worker.finished.connect(self._on_single_worker_thread_finished)
-            self.lbl_progress_status.setText(f"Procesando: {self.selected_folders[0].name}")
+            self._export_bar_status_text = f"Procesando: {self.selected_folders[0].name}"
+            self._update_export_bar_state()
             self.worker.start()
         else:
             # Multiple folders - use QueueWorker
@@ -3160,6 +3524,7 @@ class MainWindow(QMainWindow):
             
             self.queue_worker.job_started.connect(self._on_queue_job_started)
             self.queue_worker.job_progress.connect(self._on_queue_job_progress)
+            self.queue_worker.log_message.connect(self._on_export_log)
             self.queue_worker.queue_finished.connect(self._on_queue_finished)
             self.queue_worker.finished.connect(self._on_queue_worker_thread_finished)
             self.queue_worker.start()
@@ -3167,7 +3532,9 @@ class MainWindow(QMainWindow):
     def _on_queue_job_started(self, index: int, folder_path: str):
         """Called when a job in the queue starts."""
         folder_name = Path(folder_path).name
-        self.lbl_progress_status.setText(f"[{index+1}/{len(self.selected_folders)}] {folder_name}")
+        self.export_bar_mode = "processing"
+        self._export_bar_status_text = f"[{index+1}/{len(self.selected_folders)}] {folder_name}"
+        self._update_export_bar_state()
     
     def _on_queue_job_progress(self, index: int, progress: int):
         """Called when a job's progress updates."""
@@ -3181,12 +3548,15 @@ class MainWindow(QMainWindow):
         self._reset_export_ui()
 
         if errors == 0:
+            labels = ", ".join(self._last_export_variant_labels) or "ninguna"
             self._show_export_result_dialog(
                 title="Cola completada",
                 success=True,
                 summary_lines=[
                     f"✓ {completed} carpetas procesadas",
-                    f"{total_images} imágenes exportadas",
+                    f"{self._last_export_source_count} imágenes procesadas",
+                    f"{total_images} archivos exportados",
+                    f"Salidas: {labels}",
                 ],
                 destinations=self._last_export_destinations,
             )
@@ -3197,6 +3567,8 @@ class MainWindow(QMainWindow):
                 summary_lines=[
                     f"✓ {completed} carpetas completadas",
                     f"✗ {errors} carpetas con errores",
+                    f"{total_images} archivos exportados",
+                    self._last_export_error_message,
                 ],
                 destinations=self._last_export_destinations,
             )
@@ -3208,16 +3580,19 @@ class MainWindow(QMainWindow):
             
         if self.queue_worker.is_paused:
             self.queue_worker.resume()
+            self.export_bar_mode = "processing"
             self.btn_pause.setText("Pausar")
             self.btn_pause.setIcon(qta.icon('fa5s.pause', color='white'))
             self._set_widget_class(self.btn_pause, "warning-solid")
-            self.lbl_progress_status.setText("Procesando...")
+            self._export_bar_status_text = "Procesando..."
         else:
             self.queue_worker.pause()
+            self.export_bar_mode = "paused"
             self.btn_pause.setText("Reanudar")
             self.btn_pause.setIcon(qta.icon('fa5s.play', color='white'))
             self._set_widget_class(self.btn_pause, "success-solid")
-            self.lbl_progress_status.setText("Pausado (terminando imagen actual...)")
+            self._export_bar_status_text = "Pausado"
+        self._update_export_bar_state()
 
     def _stop_export(self):
         """Stop current export or queue."""
@@ -3226,20 +3601,22 @@ class MainWindow(QMainWindow):
         elif hasattr(self, 'worker') and self.worker:
             self.worker.stop()
         
+        self.export_bar_mode = "stopping"
+        self._export_bar_status_text = "Deteniendo..."
         self.btn_stop.setText("Deteniendo...")
         self.btn_stop.setEnabled(False)
+        self._update_export_bar_state()
     
     def _reset_export_ui(self):
         """Reset export UI to idle state."""
-        self.process_controls_widget.hide()
         self.btn_stop.setText("Detener")
         self.btn_stop.setEnabled(True)
-        self.btn_process.show()
-        self.btn_add_folder.setEnabled(True)
-        self.btn_clear_folders.setEnabled(bool(self.selected_folders))
+        self.export_bar_mode = (
+            "ready" if getattr(self.batch_summary, "images_count", 0) > 0 and self.selected_folders else "idle"
+        )
+        self._export_bar_status_text = ""
         self.progress_bar.setValue(0)
-        self.lbl_progress_status.setText("Listo")
-        self.lbl_progress_status.hide()
+        self._update_export_bar_state()
         self._schedule_background_pre_render()
             
     def _on_export_finished(self, success: bool, processed: int = 0, total: int = 0, duration: float = 0.0):
@@ -3247,12 +3624,14 @@ class MainWindow(QMainWindow):
         self._reset_export_ui()
 
         if success:
+            labels = ", ".join(self._last_export_variant_labels) or "ninguna"
             self._show_export_result_dialog(
                 title="Proceso completado",
                 success=True,
                 summary_lines=[
-                    "Proceso completado con éxito",
-                    f"{processed}/{total} imágenes en {duration:.1f}s",
+                    f"{self._last_export_source_count} imágenes procesadas",
+                    f"{processed}/{total} archivos exportados en {duration:.1f}s",
+                    f"Salidas: {labels}",
                 ],
                 destinations=self._last_export_destinations,
             )
@@ -3262,7 +3641,8 @@ class MainWindow(QMainWindow):
                 success=False,
                 summary_lines=[
                     "Se detuvo o falló el proceso",
-                    f"{processed}/{total} imágenes en {duration:.1f}s",
+                    f"{processed}/{total} archivos exportados en {duration:.1f}s",
+                    self._last_export_error_message,
                 ],
                 destinations=self._last_export_destinations,
             )
@@ -3519,6 +3899,8 @@ class MainWindow(QMainWindow):
         layout.addLayout(header_row)
 
         for line in summary_lines:
+            if not line:
+                continue
             summary_label = QLabel(line)
             summary_label.setProperty("class", "dialog-text")
             layout.addWidget(summary_label)
@@ -3583,6 +3965,8 @@ class MainWindow(QMainWindow):
             pixmap = QPixmap.fromImage(self.current_qimage)
             self.canvas.setProcessedImage(pixmap)
         super().resizeEvent(event)
+        if hasattr(self, "lbl_export_config_summary"):
+            self._refresh_elided_export_labels()
             
     def closeEvent(self, event):
         """Save session state before closing and stop background preview tasks."""

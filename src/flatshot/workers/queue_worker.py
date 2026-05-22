@@ -6,7 +6,13 @@ from pathlib import Path
 from typing import List
 from time import time
 from PyQt6.QtCore import QThread, pyqtSignal
-from flatshot.core.models import ShadowSettings, ExportConfig, CurveData, JobItem
+from flatshot.core.models import (
+    ShadowSettings,
+    ExportConfig,
+    CurveData,
+    JobItem,
+    normalize_export_variants,
+)
 from flatshot.workers.export_worker import ExportWorker
 from flatshot.utils.log_manager import LogManager
 
@@ -74,7 +80,10 @@ class QueueWorker(QThread):
                 images = [Path(p) for p in job.input_files if Path(p).suffix.lower() == ".png"]
             else:
                 images = list(folder_path.glob("*.png"))
-            job.total_images = len(images)
+            active_variant_count = len(
+                [variant for variant in normalize_export_variants(self.export_config) if variant.enabled]
+            )
+            job.total_images = len(images) * max(1, active_variant_count)
             
             self.job_started.emit(index, str(folder_path))
             self.logger.log_export_start(folder_path.name, job.total_images, self.preset_name)

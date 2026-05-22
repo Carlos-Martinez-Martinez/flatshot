@@ -433,9 +433,12 @@ QPushButton[class="secondary"] {{
 QPushButton[class="secondary"]:hover {{
     background-color: {COLORS['bg_hover']};
 }}
-QPushButton[class="icon-btn"] {{
+QPushButton[class="icon-btn"],
+QToolButton[class="icon-btn"] {{
     background: transparent;
     border: none;
+    color: {COLORS['text_secondary']};
+    font-weight: 700;
     padding: 5px;
     border-radius: 6px;
     min-width: 28px;
@@ -443,10 +446,12 @@ QPushButton[class="icon-btn"] {{
     min-height: 28px;
     max-height: 28px;
 }}
-QPushButton[class="icon-btn"]:hover {{
+QPushButton[class="icon-btn"]:hover,
+QToolButton[class="icon-btn"]:hover {{
     background-color: {COLORS['bg_hover']};
 }}
-QPushButton[class="icon-btn"]:checked {{
+QPushButton[class="icon-btn"]:checked,
+QToolButton[class="icon-btn"]:checked {{
     background-color: {COLORS['accent_primary']};
     color: white;
 }}
@@ -916,6 +921,7 @@ QFrame[class="essential-card"] {{
 }}
 QFrame[class="export-cluster"],
 QFrame[class="export-summary"],
+QFrame[class="export-config"],
 QFrame[class="export-progress"],
 QFrame[class="export-actions"] {{
     background-color: transparent;

@@ -48,7 +48,7 @@ def _render_tile_preview(
 
         def _to_rgb_payload(pil_image: Image.Image):
             if pil_image.mode == "RGBA":
-                bg = Image.new("RGB", pil_image.size, (230, 230, 230))
+                bg = Image.new("RGB", pil_image.size, settings.bg_color)
                 bg.paste(pil_image, (0, 0), mask=pil_image)
                 pil_image = bg
             pil_image = pil_image.convert("RGB")

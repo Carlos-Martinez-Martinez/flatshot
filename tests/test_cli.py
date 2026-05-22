@@ -117,6 +117,40 @@ class TestNamingTemplate:
         
         assert result == "item_00007"
 
+    def test_apply_naming_template_variant_tokens(self):
+        """Test naming template with output variant placeholders."""
+        from flatshot.workers.export_worker import apply_naming_template
+
+        result = apply_naming_template(
+            "{original}_{variant_id}_{bg}{suffix}",
+            "camiseta_001",
+            "_BLANCO",
+            "Camisetas",
+            1,
+            variant_label="Blanco RGB255",
+            variant_id="white_rgb255",
+            bg="FFFFFF",
+        )
+
+        assert result == "camiseta_001_white_rgb255_FFFFFF_BLANCO"
+
+    def test_apply_naming_template_variant_suffix_example(self):
+        """Test the main variant suffix example keeps the expected filename."""
+        from flatshot.workers.export_worker import apply_naming_template
+
+        result = apply_naming_template(
+            "{original}{suffix}",
+            "camiseta_001",
+            "_BLANCO",
+            "Camisetas",
+            1,
+            variant_label="Blanco RGB255",
+            variant_id="white_rgb255",
+            bg="FFFFFF",
+        )
+
+        assert result == "camiseta_001_BLANCO"
+
 
 class TestProcessValidation:
     """Tests for process command input validation."""

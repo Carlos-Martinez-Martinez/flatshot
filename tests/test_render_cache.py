@@ -70,6 +70,25 @@ def test_render_cache_key_changes_with_format_size_settings_curve_and_override(t
     )
 
 
+def test_render_cache_key_changes_with_export_variant_background_and_opacity(tmp_path):
+    source = tmp_path / "source.png"
+    Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(source)
+
+    cache = RenderCache()
+    curve = {"xp": [0.0, 1.0], "fp": [1.0, 1.0]}
+    rgb230 = {"opacity": 20, "transparent_bg": False, "bg_color": (230, 230, 230)}
+    rgb255 = {"opacity": 20, "transparent_bg": False, "bg_color": (255, 255, 255)}
+    rgb255_shadow = {"opacity": 15, "transparent_bg": False, "bg_color": (255, 255, 255)}
+
+    key_rgb230 = cache.get_cache_key(str(source), rgb230, curve, (1800, 2400), {}, "jpg")
+
+    key_rgb255 = cache.get_cache_key(str(source), rgb255, curve, (1800, 2400), {}, "jpg")
+    key_rgb255_shadow = cache.get_cache_key(str(source), rgb255_shadow, curve, (1800, 2400), {}, "jpg")
+
+    assert key_rgb230 != key_rgb255
+    assert key_rgb255 != key_rgb255_shadow
+
+
 def test_render_cache_validate_rejects_corrupt_files_and_temp_sidecars(tmp_path):
     cache = RenderCache()
     cache.cache_dir = tmp_path / "cache"

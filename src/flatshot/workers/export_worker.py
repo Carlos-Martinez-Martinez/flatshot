@@ -15,16 +15,27 @@ from flatshot.core.engine import ShadowEngine
 from flatshot.core.models import (
     CurveData,
     ExportConfig,
+    ExportVariant,
     SHADOW_ENGINE_DEFAULT,
     ShadowSettings,
+    build_variant_settings,
+    normalize_export_variants,
     normalize_shadow_settings,
 )
 from flatshot.core.overrides import apply_image_override, override_key
 from flatshot.utils.render_cache import RenderCache
 
 
-def apply_naming_template(template: str, original_name: str, suffix: str, 
-                          folder_name: str, index: int) -> str:
+def apply_naming_template(
+    template: str,
+    original_name: str,
+    suffix: str,
+    folder_name: str,
+    index: int,
+    variant_label: str = "",
+    variant_id: str = "",
+    bg: str = "",
+) -> str:
     """
     Apply naming template to generate output filename.
     
@@ -32,6 +43,9 @@ def apply_naming_template(template: str, original_name: str, suffix: str,
     - {original}: Original filename without extension
     - {suffix}: The suffix from export config
     - {folder}: Parent folder name
+    - {variant}: Output variant label
+    - {variant_id}: Output variant id
+    - {bg}: Output background as RRGGBB
     - {index}: Zero-padded index (e.g., 001, 002)
     - {index:03d}: Custom padding format
     """
@@ -39,6 +53,9 @@ def apply_naming_template(template: str, original_name: str, suffix: str,
     result = result.replace("{original}", original_name)
     result = result.replace("{suffix}", suffix)
     result = result.replace("{folder}", folder_name)
+    result = result.replace("{variant}", _safe_filename_token(variant_label))
+    result = result.replace("{variant_id}", _safe_filename_token(variant_id))
+    result = result.replace("{bg}", _safe_filename_token(bg))
     
     # Handle index with optional format specifier
     if "{index:" in result:
@@ -54,10 +71,113 @@ def apply_naming_template(template: str, original_name: str, suffix: str,
     return result
 
 
+def _safe_filename_token(value: str) -> str:
+    text = str(value or "").strip()
+    for char in '<>:"/\\|?*':
+        text = text.replace(char, "_")
+    text = "".join("_" if ord(ch) < 32 else ch for ch in text)
+    return text.strip(" .")
+
+
+def variant_bg_token(variant: ExportVariant) -> str:
+    return "{:02X}{:02X}{:02X}".format(*variant.bg_color)
+
+
+def get_enabled_export_variants(export_config: ExportConfig) -> list[ExportVariant]:
+    return [variant for variant in normalize_export_variants(export_config) if variant.enabled]
+
+
+def variant_export_format(export_config: ExportConfig, variant: ExportVariant) -> str:
+    return RenderCache.normalize_format(variant.format or export_config.format)
+
+
+def variant_output_folder(base_output_folder: Path, variant: ExportVariant) -> Path:
+    if variant.output_subfolder:
+        return base_output_folder / variant.output_subfolder
+    return base_output_folder
+
+
+def build_variant_output_path(
+    base_output_folder: Path,
+    export_config: ExportConfig,
+    variant: ExportVariant,
+    original_name: str,
+    folder_name: str,
+    index: int,
+) -> tuple[Path, str]:
+    fmt = variant_export_format(export_config, variant)
+    output_folder = variant_output_folder(base_output_folder, variant)
+    base_name = apply_naming_template(
+        export_config.naming_template,
+        original_name,
+        variant.suffix,
+        folder_name,
+        index,
+        variant_label=variant.label,
+        variant_id=variant.id,
+        bg=variant_bg_token(variant),
+    )
+    return output_folder / f"{base_name}.{fmt}", fmt
+
+
+def _path_collision_key(path: Path) -> str:
+    return os.path.normcase(os.path.abspath(str(path)))
+
+
+def validate_output_path_collisions(planned_outputs: list[dict]) -> None:
+    seen: dict[str, dict] = {}
+    for item in planned_outputs:
+        key = _path_collision_key(Path(item["save_path"]))
+        previous = seen.get(key)
+        if previous is None:
+            seen[key] = item
+            continue
+
+        current_variant = item["variant"]
+        previous_variant = previous["variant"]
+        if current_variant.id != previous_variant.id:
+            raise ValueError(
+                "Las variantes "
+                f"{previous_variant.label} y {current_variant.label} generarían el mismo archivo. "
+                "Cambia el sufijo o la subcarpeta."
+            )
+
+        raise ValueError(
+            f"Dos entradas generarían el mismo archivo: {Path(item['save_path']).name}. "
+            "Cambia la plantilla de nombre, el sufijo o la subcarpeta."
+        )
+
+
 def process_single_image(args):
     """Process a single image in a worker process."""
-    (img_path, output_folder, settings_dict, target_size, 
-     naming_template, suffix, folder_name, index, fmt, curve_data_dict, local_override) = args
+    if len(args) == 8:
+        (
+            img_path,
+            save_path,
+            settings_dict,
+            target_size,
+            fmt,
+            curve_data_dict,
+            local_override,
+            display_name,
+        ) = args
+    else:
+        (
+            img_path,
+            output_folder,
+            settings_dict,
+            target_size,
+            naming_template,
+            suffix,
+            folder_name,
+            index,
+            fmt,
+            curve_data_dict,
+            local_override,
+        ) = args
+        base_name = apply_naming_template(naming_template, img_path.stem, suffix, folder_name, index)
+        save_path = Path(output_folder) / f"{base_name}.{fmt}"
+        display_name = str(img_path.name)
     
     try:
         # Reconstruct Pydantic models from dicts (pickle serialization fix).
@@ -79,12 +199,8 @@ def process_single_image(args):
         )
         warning = diagnostics.warning if diagnostics.fallback_used else None
         
-        # Apply naming template
-        base_name = apply_naming_template(
-            naming_template, img_path.stem, suffix, folder_name, index
-        )
-        save_name = f"{base_name}.{fmt}"
-        save_path = output_folder / save_name
+        save_path = Path(save_path)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
         
         if fmt in ['jpg', 'jpeg']:
             final_img = final_img.convert("RGB")
@@ -92,7 +208,7 @@ def process_single_image(args):
         else:
             final_img.save(save_path, optimize=False, compress_level=0, dpi=dpi)
             
-        return True, str(img_path.name), warning
+        return True, display_name, warning
     except Exception as e:
         return False, f"{img_path.name}: {e}", None
 
@@ -177,38 +293,32 @@ class ExportWorker(QThread):
                     if f.is_file() and f.suffix.lower() == '.png'
                 ]
             
-            total = len(image_items)
-            if total == 0:
+            source_total = len(image_items)
+            if source_total == 0:
                 self.finished_process.emit(True, 0, 0, 0.0)
                 return
 
-            folder_name = self.export_config.output_folder_name
-            suffix = self.export_config.suffix
-            fmt = RenderCache.normalize_format(self.export_config.format)
-            naming_template = self.export_config.naming_template
-            
-            # Use dynamic output size from config
-            target_size = (self.export_config.output_width, self.export_config.output_height)
-            
-            # Update settings with export config
-            self.settings.transparent_bg = self.export_config.transparent_bg
-            self.settings.bg_color = self.export_config.bg_color
-            
-            if self.export_config.output_destination == 'custom' and self.export_config.custom_output_path:
-                output_folder = Path(self.export_config.custom_output_path)
-            else:
-                output_folder = self.input_folder / folder_name
-            
-            try:
-                output_folder.mkdir(parents=True, exist_ok=True)
-            except Exception as exc:
-                self.log_updated.emit(f"No se pudo crear carpeta de salida '{output_folder}': {exc}")
+            enabled_variants = get_enabled_export_variants(self.export_config)
+            total = source_total * len(enabled_variants)
+            if not enabled_variants:
+                self.log_updated.emit("No hay variantes de salida activas. Activa al menos una salida.")
                 duration = time() - self.start_time
-                self.finished_process.emit(False, 0, total, duration)
+                self.finished_process.emit(False, 0, 0, duration)
                 return
 
+            self.log_updated.emit(
+                "Salidas activas: " + ", ".join(variant.label for variant in enabled_variants)
+            )
+
+            # Use dynamic output size from config
+            target_size = (self.export_config.output_width, self.export_config.output_height)
+
+            if self.export_config.output_destination == 'custom' and self.export_config.custom_output_path:
+                base_output_folder = Path(self.export_config.custom_output_path)
+            else:
+                base_output_folder = self.input_folder / self.export_config.output_folder_name
+
             # Convert Pydantic models to dicts for pickle serialization
-            settings_dict = self.settings.model_dump()
             curve_data_dict = self.curve_data.model_dump() if self.curve_data else None
             parent_folder_name = self.input_folder.name
 
@@ -218,56 +328,102 @@ class ExportWorker(QThread):
             # Build task list
             tasks = []
             cached_tasks = []
+            planned_outputs = []
             
             for index, (img_path, local_key, cache_identity_path) in enumerate(
                 sorted(image_items, key=lambda item: item[0].name),
                 start=1,
             ):
                 local_override = self.image_overrides.get(local_key, {})
-                
-                task_args = (
-                    img_path, output_folder, settings_dict, target_size,
-                    naming_template, suffix, parent_folder_name, index,
-                    fmt, curve_data_dict, local_override
-                )
 
-                # Check for export-ready cache
-                key = cache.get_cache_key(
-                    str(cache_identity_path),
-                    settings_dict,
-                    curve_data_dict,
-                    target_size,
-                    local_override,
-                    fmt,
-                )
-                if cache.exists(key, fmt, validate=True):
-                    cached_tasks.append((img_path, key, index, task_args))
-                else:
-                    tasks.append(task_args)
+                for variant in enabled_variants:
+                    variant_settings = build_variant_settings(self.settings, variant)
+                    settings_dict = variant_settings.model_dump()
+                    save_path, fmt = build_variant_output_path(
+                        base_output_folder,
+                        self.export_config,
+                        variant,
+                        img_path.stem,
+                        parent_folder_name,
+                        index,
+                    )
+                    display_name = f"{img_path.name} · {variant.label}"
+
+                    task_args = (
+                        img_path,
+                        save_path,
+                        settings_dict,
+                        target_size,
+                        fmt,
+                        curve_data_dict,
+                        local_override,
+                        display_name,
+                    )
+
+                    key = cache.get_cache_key(
+                        str(cache_identity_path),
+                        settings_dict,
+                        curve_data_dict,
+                        target_size,
+                        local_override,
+                        fmt,
+                    )
+
+                    planned_outputs.append(
+                        {
+                            "save_path": save_path,
+                            "variant": variant,
+                            "image_path": img_path,
+                        }
+                    )
+                    if cache.exists(key, fmt, validate=True):
+                        cached_tasks.append(
+                            {
+                                "img_path": img_path,
+                                "key": key,
+                                "fmt": fmt,
+                                "save_path": save_path,
+                                "task_args": task_args,
+                                "display_name": display_name,
+                            }
+                        )
+                    else:
+                        tasks.append(task_args)
+
+            try:
+                validate_output_path_collisions(planned_outputs)
+                for folder in sorted(
+                    {Path(item["save_path"]).parent for item in planned_outputs},
+                    key=lambda path: str(path),
+                ):
+                    folder.mkdir(parents=True, exist_ok=True)
+            except Exception as exc:
+                self.log_updated.emit(str(exc))
+                duration = time() - self.start_time
+                self.finished_process.emit(False, 0, total, duration)
+                return
 
             # Handle cached tasks first
             if cached_tasks:
-                self.log_updated.emit(f"Exportando {len(cached_tasks)} imágenes desde caché (instantáneo)...")
-                for img_path, key, index, task_args in cached_tasks:
+                self.log_updated.emit(f"Exportando {len(cached_tasks)} archivos desde caché...")
+                for cached in cached_tasks:
                     if not self.is_running: break
                     self._pause_event.wait()
                      
                     try:
-                        cache_path = cache.get_cached_path(key, fmt)
-                        base_name = apply_naming_template(
-                            naming_template, img_path.stem, suffix, parent_folder_name, index
-                        )
-                        save_name = f"{base_name}.{fmt}"
-                        save_path = output_folder / save_name
-
+                        cache_path = cache.get_cached_path(cached["key"], cached["fmt"])
+                        save_path = Path(cached["save_path"])
+                        save_path.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(cache_path, save_path)
                          
                         completed_count += 1
-                        self.image_completed.emit(img_path.name, True)
+                        self.image_completed.emit(cached["display_name"], True)
                         self.progress_updated.emit(int((completed_count / total) * 100))
                     except Exception as e:
-                        self.log_updated.emit(f"Caché no válida para {img_path.name}; renderizando normal ({e})")
-                        success, msg, warning = process_single_image(task_args)
+                        self.log_updated.emit(
+                            f"Caché no válida para {cached['display_name']}; renderizando normal ({e})"
+                        )
+                        success, msg, warning = process_single_image(cached["task_args"])
                         if success:
                             if warning: self.log_updated.emit(f"Aviso: {msg}: {warning}")
                             self.image_completed.emit(msg, True)
@@ -281,7 +437,7 @@ class ExportWorker(QThread):
             # Proceed with remaining tasks
             if tasks and self.is_running:
                 max_workers = max(1, (os.cpu_count() or 2) - 1)
-                self.log_updated.emit(f"Procesando {len(tasks)} imágenes restantes con {max_workers} núcleos...")
+                self.log_updated.emit(f"Procesando {len(tasks)} archivos restantes con {max_workers} núcleos...")
                 
                 try:
                     with ProcessPoolExecutor(max_workers=max_workers) as executor:

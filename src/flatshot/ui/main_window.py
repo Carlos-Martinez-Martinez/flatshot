@@ -51,6 +51,7 @@ from flatshot.application.export_config_service import ExportConfigService
 from flatshot.application.folder_scanner import FolderScanner
 from flatshot.application.preview_service import PreviewService
 from flatshot.application.preset_service import PresetService
+from flatshot.application.session_service import SessionService
 from flatshot.application.settings_service import SettingsService
 from flatshot.utils.config import ConfigManager
 from flatshot.utils.history_manager import HistoryManager
@@ -3854,25 +3855,22 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
 
-            session_data = {
-                'geometry': self.saveGeometry().toBase64().data().decode(),
-                'state': self.saveState().toBase64().data().decode(),
-                'selected_folders': [str(f) for f in self.selected_folders],
-                'current_preset': self.combo_presets.currentText(),
-                'current_mock': self.current_mock,
-                'splitter_sizes': self.splitter.sizes(),
-                'export_config': {
-                    'output_folder_name': self.app_settings.get('output_folder_name'),
-                    'suffix': self.app_settings.get('suffix'),
-                    'format': self.app_settings.get('format'),
-                    'output_destination': output_destination,
-                    'custom_output_path': str(self.custom_output_path) if self.custom_output_path else None
-                }
-            }
-            
             # Save current shadow settings
             current_settings = self._get_shadow_settings()
-            session_data['shadow_settings'] = current_settings.model_dump()
+            session_data = SessionService.build_session_data(
+                geometry=self.saveGeometry().toBase64().data().decode(),
+                state=self.saveState().toBase64().data().decode(),
+                selected_folders=self.selected_folders,
+                current_preset=self.combo_presets.currentText(),
+                current_mock=self.current_mock,
+                splitter_sizes=self.splitter.sizes(),
+                output_folder_name=self.app_settings.get('output_folder_name'),
+                suffix=self.app_settings.get('suffix'),
+                export_format=self.app_settings.get('format'),
+                output_destination=output_destination,
+                custom_output_path=self.custom_output_path,
+                shadow_settings=current_settings.model_dump(),
+            )
             
             self.session_manager.save_session(session_data)
             try:

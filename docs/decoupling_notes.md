@@ -479,3 +479,50 @@
   - exercised pause/resume and stop;
   - verified exported files exist and progress/button state resets.
 - Remaining risk: `ConfigManager` still owns the Qt-specific config directory resolver for compatibility. Session state still uses `SessionManager` directly, so Phase 7 is still partial.
+
+## Batch 9 implementation
+
+- Scope: Phase 7 partial, session service.
+- Added `SessionService` in `flatshot.application.session_service`.
+- Moved reusable session persistence and payload construction out of UI/utility code:
+  - default session file resolution;
+  - JSON load/save/clear;
+  - invalid or non-object session fallback;
+  - session payload shape for geometry, window state, selected folders, active preset, mockup, splitter sizes, export config and shadow settings.
+- Adapted `SessionManager` into a compatibility wrapper:
+  - it preserves `session_dir`, `session_file`, `save_session()`, `load_session()` and `clear_session()`;
+  - it delegates file IO to `SessionService`.
+- Adapted `MainWindow.closeEvent()` to build session data through `SessionService.build_session_data()` instead of assembling the dictionary inline.
+- Kept session restore logic in `MainWindow` because it still applies Qt geometry, widgets, folders and controls.
+- Preserved the existing `session.json` key shape and did not change preview, export, queue, cache, presets, settings format or `ShadowEngine`.
+
+## Batch 9 validation
+
+- Added `tests/test_session_service.py` with coverage for:
+  - `SessionService` staying free of Qt imports;
+  - default `~/.flatshot/session.json` path construction;
+  - save/load roundtrip including Unicode;
+  - missing, invalid and non-object JSON fallback;
+  - session clear behavior;
+  - session payload shape and path conversion;
+  - `SessionManager` delegation to `SessionService`.
+- `pytest tests/test_session_service.py -q` -> 7 passed.
+- `pytest tests/test_session_service.py tests/test_settings_service.py tests/test_preset_service.py tests/test_config_manager.py -q` -> 28 passed.
+- `python -m compileall -q src/flatshot/application src/flatshot/utils/session_manager.py src/flatshot/ui/main_window.py` -> passed.
+- `pytest` -> 174 passed.
+- `rg -n "PyQt6|QStandardPaths|QMessageBox|QWidget|QApplication" src/flatshot/application/session_service.py` -> no matches.
+- PyQt offscreen smoke with temporary config and temporary session file:
+  - pre-created a session through `SessionService`;
+  - instantiated `MainWindow` and verified selected folder and preset restoration;
+  - added a second folder and verified PNG count;
+  - selected a preset;
+  - adjusted an essential slider;
+  - selected an image through the grid handler;
+  - rendered central preview;
+  - validated export configuration;
+  - processed one folder;
+  - processed two folders through the queue;
+  - exercised pause/resume and stop;
+  - closed the window and verified saved session keys and export/session values.
+- Smoke used a thread-backed executor for export to avoid Windows multiprocessing-from-stdin issues while exercising the production worker/runner path.
+- Remaining risk: session restoration still lives in `MainWindow` because it applies Qt-specific state. Existing behavior only restores destination mode/custom path from `export_config`; it does not restore every saved export field. This was observed during smoke and left unchanged to avoid altering behavior in this refactor batch.

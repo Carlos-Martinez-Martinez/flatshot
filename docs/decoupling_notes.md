@@ -421,3 +421,61 @@
   - exercised pause/resume and stop;
   - verified exported files exist and progress/button state resets.
 - Remaining risk: Phase 7 is only partially complete. Preset operations still route through `ConfigManager`, which imports Qt for `QStandardPaths`; session state still uses `SessionManager` directly.
+
+## Batch 8 implementation
+
+- Scope: Phase 7 partial, preset service.
+- Added `PresetService` in `flatshot.application.preset_service`.
+- Moved reusable preset persistence/import/export logic out of `ConfigManager`:
+  - legacy `presets.json` load/save;
+  - categorized `presets_v2.json` load/save;
+  - legacy-to-categorized migration;
+  - categorized normalization with explicit `shadow_engine`;
+  - default categorized presets;
+  - flat preset listing;
+  - preserving categories when saving the current flat preset map;
+  - import/export bundle parsing and writing;
+  - pure create/rename/delete/update operations for flat presets.
+- Adapted `ConfigManager` into a compatibility wrapper:
+  - it still resolves the current Qt config directory;
+  - it delegates preset operations to `PresetService`.
+- Adapted `MainWindow` to instantiate `PresetService` with the current config directory and use it for:
+  - initial preset loading;
+  - saving current preset state;
+  - create/rename/delete operations;
+  - import/export;
+  - opening the preset folder via the cached config directory.
+- Preserved `presets.json`, `presets_v2.json`, import/export payload format, legacy migration behavior and UI messages/dialog ownership.
+- Did not change settings, session persistence, preview, export, queue, cache or `ShadowEngine`.
+
+## Batch 8 validation
+
+- Added `tests/test_preset_service.py` with coverage for:
+  - `PresetService` staying free of Qt imports;
+  - default presets using the current default shadow engine;
+  - legacy flat preset normalization;
+  - legacy-to-categorized migration;
+  - saving flat presets while preserving categories;
+  - export bundle format;
+  - import bundle merge plus legacy file sync;
+  - legacy flat import;
+  - pure save/create/rename/delete operations and invalid-name cases.
+- `pytest tests/test_preset_service.py tests/test_config_manager.py -q` -> 15 passed.
+- `python -m compileall -q src/flatshot/application src/flatshot/utils/config.py src/flatshot/ui/main_window.py` -> passed.
+- `pytest` -> 167 passed.
+- `rg -n "PyQt6|QStandardPaths|QMessageBox|QWidget|QApplication" src/flatshot/application/preset_service.py` -> no matches.
+- PyQt offscreen smoke with a temporary config directory:
+  - created categorized presets through `PresetService`;
+  - instantiated `MainWindow` and verified the preset was loaded;
+  - selected and saved the preset through existing UI methods;
+  - verified the legacy preset file was updated;
+  - added a folder and verified PNG count;
+  - waited for grid previews;
+  - adjusted an essential slider;
+  - selected an image through the grid handler;
+  - rendered central preview;
+  - processed one folder;
+  - processed two folders through the queue;
+  - exercised pause/resume and stop;
+  - verified exported files exist and progress/button state resets.
+- Remaining risk: `ConfigManager` still owns the Qt-specific config directory resolver for compatibility. Session state still uses `SessionManager` directly, so Phase 7 is still partial.

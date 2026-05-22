@@ -50,6 +50,7 @@ from flatshot.application.contracts import PreviewRequest
 from flatshot.application.export_config_service import ExportConfigService
 from flatshot.application.folder_scanner import FolderScanner
 from flatshot.application.preview_service import PreviewService
+from flatshot.application.preset_service import PresetService
 from flatshot.application.settings_service import SettingsService
 from flatshot.utils.config import ConfigManager
 from flatshot.utils.history_manager import HistoryManager
@@ -169,6 +170,8 @@ class MainWindow(QMainWindow):
         self.session_manager = SessionManager()
         self.folder_scanner = FolderScanner()
         self.export_config_service = ExportConfigService()
+        self.config_dir = ConfigManager.get_config_dir()
+        self.preset_service = PresetService(self.config_dir)
         
         # State
         self.selected_folders = []  # List of Path objects for multi-folder export
@@ -223,15 +226,11 @@ class MainWindow(QMainWindow):
         self._folder_update_timer.timeout.connect(self._process_folder_updates)
         
         # Load configuration
-        self.presets = ConfigManager.get_flat_presets_from_categorized(
-            ConfigManager.load_categorized_presets()
-        )
-        if not self.presets:
-            self.presets = ConfigManager.load_presets()
+        self.presets = self.preset_service.load_flat_presets()
         if not self.presets:
             self.presets = self._get_default_presets()
             
-        self.settings_file = ConfigManager.get_config_dir() / "settings.json"
+        self.settings_file = self.config_dir / "settings.json"
         self.settings_service = SettingsService(self.settings_file)
         self.app_settings = self._load_app_settings()
         self.export_variants = normalize_export_variants(self.app_settings)
@@ -1936,23 +1935,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", str(e))
             
     def _save_presets_to_disk(self):
-        # Keep legacy file for backward compatibility.
-        categorized = ConfigManager.load_categorized_presets()
-        category_names = set()
-        for category in categorized.categories.values():
-            for preset_name in list(category.presets.keys()):
-                category_names.add(preset_name)
-                if preset_name in self.presets:
-                    category.presets[preset_name] = self.presets[preset_name]
-                else:
-                    del category.presets[preset_name]
-
-        categorized.uncategorized = {
-            name: settings
-            for name, settings in self.presets.items()
-            if name not in category_names
-        }
-        ConfigManager.save_all_presets(categorized)
+        self.preset_service.save_flat_presets_preserving_categories(self.presets)
 
     def _build_export_config_from_settings(self) -> ExportConfig:
         output_destination_override = None
@@ -2852,7 +2835,11 @@ class MainWindow(QMainWindow):
     def _action_save_current(self):
         current_name = self.combo_presets.currentText()
         if current_name:
-            self.presets[current_name] = self._get_shadow_settings().model_dump()
+            self.presets = self.preset_service.save_current_preset(
+                self.presets,
+                current_name,
+                self._get_shadow_settings().model_dump(),
+            )
             self._save_presets_to_disk()
             self._show_feedback("Preset guardado")
             
@@ -2863,7 +2850,11 @@ class MainWindow(QMainWindow):
             if name in self.presets:
                 self._show_feedback("Ese preset ya existe")
                 return
-            self.presets[name] = self._get_shadow_settings().model_dump()
+            self.presets = self.preset_service.create_preset(
+                self.presets,
+                name,
+                self._get_shadow_settings().model_dump(),
+            )
             self._save_presets_to_disk()
             self.combo_presets.addItem(name)
             self.combo_presets.setCurrentText(name)
@@ -2877,7 +2868,7 @@ class MainWindow(QMainWindow):
             if new_name != old_name and new_name in self.presets:
                 self._show_feedback("Ya existe un preset con ese nombre")
                 return
-            self.presets[new_name] = self.presets.pop(old_name)
+            self.presets = self.preset_service.rename_preset(self.presets, old_name, new_name)
             self._save_presets_to_disk()
             self.combo_presets.setItemText(self.combo_presets.currentIndex(), new_name)
             self._show_feedback("Preset renombrado")
@@ -2886,7 +2877,7 @@ class MainWindow(QMainWindow):
         name = self.combo_presets.currentText()
         if QMessageBox.question(self, "Eliminar Preset", 
                                f"¿Eliminar '{name}'?") == QMessageBox.StandardButton.Yes:
-            del self.presets[name]
+            self.presets = self.preset_service.delete_preset(self.presets, name)
             self._save_presets_to_disk()
             self.combo_presets.removeItem(self.combo_presets.currentIndex())
             self._show_feedback("Preset eliminado")
@@ -2904,7 +2895,7 @@ class MainWindow(QMainWindow):
         if not file_path.lower().endswith(".json"):
             file_path = f"{file_path}.json"
 
-        if ConfigManager.export_presets_to_file(file_path):
+        if self.preset_service.export_presets_to_file(file_path):
             self._show_feedback("Presets exportados")
         else:
             QMessageBox.warning(
@@ -2939,7 +2930,7 @@ class MainWindow(QMainWindow):
         if clicked not in (merge_button, replace_button):
             return
 
-        imported = ConfigManager.import_presets_from_file(
+        imported = self.preset_service.import_presets_from_file(
             file_path,
             merge=(clicked == merge_button),
         )
@@ -2951,12 +2942,12 @@ class MainWindow(QMainWindow):
             )
             return
 
-        self.presets = ConfigManager.get_flat_presets_from_categorized(imported)
+        self.presets = self.preset_service.get_flat_presets_from_categorized(imported)
         self._refresh_presets_combo(current_name)
         self._show_feedback("Presets importados")
 
     def _action_open_presets_folder(self):
-        self._open_folder_in_explorer(ConfigManager.get_config_dir())
+        self._open_folder_in_explorer(self.config_dir)
              
     # ========== FOLDER & EXPORT ==========
     

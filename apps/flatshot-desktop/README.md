@@ -4,7 +4,7 @@ Prototipo navegable de la nueva app moderna de FlatShot.
 
 Estado actual:
 
-- APP.4 completada como escaneo real integrado en la nueva UI.
+- APP.4.5 completada como consolidación del shell visual.
 - Frontend estático en HTML/CSS/JS vanilla.
 - Sin `package.json`, Tauri, Rust, Node obligatorio ni dependencias nuevas.
 - Bridge HTTP local de desarrollo en Python.
@@ -164,6 +164,26 @@ Sigue siendo simulado:
 - ajustes aplicados por motor;
 - exportacion real;
 - progreso real.
+
+## Revisión visual APP.4.5
+
+Arrancar:
+
+```bash
+python apps/flatshot-desktop/run_dev.py --open
+```
+
+Revisar:
+
+- sin scroll horizontal;
+- sin scroll vertical global;
+- paneles laterales con scroll propio;
+- barra inferior siempre visible;
+- mock/bridge legible;
+- controles de revisión plegados por defecto;
+- escaneo real visible en el flujo principal;
+- preview pendiente clara;
+- exportación real marcada como no conectada.
 
 ### Feedback visual recomendado
 

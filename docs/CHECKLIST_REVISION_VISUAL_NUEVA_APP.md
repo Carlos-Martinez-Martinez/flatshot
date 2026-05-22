@@ -55,6 +55,18 @@ Usar antes de cerrar cada tanda visual de la nueva app.
 - [ ] Cambiar a `Mock` conserva escenarios de revision.
 - [ ] `Limpiar lote` deja un estado inicial claro.
 
+## APP.4.5 — Shell visual
+
+- [ ] No hay scroll horizontal.
+- [ ] No hay scroll vertical global.
+- [ ] La barra inferior está siempre visible.
+- [ ] Los paneles laterales tienen scroll interno si hace falta.
+- [ ] El área de preview mantiene protagonismo.
+- [ ] Los controles de revisión no dominan la interfaz.
+- [ ] Mock y Bridge se distinguen claramente.
+- [ ] El panel derecho no desborda.
+- [ ] La app es usable en 1920×1080.
+
 ## Feedback a revisar
 
 - [ ] Jerarquía visual.

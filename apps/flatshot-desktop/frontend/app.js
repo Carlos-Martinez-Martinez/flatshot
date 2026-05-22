@@ -909,7 +909,7 @@ function renderBridge() {
   sourceBadge.className = `state-chip ${isBridgeBatch() ? "bridge" : isMockBatch() ? "ready" : ""}`;
   sourceBadge.textContent = `Origen: ${sourceLabel()}`;
   $("#scan-status").textContent = state.scanStatus;
-  panel.classList.toggle("is-hidden", !isBridge && state.bridgeStatus === "idle");
+  panel.classList.toggle("is-hidden", !isBridge);
   $("#bridge-panel-status").textContent = bridgeStatusLabel();
   $("#bridge-scan-path").value = state.bridgeScanPath;
   $("#bridge-scan-folder").disabled = state.bridgeStatus === "checking" || state.batch === "scanning";
@@ -1121,6 +1121,7 @@ function renderFilterButtons() {
 
 function renderPreview() {
   const image = selectedImage();
+  const previewControlsDisabled = !image || image.source === "bridge" || state.previewStatus === "empty" || state.previewStatus === "error";
   $("#preview-name").textContent = image ? image.name : "Sin imagen seleccionada";
   $("#preview-subtitle").textContent = previewSubtitle(image);
   $("#zoom-label").textContent = `${state.zoom}%`;
@@ -1130,9 +1131,14 @@ function renderPreview() {
   $("#canvas-area").className = `canvas-area bg-${state.previewBg === "transparent" ? "transparent" : state.previewBg}`;
   $$(".preview-toolbar [data-preview-mode]").forEach((button) => {
     button.classList.toggle("active", button.dataset.previewMode === state.previewMode);
+    button.disabled = previewControlsDisabled;
   });
   $$(".background-switch [data-preview-bg]").forEach((button) => {
     button.classList.toggle("active", button.dataset.previewBg === state.previewBg);
+    button.disabled = previewControlsDisabled;
+  });
+  $$("[data-action='zoom-out'], [data-action='zoom-in'], [data-action='force-preview-error']").forEach((button) => {
+    button.disabled = previewControlsDisabled;
   });
 
   const canvas = $("#preview-canvas");

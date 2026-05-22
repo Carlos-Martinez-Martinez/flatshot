@@ -25,23 +25,6 @@
           </div>
 
           <div class="top-actions">
-            <label class="demo-switcher">
-              <span>Demo</span>
-              <select id="demo-scenario" aria-label="Escenario de demo">
-                <option value="initial">Sin lote</option>
-                <option value="batch-ready">Lote listo</option>
-                <option value="empty-folder">Carpeta vacía</option>
-                <option value="preview-loading">Preview cargando</option>
-                <option value="preview-warning">Preview con aviso</option>
-                <option value="preview-error">Error de preview</option>
-                <option value="export-blocked">Destino sin configurar</option>
-                <option value="export-ready">Exportación lista</option>
-                <option value="export-running">Exportación en curso</option>
-                <option value="export-completed">Exportación completada</option>
-                <option value="export-partial">Completada con errores</option>
-                <option value="export-failed">Exportación fallida</option>
-              </select>
-            </label>
             <label class="mode-switcher">
               <span>Modo</span>
               <select id="app-mode" aria-label="Modo de datos">
@@ -49,13 +32,8 @@
                 <option value="bridge">Bridge local</option>
               </select>
             </label>
-            <label class="bridge-url-field">
-              <span>Bridge</span>
-              <input id="bridge-url" type="url" value="http://127.0.0.1:8765" />
-            </label>
             <button type="button" data-action="check-bridge">Comprobar bridge</button>
             <span class="bridge-chip idle" id="bridge-status">Mock</span>
-            <button type="button" data-action="load-batch">Añadir carpeta</button>
             <button type="button" data-action="clear-batch">Limpiar lote</button>
           </div>
         </div>
@@ -105,6 +83,10 @@
               <strong>Bridge local</strong>
               <span id="bridge-panel-status">Desconectado</span>
             </div>
+            <label class="text-field compact-field">
+              <span>URL bridge</span>
+              <input id="bridge-url" type="url" value="http://127.0.0.1:8765" />
+            </label>
             <div class="bridge-meta">
               <div>
                 <span>Última respuesta</span>
@@ -116,26 +98,6 @@
               </div>
             </div>
           </div>
-
-          <details class="review-panel" open>
-            <summary>Revisión visual</summary>
-            <div class="review-grid" aria-label="Estados de revisión">
-              <button type="button" data-review-scenario="initial">Sin lote</button>
-              <button type="button" data-review-scenario="batch-ready">Lote listo</button>
-              <button type="button" data-review-scenario="empty-folder">Carpeta vacía</button>
-              <button type="button" data-review-scenario="preview-loading">Preview loading</button>
-              <button type="button" data-review-scenario="preview-error">Preview error</button>
-              <button type="button" data-review-scenario="export-ready">Exportación lista</button>
-              <button type="button" data-review-scenario="export-running">En curso</button>
-              <button type="button" data-review-scenario="export-completed">Completada</button>
-              <button type="button" data-review-scenario="export-partial">Con errores</button>
-            </div>
-            <div class="review-actions">
-              <button type="button" data-action="check-bridge">Bridge health</button>
-              <button type="button" data-action="scan-bridge-folder">Escaneo real</button>
-            </div>
-            <p>Los estados de revisión son simulados salvo el health y el escaneo por ruta.</p>
-          </details>
 
           <label class="search-field">
             <span>Buscar</span>
@@ -153,6 +115,43 @@
 
           <div class="image-list" id="image-list" aria-label="Imágenes del lote"></div>
           <div class="empty-note" id="batch-empty-note"></div>
+
+          <details class="review-panel">
+            <summary>Revisión</summary>
+            <label class="demo-switcher review-switcher">
+              <span>Escenario</span>
+              <select id="demo-scenario" aria-label="Escenario de demo">
+                <option value="initial">Sin lote</option>
+                <option value="batch-ready">Lote listo</option>
+                <option value="empty-folder">Carpeta vacía</option>
+                <option value="preview-loading">Preview cargando</option>
+                <option value="preview-warning">Preview con aviso</option>
+                <option value="preview-error">Error de preview</option>
+                <option value="export-blocked">Destino sin configurar</option>
+                <option value="export-ready">Exportación lista</option>
+                <option value="export-running">Exportación en curso</option>
+                <option value="export-completed">Exportación completada</option>
+                <option value="export-partial">Completada con errores</option>
+                <option value="export-failed">Exportación fallida</option>
+              </select>
+            </label>
+            <div class="review-grid" aria-label="Estados de revisión">
+              <button type="button" data-review-scenario="initial">Sin lote</button>
+              <button type="button" data-review-scenario="batch-ready">Lote listo</button>
+              <button type="button" data-review-scenario="empty-folder">Carpeta vacía</button>
+              <button type="button" data-review-scenario="preview-loading">Preview loading</button>
+              <button type="button" data-review-scenario="preview-error">Preview error</button>
+              <button type="button" data-review-scenario="export-ready">Exportación lista</button>
+              <button type="button" data-review-scenario="export-running">En curso</button>
+              <button type="button" data-review-scenario="export-completed">Completada</button>
+              <button type="button" data-review-scenario="export-partial">Con errores</button>
+            </div>
+            <div class="review-actions">
+              <button type="button" data-action="check-bridge">Bridge health</button>
+              <button type="button" data-action="scan-bridge-folder">Escaneo real</button>
+            </div>
+            <p>Estados simulados salvo health y escaneo por ruta.</p>
+          </details>
         </aside>
 
         <section class="preview-panel" aria-label="Preview principal">

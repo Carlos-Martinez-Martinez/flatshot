@@ -12,18 +12,37 @@
       <header class="top-bar">
         <div class="brand-block">
           <div class="brand-mark" aria-hidden="true">F</div>
-          <div>
+          <div class="brand-copy">
             <strong>FlatShot</strong>
-            <span id="batch-title">Lote de muestra</span>
+            <span id="active-batch-label">Sin lote</span>
           </div>
         </div>
-        <div class="top-status" aria-live="polite">
-          <span class="status-dot ready" id="status-dot"></span>
-          <span id="top-status-text">Listo para procesar</span>
+
+        <div class="top-summary" aria-live="polite">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="top-status-text">Añade una carpeta</span>
         </div>
+
         <div class="top-actions">
-          <button type="button" id="add-folder">Añadir carpeta</button>
-          <button type="button" id="clear-batch">Limpiar lote</button>
+          <label class="demo-switcher">
+            <span>Demo</span>
+            <select id="demo-scenario" aria-label="Escenario de demo">
+              <option value="initial">Sin lote</option>
+              <option value="batch-ready">Lote listo</option>
+              <option value="empty-folder">Carpeta vacía</option>
+              <option value="preview-loading">Preview cargando</option>
+              <option value="preview-warning">Preview con aviso</option>
+              <option value="preview-error">Error de preview</option>
+              <option value="export-blocked">Destino sin configurar</option>
+              <option value="export-ready">Exportación lista</option>
+              <option value="export-running">Exportación en curso</option>
+              <option value="export-completed">Exportación completada</option>
+              <option value="export-partial">Completada con errores</option>
+              <option value="export-failed">Exportación fallida</option>
+            </select>
+          </label>
+          <button type="button" data-action="load-batch">Añadir carpeta</button>
+          <button type="button" data-action="clear-batch">Limpiar lote</button>
         </div>
       </header>
 
@@ -32,145 +51,240 @@
           <div class="panel-heading">
             <div>
               <span class="eyebrow">Lote</span>
-              <h1 id="batch-count">24 PNG</h1>
+              <h1 id="batch-count">0 imágenes</h1>
             </div>
-            <span class="pill" id="adjusted-count">2 ajustadas</span>
+            <span class="pill" id="batch-pill">Sin carpeta</span>
           </div>
 
-          <div class="folder-row" id="folder-row">
-            <span class="folder-name" title="Camisetas Mayo">Camisetas Mayo</span>
-            <span>24</span>
+          <div class="batch-actions">
+            <button type="button" class="wide" data-action="load-batch">Añadir carpeta</button>
+            <button type="button" class="wide secondary" data-action="show-empty-folder">Simular vacía</button>
           </div>
 
-          <div class="segmented batch-filter" aria-label="Filtro de lote">
-            <button type="button" class="active">Todas</button>
-            <button type="button">Ajustadas</button>
-            <button type="button">Errores</button>
+          <label class="search-field">
+            <span>Buscar</span>
+            <input id="image-search" type="search" placeholder="Nombre de imagen" autocomplete="off" />
+          </label>
+
+          <div class="folder-list" id="folder-list" aria-label="Carpetas del lote"></div>
+
+          <div class="segmented batch-filter" aria-label="Filtro de imágenes">
+            <button type="button" data-filter="all">Todas</button>
+            <button type="button" data-filter="adjusted">Ajustadas</button>
+            <button type="button" data-filter="warnings">Avisos</button>
+            <button type="button" data-filter="errors">Errores</button>
           </div>
 
-          <div class="image-list" id="image-list" aria-label="Imagenes del lote">
-            <button type="button" class="image-item active" data-name="camiseta_001.png" data-kind="Web RGB230">
-              <span class="thumb tone-a"></span>
-              <span>
-                <strong>camiseta_001.png</strong>
-                <small>Web RGB230</small>
-              </span>
-            </button>
-            <button type="button" class="image-item" data-name="camiseta_002.png" data-kind="Ajuste local">
-              <span class="thumb tone-b"></span>
-              <span>
-                <strong>camiseta_002.png</strong>
-                <small>Ajuste local</small>
-              </span>
-            </button>
-            <button type="button" class="image-item" data-name="chaqueta_003.png" data-kind="Pendiente">
-              <span class="thumb tone-c"></span>
-              <span>
-                <strong>chaqueta_003.png</strong>
-                <small>Pendiente</small>
-              </span>
-            </button>
-            <button type="button" class="image-item" data-name="sudadera_004.png" data-kind="Preview lista">
-              <span class="thumb tone-d"></span>
-              <span>
-                <strong>sudadera_004.png</strong>
-                <small>Preview lista</small>
-              </span>
-            </button>
-          </div>
+          <div class="image-list" id="image-list" aria-label="Imágenes del lote"></div>
+          <div class="empty-note" id="batch-empty-note"></div>
         </aside>
 
         <section class="preview-panel" aria-label="Preview principal">
           <div class="preview-header">
-            <div>
+            <div class="preview-title-block">
               <span class="eyebrow">Imagen seleccionada</span>
-              <h2 id="preview-name">camiseta_001.png</h2>
+              <h2 id="preview-name">Sin imagen seleccionada</h2>
+              <span id="preview-subtitle">Sin preview</span>
             </div>
-            <div class="preview-tools">
-              <button type="button" class="tool active" data-mode="procesada">Procesada</button>
-              <button type="button" class="tool" data-mode="original">Original</button>
-              <button type="button" class="tool" data-mode="comparar">Comparar</button>
-            </div>
-          </div>
 
-          <div class="canvas-area">
-            <div class="canvas-frame" id="canvas-frame">
-              <div class="product-shadow"></div>
-              <div class="product-silhouette">
-                <span></span>
+            <div class="preview-toolbar" aria-label="Herramientas de preview">
+              <div class="segmented compact" aria-label="Modo de preview">
+                <button type="button" data-preview-mode="processed">Procesada</button>
+                <button type="button" data-preview-mode="original">Original</button>
+                <button type="button" data-preview-mode="compare">Comparar</button>
+              </div>
+              <div class="zoom-controls" aria-label="Zoom">
+                <button type="button" data-action="zoom-out" aria-label="Reducir zoom">-</button>
+                <span id="zoom-label">100%</span>
+                <button type="button" data-action="zoom-in" aria-label="Aumentar zoom">+</button>
               </div>
             </div>
           </div>
 
+          <div class="canvas-area" id="canvas-area">
+            <div class="preview-canvas" id="preview-canvas" aria-live="polite"></div>
+          </div>
+
           <div class="preview-footer">
-            <span id="preview-meta">JPG · 1800x2400 · fondo #E6E6E6</span>
-            <span id="preview-warning">Sin avisos</span>
+            <div class="segmented compact background-switch" aria-label="Fondo de preview">
+              <button type="button" data-preview-bg="rgb230">RGB230</button>
+              <button type="button" data-preview-bg="white">Blanco</button>
+              <button type="button" data-preview-bg="transparent">Transparente</button>
+            </div>
+            <span id="preview-meta">Sin imagen</span>
+            <button type="button" class="link-button" data-action="force-preview-error">Simular error</button>
           </div>
         </section>
 
-        <aside class="settings-panel" aria-label="Ajustes y exportacion">
+        <aside class="settings-panel" aria-label="Ajustes y exportación">
           <section class="settings-section">
             <div class="section-title">
-              <span class="eyebrow">Preset</span>
-              <strong id="active-preset">Luz cenital</strong>
+              <div>
+                <span class="eyebrow">Preset</span>
+                <strong id="active-preset">Luz cenital</strong>
+              </div>
+              <span class="change-chip" id="preset-dirty">Sin cambios</span>
             </div>
-            <div class="preset-list" aria-label="Presets disponibles">
-              <button type="button" class="preset-chip active">Luz cenital</button>
-              <button type="button" class="preset-chip">Estándar oscuro</button>
-              <button type="button" class="preset-chip">Complementos</button>
+            <div class="preset-list" id="preset-list" aria-label="Presets disponibles"></div>
+            <div class="button-row">
+              <button type="button" data-action="reset-settings">Reset</button>
+              <button type="button" data-action="save-preset">Guardar preset</button>
             </div>
           </section>
 
           <section class="settings-section">
             <div class="section-title">
-              <span class="eyebrow">Aspecto</span>
-              <strong>Principal</strong>
+              <div>
+                <span class="eyebrow">Aspecto</span>
+                <strong>Ajustes principales</strong>
+              </div>
             </div>
-            <label class="control-row">
-              <span>Opacidad</span>
-              <input type="range" min="0" max="100" value="20" />
-              <output>20</output>
-            </label>
-            <label class="control-row">
-              <span>Blur</span>
-              <input type="range" min="0" max="80" value="30" />
-              <output>30</output>
-            </label>
-            <label class="control-row">
-              <span>Distancia</span>
-              <input type="range" min="0" max="80" value="25" />
-              <output>25</output>
-            </label>
+
+            <div class="control-stack">
+              <label class="control-row">
+                <span>Opacidad</span>
+                <input id="opacity-input" type="range" min="0" max="100" value="20" data-setting="opacity" />
+                <output id="opacity-output">20</output>
+              </label>
+              <label class="control-row">
+                <span>Blur</span>
+                <input id="blur-input" type="range" min="0" max="80" value="30" data-setting="blur" />
+                <output id="blur-output">30</output>
+              </label>
+              <label class="control-row">
+                <span>Distancia</span>
+                <input id="distance-input" type="range" min="0" max="80" value="25" data-setting="distance" />
+                <output id="distance-output">25</output>
+              </label>
+              <label class="control-row">
+                <span>Padding</span>
+                <input id="padding-input" type="range" min="0" max="30" value="10" data-setting="padding" />
+                <output id="padding-output">10</output>
+              </label>
+            </div>
+
+            <details class="advanced-block">
+              <summary>Avanzado</summary>
+              <div class="advanced-grid">
+                <label>
+                  <span>Spread</span>
+                  <input type="number" min="0" max="20" value="0" />
+                </label>
+                <label>
+                  <span>Ruido</span>
+                  <input type="number" min="0" max="20" value="2" />
+                </label>
+                <label>
+                  <span>Contacto</span>
+                  <input type="number" min="0" max="40" value="10" />
+                </label>
+                <label>
+                  <span>Escala</span>
+                  <input type="number" min="-30" max="30" value="0" />
+                </label>
+              </div>
+            </details>
+
+            <div class="local-adjustment" id="local-adjustment">
+              <div>
+                <strong>Ajuste por imagen</strong>
+                <span id="local-adjustment-text">Sin ajuste local</span>
+              </div>
+              <button type="button" data-action="toggle-local-adjustment">Alternar</button>
+            </div>
           </section>
 
           <section class="settings-section export-section">
             <div class="section-title">
-              <span class="eyebrow">Exportación</span>
-              <strong id="export-format-label">JPG</strong>
+              <div>
+                <span class="eyebrow">Exportación</span>
+                <strong id="export-readiness">Configura exportación</strong>
+              </div>
+              <span class="change-chip" id="export-count">0 archivos</span>
             </div>
-            <div class="segmented export-format" aria-label="Formato">
-              <button type="button" class="active">JPG</button>
-              <button type="button">PNG</button>
+
+            <div class="form-grid">
+              <label>
+                <span>Formato</span>
+                <select id="format-select">
+                  <option value="JPG">JPG</option>
+                  <option value="PNG">PNG</option>
+                </select>
+              </label>
+              <label>
+                <span>Tamaño</span>
+                <select id="size-select">
+                  <option value="1800x2400">1800x2400</option>
+                  <option value="2000x2000">2000x2000</option>
+                  <option value="1200x1600">1200x1600</option>
+                </select>
+              </label>
+              <label>
+                <span>Fondo</span>
+                <select id="background-select">
+                  <option value="rgb230">RGB230</option>
+                  <option value="white">Blanco</option>
+                  <option value="transparent">Transparente</option>
+                </select>
+              </label>
+              <label>
+                <span>Destino</span>
+                <select id="destination-mode">
+                  <option value="source">Origen / _SALIDA_PRO</option>
+                  <option value="custom">Carpeta personalizada</option>
+                </select>
+              </label>
             </div>
-            <div class="summary-lines">
-              <span>1800x2400</span>
-              <span>{original}{suffix}</span>
-              <span>Destino: origen / _SALIDA_PRO</span>
-            </div>
+
+            <label class="text-field">
+              <span>Ruta destino</span>
+              <input id="destination-input" type="text" value="_SALIDA_PRO" />
+            </label>
+
+            <label class="text-field">
+              <span>Naming</span>
+              <input id="naming-input" type="text" value="{original}{suffix}" />
+            </label>
+
+            <div class="export-summary" id="export-summary"></div>
+            <div class="issue-list" id="issue-list" aria-live="polite"></div>
           </section>
         </aside>
       </section>
 
       <footer class="bottom-bar">
+        <div class="status-grid" aria-live="polite">
+          <div>
+            <span>Lote</span>
+            <strong id="footer-batch">Sin lote</strong>
+          </div>
+          <div>
+            <span>Preview</span>
+            <strong id="footer-preview">Sin imagen</strong>
+          </div>
+          <div>
+            <span>Exportación</span>
+            <strong id="footer-export">No lista</strong>
+          </div>
+          <div>
+            <span>Destino</span>
+            <strong id="footer-destination">Sin configurar</strong>
+          </div>
+        </div>
+
         <div class="progress-block">
-          <span id="bottom-status">Listo para procesar</span>
+          <span id="bottom-status">Añade una carpeta</span>
           <div class="progress-track" aria-hidden="true">
             <span id="progress-fill"></span>
           </div>
         </div>
+
         <div class="bottom-actions">
-          <button type="button" id="open-output" disabled>Abrir destino</button>
-          <button type="button" class="primary" id="process-batch">Procesar 24 imágenes</button>
+          <button type="button" id="review-errors" data-action="review-errors">Revisar errores</button>
+          <button type="button" id="pause-export" data-action="pause-export">Pausar</button>
+          <button type="button" id="stop-export" data-action="stop-export">Detener</button>
+          <button type="button" id="open-output" data-action="open-output">Abrir destino</button>
+          <button type="button" class="primary" id="primary-action" data-action="primary">Añadir carpeta</button>
         </div>
       </footer>
     </main>

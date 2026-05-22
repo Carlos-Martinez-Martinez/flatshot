@@ -48,6 +48,7 @@ from flatshot.core.overrides import (
 )
 from flatshot.core.scaling import DEFAULT_SCALE_CURVE, normalize_curve_data
 from flatshot.application import presenters
+from flatshot.application.export_config_service import ExportConfigService
 from flatshot.application.folder_scanner import FolderScanner
 from flatshot.utils.config import ConfigManager
 from flatshot.utils.history_manager import HistoryManager
@@ -63,7 +64,6 @@ from flatshot.workers.export_worker import (
     ExportWorker,
     get_enabled_export_variants,
     variant_export_format,
-    variant_output_folder,
 )
 from flatshot.workers.queue_worker import QueueWorker
 from flatshot.workers.pre_render_scheduler import PreRenderScheduler
@@ -177,6 +177,7 @@ class MainWindow(QMainWindow):
         self.log_manager = LogManager.get_instance()
         self.session_manager = SessionManager()
         self.folder_scanner = FolderScanner()
+        self.export_config_service = ExportConfigService()
         
         # State
         self.selected_folders = []  # List of Path objects for multi-folder export
@@ -2010,29 +2011,19 @@ class MainWindow(QMainWindow):
         ConfigManager.save_all_presets(categorized)
 
     def _build_export_config_from_settings(self) -> ExportConfig:
-        output_destination = self.app_settings.get('output_destination', 'subfolder')
-        custom_output_path = self.app_settings.get('custom_output_path')
+        output_destination_override = None
 
         if hasattr(self, 'rb_dest_custom') and self.rb_dest_custom.isChecked():
-            output_destination = 'custom'
+            output_destination_override = 'custom'
         elif hasattr(self, 'rb_dest_subfolder') and self.rb_dest_subfolder.isChecked():
-            output_destination = 'subfolder'
+            output_destination_override = 'subfolder'
 
-        if self.custom_output_path:
-            custom_output_path = str(self.custom_output_path)
-
-        return ExportConfig(
-            output_folder_name=self.app_settings.get('output_folder_name', '_SALIDA_PRO'),
-            suffix=self.app_settings.get('suffix', '_PRO'),
-            format=self.app_settings.get('format', 'JPG'),
-            transparent_bg=self.app_settings.get('transparent_bg', False),
-            bg_color=self.app_settings.get('bg_color', (230, 230, 230)),
+        custom_output_path_override = str(self.custom_output_path) if self.custom_output_path else None
+        return self.export_config_service.build_from_settings(
+            self.app_settings,
             variants=self.export_variants,
-            output_width=self.app_settings.get('output_width', 1800),
-            output_height=self.app_settings.get('output_height', 2400),
-            naming_template=self.app_settings.get('naming_template', '{original}{suffix}'),
-            output_destination=output_destination,
-            custom_output_path=custom_output_path,
+            output_destination_override=output_destination_override,
+            custom_output_path_override=custom_output_path_override,
         )
 
     def _apply_export_preferences(self, config: ExportConfig):
@@ -3363,13 +3354,21 @@ class MainWindow(QMainWindow):
 
         # Build export config
         export_config = self._build_export_config_from_settings()
-        if not presenters.is_destination_configured(export_config):
-            QMessageBox.warning(
-                self,
-                "Destino no configurado",
-                "Has seleccionado destino personalizado, pero no hay carpeta elegida.\n"
-                "Selecciona una carpeta de destino o cambia a subcarpeta en origen."
-            )
+        validation_errors = self.export_config_service.validate(export_config)
+        if validation_errors:
+            if not presenters.is_destination_configured(export_config):
+                QMessageBox.warning(
+                    self,
+                    "Destino no configurado",
+                    "Has seleccionado destino personalizado, pero no hay carpeta elegida.\n"
+                    "Selecciona una carpeta de destino o cambia a subcarpeta en origen."
+                )
+            else:
+                QMessageBox.warning(
+                    self,
+                    "Configuración de exportación no válida",
+                    "\n".join(validation_errors)
+                )
             self._reset_export_ui()
             return
 
@@ -3383,16 +3382,15 @@ class MainWindow(QMainWindow):
             self._reset_export_ui()
             return
 
-        if export_config.output_destination == 'custom':
-            base_destinations = [Path(export_config.custom_output_path)]
-        else:
-            base_destinations = [Path(folder) / export_config.output_folder_name for folder in self.selected_folders]
-
-        destination_paths = []
-        for destination in base_destinations:
-            for variant in active_variants:
-                destination_paths.append(str(variant_output_folder(destination, variant)))
-        self._last_export_destinations = sorted(set(destination_paths))
+        self._last_export_destinations = sorted(
+            {
+                str(destination)
+                for destination in self.export_config_service.destinations_for_folders(
+                    self.selected_folders,
+                    export_config,
+                )
+            }
+        )
         self._last_export_variant_labels = [variant.label for variant in active_variants]
         
         # Snapshot image lists at start to keep export consistent.

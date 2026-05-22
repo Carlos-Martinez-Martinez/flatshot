@@ -164,3 +164,44 @@
   - processed two folders through the existing queue path;
   - verified both output files exist and progress/button reset.
 - Pause/resume/stop were not exercised because queue controls were not changed in this phase.
+
+## Batch 3 implementation
+
+- Scope: Phase 3, export configuration service.
+- Added `ExportConfigService` to build `ExportConfig` from stored app settings plus current UI destination overrides.
+- Added Qt-free validation for:
+  - custom destination without path;
+  - non-positive output size;
+  - unsupported export format;
+  - invalid destination mode;
+  - empty subfolder name for subfolder destination;
+  - empty naming template.
+- Added destination planning for selected folders and enabled output variants, including variant subfolders.
+- Adapted `MainWindow._build_export_config_from_settings()` to delegate construction to the service while keeping its public wrapper intact.
+- Adapted `_start_export()` to use service validation and destination planning.
+- Preserved the existing custom-destination warning text and did not touch workers, preview, presets, settings persistence or `ShadowEngine`.
+
+## Batch 3 validation
+
+- Added `tests/test_export_config_service.py` with coverage for:
+  - defaults and format normalization;
+  - UI destination overrides;
+  - valid subfolder configuration;
+  - missing custom destination;
+  - invalid dimensions, format, destination and naming template;
+  - destination planning for subfolder/custom modes and enabled variants.
+- `pytest tests/test_export_config_service.py tests/test_folder_scanner.py tests/test_presenters.py` -> 23 passed.
+- `python -m compileall -q src/flatshot/application src/flatshot/ui/main_window.py` -> passed.
+- `pytest` -> 133 passed.
+- PyQt offscreen smoke:
+  - instantiated `MainWindow`;
+  - added two temporary folders and verified PNG count;
+  - selected a preset;
+  - touched an essential slider;
+  - selected an image through the grid selection handler;
+  - rendered a preview;
+  - instantiated `ExportConfigDialog` from the current config;
+  - processed one folder to a custom destination;
+  - processed two folders through the existing subfolder queue path;
+  - verified output files exist and progress/button reset.
+- Pause/resume/stop were not exercised because queue controls were not changed in this phase.

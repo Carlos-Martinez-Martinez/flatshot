@@ -1,6 +1,6 @@
 # Architecture Guards
 
-Guía operativa corta para las guardas introducidas en TANDA V2.1 y ampliadas en TANDAS V2.3-V2.5.
+Guía operativa corta para las guardas introducidas en TANDA V2.1 y ampliadas en TANDAS V2.3-V2.6.
 
 ## Límites protegidos
 
@@ -22,6 +22,7 @@ Estas reglas están protegidas por:
 Estos módulos pueden seguir importando PyQt porque pertenecen a la capa UI/adaptador actual:
 
 - `src/flatshot/ui/*`
+- `src/flatshot/ui/export_result_dialog.py` como adaptador UI para el diálogo de resultado de exportación
 - `src/flatshot/workers/export_worker.py`
 - `src/flatshot/workers/queue_worker.py`
 - `src/flatshot/workers/pre_render_scheduler.py`
@@ -43,7 +44,7 @@ Estos módulos pueden seguir importando PyQt porque pertenecen a la capa UI/adap
 - `LogManager` depende de `QStandardPaths` sólo para resolver la ruta UI; delega operaciones de log en `ActivityLogService`.
 - `PreRenderScheduler` sigue siendo Qt (`QObject`, `QTimer`, señales), pero delega la planificación de candidatos/jobs en `pre_render_planner`.
 - La CLI usa servicios Qt-free para presets/settings/logging, pero mantiene una ruta de exportación paralela a `ExportRunner`; hay paridad básica protegida para metadatos JPG, pero la CLI aún no está migrada.
-- `MainWindow` sigue coordinando demasiado estado y el lanzamiento de workers.
+- `MainWindow` sigue coordinando demasiado estado y el lanzamiento de workers. TANDA V2.6 sólo extrajo el diálogo de resultado de exportación a un adaptador UI, sin cambiar exportación ni workers.
 - `PresetService` convive con mecanismos legacy de `ConfigManager`.
 - `SettingsService` no sustituye todavía toda la resolución real de configuración porque la ruta sigue pasando por Qt en UI/CLI.
 - No existe API local activa y no debe crearse antes de reconciliar estas deudas.
@@ -66,6 +67,7 @@ Estos módulos pueden seguir importando PyQt porque pertenecen a la capa UI/adap
 - `tests/test_log_service.py` cubre logging Qt-free y limpieza de logs antiguos.
 - `tests/test_headless_imports.py` confirma que `flatshot.cli` puede importarse sin cargar PyQt.
 - `tests/test_pre_render_planner.py` cubre firma de contexto, orden de candidatos y construcción de jobs/cache sin Qt.
+- `tests/test_export_result_dialog.py` cubre los adaptadores UI que construyen el resumen de resultado de exportación desde `ExportState` sin instanciar el diálogo real.
 - `tests/test_queue_runner.py` cubre `QueueRunner`.
 - `tests/test_preview_service.py` cubre `PreviewService`.
 - `tests/test_architecture_boundaries.py` confirma que los helpers legacy reexportados desde `workers.export_worker` apuntan a la implementación de `application.export_runner`.

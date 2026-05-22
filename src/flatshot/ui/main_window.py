@@ -60,8 +60,6 @@ from flatshot.application.app_state import (
     build_flatshot_app_state,
     build_mockup_preview_state,
     build_pre_render_bar_status,
-    build_queue_export_summary_lines,
-    build_single_export_summary_lines,
     calculate_queue_overall_progress,
     format_batch_count_text,
     format_custom_preview_button_text,
@@ -89,6 +87,10 @@ from flatshot.utils.history_manager import HistoryManager
 from flatshot.utils.log_manager import LogManager
 from flatshot.utils.session_manager import SessionManager
 from flatshot.ui.dialogs import CurveEditorDialog, ExportConfigDialog, ExportVariantsDialog
+from flatshot.ui.export_result_dialog import (
+    show_queue_export_result_dialog,
+    show_single_export_result_dialog,
+)
 from flatshot.ui.styles import scale_stylesheet, COLORS
 from flatshot.ui.shell import AppShell, WorkflowPanel, CanvasWorkbench, BatchPanel, ExportBar, CommandBar
 from flatshot.ui.widgets import SmartSlider, LightAngleWidget, ComparisonCanvas, FloatingToolbar, ModernSplashScreen, CollapsibleSection
@@ -3464,31 +3466,15 @@ class MainWindow(QMainWindow):
     def _on_queue_finished(self, completed: int, errors: int, total_images: int):
         """Called when all queue jobs are finished."""
         self._reset_export_ui()
-
-        if errors == 0:
-            self._show_export_result_dialog(
-                title="Cola completada",
-                success=True,
-                summary_lines=build_queue_export_summary_lines(
-                    self.export_state,
-                    completed=completed,
-                    errors=errors,
-                    total_images=total_images,
-                ),
-                destinations=self.export_state.destinations,
-            )
-        else:
-            self._show_export_result_dialog(
-                title="Cola completada con errores",
-                success=False,
-                summary_lines=build_queue_export_summary_lines(
-                    self.export_state,
-                    completed=completed,
-                    errors=errors,
-                    total_images=total_images,
-                ),
-                destinations=self.export_state.destinations,
-            )
+        show_queue_export_result_dialog(
+            self,
+            export_state=self.export_state,
+            completed=completed,
+            errors=errors,
+            total_images=total_images,
+            px=self._px,
+            open_folder=self._open_folder_in_explorer,
+        )
         
     def _toggle_pause(self):
         """Toggle pause/resume state of the export queue."""
@@ -3548,33 +3534,16 @@ class MainWindow(QMainWindow):
     def _on_export_finished(self, success: bool, processed: int = 0, total: int = 0, duration: float = 0.0):
         """Called when single-folder export finishes."""
         self._reset_export_ui()
-
-        if success:
-            self._show_export_result_dialog(
-                title="Proceso completado",
-                success=True,
-                summary_lines=build_single_export_summary_lines(
-                    self.export_state,
-                    success=True,
-                    processed=processed,
-                    total=total,
-                    duration=duration,
-                ),
-                destinations=self.export_state.destinations,
-            )
-        else:
-            self._show_export_result_dialog(
-                title="Proceso incompleto",
-                success=False,
-                summary_lines=build_single_export_summary_lines(
-                    self.export_state,
-                    success=False,
-                    processed=processed,
-                    total=total,
-                    duration=duration,
-                ),
-                destinations=self.export_state.destinations,
-            )
+        show_single_export_result_dialog(
+            self,
+            export_state=self.export_state,
+            success=success,
+            processed=processed,
+            total=total,
+            duration=duration,
+            px=self._px,
+            open_folder=self._open_folder_in_explorer,
+        )
 
     def _on_single_worker_thread_finished(self):
         """Release single-folder worker only after QThread has fully stopped."""
@@ -3804,89 +3773,6 @@ class MainWindow(QMainWindow):
             self._show_feedback("No se pudo abrir la carpeta de logs")
             self._log_error(f"[open-folder-error] {folder}: {e}")
 
-    def _show_export_result_dialog(self, title: str, success: bool, summary_lines: list[str], destinations: list[str]):
-        """Show a richer export summary dialog with destination shortcuts."""
-        dialog = QDialog(self)
-        dialog.setWindowTitle(title)
-        dialog.setMinimumSize(self._px(640), self._px(420))
-        dialog.setProperty("class", "dialog")
-
-        layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(self._px(16), self._px(14), self._px(16), self._px(14))
-        layout.setSpacing(self._px(10))
-
-        icon_name = 'fa5s.check-circle' if success else 'fa5s.exclamation-triangle'
-        icon_color = COLORS['success'] if success else COLORS['error']
-        header_row = QHBoxLayout()
-        icon_label = QLabel()
-        icon_label.setPixmap(qta.icon(icon_name, color=icon_color).pixmap(self._px(22), self._px(22)))
-        header_row.addWidget(icon_label)
-
-        header_title = QLabel(title)
-        header_title.setProperty("class", "dialog-title")
-        header_row.addWidget(header_title, 1)
-        layout.addLayout(header_row)
-
-        for line in summary_lines:
-            if not line:
-                continue
-            summary_label = QLabel(line)
-            summary_label.setProperty("class", "dialog-text")
-            layout.addWidget(summary_label)
-
-        dest_title = QLabel("Destino(s) de exportación:")
-        dest_title.setProperty("class", "dialog-section")
-        layout.addWidget(dest_title)
-        dest_list = QListWidget()
-        dest_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
-        dest_list.setProperty("class", "list")
-
-        valid_destinations = []
-        for dest in destinations:
-            if not dest:
-                continue
-            valid_destinations.append(dest)
-            item = QListWidgetItem(dest)
-            item.setToolTip(dest)
-            dest_list.addItem(item)
-
-        if not valid_destinations:
-            item = QListWidgetItem("(No se registró ruta de destino)")
-            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
-            dest_list.addItem(item)
-        else:
-            dest_list.setCurrentRow(0)
-
-        layout.addWidget(dest_list, 1)
-        hint_lbl = QLabel("Selecciona una ruta y pulsa 'Abrir carpeta'")
-        hint_lbl.setProperty("class", "muted")
-        layout.addWidget(hint_lbl)
-
-        btn_row = QHBoxLayout()
-        btn_open_selected = QPushButton("Abrir carpeta")
-        btn_open_selected.setEnabled(bool(valid_destinations))
-        btn_open_selected.setProperty("class", "primary")
-        btn_row.addWidget(btn_open_selected)
-
-        btn_row.addStretch()
-        btn_close = QPushButton("Cerrar")
-        btn_close.setProperty("class", "ghost")
-        btn_row.addWidget(btn_close)
-        layout.addLayout(btn_row)
-
-        def _open_selected():
-            row = dest_list.currentRow()
-            if row < 0:
-                row = 0
-            if 0 <= row < len(valid_destinations):
-                self._open_folder_in_explorer(Path(valid_destinations[row]))
-
-        btn_open_selected.clicked.connect(_open_selected)
-        dest_list.itemDoubleClicked.connect(lambda _: _open_selected())
-        btn_close.clicked.connect(dialog.accept)
-
-        dialog.exec()
-            
     # ========== WINDOW EVENTS ==========
     
     def resizeEvent(self, event):

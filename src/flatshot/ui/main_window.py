@@ -78,6 +78,7 @@ from flatshot.application.app_state import (
 from flatshot.application import presenters
 from flatshot.application.contracts import PreviewRequest
 from flatshot.application.export_config_service import ExportConfigService
+from flatshot.application.export_run_planner import ExportRunPlanner
 from flatshot.application.folder_scanner import FolderScanner
 from flatshot.application.preview_service import PreviewService
 from flatshot.application.preset_service import PresetService
@@ -201,6 +202,7 @@ class MainWindow(QMainWindow):
         self.session_manager = SessionManager()
         self.folder_scanner = FolderScanner()
         self.export_config_service = ExportConfigService()
+        self.export_run_planner = ExportRunPlanner(self.export_config_service)
         self.config_dir = ConfigManager.get_config_dir()
         self.preset_service = PresetService(self.config_dir)
         
@@ -3375,20 +3377,15 @@ class MainWindow(QMainWindow):
             return
 
         # Snapshot image lists at start to keep export consistent.
-        snapshot_files = {
-            folder: sorted(folder.glob("*.png"))
-            for folder in self.selected_folders
-        }
+        export_plan = self.export_run_planner.prepare(
+            self.selected_folders,
+            export_config,
+            active_variants=active_variants,
+        )
         self.export_state = build_export_state(
-            destinations={
-                str(destination)
-                for destination in self.export_config_service.destinations_for_folders(
-                    self.selected_folders,
-                    export_config,
-                )
-            },
-            variant_labels=[variant.label for variant in active_variants],
-            source_count=sum(len(files) for files in snapshot_files.values()),
+            destinations={str(destination) for destination in export_plan.destinations},
+            variant_labels=export_plan.variant_labels,
+            source_count=export_plan.source_count,
         )
         self._sync_app_state()
 
@@ -3410,7 +3407,7 @@ class MainWindow(QMainWindow):
                 self._get_shadow_settings(),
                 export_config,
                 self.scale_curve,
-                input_files=[str(p) for p in snapshot_files.get(self.selected_folders[0], [])],
+                input_files=[str(p) for p in export_plan.input_files_for(self.selected_folders[0])],
                 image_overrides=self.image_overrides
             )
             self.worker.progress_updated.connect(self.progress_bar.setValue)
@@ -3426,8 +3423,11 @@ class MainWindow(QMainWindow):
         else:
             # Multiple folders - use QueueWorker
             jobs = [
-                JobItem(folder_path=str(f), input_files=[str(p) for p in snapshot_files.get(f, [])])
-                for f in self.selected_folders
+                JobItem(
+                    folder_path=str(folder_plan.folder),
+                    input_files=[str(p) for p in folder_plan.input_files],
+                )
+                for folder_plan in export_plan.folders
             ]
             preset_name = self.combo_presets.currentText()
             

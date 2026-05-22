@@ -19,6 +19,7 @@ HEADLESS_MODULES = [
     "flatshot.application.events",
     "flatshot.application.execution_control",
     "flatshot.application.export_config_service",
+    "flatshot.application.export_run_planner",
     "flatshot.application.export_runner",
     "flatshot.application.folder_scanner",
     "flatshot.application.presenters",

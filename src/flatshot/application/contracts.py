@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from flatshot.core.models import CurveData, ExportConfig, JobItem, ShadowSettings
+from flatshot.core.models import CurveData, ExportConfig, ExportVariant, JobItem, ShadowSettings
 
 
 @dataclass(frozen=True)
@@ -56,6 +56,29 @@ class ExportJobResult:
     errors: int
     duration: float
     destinations: list[Path] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class ExportFolderPlan:
+    folder: Path
+    input_files: list[Path] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class ExportRunPlan:
+    folders: list[ExportFolderPlan] = field(default_factory=list)
+    destinations: list[Path] = field(default_factory=list)
+    active_variants: list[ExportVariant] = field(default_factory=list)
+    variant_labels: list[str] = field(default_factory=list)
+    source_count: int = 0
+    file_total: int = 0
+
+    def input_files_for(self, folder: str | Path) -> list[Path]:
+        target = Path(folder)
+        for folder_plan in self.folders:
+            if folder_plan.folder == target:
+                return list(folder_plan.input_files)
+        return []
 
 
 @dataclass(frozen=True)

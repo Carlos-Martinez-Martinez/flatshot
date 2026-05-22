@@ -322,3 +322,55 @@
   - verified exported files exist and progress/button state resets.
 - Smoke used an inline executor to avoid Windows multiprocessing-from-stdin issues while preserving `process_single_image` and the production queue/export runner path.
 - Remaining risk: `QueueWorker.current_worker` now references the active `ExportRunner` instead of the old nested `ExportWorker`; no app code depends on `ExportWorker`-specific methods there, but external callers should use `QueueWorker.pause()/resume()/stop()` rather than reaching into that attribute.
+
+## Batch 6 implementation
+
+- Scope: Phase 6, Qt-free preview rendering service.
+- Added preview contracts to `flatshot.application.contracts`:
+  - `PreviewRequest`;
+  - `PreviewResult`;
+  - `TilePreviewRequest`;
+  - `TilePreviewResult`.
+- Added `PreviewService` in `flatshot.application.preview_service`.
+- Moved central preview rendering out of `ui.main_window._render_preview_task()`:
+  - settings normalization;
+  - curve reconstruction;
+  - `ShadowEngine._aplicar_efectos_with_diagnostics()` call;
+  - RGBA-to-RGB background composition;
+  - fallback warning extraction;
+  - raw RGB payload generation.
+- Moved grid tile preview rendering out of `ui.grid_preview._render_tile_preview()`:
+  - image loading;
+  - tile render call;
+  - original thumbnail payload generation;
+  - RGB composition.
+- Kept `QRunnable`, `QThreadPool`, `QImage` and `QPixmap` in the PyQt UI layer.
+- Preserved preview target sizes, scale factors, `is_preview=True`, local overrides, warning behavior and RGB payload layout.
+- Did not touch `ShadowEngine`, export, queue, presets, settings persistence or UI styling.
+
+## Batch 6 validation
+
+- Added `tests/test_preview_service.py` with coverage for:
+  - `PreviewService` staying free of Qt imports;
+  - central preview RGB payload matching the previous direct `ShadowEngine` path byte-for-byte;
+  - rendering from `image_path`;
+  - tile preview processed/original payloads.
+- `pytest tests/test_preview_service.py tests/test_engine.py tests/test_scaling.py -q` -> 43 passed.
+- `python -m compileall -q src/flatshot/application src/flatshot/ui/main_window.py src/flatshot/ui/grid_preview.py` -> passed.
+- `pytest` -> 151 passed.
+- `rg -n "PyQt6|QImage|QPixmap|QThread|QRunnable" src/flatshot/application/preview_service.py` -> no matches.
+- PyQt offscreen smoke:
+  - instantiated `MainWindow`;
+  - added a temporary folder through `_add_folder_to_list`;
+  - verified PNG count and batch summary;
+  - waited for grid tile previews to render through `PreviewService`;
+  - selected a preset;
+  - adjusted an essential slider;
+  - selected an image through the grid handler;
+  - rendered the central preview through `PreviewService`;
+  - processed one folder through `ExportWorker`;
+  - processed two folders through `QueueRunner` via `QueueWorker`;
+  - exercised pause/resume and stop on the queue;
+  - verified exported files exist and progress/button state resets.
+- Smoke used an inline executor for export only to avoid Windows multiprocessing-from-stdin issues; preview workers used the normal Qt thread pool.
+- Remaining risk: `PreviewService` now imports `PIL.Image` in application contracts through type annotations for in-memory preview requests. This keeps the service Qt-free and matches current domain dependencies, but future web/API work may prefer path/bytes-only requests for cleaner transport boundaries.

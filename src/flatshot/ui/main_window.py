@@ -22,7 +22,6 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QSize, QEvent, QFileSystemWatcher
 from PyQt6.QtGui import QPixmap, QImage, QPainter, QColor, QPainterPath, QAction, QIcon, QFont
 
-from flatshot.core.engine import ShadowEngine
 from flatshot.core.models import (
     SHADOW_ENGINE_COMPAT,
     SHADOW_ENGINE_DEFAULT,
@@ -48,8 +47,10 @@ from flatshot.core.overrides import (
 )
 from flatshot.core.scaling import DEFAULT_SCALE_CURVE, normalize_curve_data
 from flatshot.application import presenters
+from flatshot.application.contracts import PreviewRequest
 from flatshot.application.export_config_service import ExportConfigService
 from flatshot.application.folder_scanner import FolderScanner
+from flatshot.application.preview_service import PreviewService
 from flatshot.utils.config import ConfigManager
 from flatshot.utils.history_manager import HistoryManager
 from flatshot.utils.log_manager import LogManager
@@ -89,27 +90,17 @@ PRE_RENDER_ACTIVITY_EVENTS = {
 
 def _render_preview_task(pil_img: Image.Image, target_size, settings_dict: dict, curve_dict: dict, scale_ratio: float, is_preview: bool = True):
     """Render preview off the UI thread; safe for ThreadPoolExecutor."""
-    from flatshot.core.engine import ShadowEngine
-    from flatshot.core.models import CurveData, SHADOW_ENGINE_DEFAULT, normalize_shadow_settings
-    settings = normalize_shadow_settings(settings_dict, missing_engine=SHADOW_ENGINE_DEFAULT)
-    curve = CurveData(**curve_dict)
-    final_pil, diagnostics = ShadowEngine._aplicar_efectos_with_diagnostics(
-        pil_img,
-        settings,
-        target_size,
-        scale_factor=scale_ratio,
-        curve_data=curve,
-        is_preview=is_preview
+    result = PreviewService().render_preview(
+        PreviewRequest(
+            image=pil_img,
+            settings=settings_dict,
+            curve_data=curve_dict,
+            target_size=tuple(target_size),
+            scale_factor=scale_ratio,
+            is_preview=is_preview,
+        )
     )
-    if final_pil.mode == "RGBA":
-        bg = Image.new("RGB", final_pil.size, settings.bg_color)
-        bg.paste(final_pil, (0, 0), mask=final_pil)
-        final_for_display = bg
-    else:
-        final_for_display = final_pil
-    im_data = final_for_display.convert("RGB").tobytes("raw", "RGB")
-    warning = diagnostics.warning if diagnostics.fallback_used else None
-    return final_for_display.width, final_for_display.height, im_data, warning
+    return result.width, result.height, result.bytes_rgb, result.warning
 
 
 from PyQt6.QtCore import QRunnable, QThreadPool, QObject
@@ -2603,7 +2594,7 @@ class MainWindow(QMainWindow):
                 self._update_current_assets(self.mockups[self.current_mock])
             
             # Prepare worker with the cached assets.
-            # Passing the PIL image directly; ShadowEngine will handle copying/scaling.
+            # Passing the PIL image directly; PreviewService will handle rendering/scaling.
             worker = PreviewWorker(
                 self.current_base_pil,
                 self.preview_size,

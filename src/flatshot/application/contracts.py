@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from PIL import Image
+
 from flatshot.core.models import CurveData, ExportConfig, JobItem, ShadowSettings
 
 
@@ -72,3 +74,39 @@ class QueueRunResult:
     errors: int
     total_images: int
     cancelled: bool = False
+
+
+@dataclass(frozen=True)
+class PreviewRequest:
+    settings: ShadowSettings | dict
+    target_size: tuple[int, int]
+    curve_data: CurveData | dict | None = None
+    scale_factor: float = 1.0
+    is_preview: bool = True
+    image_path: Path | None = None
+    image: Image.Image | None = None
+
+
+@dataclass(frozen=True)
+class PreviewResult:
+    width: int
+    height: int
+    bytes_rgb: bytes
+    mode: str = "RGB"
+    warning: str | None = None
+
+
+@dataclass(frozen=True)
+class TilePreviewRequest:
+    image_path: Path
+    settings: ShadowSettings | dict
+    target_size: tuple[int, int]
+    curve_data: CurveData | dict | None = None
+    scale_factor: float = 0.1
+    is_preview: bool = True
+
+
+@dataclass(frozen=True)
+class TilePreviewResult:
+    processed: PreviewResult
+    original: PreviewResult

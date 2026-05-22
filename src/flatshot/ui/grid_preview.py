@@ -11,12 +11,11 @@ from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QSize, QRunnable, QThreadPool, 
 from PyQt6.QtGui import QPixmap, QImage
 from PIL import Image
 
-from flatshot.core.engine import ShadowEngine
+from flatshot.application.contracts import TilePreviewRequest
+from flatshot.application.preview_service import PreviewService
 from flatshot.core.models import (
     CurveData,
-    SHADOW_ENGINE_DEFAULT,
     ShadowSettings,
-    normalize_shadow_settings,
 )
 from flatshot.core.overrides import apply_image_override, has_image_override, override_key
 
@@ -28,39 +27,21 @@ def _render_tile_preview(
     preview_size: tuple[int, int],
 ):
     """Render a grid tile preview off the UI thread."""
-    settings = normalize_shadow_settings(
-        settings_dict,
-        missing_engine=SHADOW_ENGINE_DEFAULT,
-    )
-    curve_data = CurveData(**curve_dict) if curve_dict else None
-
-    with Image.open(image_path) as pil_img:
-        pil_img = pil_img.convert("RGBA")
-
-        processed_pil = ShadowEngine.aplicar_efectos(
-            pil_img,
-            settings,
-            preview_size,
+    result = PreviewService().render_tile_preview(
+        TilePreviewRequest(
+            image_path=Path(image_path),
+            settings=settings_dict,
+            curve_data=curve_dict,
+            target_size=preview_size,
             scale_factor=0.1,
-            curve_data=curve_data,
             is_preview=True,
         )
+    )
 
-        def _to_rgb_payload(pil_image: Image.Image):
-            if pil_image.mode == "RGBA":
-                bg = Image.new("RGB", pil_image.size, settings.bg_color)
-                bg.paste(pil_image, (0, 0), mask=pil_image)
-                pil_image = bg
-            pil_image = pil_image.convert("RGB")
-            return pil_image.width, pil_image.height, pil_image.tobytes("raw", "RGB")
-
-        processed_payload = _to_rgb_payload(processed_pil)
-
-        small_orig = pil_img.copy()
-        small_orig.thumbnail((preview_size[0], preview_size[1]))
-        original_payload = _to_rgb_payload(small_orig)
-
-    return processed_payload, original_payload
+    return (
+        (result.processed.width, result.processed.height, result.processed.bytes_rgb),
+        (result.original.width, result.original.height, result.original.bytes_rgb),
+    )
 
 
 class TileRenderSignals(QObject):

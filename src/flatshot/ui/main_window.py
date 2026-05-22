@@ -47,6 +47,8 @@ from flatshot.core.overrides import (
     override_key,
 )
 from flatshot.core.scaling import DEFAULT_SCALE_CURVE, normalize_curve_data
+from flatshot.application import presenters
+from flatshot.application.folder_scanner import FolderScanner
 from flatshot.utils.config import ConfigManager
 from flatshot.utils.history_manager import HistoryManager
 from flatshot.utils.log_manager import LogManager
@@ -174,6 +176,7 @@ class MainWindow(QMainWindow):
         self.history_manager = HistoryManager()
         self.log_manager = LogManager.get_instance()
         self.session_manager = SessionManager()
+        self.folder_scanner = FolderScanner()
         
         # State
         self.selected_folders = []  # List of Path objects for multi-folder export
@@ -2051,14 +2054,7 @@ class MainWindow(QMainWindow):
 
     def _update_export_destination_label(self):
         """Keep the persistent export bar destination summary in sync."""
-        if hasattr(self, 'rb_dest_custom') and self.rb_dest_custom.isChecked():
-            if self.custom_output_path:
-                text = f"carpeta personalizada: {self.custom_output_path}"
-            else:
-                text = "carpeta personalizada sin elegir"
-        else:
-            folder_name = self.app_settings.get('output_folder_name', '_SALIDA_PRO')
-            text = f"origen / {folder_name}"
+        text = presenters.format_destination_batch_label(self._build_export_config_from_settings())
         if hasattr(self, 'batch_summary'):
             self.batch_summary.destination_label = text
         self._update_export_bar_state()
@@ -2088,73 +2084,30 @@ class MainWindow(QMainWindow):
                 self._set_elided_label(label, str(text), str(label.property("full_tooltip") or text))
 
     def _plural(self, count: int, singular: str, plural: str) -> str:
-        return singular if int(count) == 1 else plural
+        return presenters.pluralize(count, singular, plural)
 
     def _format_batch_summary_text(self) -> str:
-        folders = int(getattr(self.batch_summary, "folders_count", 0))
-        images = int(getattr(self.batch_summary, "images_count", 0))
-        adjusted = int(getattr(self.batch_summary, "adjusted_count", 0))
-        if folders <= 0:
-            return "Sin lote cargado"
-        folder_text = f"{folders} {self._plural(folders, 'carpeta', 'carpetas')}"
-        image_text = f"{images} {self._plural(images, 'imagen', 'imágenes')}"
-        if adjusted:
-            return f"{folder_text} · {image_text} · {adjusted} ajustadas"
-        return f"{folder_text} · {image_text}"
+        return presenters.format_batch_summary(
+            getattr(self.batch_summary, "folders_count", 0),
+            getattr(self.batch_summary, "images_count", 0),
+            getattr(self.batch_summary, "adjusted_count", 0),
+        )
 
     def _format_destination_summary(self) -> tuple[str, str]:
-        if hasattr(self, 'rb_dest_custom') and self.rb_dest_custom.isChecked():
-            if self.custom_output_path:
-                return "Destino: carpeta personalizada", str(self.custom_output_path)
-            return "Destino: personalizada sin elegir", "Elige una carpeta personalizada o usa subcarpeta en origen."
-        folder_name = self.app_settings.get('output_folder_name', '_SALIDA_PRO')
-        return f"Destino: origen / {folder_name}", f"Se creará {folder_name} dentro de cada carpeta de origen."
+        summary = presenters.format_destination_summary(self._build_export_config_from_settings())
+        return summary.text, summary.tooltip
 
     def _format_export_config_summary(self) -> tuple[str, str]:
         config = self._build_export_config_from_settings()
-        fmt = str(config.format).upper()
-        size = f"{config.output_width}×{config.output_height}"
-        active = self._active_export_variants()
-        if active:
-            first = active[0]
-            bg_text = "transparente" if first.transparent_bg else self._variant_hex(first)
-            output_count = f"{len(active)} {self._plural(len(active), 'salida', 'salidas')}"
-        else:
-            bg_text = "sin salida activa"
-            output_count = "0 salidas"
-        summary = f"{fmt} · {size} · {bg_text} · {output_count}"
-        tooltip = (
-            f"Formato general: {fmt}\n"
-            f"Tamaño: {size} px\n"
-            f"Fondo mostrado: {bg_text}\n"
-            f"Plantilla: {config.naming_template}"
-        )
-        return summary, tooltip
+        summary = presenters.format_export_config_summary(config, self._active_export_variants())
+        return summary.text, summary.tooltip
 
     def _format_outputs_summary(self) -> tuple[str, str]:
-        active = self._active_export_variants()
-        if not active:
-            return "Salidas: ninguna activa", "Activa al menos una versión de salida."
-        compact = " + ".join(variant.label for variant in active)
-        detail_lines = []
-        for variant in active:
-            bg = "transparente" if variant.transparent_bg else self._variant_hex(variant)
-            suffix = variant.suffix or "(sin sufijo)"
-            shadow = ""
-            if variant.shadow_opacity_override is not None:
-                shadow = f" · sombra {variant.shadow_opacity_override}"
-            elif variant.shadow_opacity_delta:
-                shadow = f" · sombra {variant.shadow_opacity_delta:+d}"
-            detail_lines.append(f"{variant.label}: {bg} · {suffix}{shadow}")
-        return f"Salidas: {compact}", "\n".join(detail_lines)
+        summary = presenters.format_outputs_summary(self._active_export_variants())
+        return summary.text, summary.tooltip
 
     def _process_button_text(self) -> str:
-        images = int(getattr(self.batch_summary, "images_count", 0))
-        if images == 1:
-            return "Procesar 1 imagen"
-        if images > 1:
-            return f"Procesar {images} imágenes"
-        return "Procesar lote"
+        return presenters.format_process_button_text(getattr(self.batch_summary, "images_count", 0))
 
     def _update_export_bar_state(self):
         if not hasattr(self, "btn_process"):
@@ -2176,38 +2129,31 @@ class MainWindow(QMainWindow):
         outputs_text, outputs_tooltip = self._format_outputs_summary()
         self._set_elided_label(self.lbl_outputs_summary, outputs_text, outputs_tooltip)
 
-        can_process = folders > 0 and images > 0 and bool(active_outputs)
+        can_process = presenters.can_process_batch(
+            folders,
+            images,
+            len(active_outputs),
+            is_processing=processing,
+        )
         self.btn_clear_folders.setEnabled(folders > 0 and not processing)
         self.btn_export_details.setEnabled(folders > 0 and not processing)
         self.btn_add_folder.setEnabled(not processing)
         self.btn_export_config.setEnabled(not processing)
         self.btn_outputs.setEnabled(not processing)
-        self.btn_process.setEnabled(can_process and not processing)
+        self.btn_process.setEnabled(can_process)
         self.btn_process.setText(self._process_button_text())
 
-        if folders <= 0:
-            status = "Añade una carpeta para procesar"
-            show_progress = False
-        elif images <= 0:
-            status = "No hay PNG válidos"
-            show_progress = False
-        elif self.export_bar_mode == "processing":
-            status = self._export_bar_status_text or "Procesando..."
-            show_progress = True
-        elif self.export_bar_mode == "paused":
-            status = "Pausado"
-            show_progress = True
-        elif self.export_bar_mode == "stopping":
-            status = "Deteniendo..."
-            show_progress = True
-        elif self._pre_render_bar_status:
-            status, prepared, total = self._pre_render_bar_status
-            show_progress = total > 0
-            if total > 0:
-                self.progress_bar.setValue(int((prepared / total) * 100))
-        else:
-            status = "Listo para procesar"
-            show_progress = False
+        status_view = presenters.format_processing_status(
+            folders,
+            images,
+            self.export_bar_mode,
+            export_status_text=self._export_bar_status_text,
+            pre_render_status=self._pre_render_bar_status,
+        )
+        status = status_view.text
+        show_progress = status_view.show_progress
+        if status_view.progress_value is not None:
+            self.progress_bar.setValue(status_view.progress_value)
 
         self._set_elided_label(self.lbl_progress_status, status)
         self.progress_bar.setVisible(show_progress)
@@ -2399,13 +2345,8 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'grid_preview'):
             self.grid_preview.set_image_overrides(self.image_overrides)
         if self.selected_folders:
-            adjusted_count = 0
-            for folder in self.selected_folders:
-                adjusted_count += sum(
-                    1 for path in folder.glob("*.png")
-                    if has_image_override(self.image_overrides.get(override_key(str(path)), {}))
-                )
-            self.batch_summary.adjusted_count = adjusted_count
+            scan = self.folder_scanner.scan_folders(self.selected_folders, self.image_overrides)
+            self.batch_summary.adjusted_count = scan.adjusted_images
             self._update_batch_header()
 
     def _format_local_delta(self, value: int, suffix: str = "") -> str:
@@ -3227,22 +3168,17 @@ class MainWindow(QMainWindow):
             self.folder_list.clear()
         except RuntimeError:
             return
-        total_images = 0
-        adjusted_count = 0
-        
-        for folder in self.selected_folders:
-            image_paths = list(folder.glob("*.png"))
-            img_count = len(image_paths)
-            total_images += img_count
-            adjusted_count += sum(
-                1 for path in image_paths
-                if has_image_override(self.image_overrides.get(override_key(str(path)), {}))
-            )
+
+        scan = self.folder_scanner.scan_folders(self.selected_folders, self.image_overrides)
+
+        for folder_result in scan.folders:
+            folder = folder_result.folder
+            img_count = len(folder_result.images)
             item = QListWidgetItem(f"Carpeta: {folder.name}  -  {img_count} imágenes")
             item.setToolTip(str(folder))
             self.folder_list.addItem(item)
         
-        has_folders = len(self.selected_folders) > 0
+        has_folders = scan.total_folders > 0
         
         # Show/hide elements in panel (details live in a dialog; keep hidden to avoid resizing)
         self.folder_list.setVisible(False)
@@ -3250,15 +3186,16 @@ class MainWindow(QMainWindow):
         self.export_details_container.setVisible(False)
 
         self.batch_summary = BatchSummary(
-            folders_count=len(self.selected_folders),
-            images_count=total_images,
-            adjusted_count=adjusted_count,
-            destination_label=self.lbl_destination_summary.text().replace("Destino: ", "", 1)
-            if hasattr(self, "lbl_destination_summary") else "Subcarpeta en origen",
+            folders_count=scan.total_folders,
+            images_count=scan.total_images,
+            adjusted_count=scan.adjusted_images,
+            destination_label=presenters.format_destination_batch_label(
+                self._build_export_config_from_settings()
+            ),
         )
         self._update_batch_header()
         if self.export_bar_mode not in {"processing", "paused", "stopping"}:
-            self.export_bar_mode = "ready" if has_folders and total_images > 0 else "idle"
+            self.export_bar_mode = "ready" if has_folders and scan.total_images > 0 else "idle"
         self._update_export_bar_state()
          
         self._sync_grid_preview_with_folders()
@@ -3309,9 +3246,13 @@ class MainWindow(QMainWindow):
         list_widget.setMaximumHeight(self._px(200))
         layout.addWidget(list_widget)
         display_names = self._build_folder_display_names(self.selected_folders)
+        scan_by_folder = {
+            str(result.folder): len(result.images)
+            for result in self.folder_scanner.scan_folders(self.selected_folders, self.image_overrides).folders
+        }
 
         def _add_folder_item(folder):
-            img_count = len(list(folder.glob("*.png")))
+            img_count = scan_by_folder.get(str(folder), 0)
             row_widget = QWidget()
             row_layout = QHBoxLayout(row_widget)
             row_layout.setContentsMargins(self._px(8), self._px(4), self._px(8), self._px(4))
@@ -3421,9 +3362,8 @@ class MainWindow(QMainWindow):
         self._update_folder_ui()
 
         # Build export config
-        use_custom_dest = self.rb_dest_custom.isChecked()
-        custom_output = str(self.custom_output_path) if self.custom_output_path else None
-        if use_custom_dest and not custom_output:
+        export_config = self._build_export_config_from_settings()
+        if not presenters.is_destination_configured(export_config):
             QMessageBox.warning(
                 self,
                 "Destino no configurado",
@@ -3432,20 +3372,6 @@ class MainWindow(QMainWindow):
             )
             self._reset_export_ui()
             return
-
-        export_config = ExportConfig(
-            output_folder_name=self.app_settings.get('output_folder_name', '_SALIDA_PRO'),
-            suffix=self.app_settings.get('suffix', '_PRO'),
-            format=self.app_settings.get('format', 'JPG'),
-            transparent_bg=self.app_settings.get('transparent_bg', False),
-            bg_color=self.app_settings.get('bg_color', (230, 230, 230)),
-            variants=self.export_variants,
-            output_width=self.app_settings.get('output_width', 1800),
-            output_height=self.app_settings.get('output_height', 2400),
-            naming_template=self.app_settings.get('naming_template', '{original}{suffix}'),
-            output_destination='custom' if use_custom_dest else 'subfolder',
-            custom_output_path=custom_output
-        )
 
         active_variants = get_enabled_export_variants(export_config)
         if not active_variants:

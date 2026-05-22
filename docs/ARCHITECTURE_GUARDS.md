@@ -1,6 +1,6 @@
 # Architecture Guards
 
-Guía operativa corta para las guardas introducidas en TANDA V2.1.
+Guía operativa corta para las guardas introducidas en TANDA V2.1 y ampliadas en TANDA V2.3.
 
 ## Límites protegidos
 
@@ -12,6 +12,7 @@ Estas reglas están protegidas por:
 
 - `tests/test_architecture_boundaries.py`
 - `tests/test_headless_imports.py`
+- `tests/test_cli_export_runner_parity.py`
 
 ## Adaptadores Qt legítimos
 
@@ -30,7 +31,7 @@ Estos módulos pueden seguir importando PyQt porque pertenecen a la capa UI/adap
 - `ConfigManager` depende de `QStandardPaths` y convive con `PresetService`.
 - `LogManager` depende de `QStandardPaths`.
 - `PreRenderScheduler` sigue siendo Qt (`QObject`, `QTimer`, señales).
-- La CLI mantiene una ruta de exportación paralela a `ExportRunner`.
+- La CLI mantiene una ruta de exportación paralela a `ExportRunner`; hay paridad básica protegida para metadatos JPG, pero la CLI aún no está migrada.
 - `MainWindow` sigue coordinando demasiado estado y el lanzamiento de workers.
 - `PresetService` convive con mecanismos legacy de `ConfigManager`.
 - `SettingsService` no sustituye todavía toda la resolución real de configuración porque la ruta sigue pasando por Qt en UI/CLI.
@@ -40,7 +41,7 @@ Estos módulos pueden seguir importando PyQt porque pertenecen a la capa UI/adap
 
 - No eliminar `ConfigManager`, `LogManager`, `ExportWorker`, `QueueWorker` ni `PreRenderScheduler`.
 - No mover helpers legacy importados desde `flatshot.workers.export_worker` sin revisar UI, CLI y tests.
-- No migrar CLI a `ExportRunner` sin pruebas de paridad de output.
+- No migrar CLI a `ExportRunner` sin preservar las pruebas de paridad de output y ampliar cobertura si se tocan presets, configuración global o variantes.
 - No cambiar rutas de configuración, formato de presets ni ubicación de logs sin migración y tests.
 
 ## Cobertura de paridad mínima
@@ -49,6 +50,7 @@ Estos módulos pueden seguir importando PyQt porque pertenecen a la capa UI/adap
 - `tests/test_folder_scanner.py` cubre `FolderScanner`.
 - `tests/test_export_config_service.py` cubre `ExportConfigService`.
 - `tests/test_export_runner.py` cubre `ExportRunner`.
+- `tests/test_cli_export_runner_parity.py` compara ruta CLI actual y `ExportRunner` para nombre, extensión, dimensiones, modo de color y DPI en una exportación JPG mínima; también protege que `--dry-run` no cree salida.
 - `tests/test_queue_runner.py` cubre `QueueRunner`.
 - `tests/test_preview_service.py` cubre `PreviewService`.
 - `tests/test_architecture_boundaries.py` confirma que los helpers legacy reexportados desde `workers.export_worker` apuntan a la implementación de `application.export_runner`.

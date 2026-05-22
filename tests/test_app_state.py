@@ -6,8 +6,12 @@ from flatshot.application.app_state import (
     FlatshotAppState,
     ProcessingState,
     UiViewState,
+    build_batch_summary,
     build_export_bar_state,
+    format_batch_count_text,
+    processing_mode_for_batch,
 )
+from flatshot.application.contracts import BatchScanResult
 
 
 def test_app_state_does_not_import_pyqt():
@@ -36,6 +40,41 @@ def test_flatshot_app_state_groups_existing_ui_state_without_widgets():
     assert state.processing.mode == "ready"
     assert state.selected_image == "image.png"
     assert state.active_preset == "Preset"
+
+
+def test_build_batch_summary_from_scan_result():
+    scan = BatchScanResult(total_folders=2, total_images=5, adjusted_images=1)
+
+    summary = build_batch_summary(scan, destination_label="origen / _SALIDA_PRO")
+
+    assert summary == BatchSummary(
+        folders_count=2,
+        images_count=5,
+        adjusted_count=1,
+        destination_label="origen / _SALIDA_PRO",
+    )
+
+
+def test_format_batch_count_text_preserves_existing_header_texts():
+    assert format_batch_count_text(BatchSummary()) == "0 imágenes"
+    assert format_batch_count_text(BatchSummary(folders_count=1, images_count=0)) == "0 imágenes"
+    assert format_batch_count_text(BatchSummary(folders_count=1, images_count=1)) == "1 imágenes"
+    assert (
+        format_batch_count_text(BatchSummary(folders_count=2, images_count=50, adjusted_count=4))
+        == "50 imágenes · 4 ajustadas"
+    )
+
+
+def test_processing_mode_for_batch_keeps_busy_modes_and_derives_idle_ready():
+    empty = BatchSummary()
+    ready = BatchSummary(folders_count=1, images_count=1)
+
+    assert processing_mode_for_batch(empty, "ready") == "idle"
+    assert processing_mode_for_batch(BatchSummary(folders_count=1, images_count=0), "ready") == "idle"
+    assert processing_mode_for_batch(ready, "idle") == "ready"
+    assert processing_mode_for_batch(empty, "processing") == "processing"
+    assert processing_mode_for_batch(empty, "paused") == "paused"
+    assert processing_mode_for_batch(empty, "stopping") == "stopping"
 
 
 def test_export_bar_state_for_empty_batch_disables_processing():

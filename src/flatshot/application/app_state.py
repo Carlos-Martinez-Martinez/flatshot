@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from flatshot.application import presenters
+from flatshot.application.contracts import BatchScanResult
 
 
 BUSY_PROCESSING_MODES = {"processing", "paused", "stopping"}
@@ -65,6 +66,35 @@ class ExportBarState:
     progress_value: int | None
     show_pause: bool
     show_stop: bool
+
+
+def build_batch_summary(
+    scan: BatchScanResult,
+    *,
+    destination_label: str,
+) -> BatchSummary:
+    return BatchSummary(
+        folders_count=scan.total_folders,
+        images_count=scan.total_images,
+        adjusted_count=scan.adjusted_images,
+        destination_label=destination_label,
+    )
+
+
+def format_batch_count_text(batch: BatchSummary) -> str:
+    if int(batch.folders_count) <= 0:
+        return "0 imágenes"
+    if int(batch.adjusted_count) > 0:
+        return f"{int(batch.images_count)} imágenes · {int(batch.adjusted_count)} ajustadas"
+    return f"{int(batch.images_count)} imágenes"
+
+
+def processing_mode_for_batch(batch: BatchSummary, current_mode: str) -> str:
+    if current_mode in BUSY_PROCESSING_MODES:
+        return current_mode
+    if int(batch.folders_count) > 0 and int(batch.images_count) > 0:
+        return "ready"
+    return "idle"
 
 
 def build_export_bar_state(

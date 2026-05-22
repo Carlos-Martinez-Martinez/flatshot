@@ -580,3 +580,44 @@
   - verified final ready state, enabled process button and session save.
 - Smoke used a thread-backed executor for export to avoid Windows multiprocessing-from-stdin issues while preserving the worker/runner path.
 - Remaining risk: the previously observed queue race still exists if pause is toggled at the same instant as the first `job_started` signal. The underlying worker pause flag works; this batch did not change queue event ordering because it would be a separate behavioral refactor.
+
+## Batch 11 implementation
+
+- Scope: Phase 8 partial, batch state extraction.
+- Extended `app_state.py` with Qt-free helpers for existing batch UI state:
+  - `build_batch_summary()` builds `BatchSummary` from `BatchScanResult` plus destination label;
+  - `format_batch_count_text()` owns the compact batch counter text currently shown in the grid header;
+  - `processing_mode_for_batch()` derives `idle`/`ready` from batch availability while preserving busy modes.
+- Adapted `MainWindow._update_folder_ui()` to build `BatchSummary` and derive `export_bar_mode` through the new helpers.
+- Adapted `MainWindow._update_batch_header()` to use `format_batch_count_text()` and keep `self.app_state` synced.
+- Preserved the existing visible counter text, including the current compact `"1 imágenes"` form for one image.
+- Did not touch `ShadowEngine`, export output, export runner, queue runner, preview service, presets, settings, session format or UI styling.
+
+## Batch 11 validation
+
+- Extended `tests/test_app_state.py` with coverage for:
+  - `BatchSummary` creation from `BatchScanResult`;
+  - existing compact batch counter text;
+  - `idle`/`ready` derivation;
+  - preserving `processing`, `paused` and `stopping` modes.
+- `pytest tests/test_app_state.py tests/test_folder_scanner.py tests/test_presenters.py -q` -> 25 passed.
+- `python -m compileall -q src/flatshot/application src/flatshot/ui/main_window.py` -> passed.
+- `pytest` -> 185 passed.
+- `rg -n "PyQt6|QWidget|QApplication|QThread|QPixmap|QImage" src/flatshot/application/app_state.py` -> no matches.
+- PyQt offscreen smoke with temporary config and session:
+  - launched `MainWindow`;
+  - restored one folder and preset from session;
+  - added a second folder and verified PNG count;
+  - verified `BatchSummary`, `app_state.batch` and `lbl_batch_count`;
+  - selected a preset;
+  - instantiated `ExportConfigDialog` from current config;
+  - adjusted an essential slider;
+  - selected an image through the grid;
+  - rendered central preview;
+  - processed one folder and verified output plus ready/button reset;
+  - processed two folders through the queue;
+  - exercised pause/resume after first queue job signal settled;
+  - exercised stop;
+  - cleared folders and verified `idle`, disabled process button and `0 imágenes`.
+- Smoke used a thread-backed executor for export to avoid Windows multiprocessing-from-stdin issues while preserving the worker/runner path.
+- Remaining risk: batch-state extraction is still partial. `MainWindow` still owns several direct state mutations for queue/export transitions and preview state, which should be moved only in small follow-up batches.

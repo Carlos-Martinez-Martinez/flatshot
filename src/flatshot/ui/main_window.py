@@ -50,7 +50,10 @@ from flatshot.application.app_state import (
     FlatshotAppState,
     ProcessingState,
     UiViewState,
+    build_batch_summary,
     build_export_bar_state,
+    format_batch_count_text,
+    processing_mode_for_batch,
 )
 from flatshot.application import presenters
 from flatshot.application.contracts import PreviewRequest
@@ -1644,16 +1647,8 @@ class MainWindow(QMainWindow):
     def _update_batch_header(self):
         if not hasattr(self, 'lbl_batch_count'):
             return
-        images = self.batch_summary.images_count
-        folders = self.batch_summary.folders_count
-        adjusted = self.batch_summary.adjusted_count
-        if folders <= 0:
-            text = "0 imágenes"
-        elif adjusted:
-            text = f"{images} imágenes · {adjusted} ajustadas"
-        else:
-            text = f"{images} imágenes"
-        self.lbl_batch_count.setText(text)
+        self.lbl_batch_count.setText(format_batch_count_text(self.batch_summary))
+        self._sync_app_state()
 
     def _on_grid_columns_changed(self, columns: int):
         if not hasattr(self, 'grid_preview'):
@@ -3124,24 +3119,19 @@ class MainWindow(QMainWindow):
             item.setToolTip(str(folder))
             self.folder_list.addItem(item)
         
-        has_folders = scan.total_folders > 0
-        
         # Show/hide elements in panel (details live in a dialog; keep hidden to avoid resizing)
         self.folder_list.setVisible(False)
         self.dest_group.setVisible(False)
         self.export_details_container.setVisible(False)
 
-        self.batch_summary = BatchSummary(
-            folders_count=scan.total_folders,
-            images_count=scan.total_images,
-            adjusted_count=scan.adjusted_images,
+        self.batch_summary = build_batch_summary(
+            scan,
             destination_label=presenters.format_destination_batch_label(
                 self._build_export_config_from_settings()
             ),
         )
         self._update_batch_header()
-        if self.export_bar_mode not in {"processing", "paused", "stopping"}:
-            self.export_bar_mode = "ready" if has_folders and scan.total_images > 0 else "idle"
+        self.export_bar_mode = processing_mode_for_batch(self.batch_summary, self.export_bar_mode)
         self._update_export_bar_state()
          
         self._sync_grid_preview_with_folders()

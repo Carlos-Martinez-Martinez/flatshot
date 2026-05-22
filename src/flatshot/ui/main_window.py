@@ -49,14 +49,27 @@ from flatshot.application.app_state import (
     BatchSummary,
     ExportState,
     FlatshotAppState,
+    PreviewState,
     ProcessingState,
     UiViewState,
+    build_custom_preview_state,
+    build_empty_preview_state,
     build_batch_summary,
     build_export_bar_state,
     build_export_state,
+    build_mockup_preview_state,
+    build_pre_render_bar_status,
     build_queue_export_summary_lines,
     build_single_export_summary_lines,
+    calculate_queue_overall_progress,
     format_batch_count_text,
+    format_custom_preview_button_text,
+    processing_state_after_reset,
+    processing_state_for_export_start,
+    processing_state_for_pause,
+    processing_state_for_queue_job,
+    processing_state_for_single_export,
+    processing_state_for_stop,
     processing_mode_for_batch,
 )
 from flatshot.application import presenters
@@ -231,6 +244,7 @@ class MainWindow(QMainWindow):
         self.queue_worker = None
         self.worker = None
         self.export_state = ExportState()
+        self.preview_state = PreviewState()
         self.current_custom_path = None
         self._watched_folders = set()
         self._pending_folder_updates = set()
@@ -269,6 +283,7 @@ class MainWindow(QMainWindow):
         self.app_state = FlatshotAppState(
             batch=self.batch_summary,
             export=self.export_state,
+            preview=self.preview_state,
             view=self.ui_view_state,
         )
 
@@ -1793,11 +1808,7 @@ class MainWindow(QMainWindow):
             self.btn_custom.hide()
             self.mock_buttons['dark'].setChecked(True)
         self.current_custom_path = None
-        self.ui_view_state.selected_image = None
-        self._sync_app_state()
-        if hasattr(self, 'lbl_current_image'):
-            self.lbl_current_image.setText("Sin imagen seleccionada")
-            self.lbl_current_image.setToolTip("")
+        self._apply_preview_state(build_empty_preview_state(self.current_mock))
         self._sync_local_override_ui()
     
     # ========== BUSINESS LOGIC ==========
@@ -1851,8 +1862,6 @@ class MainWindow(QMainWindow):
             self.mockups['custom_drop'] = pil_img
             self.current_mock = 'custom_drop'
             self.current_custom_path = path
-            self.ui_view_state.selected_image = path
-            self._sync_app_state()
 
             # Clear caches to force recalculation for the new image
             self.current_base_pil = None
@@ -1861,11 +1870,9 @@ class MainWindow(QMainWindow):
 
             # Show and select the custom image button
             self.btn_custom.show()
-            self.btn_custom.setText(f" {Path(path).stem[:15]}")
+            self.btn_custom.setText(format_custom_preview_button_text(path))
             self.btn_custom.setChecked(True)
-            if hasattr(self, 'lbl_current_image'):
-                self.lbl_current_image.setText(Path(path).stem)
-                self.lbl_current_image.setToolTip(path)
+            self._apply_preview_state(build_custom_preview_state(path))
             self._sync_local_override_ui()
 
             # Only update canvas, NOT the grid (to avoid reload)
@@ -2051,8 +2058,32 @@ class MainWindow(QMainWindow):
             pre_render_status=self._pre_render_bar_status,
             progress_value=progress_value,
         )
-        self.app_state.selected_image = self.ui_view_state.selected_image
+        self.app_state.preview = self.preview_state
+        self.app_state.selected_image = self.preview_state.selected_image
         self.app_state.active_preset = active_preset
+
+    def _apply_preview_state(self, preview_state: PreviewState):
+        self.preview_state = preview_state
+        self.ui_view_state.selected_image = preview_state.selected_image
+        if hasattr(self, 'lbl_current_image'):
+            self.lbl_current_image.setText(preview_state.label_text)
+            self.lbl_current_image.setToolTip(preview_state.tooltip)
+        self._sync_app_state()
+
+    def _apply_processing_state(
+        self,
+        processing_state: ProcessingState,
+        *,
+        update_progress: bool = False,
+        update_pre_render: bool = True,
+    ):
+        self.export_bar_mode = processing_state.mode
+        self._export_bar_status_text = processing_state.status_text
+        if update_pre_render:
+            self._pre_render_bar_status = processing_state.pre_render_status
+        if update_progress and hasattr(self, "progress_bar"):
+            self.progress_bar.setValue(processing_state.progress_value)
+        self._sync_app_state()
 
     def _update_export_bar_state(self):
         if not hasattr(self, "btn_process"):
@@ -2515,21 +2546,7 @@ class MainWindow(QMainWindow):
         if (self.worker and self.worker.isRunning()) or (self.queue_worker and self.queue_worker.isRunning()):
             return
 
-        if state == "idle" or total <= 0:
-            self._pre_render_bar_status = None
-            self._update_export_bar_state()
-            return
-
-        if state == "preparing":
-            text = f"Preparando exportación {prepared}/{total}"
-        elif state == "ready":
-            text = f"Listo para exportar {prepared}/{total}"
-        elif state == "partial":
-            text = f"Caché parcial {prepared}/{total}"
-        else:
-            text = "Pausado por actividad" if prepared <= 0 else f"Caché parcial {prepared}/{total}"
-
-        self._pre_render_bar_status = (text, int(prepared), int(total))
+        self._pre_render_bar_status = build_pre_render_bar_status(state, prepared, total)
         self._update_export_bar_state()
     
     def _start_preview_thread(self):
@@ -2674,9 +2691,12 @@ class MainWindow(QMainWindow):
         if mock_id == "med":
             mock_id = "medium"
         self.current_mock = mock_id
-        if hasattr(self, 'lbl_current_image') and mock_id != 'custom_drop':
-            self.lbl_current_image.setText("Mockup de prueba")
-            self.lbl_current_image.setToolTip("Vista previa generada para ajustar el preset")
+        if mock_id == 'custom_drop' and self.current_custom_path:
+            self._apply_preview_state(build_custom_preview_state(self.current_custom_path))
+        elif mock_id == 'custom_drop':
+            self._apply_preview_state(build_empty_preview_state(mock_id))
+        else:
+            self._apply_preview_state(build_mockup_preview_state(mock_id))
         # Clear cache to force re-generation for the mockup
         self.current_base_pil = None
         self.current_orig_pixmap = None
@@ -2697,14 +2717,12 @@ class MainWindow(QMainWindow):
             
             # Show and select the custom image button
             self.btn_custom.show()
-            self.btn_custom.setText(f" {os.path.basename(path)[:15]}")
+            self.btn_custom.setText(format_custom_preview_button_text(path, include_suffix=True))
             self.btn_custom.setChecked(True)
-            if hasattr(self, 'lbl_current_image'):
-                self.lbl_current_image.setText(Path(path).stem)
-                self.lbl_current_image.setToolTip(path)
             
             self.current_mock = 'custom_drop'
             self.current_custom_path = path
+            self._apply_preview_state(build_custom_preview_state(path))
             
             # Update assets and schedule
             self.current_base_pil = None
@@ -3352,10 +3370,10 @@ class MainWindow(QMainWindow):
         )
         self._sync_app_state()
 
-        self.export_bar_mode = "processing"
-        self._pre_render_bar_status = None
-        self._export_bar_status_text = "Procesando..."
-        self.progress_bar.setValue(0)
+        self._apply_processing_state(
+            processing_state_for_export_start(),
+            update_progress=True,
+        )
         self.btn_pause.setText("Pausar")
         self.btn_pause.setIcon(qta.icon('fa5s.pause', color='white'))
         self._set_widget_class(self.btn_pause, "warning-solid")
@@ -3377,7 +3395,10 @@ class MainWindow(QMainWindow):
             self.worker.log_updated.connect(self._on_export_log)
             self.worker.finished_process.connect(self._on_export_finished)
             self.worker.finished.connect(self._on_single_worker_thread_finished)
-            self._export_bar_status_text = f"Procesando: {self.selected_folders[0].name}"
+            self._apply_processing_state(
+                processing_state_for_single_export(self.selected_folders[0].name),
+                update_pre_render=False,
+            )
             self._update_export_bar_state()
             self.worker.start()
         else:
@@ -3406,17 +3427,17 @@ class MainWindow(QMainWindow):
     
     def _on_queue_job_started(self, index: int, folder_path: str):
         """Called when a job in the queue starts."""
-        folder_name = Path(folder_path).name
-        self.export_bar_mode = "processing"
-        self._export_bar_status_text = f"[{index+1}/{len(self.selected_folders)}] {folder_name}"
+        self._apply_processing_state(
+            processing_state_for_queue_job(index, len(self.selected_folders), folder_path),
+            update_pre_render=False,
+        )
         self._update_export_bar_state()
     
     def _on_queue_job_progress(self, index: int, progress: int):
         """Called when a job's progress updates."""
-        # Calculate overall progress across all jobs
-        base_progress = (index * 100) // len(self.selected_folders)
-        job_contribution = progress // len(self.selected_folders)
-        self.progress_bar.setValue(base_progress + job_contribution)
+        self.progress_bar.setValue(
+            calculate_queue_overall_progress(index, progress, len(self.selected_folders))
+        )
     
     def _on_queue_finished(self, completed: int, errors: int, total_images: int):
         """Called when all queue jobs are finished."""
@@ -3454,18 +3475,22 @@ class MainWindow(QMainWindow):
             
         if self.queue_worker.is_paused:
             self.queue_worker.resume()
-            self.export_bar_mode = "processing"
+            self._apply_processing_state(
+                processing_state_for_pause(False),
+                update_pre_render=False,
+            )
             self.btn_pause.setText("Pausar")
             self.btn_pause.setIcon(qta.icon('fa5s.pause', color='white'))
             self._set_widget_class(self.btn_pause, "warning-solid")
-            self._export_bar_status_text = "Procesando..."
         else:
             self.queue_worker.pause()
-            self.export_bar_mode = "paused"
+            self._apply_processing_state(
+                processing_state_for_pause(True),
+                update_pre_render=False,
+            )
             self.btn_pause.setText("Reanudar")
             self.btn_pause.setIcon(qta.icon('fa5s.play', color='white'))
             self._set_widget_class(self.btn_pause, "success-solid")
-            self._export_bar_status_text = "Pausado"
         self._update_export_bar_state()
 
     def _stop_export(self):
@@ -3475,8 +3500,10 @@ class MainWindow(QMainWindow):
         elif hasattr(self, 'worker') and self.worker:
             self.worker.stop()
         
-        self.export_bar_mode = "stopping"
-        self._export_bar_status_text = "Deteniendo..."
+        self._apply_processing_state(
+            processing_state_for_stop(),
+            update_pre_render=False,
+        )
         self.btn_stop.setText("Deteniendo...")
         self.btn_stop.setEnabled(False)
         self._update_export_bar_state()
@@ -3485,11 +3512,14 @@ class MainWindow(QMainWindow):
         """Reset export UI to idle state."""
         self.btn_stop.setText("Detener")
         self.btn_stop.setEnabled(True)
-        self.export_bar_mode = (
-            "ready" if getattr(self.batch_summary, "images_count", 0) > 0 and self.selected_folders else "idle"
+        self._apply_processing_state(
+            processing_state_after_reset(
+                self.batch_summary,
+                selected_folders_count=len(self.selected_folders),
+            ),
+            update_progress=True,
+            update_pre_render=False,
         )
-        self._export_bar_status_text = ""
-        self.progress_bar.setValue(0)
         self._update_export_bar_state()
         self._schedule_background_pre_render()
             

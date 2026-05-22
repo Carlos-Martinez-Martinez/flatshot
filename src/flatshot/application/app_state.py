@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Iterable
 
 from flatshot.application import presenters
@@ -9,6 +10,12 @@ from flatshot.application.contracts import BatchScanResult
 
 
 BUSY_PROCESSING_MODES = {"processing", "paused", "stopping"}
+PREVIEW_INITIAL_LABEL = "Sin imagen"
+PREVIEW_INITIAL_TOOLTIP = "Imagen mostrada en el canvas · ESPACIO = ver original"
+PREVIEW_EMPTY_LABEL = "Sin imagen seleccionada"
+PREVIEW_EMPTY_TOOLTIP = ""
+PREVIEW_MOCKUP_LABEL = "Mockup de prueba"
+PREVIEW_MOCKUP_TOOLTIP = "Vista previa generada para ajustar el preset"
 
 
 @dataclass
@@ -53,9 +60,19 @@ class ExportState:
 
 
 @dataclass
+class PreviewState:
+    current_mock: str = "dark"
+    selected_image: str | None = None
+    label_text: str = PREVIEW_INITIAL_LABEL
+    tooltip: str = PREVIEW_INITIAL_TOOLTIP
+    is_custom_image: bool = False
+
+
+@dataclass
 class FlatshotAppState:
     batch: BatchSummary = field(default_factory=BatchSummary)
     export: ExportState = field(default_factory=ExportState)
+    preview: PreviewState = field(default_factory=PreviewState)
     view: UiViewState = field(default_factory=UiViewState)
     processing: ProcessingState = field(default_factory=ProcessingState)
     selected_image: str | None = None
@@ -106,6 +123,146 @@ def processing_mode_for_batch(batch: BatchSummary, current_mode: str) -> str:
     if int(batch.folders_count) > 0 and int(batch.images_count) > 0:
         return "ready"
     return "idle"
+
+
+def processing_state_for_export_start() -> ProcessingState:
+    return ProcessingState(
+        mode="processing",
+        status_text="Procesando...",
+        pre_render_status=None,
+        progress_value=0,
+    )
+
+
+def processing_state_for_single_export(folder_name: str) -> ProcessingState:
+    return ProcessingState(
+        mode="processing",
+        status_text=f"Procesando: {folder_name}",
+        pre_render_status=None,
+        progress_value=0,
+    )
+
+
+def processing_state_for_queue_job(
+    index: int,
+    total_folders: int,
+    folder_path: str | Path,
+) -> ProcessingState:
+    current = max(0, int(index)) + 1
+    total = max(0, int(total_folders))
+    folder_name = Path(str(folder_path)).name
+    return ProcessingState(
+        mode="processing",
+        status_text=f"[{current}/{total}] {folder_name}",
+        pre_render_status=None,
+        progress_value=0,
+    )
+
+
+def processing_state_for_pause(is_paused: bool) -> ProcessingState:
+    if is_paused:
+        return ProcessingState(
+            mode="paused",
+            status_text="Pausado",
+            pre_render_status=None,
+            progress_value=0,
+        )
+    return processing_state_for_export_start()
+
+
+def processing_state_for_stop() -> ProcessingState:
+    return ProcessingState(
+        mode="stopping",
+        status_text="Deteniendo...",
+        pre_render_status=None,
+        progress_value=0,
+    )
+
+
+def processing_state_after_reset(
+    batch: BatchSummary,
+    *,
+    selected_folders_count: int,
+) -> ProcessingState:
+    mode = "ready" if int(batch.images_count) > 0 and int(selected_folders_count) > 0 else "idle"
+    return ProcessingState(mode=mode, status_text="", progress_value=0)
+
+
+def calculate_queue_overall_progress(index: int, progress: int, total_jobs: int) -> int:
+    total = max(1, int(total_jobs))
+    current_index = max(0, int(index))
+    job_progress = min(100, max(0, int(progress)))
+    value = (current_index * 100) // total + job_progress // total
+    return min(100, max(0, value))
+
+
+def build_pre_render_bar_status(
+    state: str,
+    prepared: int,
+    total: int,
+) -> tuple[str, int, int] | None:
+    prepared_count = int(prepared)
+    total_count = int(total)
+    if state == "idle" or total_count <= 0:
+        return None
+    if state == "preparing":
+        text = f"Preparando exportación {prepared_count}/{total_count}"
+    elif state == "ready":
+        text = f"Listo para exportar {prepared_count}/{total_count}"
+    elif state == "partial":
+        text = f"Caché parcial {prepared_count}/{total_count}"
+    else:
+        text = (
+            "Pausado por actividad"
+            if prepared_count <= 0
+            else f"Caché parcial {prepared_count}/{total_count}"
+        )
+    return text, prepared_count, total_count
+
+
+def build_empty_preview_state(current_mock: str = "dark") -> PreviewState:
+    return PreviewState(
+        current_mock=str(current_mock or "dark"),
+        selected_image=None,
+        label_text=PREVIEW_EMPTY_LABEL,
+        tooltip=PREVIEW_EMPTY_TOOLTIP,
+        is_custom_image=False,
+    )
+
+
+def build_mockup_preview_state(current_mock: str) -> PreviewState:
+    mock = "medium" if current_mock == "med" else str(current_mock or "dark")
+    return PreviewState(
+        current_mock=mock,
+        selected_image=None,
+        label_text=PREVIEW_MOCKUP_LABEL,
+        tooltip=PREVIEW_MOCKUP_TOOLTIP,
+        is_custom_image=False,
+    )
+
+
+def build_custom_preview_state(path: str | Path) -> PreviewState:
+    path_text = str(path)
+    image_path = Path(path_text)
+    return PreviewState(
+        current_mock="custom_drop",
+        selected_image=path_text,
+        label_text=image_path.stem,
+        tooltip=path_text,
+        is_custom_image=True,
+    )
+
+
+def format_custom_preview_button_text(
+    path: str | Path,
+    *,
+    max_length: int = 15,
+    include_suffix: bool = False,
+) -> str:
+    image_path = Path(str(path))
+    name = image_path.name if include_suffix else image_path.stem
+    limit = max(0, int(max_length))
+    return f" {name[:limit]}"
 
 
 def build_export_state(

@@ -667,3 +667,104 @@
   - verified `export_state.source_count`, `file_total`, destinations, ready mode, enabled process button and progress reset.
 - Smoke used a thread-backed executor for export to avoid Windows multiprocessing-from-stdin issues while preserving the worker/runner path.
 - Remaining risk: export result state is now central, but `MainWindow` still owns the actual lifecycle transitions and dialog display. A later small batch can extract preview state or export lifecycle state without changing worker behavior.
+
+## Batch 13 implementation
+
+- Scope: Phase 8 partial, preview selection state extraction.
+- Added `PreviewState` to `flatshot.application.app_state`.
+- Added Qt-free helpers for current preview label/tooltip and custom image button text:
+  - `build_custom_preview_state()`;
+  - `build_mockup_preview_state()`;
+  - `build_empty_preview_state()`;
+  - `format_custom_preview_button_text()`.
+- Adapted `MainWindow` to keep `self.preview_state` and `self.app_state.preview` in sync.
+- Replaced duplicated direct label/tooltip/button formatting in:
+  - grid image selection;
+  - custom image drop;
+  - mockup selection;
+  - empty grid folder reset.
+- Preserved the existing initial label, empty-folder label, mockup label, custom image tooltip and custom button truncation behavior.
+- Did not touch `PreviewService`, `ShadowEngine`, export output, export runner, queue runner, presets, settings, session format or UI styling.
+
+## Batch 13 validation
+
+- Extended `tests/test_app_state.py` with coverage for:
+  - `PreviewState` inside `FlatshotAppState`;
+  - custom preview state labels and selected image path;
+  - mockup state label and legacy `med` normalization;
+  - empty preview state label;
+  - custom preview button text truncation with and without suffix.
+- `pytest tests/test_app_state.py -q` -> 17 passed.
+- `pytest tests/test_app_state.py tests/test_preview_service.py tests/test_folder_scanner.py tests/test_presenters.py -q` -> 35 passed.
+- `python -m compileall -q src/flatshot/application src/flatshot/ui/main_window.py` -> passed.
+- `pytest` -> 191 passed.
+- `rg -n "PyQt6|QWidget|QApplication|QThread|QPixmap|QImage" src/flatshot/application/app_state.py` -> no matches.
+- PyQt offscreen smoke with temporary config and session:
+  - launched `MainWindow`;
+  - added an empty folder and verified disabled processing plus empty preview label;
+  - added a PNG folder and verified PNG count and batch label;
+  - selected a preset;
+  - adjusted an essential slider;
+  - selected an image through the grid and verified `PreviewState`, label, tooltip and custom button text;
+  - switched back to mockup and verified selected image state cleared;
+  - instantiated `ExportConfigDialog`;
+  - rendered central preview;
+  - processed one folder and verified output files, progress reset and enabled process button;
+  - processed two folders through the queue;
+  - exercised pause/resume on the queue with slowed validation processing;
+  - exercised stop on a running queue;
+  - verified progress reset and enabled process button after queue/stop.
+- Smoke used an inline executor to avoid Windows multiprocessing-from-stdin issues while preserving `process_single_image` and the production worker/runner path.
+- Remaining risk: `MainWindow` still owns preview lifecycle scheduling, cached assets and actual label application. This batch only moved preview view-state formatting and synchronization.
+
+## Batch 14 implementation
+
+- Scope: Phase 8 partial, processing lifecycle state extraction.
+- Added Qt-free processing state helpers in `flatshot.application.app_state`:
+  - `processing_state_for_export_start()`;
+  - `processing_state_for_single_export()`;
+  - `processing_state_for_queue_job()`;
+  - `processing_state_for_pause()`;
+  - `processing_state_for_stop()`;
+  - `processing_state_after_reset()`;
+  - `calculate_queue_overall_progress()`;
+  - `build_pre_render_bar_status()`.
+- Adapted `MainWindow` to apply those states through a small UI adapter method while keeping widget/icon/class changes in the PyQt layer.
+- Replaced direct status/progress calculations in:
+  - export start;
+  - single-folder export status;
+  - queue job start;
+  - queue progress;
+  - pause/resume;
+  - stop;
+  - export UI reset;
+  - background pre-render status.
+- Preserved current visible strings and progress math for valid queue states.
+- Did not touch `ShadowEngine`, image output, export runner, queue runner, preview rendering, presets, settings, session format or UI styling.
+
+## Batch 14 validation
+
+- Extended `tests/test_app_state.py` with coverage for:
+  - processing start/single/queue/pause/resume/stop/reset states;
+  - queue overall progress calculation;
+  - pre-render status text mapping.
+- `pytest tests/test_app_state.py -q` -> 20 passed.
+- `pytest tests/test_app_state.py tests/test_presenters.py tests/test_export_runner.py tests/test_queue_runner.py -q` -> 42 passed.
+- `python -m compileall -q src/flatshot/application src/flatshot/ui/main_window.py` -> passed.
+- `pytest` -> 194 passed.
+- `rg -n "PyQt6|QWidget|QApplication|QThread|QPixmap|QImage" src/flatshot/application/app_state.py` -> no matches.
+- PyQt offscreen smoke with temporary config and session:
+  - launched `MainWindow`;
+  - added an empty folder and verified disabled processing plus empty preview label;
+  - added a PNG folder and verified PNG count and batch label;
+  - selected a preset;
+  - adjusted an essential slider;
+  - selected an image through the grid and switched back to mockup;
+  - instantiated `ExportConfigDialog`;
+  - rendered central preview;
+  - processed one folder and verified output files, progress reset, enabled process button and `app_state.processing.mode == "ready"`;
+  - processed two folders through the queue;
+  - exercised pause/resume and verified `app_state.processing.mode`;
+  - exercised stop and verified `stopping` state, progress reset and enabled process button.
+- Smoke used an inline executor to avoid Windows multiprocessing-from-stdin issues while preserving `process_single_image` and the production worker/runner path.
+- Remaining risk: `MainWindow` still owns the actual worker lifecycle and button/icon styling. This batch only moved lifecycle state calculation and progress/status formatting.

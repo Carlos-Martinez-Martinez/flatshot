@@ -5,15 +5,28 @@ from flatshot.application.app_state import (
     BatchSummary,
     ExportState,
     FlatshotAppState,
+    PreviewState,
     ProcessingState,
     UiViewState,
     build_batch_summary,
+    build_custom_preview_state,
+    build_empty_preview_state,
     build_export_state,
     build_export_bar_state,
+    build_mockup_preview_state,
+    build_pre_render_bar_status,
     build_queue_export_summary_lines,
     build_single_export_summary_lines,
+    calculate_queue_overall_progress,
     format_batch_count_text,
+    format_custom_preview_button_text,
     format_export_variant_labels,
+    processing_state_after_reset,
+    processing_state_for_export_start,
+    processing_state_for_pause,
+    processing_state_for_queue_job,
+    processing_state_for_single_export,
+    processing_state_for_stop,
     processing_mode_for_batch,
 )
 from flatshot.application.contracts import BatchScanResult
@@ -35,6 +48,7 @@ def test_flatshot_app_state_groups_existing_ui_state_without_widgets():
     state = FlatshotAppState(
         batch=batch,
         export=ExportState(destinations=["C:/out"]),
+        preview=PreviewState(selected_image="image.png", label_text="image"),
         view=view,
         processing=processing,
         selected_image=view.selected_image,
@@ -43,10 +57,46 @@ def test_flatshot_app_state_groups_existing_ui_state_without_widgets():
 
     assert state.batch.images_count == 2
     assert state.export.destinations == ["C:/out"]
+    assert state.preview.label_text == "image"
     assert state.view.active_folder == "folder"
     assert state.processing.mode == "ready"
     assert state.selected_image == "image.png"
     assert state.active_preset == "Preset"
+
+
+def test_preview_state_helpers_preserve_preview_labels_and_selection(tmp_path):
+    image = tmp_path / "camiseta larga.png"
+    image.write_bytes(b"")
+
+    custom = build_custom_preview_state(image)
+    mockup = build_mockup_preview_state("med")
+    empty = build_empty_preview_state()
+
+    assert custom.current_mock == "custom_drop"
+    assert custom.selected_image == str(image)
+    assert custom.label_text == "camiseta larga"
+    assert custom.tooltip == str(image)
+    assert custom.is_custom_image
+
+    assert mockup.current_mock == "medium"
+    assert mockup.selected_image is None
+    assert mockup.label_text == "Mockup de prueba"
+    assert mockup.tooltip == "Vista previa generada para ajustar el preset"
+    assert not mockup.is_custom_image
+
+    assert empty.current_mock == "dark"
+    assert empty.selected_image is None
+    assert empty.label_text == "Sin imagen seleccionada"
+    assert empty.tooltip == ""
+
+
+def test_custom_preview_button_text_preserves_existing_truncation_modes(tmp_path):
+    image = tmp_path / "nombre-muy-largo.png"
+    dropped = tmp_path / "drop.png"
+
+    assert format_custom_preview_button_text(image) == " nombre-muy-larg"
+    assert format_custom_preview_button_text(dropped, include_suffix=True) == " drop.png"
+    assert format_custom_preview_button_text(image, max_length=4) == " nomb"
 
 
 def test_build_batch_summary_from_scan_result():
@@ -82,6 +132,62 @@ def test_processing_mode_for_batch_keeps_busy_modes_and_derives_idle_ready():
     assert processing_mode_for_batch(empty, "processing") == "processing"
     assert processing_mode_for_batch(empty, "paused") == "paused"
     assert processing_mode_for_batch(empty, "stopping") == "stopping"
+
+
+def test_processing_state_helpers_preserve_export_status_texts(tmp_path):
+    folder = tmp_path / "folder"
+
+    start = processing_state_for_export_start()
+    single = processing_state_for_single_export("folder")
+    queue = processing_state_for_queue_job(0, 2, folder)
+    paused = processing_state_for_pause(True)
+    resumed = processing_state_for_pause(False)
+    stopping = processing_state_for_stop()
+    ready_reset = processing_state_after_reset(
+        BatchSummary(folders_count=1, images_count=2),
+        selected_folders_count=1,
+    )
+    idle_reset = processing_state_after_reset(
+        BatchSummary(folders_count=1, images_count=0),
+        selected_folders_count=1,
+    )
+
+    assert start == ProcessingState(mode="processing", status_text="Procesando...", progress_value=0)
+    assert single.mode == "processing"
+    assert single.status_text == "Procesando: folder"
+    assert queue.status_text == "[1/2] folder"
+    assert paused.mode == "paused"
+    assert paused.status_text == "Pausado"
+    assert resumed.mode == "processing"
+    assert resumed.status_text == "Procesando..."
+    assert stopping.mode == "stopping"
+    assert stopping.status_text == "Deteniendo..."
+    assert ready_reset.mode == "ready"
+    assert ready_reset.status_text == ""
+    assert ready_reset.progress_value == 0
+    assert idle_reset.mode == "idle"
+
+
+def test_queue_overall_progress_preserves_existing_calculation():
+    assert calculate_queue_overall_progress(0, 0, 2) == 0
+    assert calculate_queue_overall_progress(0, 50, 2) == 25
+    assert calculate_queue_overall_progress(1, 0, 2) == 50
+    assert calculate_queue_overall_progress(1, 50, 2) == 75
+    assert calculate_queue_overall_progress(1, 100, 2) == 100
+    assert calculate_queue_overall_progress(0, 50, 0) == 50
+
+
+def test_pre_render_bar_status_preserves_existing_texts():
+    assert build_pre_render_bar_status("idle", 0, 0) is None
+    assert build_pre_render_bar_status("preparing", 2, 4) == (
+        "Preparando exportación 2/4",
+        2,
+        4,
+    )
+    assert build_pre_render_bar_status("ready", 4, 4) == ("Listo para exportar 4/4", 4, 4)
+    assert build_pre_render_bar_status("partial", 1, 4) == ("Caché parcial 1/4", 1, 4)
+    assert build_pre_render_bar_status("paused", 0, 4) == ("Pausado por actividad", 0, 4)
+    assert build_pre_render_bar_status("paused", 1, 4) == ("Caché parcial 1/4", 1, 4)
 
 
 def test_build_export_state_sorts_destinations_and_counts_total_outputs():

@@ -4,7 +4,7 @@ Prototipo navegable de la nueva app moderna de FlatShot.
 
 Estado actual:
 
-- APP.3.5 completada como entorno local de revision visual.
+- APP.4 completada como escaneo real integrado en la nueva UI.
 - Frontend estático en HTML/CSS/JS vanilla.
 - Sin `package.json`, Tauri, Rust, Node obligatorio ni dependencias nuevas.
 - Bridge HTTP local de desarrollo en Python.
@@ -101,8 +101,8 @@ La franja superior indica:
 3. Confirmar URL `http://127.0.0.1:8765`.
 4. Pulsar `Comprobar bridge`.
 5. Verificar `Bridge: Conectado` y `Última respuesta: health OK`.
-6. Escribir una ruta real en `Ruta carpeta`.
-7. Pulsar `Escanear ruta`.
+6. Escribir una ruta real en `Ruta manual`.
+7. Pulsar `Escanear`.
 
 Esto llama a:
 
@@ -111,7 +111,59 @@ Esto llama a:
 - `GET /presets`;
 - `POST /folders/scan`.
 
-El listado de imagenes puede venir de una carpeta real. La preview, ajustes y exportacion siguen siendo simulados.
+El panel de lote se actualiza con carpetas, imagenes, contadores y errores reales del bridge. La preview muestra un placeholder de imagen real pendiente. Ajustes y exportacion siguen sin motor real.
+
+## Probar APP.4 — Escaneo real de carpetas
+
+1. Arrancar la app:
+
+   ```bash
+   python apps/flatshot-desktop/run_dev.py --open
+   ```
+
+2. Abrir `http://127.0.0.1:4173` si el navegador no se abre solo.
+3. Confirmar que la franja superior muestra `Bridge local` cuando cambias `Modo`.
+4. Pulsar `Comprobar bridge` y comprobar `health OK`.
+5. Pegar en `Ruta manual` una carpeta real con PNG.
+6. Pulsar `Escanear`.
+
+Debe verse:
+
+- `Origen: Bridge local`;
+- contador de carpetas e imagenes reales;
+- lista de carpetas con estado;
+- lista de imagenes devuelta por `/folders/scan`;
+- primera imagen seleccionada automaticamente;
+- preview central con `Preview real pendiente`;
+- ruta de la imagen seleccionada;
+- exportacion marcada como no conectada.
+
+Para probar carpeta vacia:
+
+1. Pegar una carpeta existente sin PNG.
+2. Pulsar `Escanear`.
+3. Revisar `No se encontraron PNG` y contador `0 PNG`.
+
+Para probar ruta invalida:
+
+1. Pegar una ruta que no exista, por ejemplo `C:/flatshot/ruta-inexistente`.
+2. Pulsar `Escanear`.
+3. Revisar `Carpeta no encontrada` o el error controlado del bridge.
+
+Para probar varias carpetas, separarlas con `;` en `Ruta manual`.
+
+Para volver a mock:
+
+1. Cambiar `Modo` a `Mock` o usar el selector `Demo`.
+2. Pulsar `Lote mock` o elegir un escenario de `Revisión visual`.
+
+Sigue siendo simulado:
+
+- selector nativo de carpetas;
+- preview real;
+- ajustes aplicados por motor;
+- exportacion real;
+- progreso real.
 
 ### Feedback visual recomendado
 
@@ -206,8 +258,8 @@ En la UI:
 1. Cambiar `Modo` a `Bridge local`.
 2. Mantener `Bridge` como `http://127.0.0.1:8765`.
 3. Pulsar `Comprobar bridge`.
-4. Escribir una ruta real en `Ruta carpeta`.
-5. Pulsar `Escanear ruta`.
+4. Escribir una ruta real en `Ruta manual`.
+5. Pulsar `Escanear`.
 
 Esto llama a:
 
@@ -216,10 +268,10 @@ Esto llama a:
 - `GET /presets`;
 - `POST /folders/scan`.
 
-El listado de imágenes puede venir de una carpeta real. La preview, ajustes y exportación siguen siendo simulados.
+El listado de imágenes puede venir de una carpeta real. La preview muestra placeholder de imagen real pendiente. Ajustes y exportación siguen siendo simulados o no conectados.
 
 ## Siguiente paso
 
-APP.4 — Escaneo real de carpetas en la nueva UI.
+APP.5 — Preview real conectada al motor.
 
-La siguiente tanda debe sustituir el input manual temporal por un flujo de escaneo más integrado en la nueva UI, manteniendo todavía fuera Tauri y exportación real.
+La siguiente tanda debe conectar la preview real sin duplicar lógica de imagen en frontend, manteniendo todavía fuera Tauri y exportación real.

@@ -374,17 +374,22 @@ small {
   color: var(--warn);
 }
 
+.state-chip.ready,
+.state-chip.bridge {
+  border: 1px solid #b9d8cf;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
 .state-chip.error {
   border: 1px solid #efb8be;
   background: var(--danger-soft);
   color: var(--danger);
 }
 
-.batch-actions {
-  margin-top: 14px;
-}
-
-.bridge-panel {
+.source-panel,
+.bridge-panel,
+.batch-summary {
   display: grid;
   gap: 10px;
   margin-top: 14px;
@@ -392,6 +397,88 @@ small {
   border-radius: 8px;
   background: var(--surface-muted);
   padding: 12px;
+}
+
+.source-panel {
+  background: #ffffff;
+}
+
+.source-panel.bridge {
+  border-color: #b9d8cf;
+  background: var(--accent-soft);
+}
+
+.source-panel.error {
+  border-color: #efb8be;
+  background: var(--danger-soft);
+}
+
+.source-panel.scanning {
+  border-color: #edcf91;
+  background: var(--warn-soft);
+}
+
+.source-panel-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.source-panel-heading strong,
+.source-panel-heading span {
+  display: block;
+}
+
+.source-panel-heading > div > span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.source-panel .button-row {
+  flex-wrap: wrap;
+}
+
+.source-panel .button-row button {
+  flex: 1 1 auto;
+}
+
+.batch-summary {
+  background: var(--surface-raised);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.summary-metric {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #ffffff;
+  padding: 8px;
+}
+
+.summary-metric span,
+.summary-note {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.summary-metric strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 15px;
+}
+
+.summary-note {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .bridge-panel-heading {
@@ -829,6 +916,36 @@ small {
 .preview-state strong {
   color: var(--text);
   font-size: 18px;
+}
+
+.real-preview-placeholder {
+  width: min(82%, 340px);
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 18px;
+  box-shadow: 0 12px 30px rgba(28, 35, 33, 0.1);
+}
+
+.real-preview-placeholder strong {
+  font-size: 18px;
+}
+
+.real-preview-placeholder span,
+.real-preview-placeholder small {
+  color: var(--muted);
+}
+
+.real-preview-placeholder .path-line {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.real-preview-placeholder .state-chip {
+  justify-self: start;
 }
 
 .loader {

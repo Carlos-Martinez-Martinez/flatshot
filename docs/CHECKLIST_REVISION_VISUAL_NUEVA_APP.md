@@ -39,6 +39,22 @@ Usar antes de cerrar cada tanda visual de la nueva app.
 - [ ] Error de ruta se muestra bien.
 - [ ] La UI diferencia claramente escaneo real de estados simulados.
 
+## APP.4 — Escaneo real en UI
+
+- [ ] `Modo` en `Bridge local` muestra el panel de ruta en el flujo principal.
+- [ ] `Comprobar bridge` muestra `health OK`.
+- [ ] Escanear una carpeta con PNG actualiza carpetas, imagenes y contadores.
+- [ ] La primera imagen real queda seleccionada.
+- [ ] La preview muestra `Preview real pendiente`.
+- [ ] La preview muestra nombre y ruta de la imagen real.
+- [ ] La exportacion queda marcada como no conectada.
+- [ ] Una carpeta vacia muestra `No se encontraron PNG`.
+- [ ] Una ruta invalida muestra error controlado.
+- [ ] Una ruta vacia muestra `Ruta vacia`.
+- [ ] El bridge desconectado muestra feedback claro.
+- [ ] Cambiar a `Mock` conserva escenarios de revision.
+- [ ] `Limpiar lote` deja un estado inicial claro.
+
 ## Feedback a revisar
 
 - [ ] Jerarquía visual.

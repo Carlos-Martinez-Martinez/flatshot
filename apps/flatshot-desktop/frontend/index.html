@@ -78,23 +78,32 @@
             <span class="pill" id="batch-pill">Sin carpeta</span>
           </div>
 
-          <div class="batch-actions">
-            <button type="button" class="wide" data-action="load-batch">Añadir carpeta</button>
-            <button type="button" class="wide secondary" data-action="show-empty-folder">Simular vacía</button>
-          </div>
-
-          <div class="bridge-panel is-hidden" id="bridge-panel">
-            <div class="bridge-panel-heading">
-              <strong>Bridge local</strong>
-              <span id="bridge-panel-status">Desconectado</span>
+          <div class="source-panel" id="source-panel">
+            <div class="source-panel-heading">
+              <div>
+                <strong>Añadir carpeta</strong>
+                <span id="scan-status">Pega una ruta o usa lote mock.</span>
+              </div>
+              <span class="state-chip" id="scan-source-badge">Origen: Mock</span>
             </div>
             <label class="text-field">
-              <span>Ruta carpeta</span>
+              <span>Ruta manual</span>
               <input id="bridge-scan-path" type="text" placeholder="C:/ruta/lote" />
             </label>
             <div class="button-row">
-              <button type="button" data-action="check-bridge">Comprobar</button>
-              <button type="button" id="bridge-scan-folder" data-action="scan-bridge-folder">Escanear ruta</button>
+              <button type="button" id="bridge-scan-folder" data-action="scan-bridge-folder">Escanear</button>
+              <button type="button" data-action="check-bridge">Comprobar bridge</button>
+              <button type="button" class="secondary" data-action="load-mock-batch">Lote mock</button>
+            </div>
+            <div class="bridge-message" id="bridge-message">Modo mock activo.</div>
+          </div>
+
+          <div class="batch-summary" id="batch-summary" aria-live="polite"></div>
+
+          <div class="bridge-panel" id="bridge-panel">
+            <div class="bridge-panel-heading">
+              <strong>Bridge local</strong>
+              <span id="bridge-panel-status">Desconectado</span>
             </div>
             <div class="bridge-meta">
               <div>
@@ -106,7 +115,6 @@
                 <strong id="bridge-capabilities">Sin comprobar</strong>
               </div>
             </div>
-            <div class="bridge-message" id="bridge-message">Arranca el bridge y comprueba conexión.</div>
           </div>
 
           <details class="review-panel" open>

@@ -57,6 +57,7 @@ from flatshot.application.app_state import (
     build_batch_summary,
     build_export_bar_state,
     build_export_state,
+    build_flatshot_app_state,
     build_mockup_preview_state,
     build_pre_render_bar_status,
     build_queue_export_summary_lines,
@@ -65,12 +66,14 @@ from flatshot.application.app_state import (
     format_batch_count_text,
     format_custom_preview_button_text,
     processing_state_after_reset,
+    processing_state_for_batch_availability,
     processing_state_for_export_start,
     processing_state_for_pause,
     processing_state_for_queue_job,
     processing_state_for_single_export,
     processing_state_for_stop,
-    processing_mode_for_batch,
+    processing_state_with_pre_render_status,
+    processing_state_with_progress,
 )
 from flatshot.application import presenters
 from flatshot.application.contracts import PreviewRequest
@@ -270,9 +273,7 @@ class MainWindow(QMainWindow):
             saved_preview_variant if saved_preview_variant in variant_ids else self.export_variants[0].id
         )
         self.app_settings['current_preview_variant_id'] = self.current_preview_variant_id
-        self.export_bar_mode = "idle"
-        self._export_bar_status_text = ""
-        self._pre_render_bar_status = None
+        self.processing_state = ProcessingState()
         self.ui_view_state = UiViewState(
             grid_columns=int(self.app_settings.get('grid_columns', 3)),
             preview_background=self.app_settings.get('preview_bg_color', "#E6E6E6"),
@@ -285,6 +286,7 @@ class MainWindow(QMainWindow):
             export=self.export_state,
             preview=self.preview_state,
             view=self.ui_view_state,
+            processing=self.processing_state,
         )
 
         # --- Background Pre-rendering ---
@@ -2049,18 +2051,18 @@ class MainWindow(QMainWindow):
             return
         progress_value = self.progress_bar.value() if hasattr(self, "progress_bar") else 0
         active_preset = self.combo_presets.currentText() if hasattr(self, "combo_presets") else None
-        self.app_state.batch = self.batch_summary
-        self.app_state.export = self.export_state
-        self.app_state.view = self.ui_view_state
-        self.app_state.processing = ProcessingState(
-            mode=self.export_bar_mode,
-            status_text=self._export_bar_status_text,
-            pre_render_status=self._pre_render_bar_status,
-            progress_value=progress_value,
+        self.processing_state = processing_state_with_progress(
+            self.processing_state,
+            progress_value,
         )
-        self.app_state.preview = self.preview_state
-        self.app_state.selected_image = self.preview_state.selected_image
-        self.app_state.active_preset = active_preset
+        self.app_state = build_flatshot_app_state(
+            batch=self.batch_summary,
+            export=self.export_state,
+            preview=self.preview_state,
+            view=self.ui_view_state,
+            processing=self.processing_state,
+            active_preset=active_preset,
+        )
 
     def _apply_preview_state(self, preview_state: PreviewState):
         self.preview_state = preview_state
@@ -2077,12 +2079,24 @@ class MainWindow(QMainWindow):
         update_progress: bool = False,
         update_pre_render: bool = True,
     ):
-        self.export_bar_mode = processing_state.mode
-        self._export_bar_status_text = processing_state.status_text
-        if update_pre_render:
-            self._pre_render_bar_status = processing_state.pre_render_status
+        pre_render_status = (
+            processing_state.pre_render_status
+            if update_pre_render
+            else self.processing_state.pre_render_status
+        )
+        progress_value = (
+            processing_state.progress_value
+            if update_progress
+            else self.processing_state.progress_value
+        )
+        self.processing_state = ProcessingState(
+            mode=processing_state.mode,
+            status_text=processing_state.status_text,
+            pre_render_status=pre_render_status,
+            progress_value=progress_value,
+        )
         if update_progress and hasattr(self, "progress_bar"):
-            self.progress_bar.setValue(processing_state.progress_value)
+            self.progress_bar.setValue(self.processing_state.progress_value)
         self._sync_app_state()
 
     def _update_export_bar_state(self):
@@ -2093,10 +2107,10 @@ class MainWindow(QMainWindow):
         bar_state = build_export_bar_state(
             self.batch_summary,
             active_outputs_count=len(active_outputs),
-            mode=self.export_bar_mode,
+            mode=self.processing_state.mode,
             selected_folders_count=len(self.selected_folders),
-            export_status_text=self._export_bar_status_text,
-            pre_render_status=self._pre_render_bar_status,
+            export_status_text=self.processing_state.status_text,
+            pre_render_status=self.processing_state.pre_render_status,
         )
 
         self._set_elided_label(self.lbl_folder_summary, self._format_batch_summary_text())
@@ -2546,7 +2560,11 @@ class MainWindow(QMainWindow):
         if (self.worker and self.worker.isRunning()) or (self.queue_worker and self.queue_worker.isRunning()):
             return
 
-        self._pre_render_bar_status = build_pre_render_bar_status(state, prepared, total)
+        self.processing_state = processing_state_with_pre_render_status(
+            self.processing_state,
+            build_pre_render_bar_status(state, prepared, total),
+        )
+        self._sync_app_state()
         self._update_export_bar_state()
     
     def _start_preview_thread(self):
@@ -3155,7 +3173,11 @@ class MainWindow(QMainWindow):
             ),
         )
         self._update_batch_header()
-        self.export_bar_mode = processing_mode_for_batch(self.batch_summary, self.export_bar_mode)
+        self.processing_state = processing_state_for_batch_availability(
+            self.batch_summary,
+            self.processing_state,
+        )
+        self._sync_app_state()
         self._update_export_bar_state()
          
         self._sync_grid_preview_with_folders()

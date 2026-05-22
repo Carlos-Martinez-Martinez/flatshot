@@ -1,7 +1,7 @@
 """Qt-free application state models for FlatShot UI coordination."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Iterable
 
@@ -123,6 +123,50 @@ def processing_mode_for_batch(batch: BatchSummary, current_mode: str) -> str:
     if int(batch.folders_count) > 0 and int(batch.images_count) > 0:
         return "ready"
     return "idle"
+
+
+def build_flatshot_app_state(
+    *,
+    batch: BatchSummary,
+    export: ExportState,
+    preview: PreviewState,
+    view: UiViewState,
+    processing: ProcessingState,
+    active_preset: str | None,
+) -> FlatshotAppState:
+    return FlatshotAppState(
+        batch=batch,
+        export=export,
+        preview=preview,
+        view=view,
+        processing=processing,
+        selected_image=preview.selected_image,
+        active_preset=active_preset,
+    )
+
+
+def processing_state_for_batch_availability(
+    batch: BatchSummary,
+    current: ProcessingState,
+) -> ProcessingState:
+    return replace(
+        current,
+        mode=processing_mode_for_batch(batch, current.mode),
+    )
+
+
+def processing_state_with_progress(
+    current: ProcessingState,
+    progress_value: int,
+) -> ProcessingState:
+    return replace(current, progress_value=max(0, int(progress_value)))
+
+
+def processing_state_with_pre_render_status(
+    current: ProcessingState,
+    pre_render_status: tuple[str, int, int] | None,
+) -> ProcessingState:
+    return replace(current, pre_render_status=pre_render_status)
 
 
 def processing_state_for_export_start() -> ProcessingState:

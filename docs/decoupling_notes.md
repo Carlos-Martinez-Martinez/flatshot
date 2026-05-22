@@ -768,3 +768,50 @@
   - exercised stop and verified `stopping` state, progress reset and enabled process button.
 - Smoke used an inline executor to avoid Windows multiprocessing-from-stdin issues while preserving `process_single_image` and the production worker/runner path.
 - Remaining risk: `MainWindow` still owns the actual worker lifecycle and button/icon styling. This batch only moved lifecycle state calculation and progress/status formatting.
+
+## Batch 15 implementation
+
+- Scope: Phase 8 closure, application state as the UI coordination source.
+- Removed the remaining primitive processing-state fields from `MainWindow`:
+  - `export_bar_mode`;
+  - `_export_bar_status_text`;
+  - `_pre_render_bar_status`.
+- Made `self.processing_state` the single source for processing mode, status text, pre-render status and progress value.
+- Added Qt-free state helpers in `flatshot.application.app_state`:
+  - `build_flatshot_app_state()`;
+  - `processing_state_for_batch_availability()`;
+  - `processing_state_with_progress()`;
+  - `processing_state_with_pre_render_status()`.
+- Adapted `MainWindow._sync_app_state()` to rebuild `FlatshotAppState` from the current state components instead of mutating independent fields.
+- Adapted folder updates and pre-render status updates to use `ProcessingState` directly.
+- Verified that `MainWindow` no longer references the old primitive processing fields.
+- Phase 8 is considered closed for this refactor track: `FlatshotAppState` now covers batch, export, preview, processing, selected image and active preset with Qt-free builders/helpers.
+- Did not touch `ShadowEngine`, image output, export runner, queue runner, preview rendering, presets, settings, session format or UI styling.
+
+## Batch 15 validation
+
+- Extended `tests/test_app_state.py` with coverage for:
+  - `build_flatshot_app_state()` using preview state as selected image source;
+  - immutable-style processing state updates for progress, pre-render and batch availability.
+- `pytest tests/test_app_state.py -q` -> 22 passed.
+- `pytest tests/test_app_state.py tests/test_presenters.py tests/test_export_runner.py tests/test_queue_runner.py tests/test_preview_service.py -q` -> 48 passed.
+- `python -m compileall -q src/flatshot/application src/flatshot/ui/main_window.py` -> passed.
+- `pytest` -> 196 passed.
+- `rg -n "export_bar_mode|_export_bar_status_text|_pre_render_bar_status" src/flatshot/ui/main_window.py tests -g "*.py"` -> no `MainWindow` matches; only pre-render helper tests/imports.
+- `rg -n "PyQt6|QWidget|QApplication|QThread|QPixmap|QImage" src/flatshot/application/app_state.py` -> no matches.
+- PyQt offscreen smoke with temporary config and session:
+  - launched `MainWindow`;
+  - verified initial `processing_state` and `app_state.processing`;
+  - added an empty folder and verified disabled processing plus empty preview label;
+  - added a PNG folder and verified PNG count, batch label and ready processing state;
+  - selected a preset;
+  - adjusted an essential slider;
+  - selected an image through the grid and switched back to mockup;
+  - instantiated `ExportConfigDialog`;
+  - rendered central preview;
+  - processed one folder and verified output files, progress reset, enabled process button and ready state;
+  - processed two folders through the queue;
+  - exercised pause/resume and verified `processing_state` and `app_state.processing`;
+  - exercised stop and verified `stopping` state, progress reset and enabled process button.
+- Smoke used an inline executor to avoid Windows multiprocessing-from-stdin issues while preserving `process_single_image` and the production worker/runner path.
+- Remaining risk moving into Phase 9: `MainWindow` still owns worker lifecycle wiring, result dialogs, and widget-level painting. These are UI responsibilities for now, but Phase 9 should reduce method size and delegate request construction/adapters more explicitly.

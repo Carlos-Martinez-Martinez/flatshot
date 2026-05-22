@@ -13,6 +13,7 @@ from flatshot.application.app_state import (
     build_empty_preview_state,
     build_export_state,
     build_export_bar_state,
+    build_flatshot_app_state,
     build_mockup_preview_state,
     build_pre_render_bar_status,
     build_queue_export_summary_lines,
@@ -22,11 +23,14 @@ from flatshot.application.app_state import (
     format_custom_preview_button_text,
     format_export_variant_labels,
     processing_state_after_reset,
+    processing_state_for_batch_availability,
     processing_state_for_export_start,
     processing_state_for_pause,
     processing_state_for_queue_job,
     processing_state_for_single_export,
     processing_state_for_stop,
+    processing_state_with_pre_render_status,
+    processing_state_with_progress,
     processing_mode_for_batch,
 )
 from flatshot.application.contracts import BatchScanResult
@@ -62,6 +66,25 @@ def test_flatshot_app_state_groups_existing_ui_state_without_widgets():
     assert state.processing.mode == "ready"
     assert state.selected_image == "image.png"
     assert state.active_preset == "Preset"
+
+
+def test_build_flatshot_app_state_uses_preview_as_selected_image_source():
+    state = build_flatshot_app_state(
+        batch=BatchSummary(folders_count=1, images_count=1),
+        export=ExportState(destinations=["C:/out"]),
+        preview=PreviewState(selected_image="C:/in/image.png", label_text="image"),
+        view=UiViewState(active_folder="C:/in"),
+        processing=ProcessingState(mode="ready"),
+        active_preset="Actual",
+    )
+
+    assert state.batch.images_count == 1
+    assert state.export.destinations == ["C:/out"]
+    assert state.preview.label_text == "image"
+    assert state.view.active_folder == "C:/in"
+    assert state.processing.mode == "ready"
+    assert state.selected_image == "C:/in/image.png"
+    assert state.active_preset == "Actual"
 
 
 def test_preview_state_helpers_preserve_preview_labels_and_selection(tmp_path):
@@ -132,6 +155,35 @@ def test_processing_mode_for_batch_keeps_busy_modes_and_derives_idle_ready():
     assert processing_mode_for_batch(empty, "processing") == "processing"
     assert processing_mode_for_batch(empty, "paused") == "paused"
     assert processing_mode_for_batch(empty, "stopping") == "stopping"
+
+
+def test_processing_state_update_helpers_keep_processing_state_as_source_of_truth():
+    current = ProcessingState(
+        mode="ready",
+        status_text="Listo",
+        pre_render_status=("Preparando exportación 1/4", 1, 4),
+        progress_value=10,
+    )
+    ready = BatchSummary(folders_count=1, images_count=2)
+    empty = BatchSummary()
+
+    with_progress = processing_state_with_progress(current, 55)
+    with_pre_render = processing_state_with_pre_render_status(current, None)
+    still_ready = processing_state_for_batch_availability(ready, current)
+    idle = processing_state_for_batch_availability(empty, current)
+    busy = processing_state_for_batch_availability(
+        empty,
+        ProcessingState(mode="processing", status_text="Procesando..."),
+    )
+
+    assert with_progress.progress_value == 55
+    assert with_progress.pre_render_status == current.pre_render_status
+    assert with_pre_render.pre_render_status is None
+    assert with_pre_render.mode == "ready"
+    assert still_ready.mode == "ready"
+    assert still_ready.status_text == "Listo"
+    assert idle.mode == "idle"
+    assert busy.mode == "processing"
 
 
 def test_processing_state_helpers_preserve_export_status_texts(tmp_path):

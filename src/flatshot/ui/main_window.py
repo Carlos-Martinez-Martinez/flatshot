@@ -45,6 +45,13 @@ from flatshot.core.overrides import (
     override_key,
 )
 from flatshot.core.scaling import DEFAULT_SCALE_CURVE, normalize_curve_data
+from flatshot.application.app_state import (
+    BatchSummary,
+    FlatshotAppState,
+    ProcessingState,
+    UiViewState,
+    build_export_bar_state,
+)
 from flatshot.application import presenters
 from flatshot.application.contracts import PreviewRequest
 from flatshot.application.export_config_service import ExportConfigService
@@ -59,7 +66,7 @@ from flatshot.utils.log_manager import LogManager
 from flatshot.utils.session_manager import SessionManager
 from flatshot.ui.dialogs import CurveEditorDialog, ExportConfigDialog, ExportVariantsDialog
 from flatshot.ui.styles import scale_stylesheet, COLORS
-from flatshot.ui.shell import AppShell, WorkflowPanel, CanvasWorkbench, BatchPanel, ExportBar, CommandBar, UiViewState, BatchSummary
+from flatshot.ui.shell import AppShell, WorkflowPanel, CanvasWorkbench, BatchPanel, ExportBar, CommandBar
 from flatshot.ui.widgets import SmartSlider, LightAngleWidget, ComparisonCanvas, FloatingToolbar, ModernSplashScreen, CollapsibleSection
 from flatshot.ui.queue_widget import QueueWidget
 from flatshot.ui.grid_preview import GridPreviewWidget
@@ -256,6 +263,7 @@ class MainWindow(QMainWindow):
             advanced_open=bool(self.app_settings.get('section_visibility', {}).get('advanced', False)),
         )
         self.batch_summary = BatchSummary()
+        self.app_state = FlatshotAppState(batch=self.batch_summary, view=self.ui_view_state)
 
         # --- Background Pre-rendering ---
         self.pre_render_scheduler = PreRenderScheduler(
@@ -1787,6 +1795,7 @@ class MainWindow(QMainWindow):
             self.mock_buttons['dark'].setChecked(True)
         self.current_custom_path = None
         self.ui_view_state.selected_image = None
+        self._sync_app_state()
         if hasattr(self, 'lbl_current_image'):
             self.lbl_current_image.setText("Sin imagen seleccionada")
             self.lbl_current_image.setToolTip("")
@@ -1844,6 +1853,7 @@ class MainWindow(QMainWindow):
             self.current_mock = 'custom_drop'
             self.current_custom_path = path
             self.ui_view_state.selected_image = path
+            self._sync_app_state()
 
             # Clear caches to force recalculation for the new image
             self.current_base_pil = None
@@ -2028,14 +2038,35 @@ class MainWindow(QMainWindow):
     def _process_button_text(self) -> str:
         return presenters.format_process_button_text(getattr(self.batch_summary, "images_count", 0))
 
+    def _sync_app_state(self):
+        if not hasattr(self, "app_state"):
+            return
+        progress_value = self.progress_bar.value() if hasattr(self, "progress_bar") else 0
+        active_preset = self.combo_presets.currentText() if hasattr(self, "combo_presets") else None
+        self.app_state.batch = self.batch_summary
+        self.app_state.view = self.ui_view_state
+        self.app_state.processing = ProcessingState(
+            mode=self.export_bar_mode,
+            status_text=self._export_bar_status_text,
+            pre_render_status=self._pre_render_bar_status,
+            progress_value=progress_value,
+        )
+        self.app_state.selected_image = self.ui_view_state.selected_image
+        self.app_state.active_preset = active_preset
+
     def _update_export_bar_state(self):
         if not hasattr(self, "btn_process"):
             return
 
-        folders = int(getattr(self.batch_summary, "folders_count", 0))
-        images = int(getattr(self.batch_summary, "images_count", 0))
         active_outputs = self._active_export_variants()
-        processing = self.export_bar_mode in {"processing", "paused", "stopping"}
+        bar_state = build_export_bar_state(
+            self.batch_summary,
+            active_outputs_count=len(active_outputs),
+            mode=self.export_bar_mode,
+            selected_folders_count=len(self.selected_folders),
+            export_status_text=self._export_bar_status_text,
+            pre_render_status=self._pre_render_bar_status,
+        )
 
         self._set_elided_label(self.lbl_folder_summary, self._format_batch_summary_text())
 
@@ -2048,47 +2079,35 @@ class MainWindow(QMainWindow):
         outputs_text, outputs_tooltip = self._format_outputs_summary()
         self._set_elided_label(self.lbl_outputs_summary, outputs_text, outputs_tooltip)
 
-        can_process = presenters.can_process_batch(
-            folders,
-            images,
-            len(active_outputs),
-            is_processing=processing,
-        )
-        self.btn_clear_folders.setEnabled(folders > 0 and not processing)
-        self.btn_export_details.setEnabled(folders > 0 and not processing)
-        self.btn_add_folder.setEnabled(not processing)
-        self.btn_export_config.setEnabled(not processing)
-        self.btn_outputs.setEnabled(not processing)
-        self.btn_process.setEnabled(can_process)
-        self.btn_process.setText(self._process_button_text())
+        self.btn_clear_folders.setEnabled(bar_state.can_clear_folders)
+        self.btn_export_details.setEnabled(bar_state.can_open_export_details)
+        self.btn_add_folder.setEnabled(bar_state.can_add_folder)
+        self.btn_export_config.setEnabled(bar_state.can_edit_export_config)
+        self.btn_outputs.setEnabled(bar_state.can_edit_outputs)
+        self.btn_process.setEnabled(bar_state.can_process)
+        self.btn_process.setText(bar_state.process_button_text)
 
-        status_view = presenters.format_processing_status(
-            folders,
-            images,
-            self.export_bar_mode,
-            export_status_text=self._export_bar_status_text,
-            pre_render_status=self._pre_render_bar_status,
-        )
-        status = status_view.text
-        show_progress = status_view.show_progress
-        if status_view.progress_value is not None:
-            self.progress_bar.setValue(status_view.progress_value)
+        if bar_state.progress_value is not None:
+            self.progress_bar.setValue(bar_state.progress_value)
 
-        self._set_elided_label(self.lbl_progress_status, status)
-        self.progress_bar.setVisible(show_progress)
-        if not show_progress:
+        self._set_elided_label(self.lbl_progress_status, bar_state.progress_status_text)
+        self.progress_bar.setVisible(bar_state.show_progress)
+        if not bar_state.show_progress:
             self.progress_bar.setValue(0)
 
-        self.export_action_stack.setCurrentIndex(1 if processing else 0)
+        self.export_action_stack.setCurrentIndex(1 if bar_state.processing else 0)
         if hasattr(self, "btn_pause"):
-            self.btn_pause.setVisible(processing and len(self.selected_folders) > 1)
+            self.btn_pause.setVisible(bar_state.show_pause)
         if hasattr(self, "btn_stop"):
-            self.btn_stop.setVisible(processing)
+            self.btn_stop.setVisible(bar_state.show_stop)
 
         tooltip = self._format_outputs_summary()[1]
         self.btn_process.setToolTip(
-            f"{self._process_button_text()}\n{tooltip}" if can_process else status
+            f"{bar_state.process_button_text}\n{tooltip}"
+            if bar_state.can_process
+            else bar_state.progress_status_text
         )
+        self._sync_app_state()
 
     def _variant_hex(self, variant: ExportVariant) -> str:
         return "#{:02X}{:02X}{:02X}".format(*variant.bg_color)

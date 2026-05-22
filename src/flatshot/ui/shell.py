@@ -1,27 +1,7 @@
 """Structural UI containers for the FlatShot workspace."""
-from dataclasses import dataclass
-
 from PyQt6.QtWidgets import QFrame, QSizePolicy, QVBoxLayout
 
-
-@dataclass
-class UiViewState:
-    selected_image: str | None = None
-    active_folder: str | None = None
-    grid_columns: int = 3
-    preview_background: str = "#E6E6E6"
-    guides_enabled: bool = False
-    advanced_open: bool = False
-
-
-@dataclass
-class BatchSummary:
-    folders_count: int = 0
-    images_count: int = 0
-    processed_count: int = 0
-    error_count: int = 0
-    adjusted_count: int = 0
-    destination_label: str = "Subcarpeta en origen"
+from flatshot.application.app_state import BatchSummary, UiViewState
 
 
 class _ShellFrame(QFrame):

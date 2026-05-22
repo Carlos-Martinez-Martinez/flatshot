@@ -3,7 +3,6 @@ Modern Main Window with Professional UI Layout
 """
 import sys
 import os
-import json
 import tempfile
 import logging
 import subprocess
@@ -51,6 +50,7 @@ from flatshot.application.contracts import PreviewRequest
 from flatshot.application.export_config_service import ExportConfigService
 from flatshot.application.folder_scanner import FolderScanner
 from flatshot.application.preview_service import PreviewService
+from flatshot.application.settings_service import SettingsService
 from flatshot.utils.config import ConfigManager
 from flatshot.utils.history_manager import HistoryManager
 from flatshot.utils.log_manager import LogManager
@@ -232,6 +232,7 @@ class MainWindow(QMainWindow):
             self.presets = self._get_default_presets()
             
         self.settings_file = ConfigManager.get_config_dir() / "settings.json"
+        self.settings_service = SettingsService(self.settings_file)
         self.app_settings = self._load_app_settings()
         self.export_variants = normalize_export_variants(self.app_settings)
         self.app_settings['variants'] = [variant.model_dump() for variant in self.export_variants]
@@ -1913,54 +1914,7 @@ class MainWindow(QMainWindow):
         }
     
     def _load_app_settings(self) -> dict:
-        defaults = {
-            'output_folder_name': '_SALIDA_PRO',
-            'suffix': '_PRO',
-            'format': 'JPG',
-            'transparent_bg': False,
-            'bg_color': (230, 230, 230),
-            'output_width': 1800,
-            'output_height': 2400,
-            'naming_template': '{original}{suffix}',
-            'output_destination': 'subfolder',
-            'custom_output_path': None,
-            'last_input_folder': '',
-            'preview_bg_color': '#E6E6E6',
-            'preview_grid': False,
-            'preview_guides': {
-                'preset': 'thirds',
-                'color': '#FFFFFF',
-                'opacity': 42,
-            },
-            'image_overrides': {},
-            'shadow_engine': SHADOW_ENGINE_DEFAULT,
-            'scale_curve': dict(DEFAULT_SCALE_CURVE),
-            'section_visibility': {
-                'presets': True,
-                'lighting': True,
-                'shadows': True,
-                'finishing': False,
-                'advanced': False,
-                'export': True,
-            },
-            'grid_columns': 3,
-            'grid_folder_index': 0,
-            'background_pre_render': False,
-            'background_pre_render_cache_mb': 2048,
-            'background_pre_render_idle_ms': 8000,
-        }
-        if self.settings_file.exists():
-            try:
-                with open(self.settings_file, 'r') as f:
-                    loaded = json.load(f)
-                    if 'bg_color' in loaded and isinstance(loaded['bg_color'], list):
-                        loaded['bg_color'] = tuple(loaded['bg_color'])
-                    if 'shadow_engine' not in loaded:
-                        loaded['shadow_engine'] = SHADOW_ENGINE_COMPAT
-                    return {**defaults, **loaded}
-            except:
-                return defaults
-        return defaults
+        return self.settings_service.load()
     
     def _save_app_settings(self):
         """Schedule a coalesced disk write (avoids blocking UI on every slider tick)."""
@@ -1977,8 +1931,7 @@ class MainWindow(QMainWindow):
     def _flush_app_settings(self):
         """Actually write settings to disk (called by coalesced timer)."""
         try:
-            with open(self.settings_file, 'w') as f:
-                json.dump(self.app_settings, f, indent=4)
+            self.settings_service.save(self.app_settings)
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
             

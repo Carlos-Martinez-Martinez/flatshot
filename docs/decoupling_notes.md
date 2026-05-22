@@ -374,3 +374,50 @@
   - verified exported files exist and progress/button state resets.
 - Smoke used an inline executor for export only to avoid Windows multiprocessing-from-stdin issues; preview workers used the normal Qt thread pool.
 - Remaining risk: `PreviewService` now imports `PIL.Image` in application contracts through type annotations for in-memory preview requests. This keeps the service Qt-free and matches current domain dependencies, but future web/API work may prefer path/bytes-only requests for cleaner transport boundaries.
+
+## Batch 7 implementation
+
+- Scope: Phase 7 partial, application settings service only.
+- Added `SettingsService` in `flatshot.application.settings_service`.
+- Added `DEFAULT_APP_SETTINGS` as the Qt-free source of app settings defaults.
+- Moved the reusable settings logic out of `MainWindow`:
+  - default settings construction;
+  - `settings.json` loading;
+  - invalid/missing settings fallback;
+  - `bg_color` list-to-tuple normalization;
+  - legacy missing `shadow_engine` compatibility;
+  - raw JSON persistence.
+- Adapted `MainWindow._load_app_settings()` to delegate to `SettingsService.load()`.
+- Adapted `MainWindow._flush_app_settings()` to delegate to `SettingsService.save()`.
+- Kept the existing coalesced save timer in the UI layer.
+- Kept config directory selection in the current `ConfigManager` path for now; only file IO and normalization moved.
+- Did not change presets, session persistence, settings file format, export, queue, preview rendering or `ShadowEngine`.
+
+## Batch 7 validation
+
+- Added `tests/test_settings_service.py` with coverage for:
+  - `SettingsService` staying free of Qt imports;
+  - missing settings returning independent defaults;
+  - loaded settings normalization;
+  - invalid JSON fallback;
+  - non-object JSON fallback;
+  - saving JSON to nested paths.
+- `pytest tests/test_settings_service.py tests/test_config_manager.py tests/test_export_config_service.py -q` -> 20 passed.
+- `python -m compileall -q src/flatshot/application src/flatshot/ui/main_window.py` -> passed.
+- `pytest` -> 157 passed.
+- `rg -n "PyQt6|QStandardPaths|QMessageBox|QWidget|QApplication" src/flatshot/application/settings_service.py` -> no matches.
+- PyQt offscreen smoke with a temporary config directory:
+  - instantiated `MainWindow` from a temporary `settings.json`;
+  - verified loaded `format` and `bg_color` normalization;
+  - saved a setting through `_flush_app_settings()` and verified the JSON file;
+  - added a folder and verified PNG count;
+  - waited for grid previews;
+  - selected a preset;
+  - adjusted an essential slider;
+  - selected an image through the grid handler;
+  - rendered central preview;
+  - processed one folder;
+  - processed two folders through the queue;
+  - exercised pause/resume and stop;
+  - verified exported files exist and progress/button state resets.
+- Remaining risk: Phase 7 is only partially complete. Preset operations still route through `ConfigManager`, which imports Qt for `QStandardPaths`; session state still uses `SessionManager` directly.

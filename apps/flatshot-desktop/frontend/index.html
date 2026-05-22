@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FlatShot Desktop Mock</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell" aria-label="FlatShot nueva app">
+      <header class="top-bar">
+        <div class="brand-block">
+          <div class="brand-mark" aria-hidden="true">F</div>
+          <div>
+            <strong>FlatShot</strong>
+            <span id="batch-title">Lote de muestra</span>
+          </div>
+        </div>
+        <div class="top-status" aria-live="polite">
+          <span class="status-dot ready" id="status-dot"></span>
+          <span id="top-status-text">Listo para procesar</span>
+        </div>
+        <div class="top-actions">
+          <button type="button" id="add-folder">Añadir carpeta</button>
+          <button type="button" id="clear-batch">Limpiar lote</button>
+        </div>
+      </header>
+
+      <section class="workspace">
+        <aside class="batch-panel" aria-label="Lote">
+          <div class="panel-heading">
+            <div>
+              <span class="eyebrow">Lote</span>
+              <h1 id="batch-count">24 PNG</h1>
+            </div>
+            <span class="pill" id="adjusted-count">2 ajustadas</span>
+          </div>
+
+          <div class="folder-row" id="folder-row">
+            <span class="folder-name" title="Camisetas Mayo">Camisetas Mayo</span>
+            <span>24</span>
+          </div>
+
+          <div class="segmented batch-filter" aria-label="Filtro de lote">
+            <button type="button" class="active">Todas</button>
+            <button type="button">Ajustadas</button>
+            <button type="button">Errores</button>
+          </div>
+
+          <div class="image-list" id="image-list" aria-label="Imagenes del lote">
+            <button type="button" class="image-item active" data-name="camiseta_001.png" data-kind="Web RGB230">
+              <span class="thumb tone-a"></span>
+              <span>
+                <strong>camiseta_001.png</strong>
+                <small>Web RGB230</small>
+              </span>
+            </button>
+            <button type="button" class="image-item" data-name="camiseta_002.png" data-kind="Ajuste local">
+              <span class="thumb tone-b"></span>
+              <span>
+                <strong>camiseta_002.png</strong>
+                <small>Ajuste local</small>
+              </span>
+            </button>
+            <button type="button" class="image-item" data-name="chaqueta_003.png" data-kind="Pendiente">
+              <span class="thumb tone-c"></span>
+              <span>
+                <strong>chaqueta_003.png</strong>
+                <small>Pendiente</small>
+              </span>
+            </button>
+            <button type="button" class="image-item" data-name="sudadera_004.png" data-kind="Preview lista">
+              <span class="thumb tone-d"></span>
+              <span>
+                <strong>sudadera_004.png</strong>
+                <small>Preview lista</small>
+              </span>
+            </button>
+          </div>
+        </aside>
+
+        <section class="preview-panel" aria-label="Preview principal">
+          <div class="preview-header">
+            <div>
+              <span class="eyebrow">Imagen seleccionada</span>
+              <h2 id="preview-name">camiseta_001.png</h2>
+            </div>
+            <div class="preview-tools">
+              <button type="button" class="tool active" data-mode="procesada">Procesada</button>
+              <button type="button" class="tool" data-mode="original">Original</button>
+              <button type="button" class="tool" data-mode="comparar">Comparar</button>
+            </div>
+          </div>
+
+          <div class="canvas-area">
+            <div class="canvas-frame" id="canvas-frame">
+              <div class="product-shadow"></div>
+              <div class="product-silhouette">
+                <span></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="preview-footer">
+            <span id="preview-meta">JPG · 1800x2400 · fondo #E6E6E6</span>
+            <span id="preview-warning">Sin avisos</span>
+          </div>
+        </section>
+
+        <aside class="settings-panel" aria-label="Ajustes y exportacion">
+          <section class="settings-section">
+            <div class="section-title">
+              <span class="eyebrow">Preset</span>
+              <strong id="active-preset">Luz cenital</strong>
+            </div>
+            <div class="preset-list" aria-label="Presets disponibles">
+              <button type="button" class="preset-chip active">Luz cenital</button>
+              <button type="button" class="preset-chip">Estándar oscuro</button>
+              <button type="button" class="preset-chip">Complementos</button>
+            </div>
+          </section>
+
+          <section class="settings-section">
+            <div class="section-title">
+              <span class="eyebrow">Aspecto</span>
+              <strong>Principal</strong>
+            </div>
+            <label class="control-row">
+              <span>Opacidad</span>
+              <input type="range" min="0" max="100" value="20" />
+              <output>20</output>
+            </label>
+            <label class="control-row">
+              <span>Blur</span>
+              <input type="range" min="0" max="80" value="30" />
+              <output>30</output>
+            </label>
+            <label class="control-row">
+              <span>Distancia</span>
+              <input type="range" min="0" max="80" value="25" />
+              <output>25</output>
+            </label>
+          </section>
+
+          <section class="settings-section export-section">
+            <div class="section-title">
+              <span class="eyebrow">Exportación</span>
+              <strong id="export-format-label">JPG</strong>
+            </div>
+            <div class="segmented export-format" aria-label="Formato">
+              <button type="button" class="active">JPG</button>
+              <button type="button">PNG</button>
+            </div>
+            <div class="summary-lines">
+              <span>1800x2400</span>
+              <span>{original}{suffix}</span>
+              <span>Destino: origen / _SALIDA_PRO</span>
+            </div>
+          </section>
+        </aside>
+      </section>
+
+      <footer class="bottom-bar">
+        <div class="progress-block">
+          <span id="bottom-status">Listo para procesar</span>
+          <div class="progress-track" aria-hidden="true">
+            <span id="progress-fill"></span>
+          </div>
+        </div>
+        <div class="bottom-actions">
+          <button type="button" id="open-output" disabled>Abrir destino</button>
+          <button type="button" class="primary" id="process-batch">Procesar 24 imágenes</button>
+        </div>
+      </footer>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

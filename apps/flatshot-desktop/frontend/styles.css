@@ -146,6 +146,8 @@ input[type="range"] {
 .brand-copy strong,
 .brand-copy span,
 .demo-switcher span,
+.mode-switcher span,
+.bridge-url-field span,
 .text-field span,
 .form-grid span,
 .advanced-grid span {
@@ -154,6 +156,8 @@ input[type="range"] {
 
 .brand-copy span,
 .demo-switcher span,
+.mode-switcher span,
+.bridge-url-field span,
 .eyebrow,
 .text-field span,
 .form-grid span,
@@ -175,6 +179,56 @@ small {
   grid-template-columns: auto 190px;
   align-items: center;
   gap: 8px;
+}
+
+.mode-switcher {
+  display: grid;
+  grid-template-columns: auto 122px;
+  align-items: center;
+  gap: 8px;
+}
+
+.bridge-url-field {
+  display: grid;
+  grid-template-columns: auto 178px;
+  align-items: center;
+  gap: 8px;
+}
+
+.bridge-url-field input {
+  width: 178px;
+}
+
+.bridge-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 10px;
+  color: var(--muted);
+  background: var(--surface-muted);
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.bridge-chip.connected {
+  border-color: #b9d8cf;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+}
+
+.bridge-chip.checking {
+  border-color: #edcf91;
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+
+.bridge-chip.disconnected {
+  border-color: #efb8be;
+  color: var(--danger);
+  background: var(--danger-soft);
 }
 
 .status-dot {
@@ -280,6 +334,41 @@ small {
 
 .batch-actions {
   margin-top: 14px;
+}
+
+.bridge-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: 12px;
+}
+
+.bridge-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bridge-panel-heading span,
+.bridge-message {
+  color: var(--muted);
+}
+
+.bridge-message {
+  min-height: 18px;
+  font-size: 13px;
+}
+
+.bridge-message.error {
+  color: var(--danger);
+}
+
+.bridge-message.ready {
+  color: var(--accent-strong);
 }
 
 .wide {

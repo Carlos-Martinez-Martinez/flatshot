@@ -37,6 +37,7 @@ src/
   flatshot/
     core/
     application/
+    bridge/              # backend local minimo, Qt-free
     ui/                  # legacy, no tocar para la nueva UX salvo necesidad
     workers/             # adaptadores Qt legacy
 ```
@@ -56,7 +57,7 @@ src/
   flatshot/
     core/
     application/
-    desktop_bridge/      # futuro, si se crea bridge Python sin activar API local
+    bridge/              # servicio testeable y servidor HTTP fino
 ```
 
 Reglas:
@@ -64,7 +65,7 @@ Reglas:
 - `core` y `application` siguen siendo la fuente funcional.
 - El frontend nuevo vive fuera de `src/flatshot/ui`.
 - La UI PyQt no se mueve ni se borra en esta etapa.
-- No crear una API local activa hasta tener contratos y seguridad claros.
+- No ampliar la API local sin contratos y seguridad claros.
 
 ## 4. Contratos minimos entre UI y motor
 
@@ -195,17 +196,17 @@ Riesgos: crear microcopy o layout demasiado cercano a legacy.
 
 Objetivo: definir proceso Python o contrato IPC minimo sin exportacion real.
 
-Archivos probables: `apps/flatshot-desktop/bridge`, posible `src/flatshot/desktop_bridge`.
+Archivos probables: `apps/flatshot-desktop/bridge`, `src/flatshot/bridge`.
 
-Se puede tocar: capa nueva de bridge y tests.
+Se puede tocar: capa nueva de bridge, servidor HTTP fino, serializacion y tests.
 
 No se puede tocar: output de imagen, runners salvo wrappers seguros.
 
-Tests: unitarios de serializacion y comandos health/config.
+Tests: unitarios de servicio, serializacion, errores JSON y servidor HTTP.
 
-Validacion manual: frontend obtiene health/version desde backend.
+Validacion manual: frontend obtiene health/capabilities y escanea una carpeta por ruta manual.
 
-Riesgos: crear API local insegura o acoplar frontend a modelos Python internos sin versionar.
+Riesgos: crear API local insegura, abrir bind fuera de localhost o acoplar frontend a modelos Python internos sin versionar.
 
 ### APP.4 - Escaneo real de carpetas
 
@@ -384,4 +385,3 @@ Para fases con exportacion o preview real, se requieren tests del servicio exist
 - No crear dependencia de Windows-only salvo adapter nativo aislado.
 - No mover business logic a JS/TS.
 - No convertir `MainWindow` en base conceptual de la nueva app.
-

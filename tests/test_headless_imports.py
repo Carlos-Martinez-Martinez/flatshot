@@ -31,6 +31,12 @@ HEADLESS_MODULES = [
     "flatshot.application.queue_runner",
     "flatshot.application.session_service",
     "flatshot.application.settings_service",
+    "flatshot.bridge",
+    "flatshot.bridge.app_info",
+    "flatshot.bridge.errors",
+    "flatshot.bridge.http_server",
+    "flatshot.bridge.serialization",
+    "flatshot.bridge.service",
 ]
 
 

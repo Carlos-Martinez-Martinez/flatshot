@@ -41,6 +41,19 @@
               <option value="export-failed">Exportación fallida</option>
             </select>
           </label>
+          <label class="mode-switcher">
+            <span>Modo</span>
+            <select id="app-mode" aria-label="Modo de datos">
+              <option value="mock">Mock</option>
+              <option value="bridge">Bridge local</option>
+            </select>
+          </label>
+          <label class="bridge-url-field">
+            <span>Bridge</span>
+            <input id="bridge-url" type="url" value="http://127.0.0.1:8765" />
+          </label>
+          <button type="button" data-action="check-bridge">Comprobar bridge</button>
+          <span class="bridge-chip idle" id="bridge-status">Mock</span>
           <button type="button" data-action="load-batch">Añadir carpeta</button>
           <button type="button" data-action="clear-batch">Limpiar lote</button>
         </div>
@@ -59,6 +72,22 @@
           <div class="batch-actions">
             <button type="button" class="wide" data-action="load-batch">Añadir carpeta</button>
             <button type="button" class="wide secondary" data-action="show-empty-folder">Simular vacía</button>
+          </div>
+
+          <div class="bridge-panel is-hidden" id="bridge-panel">
+            <div class="bridge-panel-heading">
+              <strong>Bridge local</strong>
+              <span id="bridge-panel-status">Desconectado</span>
+            </div>
+            <label class="text-field">
+              <span>Ruta carpeta</span>
+              <input id="bridge-scan-path" type="text" placeholder="C:/ruta/lote" />
+            </label>
+            <div class="button-row">
+              <button type="button" data-action="check-bridge">Comprobar</button>
+              <button type="button" id="bridge-scan-folder" data-action="scan-bridge-folder">Escanear ruta</button>
+            </div>
+            <div class="bridge-message" id="bridge-message">Arranca el bridge y comprueba conexión.</div>
           </div>
 
           <label class="search-field">

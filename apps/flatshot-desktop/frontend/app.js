@@ -65,12 +65,14 @@ const mockImages = [
   },
 ];
 
-const presets = [
+const mockPresets = [
   "Luz cenital",
   "Estándar oscuro",
   "Complementos",
   "Sin sombra",
 ];
+
+const defaultBridgeUrl = "http://127.0.0.1:8765";
 
 const statusLabels = {
   ready: "Lista",
@@ -127,6 +129,15 @@ const state = {
   errors: [],
   paused: false,
   statusText: "Añade una carpeta",
+  bridgeMode: "mock",
+  bridgeUrl: defaultBridgeUrl,
+  bridgeStatus: "idle",
+  bridgeMessage: "Modo mock activo",
+  bridgeCapabilities: null,
+  bridgePresets: [],
+  bridgeScanPath: "",
+  realFolders: [],
+  realImages: [],
 };
 
 const timers = new Set();
@@ -157,7 +168,9 @@ function clearTimers() {
 }
 
 function selectedImage() {
-  return mockImages.find((image) => image.id === state.selectedImageId) || null;
+  return activeImages().find((image) => image.id === state.selectedImageId)
+    || mockImages.find((image) => image.id === state.selectedImageId)
+    || null;
 }
 
 function hasBatch() {
@@ -165,7 +178,30 @@ function hasBatch() {
 }
 
 function activeImages() {
-  return state.batch === "ready" ? mockImages : [];
+  if (state.batch !== "ready") {
+    return [];
+  }
+  if (state.bridgeMode === "bridge" && state.realImages.length) {
+    return state.realImages;
+  }
+  return mockImages;
+}
+
+function activeFolders() {
+  if (state.batch !== "ready") {
+    return [];
+  }
+  if (state.bridgeMode === "bridge" && state.realFolders.length) {
+    return state.realFolders;
+  }
+  return mockFolders;
+}
+
+function activePresets() {
+  if (state.bridgeMode === "bridge" && state.bridgePresets.length) {
+    return state.bridgePresets;
+  }
+  return mockPresets;
 }
 
 function exportableImages() {
@@ -320,6 +356,11 @@ function setScenario(scenario) {
 }
 
 function loadBatch() {
+  if (state.bridgeMode === "bridge" && state.bridgeScanPath.trim()) {
+    void scanBridgeFolder();
+    return;
+  }
+
   clearTimers();
   Object.assign(state, {
     scenario: "batch-ready",
@@ -481,6 +522,190 @@ function reviewErrors() {
   render();
 }
 
+function normalizedBridgeUrl() {
+  return (state.bridgeUrl || defaultBridgeUrl).trim().replace(/\/+$/, "");
+}
+
+async function bridgeRequest(path, options = {}) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 3500);
+  const headers = options.body
+    ? { "Content-Type": "application/json", ...(options.headers || {}) }
+    : { ...(options.headers || {}) };
+
+  try {
+    const response = await fetch(`${normalizedBridgeUrl()}${path}`, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.error?.message || `HTTP ${response.status}`);
+    }
+    return payload;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+async function checkBridge() {
+  state.bridgeMode = "bridge";
+  state.bridgeStatus = "checking";
+  state.bridgeMessage = "Comprobando bridge";
+  state.statusText = "Comprobando bridge";
+  render();
+
+  try {
+    const health = await bridgeRequest("/health");
+    const capabilities = await bridgeRequest("/capabilities");
+    const presetPayload = await bridgeRequest("/presets");
+    state.bridgeStatus = "connected";
+    state.bridgeCapabilities = capabilities;
+    state.bridgeMessage = `${health.service} conectado`;
+    state.statusText = "Bridge conectado";
+    applyBridgePresets(presetPayload);
+  } catch (error) {
+    state.bridgeStatus = "disconnected";
+    state.bridgeCapabilities = null;
+    state.bridgeMessage = bridgeErrorMessage(error);
+    state.statusText = "Bridge sin conexión";
+  }
+
+  render();
+}
+
+function applyBridgePresets(payload) {
+  const names = Array.isArray(payload.items)
+    ? payload.items.map((item) => item.name).filter(Boolean)
+    : [];
+  state.bridgePresets = names;
+  if (state.bridgeMode === "bridge" && names.length && !names.includes(state.activePreset)) {
+    state.activePreset = names[0];
+  }
+}
+
+async function scanBridgeFolder() {
+  state.bridgeMode = "bridge";
+  const folderPath = state.bridgeScanPath.trim();
+  if (!folderPath) {
+    state.bridgeStatus = state.bridgeStatus === "connected" ? "connected" : "disconnected";
+    state.bridgeMessage = "Ruta sin configurar";
+    state.statusText = "Ruta sin configurar";
+    render();
+    return;
+  }
+
+  Object.assign(state, {
+    batch: "scanning",
+    selectedImageId: null,
+    previewStatus: "empty",
+    exportStatus: "blocked",
+    progress: 0,
+    processed: 0,
+    errors: [],
+    statusText: "Escaneando ruta",
+  });
+  render();
+
+  try {
+    const response = await bridgeRequest("/folders/scan", {
+      method: "POST",
+      body: JSON.stringify({ folders: [folderPath] }),
+    });
+    applyBridgeScanResult(response);
+  } catch (error) {
+    Object.assign(state, {
+      batch: "none",
+      selectedImageId: null,
+      previewStatus: "empty",
+      exportStatus: "blocked",
+      bridgeStatus: "disconnected",
+      bridgeMessage: bridgeErrorMessage(error),
+      statusText: "No se pudo escanear",
+    });
+  }
+
+  render();
+}
+
+function applyBridgeScanResult(response) {
+  state.realFolders = (response.folders || []).map(bridgeFolderToItem);
+  state.realImages = (response.folders || []).flatMap((folder, folderIndex) =>
+    (folder.images || []).map((image, imageIndex) => bridgeImageToItem(image, folderIndex, imageIndex))
+  );
+  state.bridgeStatus = "connected";
+  state.bridgeMessage = `${response.totalImages || 0} imágenes encontradas`;
+
+  if (state.realImages.length) {
+    state.batch = "ready";
+    state.selectedImageId = state.realImages[0].id;
+    state.previewStatus = "loading";
+    state.exportStatus = "ready";
+    state.statusText = "Generando preview mock";
+    setTimer(() => {
+      state.previewStatus = "ready";
+      state.statusText = "Lote escaneado";
+      render();
+    }, 360);
+    return;
+  }
+
+  state.batch = "empty";
+  state.selectedImageId = null;
+  state.previewStatus = "empty";
+  state.exportStatus = "blocked";
+  state.statusText = response.errors?.length ? "Revisa carpeta" : "No hay PNG válidos";
+}
+
+function bridgeFolderToItem(folder, index) {
+  const hasErrors = Array.isArray(folder.errors) && folder.errors.length > 0;
+  const count = Array.isArray(folder.images) ? folder.images.length : 0;
+  return {
+    id: `bridge-folder-${index}`,
+    name: basename(folder.path) || `Carpeta ${index + 1}`,
+    path: folder.path,
+    count,
+    status: hasErrors ? (count ? "warning" : "error") : count ? "ready" : "empty",
+    detail: hasErrors ? folder.errors[0] : count ? `${count} PNG` : "No hay PNG válidos",
+  };
+}
+
+function bridgeImageToItem(image, folderIndex, imageIndex) {
+  return {
+    id: `bridge-${folderIndex}-${imageIndex}`,
+    folderId: `bridge-folder-${folderIndex}`,
+    name: image.name,
+    detail: `${formatBytes(image.sizeBytes)} · Preview mock`,
+    status: image.hasLocalOverride ? "adjusted" : "ready",
+    tone: `tone-${["a", "b", "c", "d", "e"][imageIndex % 5]}`,
+    exportable: true,
+    path: image.path,
+  };
+}
+
+function basename(path) {
+  return String(path || "").split(/[\\/]/).filter(Boolean).pop() || "";
+}
+
+function formatBytes(bytes) {
+  const value = Number(bytes) || 0;
+  if (value >= 1024 * 1024) {
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  if (value >= 1024) {
+    return `${Math.round(value / 1024)} KB`;
+  }
+  return `${value} B`;
+}
+
+function bridgeErrorMessage(error) {
+  if (error?.name === "AbortError") {
+    return "Bridge no responde";
+  }
+  return error?.message || "Bridge no disponible";
+}
+
 function primaryAction() {
   if (!hasBatch()) {
     loadBatch();
@@ -508,6 +733,7 @@ function statusMode() {
 
 function render() {
   renderTop();
+  renderBridge();
   renderBatch();
   renderPreview();
   renderSettings();
@@ -517,6 +743,8 @@ function render() {
 
 function renderTop() {
   $("#demo-scenario").value = scenarioLabels[state.scenario] ? state.scenario : "batch-ready";
+  $("#app-mode").value = state.bridgeMode;
+  $("#bridge-url").value = state.bridgeUrl;
   $("#active-batch-label").textContent = hasBatch()
     ? `${activeImages().length} imágenes · ${state.activePreset}`
     : state.batch === "empty"
@@ -524,6 +752,45 @@ function renderTop() {
       : "Sin lote";
   $("#top-status-text").textContent = state.statusText;
   $("#status-dot").className = `status-dot ${statusMode()}`;
+}
+
+function renderBridge() {
+  const isBridge = state.bridgeMode === "bridge";
+  const chip = $("#bridge-status");
+  const panel = $("#bridge-panel");
+  const message = $("#bridge-message");
+
+  chip.className = `bridge-chip ${bridgeStatusClass()}`;
+  chip.textContent = bridgeStatusLabel();
+  panel.classList.toggle("is-hidden", !isBridge);
+  $("#bridge-panel-status").textContent = bridgeStatusLabel();
+  $("#bridge-scan-path").value = state.bridgeScanPath;
+  $("#bridge-scan-folder").disabled = state.bridgeStatus === "checking";
+  message.textContent = state.bridgeMessage;
+  message.className = `bridge-message ${state.bridgeStatus === "connected" ? "ready" : state.bridgeStatus === "disconnected" ? "error" : ""}`;
+}
+
+function bridgeStatusClass() {
+  if (state.bridgeMode !== "bridge") {
+    return "idle";
+  }
+  return state.bridgeStatus;
+}
+
+function bridgeStatusLabel() {
+  if (state.bridgeMode !== "bridge") {
+    return "Mock";
+  }
+  if (state.bridgeStatus === "connected") {
+    return "Conectado";
+  }
+  if (state.bridgeStatus === "checking") {
+    return "Comprobando";
+  }
+  if (state.bridgeStatus === "disconnected") {
+    return "Sin conexión";
+  }
+  return "Bridge local";
 }
 
 function renderBatch() {
@@ -560,15 +827,18 @@ function renderBatch() {
   }
 
   if (state.batch === "empty") {
+    const emptyFolder = state.bridgeMode === "bridge" && state.realFolders.length
+      ? state.realFolders[0]
+      : {
+          id: "empty",
+          name: "Carpeta vacía",
+          detail: "No hay PNG válidos",
+          count: "0",
+          status: "empty",
+        };
     $("#batch-count").textContent = "0 PNG";
     $("#batch-pill").textContent = "Sin imágenes";
-    $("#folder-list").innerHTML = folderItemHtml({
-      id: "empty",
-      name: "Carpeta vacía",
-      detail: "No hay PNG válidos",
-      count: "0",
-      status: "empty",
-    });
+    $("#folder-list").innerHTML = folderItemHtml(emptyFolder);
     $("#image-list").innerHTML = "";
     $("#batch-empty-note").textContent = "No hay PNG válidos.";
     renderFilterButtons();
@@ -577,7 +847,7 @@ function renderBatch() {
 
   $("#batch-count").textContent = `${images.length} imágenes`;
   $("#batch-pill").textContent = errors ? `${errors} errores` : adjusted ? `${adjusted} ajustadas` : `${warnings} avisos`;
-  $("#folder-list").innerHTML = mockFolders.map(folderItemHtml).join("");
+  $("#folder-list").innerHTML = activeFolders().map(folderItemHtml).join("");
   $("#image-search").value = state.search;
   renderFilterButtons();
 
@@ -699,7 +969,7 @@ function renderSettings() {
   $("#active-preset").textContent = state.activePreset;
   $("#preset-dirty").textContent = state.presetDirty ? "Sin guardar" : "Sin cambios";
   $("#preset-dirty").classList.toggle("dirty", state.presetDirty);
-  $("#preset-list").innerHTML = presets.map((preset) => `
+  $("#preset-list").innerHTML = activePresets().map((preset) => `
     <button type="button" class="preset-chip ${preset === state.activePreset ? "active" : ""}" data-preset="${escapeHtml(preset)}">
       ${escapeHtml(preset)}
     </button>
@@ -842,6 +1112,10 @@ function previewFooterLabel() {
 function handleAction(action) {
   if (action === "load-batch") {
     loadBatch();
+  } else if (action === "check-bridge") {
+    void checkBridge();
+  } else if (action === "scan-bridge-folder") {
+    void scanBridgeFolder();
   } else if (action === "clear-batch") {
     clearBatch();
   } else if (action === "show-empty-folder") {
@@ -931,7 +1205,25 @@ document.addEventListener("click", (event) => {
 });
 
 $("#demo-scenario").addEventListener("change", (event) => {
+  state.bridgeMode = "mock";
   setScenario(event.target.value);
+});
+
+$("#app-mode").addEventListener("change", (event) => {
+  state.bridgeMode = event.target.value;
+  state.statusText = state.bridgeMode === "bridge" ? "Bridge local" : "Modo mock";
+  render();
+});
+
+$("#bridge-url").addEventListener("input", (event) => {
+  state.bridgeUrl = event.target.value || defaultBridgeUrl;
+  state.bridgeStatus = "idle";
+  state.bridgeMessage = "Comprueba conexión";
+  render();
+});
+
+$("#bridge-scan-path").addEventListener("input", (event) => {
+  state.bridgeScanPath = event.target.value;
 });
 
 $("#image-search").addEventListener("input", (event) => {

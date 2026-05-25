@@ -1092,6 +1092,14 @@ small {
   gap: 6px;
 }
 
+#preset-source {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .preset-chip {
   padding: 0 10px;
 }
@@ -1144,6 +1152,10 @@ small {
   padding: 0 10px 10px;
 }
 
+.advanced-grid .advanced-wide {
+  grid-column: 1 / -1;
+}
+
 .advanced-grid label,
 .form-grid label,
 .text-field {
@@ -1154,6 +1166,16 @@ small {
 .advanced-grid input {
   min-width: 0;
   width: 100%;
+}
+
+.advanced-grid select {
+  min-width: 0;
+  width: 100%;
+}
+
+.advanced-grid input[type="checkbox"] {
+  width: auto;
+  justify-self: start;
 }
 
 .local-adjustment {

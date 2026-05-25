@@ -4,13 +4,14 @@ Prototipo navegable de la nueva app moderna de FlatShot.
 
 Estado actual:
 
-- APP.5 completada como preview real conectada al motor.
+- APP.6 completada como presets y ajustes reales conectados a la preview.
 - Frontend estático en HTML/CSS/JS vanilla.
 - Sin `package.json`, Tauri, Rust, Node obligatorio ni dependencias nuevas.
 - Bridge HTTP local de desarrollo en Python.
 - Escaneo real de carpetas por ruta manual usando servicios existentes.
 - Preview real de PNG seleccionados usando `PreviewService`.
-- Lectura real/parcial de presets desde el servicio Python.
+- Lectura real de presets desde el servicio Python.
+- Presets y ajustes principales/avanzados aplicados a la preview real.
 - La app PyQt legacy sigue intacta.
 
 ## Probar visualmente la nueva app
@@ -113,7 +114,7 @@ Esto llama a:
 - `POST /folders/scan`.
 - `POST /preview/render`.
 
-El panel de lote se actualiza con carpetas, imagenes, contadores y errores reales del bridge. La preview real se genera en Python al seleccionar imagen. Exportacion sigue sin motor real.
+El panel de lote se actualiza con carpetas, imagenes, contadores y errores reales del bridge. La preview real se genera en Python al seleccionar imagen. Los presets reales actualizan la preview. Exportacion sigue sin motor real.
 
 ## Probar APP.4 — Escaneo real de carpetas
 
@@ -218,7 +219,40 @@ Sigue siendo mock o no conectado:
 
 - selector nativo de carpetas;
 - comparación/original de preview real;
-- presets reales completos aplicados a sliders;
+- exportacion real;
+- progreso real.
+
+## Probar APP.6 — Presets y ajustes reales
+
+1. Arrancar la app:
+
+   ```bash
+   python apps/flatshot-desktop/run_dev.py --open
+   ```
+
+2. Cambiar `Modo` a `Bridge local`.
+3. Pulsar `Comprobar bridge`.
+4. Revisar el panel `Preset`.
+5. Seleccionar `Luz cenital` o `Estándar oscuro`.
+6. Escanear una carpeta real con PNG.
+7. Seleccionar una imagen.
+8. Cambiar opacidad, blur, distancia o padding.
+9. Abrir `Avanzado` y cambiar ruido, contacto, escala o motor.
+
+Debe verse:
+
+- presets reales cargados desde `/presets`;
+- etiqueta `Defaults`, `Config` o `Config legacy` bajo el preset activo;
+- sliders actualizados al cambiar de preset;
+- preview real regenerada al cambiar preset o ajuste;
+- `Sin guardar` al modificar un ajuste;
+- `Reset` vuelve al preset activo;
+- `Guardar preset` queda pendiente en modo bridge.
+
+Sigue sin conectarse:
+
+- guardado/edición real de presets;
+- ajustes por imagen reales;
 - exportacion real;
 - progreso real.
 
@@ -275,7 +309,7 @@ Todavía no existe:
 - selector nativo de carpetas;
 - exportación real;
 - progreso real;
-- presets editables;
+- presets editables/guardables;
 - configuración persistente completa;
 - apertura real de carpeta de salida.
 
@@ -325,10 +359,10 @@ Esto llama a:
 - `POST /folders/scan`.
 - `POST /preview/render`.
 
-El listado de imágenes puede venir de una carpeta real. La preview se genera con Python. Ajustes principales se envían parcialmente; exportación sigue sin conectar.
+El listado de imágenes puede venir de una carpeta real. La preview se genera con Python. Presets y ajustes de sombra se envían como settings reales al bridge; exportación sigue sin conectar.
 
 ## Siguiente paso
 
-APP.6 — Presets y ajustes reales en la nueva UI.
+APP.7 — Exportación real y progreso.
 
-La siguiente tanda debe conectar presets y ajustes reales de forma completa, manteniendo todavía fuera Tauri y exportación real.
+La siguiente tanda debe preparar exportación real y progreso, manteniendo todavía fuera Tauri y empaquetado.

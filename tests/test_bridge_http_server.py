@@ -73,6 +73,17 @@ def test_bridge_http_capabilities(tmp_path):
     assert data["exportRun"] is False
 
 
+def test_bridge_http_presets_include_settings(tmp_path):
+    with running_bridge(tmp_path / "config") as port:
+        status, data = request_json(port, "GET", "/presets")
+
+    assert status == 200
+    assert data["source"] == "defaults"
+    assert data["items"][0]["name"] == "Luz cenital"
+    assert data["items"][0]["settings"]["opacity"] == 20
+    assert data["items"][0]["settings"]["shadow_engine"] == "realistic_v2"
+
+
 def test_bridge_http_scan_folder(tmp_path):
     source = tmp_path / "source"
     source.mkdir()

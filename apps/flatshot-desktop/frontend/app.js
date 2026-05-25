@@ -96,11 +96,72 @@ const scenarioLabels = {
   "export-failed": "Exportación fallida",
 };
 
+const shadowSettingKeys = [
+  "angle",
+  "distance",
+  "blur",
+  "spread",
+  "fusion",
+  "opacity",
+  "noise",
+  "padding",
+  "contact_blur",
+  "contraction",
+  "adaptive_zoom",
+  "scale_adjustment",
+  "shadow_engine",
+  "transparent_bg",
+  "bg_color",
+];
+
 const defaultSettings = {
+  angle: 180,
   opacity: 20,
   blur: 30,
   distance: 25,
+  spread: 0,
+  fusion: 1,
+  noise: 2,
   padding: 10,
+  contact_blur: 10,
+  contraction: 0,
+  adaptive_zoom: true,
+  scale_adjustment: 0,
+  shadow_engine: "realistic_v2",
+  transparent_bg: false,
+  bg_color: [230, 230, 230],
+};
+
+const mockPresetSettings = {
+  "Luz cenital": { ...defaultSettings },
+  "Estándar oscuro": {
+    ...defaultSettings,
+    distance: 20,
+    blur: 40,
+    spread: 3,
+    fusion: 5,
+    opacity: 45,
+    noise: 5,
+    contact_blur: 12,
+  },
+  Complementos: {
+    ...defaultSettings,
+    distance: 18,
+    blur: 22,
+    opacity: 26,
+    padding: 8,
+    scale_adjustment: 4,
+  },
+  "Sin sombra": {
+    ...defaultSettings,
+    distance: 0,
+    blur: 0,
+    spread: 0,
+    fusion: 0,
+    opacity: 0,
+    noise: 0,
+    contact_blur: 0,
+  },
 };
 
 const state = {
@@ -120,6 +181,7 @@ const state = {
   activePreset: "Luz cenital",
   settings: { ...defaultSettings },
   presetDirty: false,
+  presetSource: "Mock",
   localOverride: false,
   exportStatus: "blocked",
   destinationMode: "source",
@@ -141,6 +203,8 @@ const state = {
   bridgeCapabilitiesSummary: "Sin comprobar",
   bridgeCapabilities: null,
   bridgePresets: [],
+  bridgePresetSource: "unavailable",
+  bridgePresetWarning: "",
   bridgeScanPath: "",
   scanStatus: "Pega una ruta o usa lote mock.",
   scanIssues: [],
@@ -214,10 +278,24 @@ function activeFolders() {
 }
 
 function activePresets() {
+  return activePresetItems().map((preset) => preset.name);
+}
+
+function activePresetItems() {
   if (state.bridgeMode === "bridge" && state.bridgePresets.length) {
     return state.bridgePresets;
   }
-  return mockPresets;
+  return mockPresets.map((name) => ({
+    name,
+    category: "Mock",
+    categoryId: "mock",
+    settings: normalizeSettings(mockPresetSettings[name]),
+    source: "mock",
+  }));
+}
+
+function activePresetItem() {
+  return activePresetItems().find((preset) => preset.name === state.activePreset) || null;
 }
 
 function exportableImages() {
@@ -466,8 +544,68 @@ function selectImage(imageId) {
   }, 380);
 }
 
+function normalizeSettings(settings = {}) {
+  const source = settings && typeof settings === "object" ? settings : {};
+  const normalized = { ...defaultSettings };
+  shadowSettingKeys.forEach((key) => {
+    if (source[key] === undefined || source[key] === null) {
+      return;
+    }
+    if (key === "adaptive_zoom" || key === "transparent_bg") {
+      normalized[key] = Boolean(source[key]);
+      return;
+    }
+    if (key === "shadow_engine") {
+      normalized[key] = source[key] === "legacy" ? "legacy" : "realistic_v2";
+      return;
+    }
+    if (key === "bg_color") {
+      normalized[key] = Array.isArray(source[key]) && source[key].length === 3
+        ? source[key].map((channel) => Number(channel))
+        : defaultSettings.bg_color;
+      return;
+    }
+    normalized[key] = Number(source[key]);
+  });
+  return normalized;
+}
+
+function presetItemByName(name) {
+  return activePresetItems().find((preset) => preset.name === name) || null;
+}
+
+function applyPresetSettings(name, options = {}) {
+  const preset = presetItemByName(name);
+  if (!preset) {
+    return false;
+  }
+  state.activePreset = preset.name;
+  state.settings = normalizeSettings(preset.settings);
+  state.presetDirty = false;
+  state.presetSource = preset.source === "bridge"
+    ? `Bridge local · ${preset.category || "Preset"}`
+    : "Mock";
+  state.statusText = options.statusText || `Preset: ${preset.name}`;
+  if (options.refresh !== false) {
+    refreshPreviewAfterSettingChange();
+  }
+  return true;
+}
+
+function resetActivePresetSettings() {
+  if (applyPresetSettings(state.activePreset, { statusText: "Ajustes restaurados" })) {
+    return;
+  }
+  state.settings = { ...defaultSettings };
+  state.presetDirty = false;
+  state.presetSource = state.bridgeMode === "bridge" ? "Bridge local · defaults" : "Mock";
+  state.statusText = "Ajustes restaurados";
+  refreshPreviewAfterSettingChange();
+}
+
 function markPresetDirty() {
   state.presetDirty = true;
+  state.presetSource = state.bridgeMode === "bridge" ? "Bridge local · modificado" : "Mock · modificado";
   refreshPreviewAfterSettingChange();
 }
 
@@ -672,11 +810,8 @@ function previewResponseToData(response) {
 
 function bridgePreviewSettings() {
   return {
+    ...normalizeSettings(state.settings),
     presetName: state.activePreset,
-    opacity: state.settings.opacity,
-    blur: state.settings.blur,
-    distance: state.settings.distance,
-    padding: state.settings.padding,
     transparentBg: state.background === "transparent",
     bgColor: backgroundColorTuple(state.background),
   };
@@ -741,13 +876,37 @@ async function checkBridge() {
 }
 
 function applyBridgePresets(payload) {
-  const names = Array.isArray(payload.items)
-    ? payload.items.map((item) => item.name).filter(Boolean)
+  const items = Array.isArray(payload.items)
+    ? payload.items.map(normalizePresetItem).filter(Boolean)
     : [];
-  state.bridgePresets = names;
-  if (state.bridgeMode === "bridge" && names.length && !names.includes(state.activePreset)) {
-    state.activePreset = names[0];
+  state.bridgePresets = items;
+  state.bridgePresetSource = payload.source || "unavailable";
+  state.bridgePresetWarning = payload.warning || "";
+  if (!items.length) {
+    state.presetSource = "Bridge local · sin presets";
+    return;
   }
+
+  const names = items.map((item) => item.name);
+  if (state.bridgeMode === "bridge") {
+    if (!names.includes(state.activePreset)) {
+      state.activePreset = names[0];
+    }
+    applyPresetSettings(state.activePreset, { refresh: false, statusText: state.statusText });
+  }
+}
+
+function normalizePresetItem(item) {
+  if (!item || typeof item !== "object" || !item.name) {
+    return null;
+  }
+  return {
+    name: String(item.name),
+    categoryId: String(item.categoryId || "uncategorized"),
+    category: String(item.category || "Sin categoría"),
+    settings: normalizeSettings(item.settings),
+    source: "bridge",
+  };
 }
 
 async function scanBridgeFolder() {
@@ -783,6 +942,10 @@ async function scanBridgeFolder() {
   render();
 
   try {
+    if (!state.bridgePresets.length) {
+      const presetPayload = await bridgeRequest("/presets");
+      applyBridgePresets(presetPayload);
+    }
     const response = await bridgeRequest("/folders/scan", {
       method: "POST",
       body: JSON.stringify({ folders }),
@@ -1343,9 +1506,16 @@ function bridgePreviewMeta() {
   }
   if (state.previewData) {
     const warning = state.previewData.warning ? " · Aviso" : "";
-    return `${state.previewData.width}x${state.previewData.height} · ${state.previewData.renderTimeMs} ms · Ajustes parciales${warning}`;
+    return `${state.previewData.width}x${state.previewData.height} · ${state.previewData.renderTimeMs} ms · ${previewSettingsLabel()}${warning}`;
   }
   return "Bridge local · Preview pendiente";
+}
+
+function previewSettingsLabel() {
+  if (state.bridgeMode === "bridge" && activePresetItem()?.source === "bridge") {
+    return state.presetDirty ? "Ajustes reales modificados" : "Preset real";
+  }
+  return state.presetDirty ? "Ajustes modificados" : "Ajustes";
 }
 
 function previewStateHtml(title, detail) {
@@ -1390,11 +1560,12 @@ function previewSubtitle(image) {
 
 function renderSettings() {
   $("#active-preset").textContent = state.activePreset;
+  $("#preset-source").textContent = presetSourceLabel();
   $("#preset-dirty").textContent = state.presetDirty ? "Sin guardar" : "Sin cambios";
   $("#preset-dirty").classList.toggle("dirty", state.presetDirty);
-  $("#preset-list").innerHTML = activePresets().map((preset) => `
-    <button type="button" class="preset-chip ${preset === state.activePreset ? "active" : ""}" data-preset="${escapeHtml(preset)}">
-      ${escapeHtml(preset)}
+  $("#preset-list").innerHTML = activePresetItems().map((preset) => `
+    <button type="button" class="preset-chip ${preset.name === state.activePreset ? "active" : ""}" data-preset="${escapeHtml(preset.name)}" title="${escapeHtml(preset.category)}">
+      ${escapeHtml(preset.name)}
     </button>
   `).join("");
 
@@ -1402,7 +1573,11 @@ function renderSettings() {
     const input = $(`[data-setting="${key}"]`);
     const output = $(`#${key}-output`);
     if (input) {
-      input.value = value;
+      if (input.type === "checkbox") {
+        input.checked = Boolean(value);
+      } else {
+        input.value = value;
+      }
     }
     if (output) {
       output.textContent = value;
@@ -1413,6 +1588,25 @@ function renderSettings() {
   const localActive = state.localOverride || image?.status === "adjusted";
   $("#local-adjustment").classList.toggle("active", localActive);
   $("#local-adjustment-text").textContent = localActive ? "Ajuste local activo" : "Sin ajuste local";
+  $("#save-preset").disabled = state.bridgeMode === "bridge";
+  $("#save-preset").textContent = state.bridgeMode === "bridge" ? "Guardar pendiente" : "Guardar preset";
+}
+
+function presetSourceLabel() {
+  if (state.bridgeMode === "bridge") {
+    const source = state.bridgePresetSource === "config"
+      ? "Config"
+      : state.bridgePresetSource === "legacy-config"
+        ? "Config legacy"
+        : state.bridgePresetSource === "defaults"
+          ? "Defaults"
+          : "Bridge local";
+    if (state.bridgePresetWarning) {
+      return `${source} · aviso`;
+    }
+    return state.presetDirty ? `${source} · modificado` : source;
+  }
+  return state.presetDirty ? "Mock · modificado" : "Mock";
 }
 
 function renderExport() {
@@ -1580,12 +1774,15 @@ function handleAction(action) {
     state.zoom = Math.max(70, state.zoom - 10);
     render();
   } else if (action === "reset-settings") {
-    state.settings = { ...defaultSettings };
-    state.presetDirty = false;
-    state.statusText = "Ajustes restaurados";
-    render();
+    resetActivePresetSettings();
   } else if (action === "save-preset") {
+    if (state.bridgeMode === "bridge") {
+      state.statusText = "Guardar preset pendiente";
+      render();
+      return;
+    }
     state.presetDirty = false;
+    state.presetSource = "Mock";
     state.statusText = "Preset guardado";
     render();
   } else if (action === "toggle-local-adjustment") {
@@ -1651,9 +1848,7 @@ document.addEventListener("click", (event) => {
 
   const presetTarget = event.target.closest("[data-preset]");
   if (presetTarget) {
-    state.activePreset = presetTarget.dataset.preset;
-    state.presetDirty = false;
-    refreshPreviewAfterSettingChange();
+    applyPresetSettings(presetTarget.dataset.preset);
   }
 });
 
@@ -1690,12 +1885,28 @@ $("#image-search").addEventListener("input", (event) => {
 });
 
 $$("[data-setting]").forEach((input) => {
-  input.addEventListener("input", (event) => {
+  const updateSetting = (event) => {
     const key = event.target.dataset.setting;
-    state.settings[key] = Number(event.target.value);
+    const nextValue = settingInputValue(event.target);
+    if (state.settings[key] === nextValue) {
+      return;
+    }
+    state.settings[key] = nextValue;
     markPresetDirty();
-  });
+  };
+  input.addEventListener("input", updateSetting);
+  input.addEventListener("change", updateSetting);
 });
+
+function settingInputValue(input) {
+  if (input.type === "checkbox") {
+    return input.checked;
+  }
+  if (input.tagName === "SELECT") {
+    return input.value;
+  }
+  return Number(input.value);
+}
 
 $("#format-select").addEventListener("change", (event) => {
   state.format = event.target.value;

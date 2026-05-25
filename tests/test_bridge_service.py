@@ -49,6 +49,12 @@ def test_bridge_presets_return_defaults_without_creating_config_dir(tmp_path):
 
     assert response["source"] == "defaults"
     assert [item["name"] for item in response["items"]] == ["Luz cenital", "Estándar oscuro"]
+    first_settings = response["items"][0]["settings"]
+    assert first_settings["opacity"] == 20
+    assert first_settings["blur"] == 30
+    assert first_settings["distance"] == 25
+    assert first_settings["padding"] == 10
+    assert first_settings["shadow_engine"] == "realistic_v2"
     assert not config_dir.exists()
 
 
@@ -62,6 +68,29 @@ def test_bridge_presets_read_existing_categorized_config(tmp_path):
 
     assert response["source"] == "config"
     assert "Local" in {item["name"] for item in response["items"]}
+    local = next(item for item in response["items"] if item["name"] == "Local")
+    assert local["settings"]["angle"] == 90
+    assert local["settings"]["distance"] == 10
+    assert local["settings"]["shadow_engine"] == "legacy"
+
+
+def test_bridge_render_preview_accepts_preset_settings_from_presets(tmp_path):
+    image = _png(tmp_path / "source.png")
+    preset_payload = _service(tmp_path / "missing-config").list_presets()
+    settings = preset_payload["items"][1]["settings"]
+
+    response = _service(tmp_path / "config").render_preview(
+        {
+            "imagePath": str(image),
+            "targetWidth": 32,
+            "targetHeight": 32,
+            "settings": settings,
+        }
+    )
+
+    assert response["ok"] is True
+    assert response["image"]["width"] == 32
+    assert response["image"]["height"] == 32
 
 
 def test_bridge_serializes_image_info_with_stable_keys(tmp_path):

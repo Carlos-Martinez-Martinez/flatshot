@@ -197,13 +197,14 @@
               <div>
                 <span class="eyebrow">Preset</span>
                 <strong id="active-preset">Luz cenital</strong>
+                <small id="preset-source">Mock</small>
               </div>
               <span class="change-chip" id="preset-dirty">Sin cambios</span>
             </div>
             <div class="preset-list" id="preset-list" aria-label="Presets disponibles"></div>
             <div class="button-row">
               <button type="button" data-action="reset-settings">Reset</button>
-              <button type="button" data-action="save-preset">Guardar preset</button>
+              <button type="button" id="save-preset" data-action="save-preset">Guardar preset</button>
             </div>
           </section>
 
@@ -243,19 +244,42 @@
               <div class="advanced-grid">
                 <label>
                   <span>Spread</span>
-                  <input type="number" min="0" max="20" value="0" />
+                  <input type="number" min="0" max="20" value="0" data-setting="spread" />
                 </label>
                 <label>
                   <span>Ruido</span>
-                  <input type="number" min="0" max="20" value="2" />
+                  <input type="number" min="0" max="20" value="2" data-setting="noise" />
                 </label>
                 <label>
                   <span>Contacto</span>
-                  <input type="number" min="0" max="40" value="10" />
+                  <input type="number" min="0" max="40" value="10" data-setting="contact_blur" />
                 </label>
                 <label>
                   <span>Escala</span>
-                  <input type="number" min="-30" max="30" value="0" />
+                  <input type="number" min="-30" max="30" value="0" data-setting="scale_adjustment" />
+                </label>
+                <label>
+                  <span>Fusión</span>
+                  <input type="number" min="0" max="20" value="1" data-setting="fusion" />
+                </label>
+                <label>
+                  <span>Ángulo</span>
+                  <input type="number" min="0" max="360" value="180" data-setting="angle" />
+                </label>
+                <label>
+                  <span>Contracción</span>
+                  <input type="number" min="0" max="80" value="0" data-setting="contraction" />
+                </label>
+                <label>
+                  <span>Zoom auto</span>
+                  <input type="checkbox" data-setting="adaptive_zoom" checked />
+                </label>
+                <label class="advanced-wide">
+                  <span>Motor</span>
+                  <select data-setting="shadow_engine">
+                    <option value="realistic_v2">Realista V2</option>
+                    <option value="legacy">Clásico</option>
+                  </select>
                 </label>
               </div>
             </details>

@@ -82,6 +82,21 @@ Usar antes de cerrar cada tanda visual de la nueva app.
 - [ ] Modo mock sigue funcionando.
 - [ ] Exportación sigue marcada como no conectada.
 
+## APP.6 — Presets y ajustes reales
+
+- [ ] `Comprobar bridge` carga presets reales.
+- [ ] El panel de preset indica `Defaults`, `Config` o `Config legacy`.
+- [ ] Cambiar preset actualiza sliders principales.
+- [ ] Cambiar preset regenera preview real.
+- [ ] Opacidad, blur, distancia y padding afectan la preview real.
+- [ ] Los controles avanzados están plegados por defecto.
+- [ ] Ruido, contacto, escala y motor se pueden modificar.
+- [ ] `Sin guardar` aparece al cambiar ajustes.
+- [ ] `Reset` vuelve al preset activo.
+- [ ] `Guardar preset` queda claramente pendiente en Bridge.
+- [ ] Modo mock sigue funcionando.
+- [ ] Exportación sigue marcada como no conectada.
+
 ## Feedback a revisar
 
 - [ ] Jerarquía visual.

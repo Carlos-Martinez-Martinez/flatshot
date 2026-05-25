@@ -1,6 +1,6 @@
 # Bridge FlatShot Desktop
 
-Bridge local minimo de APP.3 para conectar el prototipo moderno con servicios Python reutilizables.
+Bridge local minimo para conectar el prototipo moderno con servicios Python reutilizables.
 
 Estado actual:
 
@@ -9,6 +9,7 @@ Estado actual:
 - implementado con stdlib, sin dependencias nuevas;
 - sin PyQt;
 - preview real por endpoint JSON;
+- presets reales de solo lectura con settings serializables;
 - sin exportacion real;
 - sin Tauri.
 
@@ -62,7 +63,7 @@ Real. Devuelve informacion basica de FlatShot, version de bridge y tipo de UI.
 
 ### `GET /capabilities`
 
-Real. Declara lo disponible en APP.5:
+Real. Declara lo disponible en APP.6:
 
 - `folderScan`: `true`;
 - `presetsRead`: `true`;
@@ -73,13 +74,45 @@ Real. Declara lo disponible en APP.5:
 
 ### `GET /presets`
 
-Parcial real. Lee presets sin escribir configuracion:
+Real de solo lectura. Lee presets sin escribir configuracion:
 
 - si existe `presets_v2.json`, lee categorias reales;
 - si existe solo `presets.json`, lo lee sin migrar ni escribir;
 - si no existe config, devuelve presets por defecto del servicio.
 
 No permite crear, editar, borrar ni guardar presets.
+
+Response:
+
+```json
+{
+  "items": [
+    {
+      "name": "Luz cenital",
+      "categoryId": "ropa_clara",
+      "category": "Ropa Clara",
+      "settings": {
+        "angle": 180,
+        "distance": 25,
+        "blur": 30,
+        "spread": 0,
+        "fusion": 1,
+        "opacity": 20,
+        "noise": 2,
+        "padding": 10,
+        "contact_blur": 10,
+        "contraction": 0,
+        "adaptive_zoom": true,
+        "scale_adjustment": 0,
+        "shadow_engine": "realistic_v2",
+        "transparent_bg": false,
+        "bg_color": [230, 230, 230]
+      }
+    }
+  ],
+  "source": "defaults"
+}
+```
 
 ### `POST /folders/scan`
 
@@ -142,10 +175,19 @@ Request:
   "targetHeight": 900,
   "settings": {
     "presetName": "Luz cenital",
+    "angle": 180,
     "opacity": 20,
     "blur": 30,
     "distance": 25,
+    "spread": 0,
+    "fusion": 1,
+    "noise": 2,
     "padding": 10,
+    "contact_blur": 10,
+    "contraction": 0,
+    "adaptive_zoom": true,
+    "scale_adjustment": 0,
+    "shadow_engine": "realistic_v2",
     "bgColor": [230, 230, 230],
     "transparentBg": false
   }
@@ -178,8 +220,8 @@ Notas:
 - no modifica archivos;
 - no escribe configuracion;
 - limita cada lado de preview a 1200 px;
-- los sliders `opacity`, `blur`, `distance` y `padding` se envian como ajustes reales parciales;
-- `presetName` se conserva como contexto, pero APP.6 conectara presets reales completos.
+- los presets y ajustes principales/avanzados se envian como settings reales de `ShadowSettings`;
+- `presetName` se conserva como contexto para UI/contrato, pero el render usa el objeto `settings`.
 
 ## Errores JSON
 
@@ -197,12 +239,13 @@ Las rutas desconocidas, metodos incorrectos e inputs invalidos devuelven errores
 
 No se devuelve traceback bruto en JSON.
 
-## Seguridad de APP.5
+## Seguridad de APP.6
 
 - Solo lectura.
 - No ejecuta comandos arbitrarios.
 - No borra, mueve ni modifica imagenes.
 - No escribe configuracion.
+- No guarda ni edita presets.
 - Expone preview de lectura para rutas solicitadas por la UI.
 - No expone exportacion.
 - El servidor rechaza binds distintos de `127.0.0.1` o `localhost` desde el CLI.
@@ -218,3 +261,4 @@ No se devuelve traceback bruto en JSON.
 - pausa/reanudar/cancelar reales;
 - apertura real de carpeta de salida;
 - empaquetado Windows.
+- guardado/edicion real de presets.

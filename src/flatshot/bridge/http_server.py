@@ -58,12 +58,16 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(self.server.service.capabilities())
             elif path == "/presets":
                 self._send_json(self.server.service.list_presets())
+            elif _is_export_job_status_path(path):
+                self._send_json(self.server.service.export_status(_export_job_id(path)))
             elif path == "/folders/scan":
                 raise MethodNotAllowedError("Use POST for /folders/scan.")
             elif path == "/folders/pick":
                 raise MethodNotAllowedError("Use POST for /folders/pick.")
             elif path == "/preview/render":
                 raise MethodNotAllowedError("Use POST for /preview/render.")
+            elif path.startswith("/exports/"):
+                raise MethodNotAllowedError("Use POST for this export endpoint.")
             else:
                 raise NotFoundError()
         except CLIENT_DISCONNECT_ERRORS:
@@ -80,8 +84,20 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(self.server.service.pick_folder(self._read_json_body()))
             elif path == "/preview/render":
                 self._send_json(self.server.service.render_preview(self._read_json_body()))
+            elif path == "/exports/prepare":
+                self._send_json(self.server.service.prepare_export(self._read_json_body()))
+            elif path == "/exports/run":
+                self._send_json(self.server.service.start_export(self._read_json_body()), status=202)
+            elif _is_export_job_action_path(path, "pause"):
+                self._send_json(self.server.service.pause_export(_export_job_id(path)))
+            elif _is_export_job_action_path(path, "resume"):
+                self._send_json(self.server.service.resume_export(_export_job_id(path)))
+            elif _is_export_job_action_path(path, "cancel"):
+                self._send_json(self.server.service.cancel_export(_export_job_id(path)))
             else:
                 if path in {"/health", "/app-info", "/capabilities", "/presets"}:
+                    raise MethodNotAllowedError("Use GET for this endpoint.")
+                if _is_export_job_status_path(path):
                     raise MethodNotAllowedError("Use GET for this endpoint.")
                 raise NotFoundError()
         except CLIENT_DISCONNECT_ERRORS:
@@ -164,6 +180,24 @@ def create_server(
         service=service,
         allowed_origins=allowed_origins,
     )
+
+
+def _path_parts(path: str) -> list[str]:
+    return [part for part in path.strip("/").split("/") if part]
+
+
+def _is_export_job_status_path(path: str) -> bool:
+    parts = _path_parts(path)
+    return len(parts) == 3 and parts[:2] == ["exports", "jobs"]
+
+
+def _is_export_job_action_path(path: str, action: str) -> bool:
+    parts = _path_parts(path)
+    return len(parts) == 4 and parts[:2] == ["exports", "jobs"] and parts[3] == action
+
+
+def _export_job_id(path: str) -> str:
+    return _path_parts(path)[2]
 
 
 def main(argv: list[str] | None = None) -> int:

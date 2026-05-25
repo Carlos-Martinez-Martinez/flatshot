@@ -4,13 +4,16 @@ import http.client
 import json
 import base64
 import threading
+from concurrent.futures import Future
 from contextlib import contextmanager
 from pathlib import Path
+from time import sleep
 from types import SimpleNamespace
 
 from PIL import Image
 
 from flatshot.application.config_paths import ConfigPathResolver
+from flatshot.application.export_runner import ExportRunner
 from flatshot.bridge.http_server import FlatShotBridgeRequestHandler, create_server
 from flatshot.bridge.service import FlatShotBridgeService
 
@@ -18,6 +21,32 @@ from flatshot.bridge.service import FlatShotBridgeService
 def _png(path: Path) -> Path:
     Image.new("RGBA", (4, 4), (255, 0, 0, 255)).save(path)
     return path
+
+
+class InlineExecutor:
+    def __init__(self, max_workers=1):
+        self.max_workers = max_workers
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.shutdown()
+
+    def submit(self, fn, arg):
+        future = Future()
+        try:
+            future.set_result(fn(arg))
+        except Exception as exc:
+            future.set_exception(exc)
+        return future
+
+    def shutdown(self, wait=True, cancel_futures=False):
+        return None
+
+
+def _export_runner_factory(**kwargs) -> ExportRunner:
+    return ExportRunner(**kwargs, executor_factory=InlineExecutor)
 
 
 @contextmanager
@@ -99,7 +128,8 @@ def test_bridge_http_capabilities(tmp_path):
     assert status == 200
     assert data["folderScan"] is True
     assert data["previewRender"] is True
-    assert data["exportRun"] is False
+    assert data["exportRun"] is True
+    assert data["exportProgress"] is True
 
 
 def test_bridge_http_presets_include_settings(tmp_path):
@@ -216,6 +246,53 @@ def test_bridge_http_render_preview_invalid_json_returns_json_error(tmp_path):
             "message": "Request body must be valid JSON.",
         },
     }
+
+
+def test_bridge_http_export_prepare_and_run(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    png = _png(source / "item.png")
+    service = FlatShotBridgeService(
+        config_resolver=ConfigPathResolver(tmp_path / "config"),
+        export_runner_factory=_export_runner_factory,
+    )
+    payload = {
+        "imagePaths": [str(png)],
+        "settings": {"opacity": 0, "blur": 0, "noise": 0},
+        "export": {
+            "format": "PNG",
+            "size": "8x8",
+            "destinationMode": "source",
+            "destinationValue": "_OUT",
+            "namingTemplate": "{original}{suffix}",
+        },
+    }
+
+    with running_bridge(tmp_path / "config", service=service) as port:
+        status, plan = request_json(port, "POST", "/exports/prepare", payload)
+        run_status, started = request_json(port, "POST", "/exports/run", payload)
+        final = started
+        for _ in range(50):
+            _, final = request_json(port, "GET", f"/exports/jobs/{started['jobId']}")
+            if final["status"] in {"completed", "partial", "failed", "cancelled"}:
+                break
+            sleep(0.02)
+
+    assert status == 200
+    assert plan["sourceImages"] == 1
+    assert run_status == 202
+    assert final["status"] == "completed"
+    assert final["progress"]["percent"] == 100
+    assert (source / "_OUT" / "item_PRO.png").exists()
+
+
+def test_bridge_http_export_unknown_job_returns_json_error(tmp_path):
+    with running_bridge(tmp_path / "config") as port:
+        status, data = request_json(port, "GET", "/exports/jobs/missing")
+
+    assert status == 404
+    assert data["ok"] is False
+    assert data["error"]["code"] == "job_not_found"
 
 
 def test_bridge_http_unknown_route_returns_json_error(tmp_path):

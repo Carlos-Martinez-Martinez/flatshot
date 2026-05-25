@@ -10,7 +10,8 @@ Estado actual:
 - sin PyQt;
 - preview real por endpoint JSON;
 - presets reales de solo lectura con settings serializables;
-- sin exportacion real;
+- exportacion real con jobs locales en memoria;
+- progreso real consultable por polling;
 - sin Tauri.
 
 ## Como arrancar
@@ -63,13 +64,13 @@ Real. Devuelve informacion basica de FlatShot, version de bridge y tipo de UI.
 
 ### `GET /capabilities`
 
-Real. Declara lo disponible en APP.6:
+Real. Declara lo disponible en APP.7:
 
 - `folderScan`: `true`;
 - `presetsRead`: `true`;
 - `previewRender`: `true`;
-- `exportRun`: `false`;
-- `exportProgress`: `false`;
+- `exportRun`: `true`;
+- `exportProgress`: `true`;
 - `nativeFolderPicker`: `false`.
 
 ### `GET /presets`
@@ -281,6 +282,112 @@ Notas:
 - los presets y ajustes principales/avanzados se envian como settings reales de `ShadowSettings`;
 - `presetName` se conserva como contexto para UI/contrato, pero el render usa el objeto `settings`.
 
+### `POST /exports/prepare`
+
+Real. Valida y resume una exportacion sin escribir archivos.
+
+Request:
+
+```json
+{
+  "imagePaths": ["C:/ruta/a/carpeta/imagen.png"],
+  "presetName": "Luz cenital",
+  "settings": {
+    "opacity": 20,
+    "blur": 30,
+    "distance": 25,
+    "padding": 10,
+    "shadow_engine": "realistic_v2"
+  },
+  "export": {
+    "format": "JPG",
+    "size": "1800x2400",
+    "background": "rgb230",
+    "destinationMode": "source",
+    "destinationValue": "_SALIDA_PRO",
+    "namingTemplate": "{original}{suffix}",
+    "suffix": "_PRO"
+  }
+}
+```
+
+Response:
+
+```json
+{
+  "ok": true,
+  "sourceImages": 1,
+  "totalOutputs": 1,
+  "destinations": ["C:/ruta/a/carpeta/_SALIDA_PRO"],
+  "activeVariants": [
+    {
+      "id": "web_rgb230",
+      "label": "Web RGB230",
+      "format": "JPG",
+      "suffix": "_PRO"
+    }
+  ],
+  "errors": []
+}
+```
+
+### `POST /exports/run`
+
+Real. Lanza una exportacion en segundo plano usando `flatshot.application.export_runner.ExportRunner`.
+
+Devuelve `202` con el estado inicial del job:
+
+```json
+{
+  "ok": true,
+  "jobId": "abc123",
+  "status": "running",
+  "sourceImages": 1,
+  "totalOutputs": 1,
+  "progress": {
+    "processed": 0,
+    "total": 1,
+    "percent": 0
+  },
+  "destinations": ["C:/ruta/a/carpeta/_SALIDA_PRO"]
+}
+```
+
+Notas:
+
+- solo acepta PNG en esta fase;
+- no borra ni mueve fuentes;
+- respeta `ExportRunner`, naming, sufijos, formatos, calidad y dimensiones existentes;
+- escribe en `_SALIDA_PRO` por defecto o en el destino personalizado indicado;
+- los jobs viven en memoria del proceso bridge de desarrollo.
+
+### `GET /exports/jobs/{jobId}`
+
+Real. Devuelve progreso y resultado del job.
+
+Estados posibles:
+
+- `queued`;
+- `running`;
+- `paused`;
+- `cancelling`;
+- `completed`;
+- `partial`;
+- `failed`;
+- `cancelled`.
+
+### `POST /exports/jobs/{jobId}/pause`
+
+Real. Pausa el job usando `PauseToken`.
+
+### `POST /exports/jobs/{jobId}/resume`
+
+Real. Reanuda el job pausado.
+
+### `POST /exports/jobs/{jobId}/cancel`
+
+Real. Solicita cancelacion usando `CancellationToken`.
+
 ## Errores JSON
 
 Las rutas desconocidas, metodos incorrectos e inputs invalidos devuelven errores controlados:
@@ -297,16 +404,16 @@ Las rutas desconocidas, metodos incorrectos e inputs invalidos devuelven errores
 
 No se devuelve traceback bruto en JSON.
 
-## Seguridad de APP.6
+## Seguridad de APP.7
 
-- Solo lectura.
 - No ejecuta comandos arbitrarios.
 - No borra, mueve ni modifica imagenes.
 - No escribe configuracion.
 - No guarda ni edita presets.
 - El selector de carpeta solo devuelve una ruta seleccionada por el usuario.
 - Expone preview de lectura para rutas solicitadas por la UI.
-- No expone exportacion.
+- Expone exportacion solo para rutas de imagen solicitadas por la UI.
+- La exportacion usa `ExportRunner`; no reimplementa motor ni naming en el bridge.
 - El servidor rechaza binds distintos de `127.0.0.1` o `localhost` desde el CLI.
 - CORS esta limitado a origenes locales de desarrollo del prototipo.
 
@@ -314,10 +421,7 @@ No se devuelve traceback bruto en JSON.
 
 - Tauri;
 - selector nativo Tauri de carpetas;
-- exportacion real;
-- progreso real;
 - cola;
-- pausa/reanudar/cancelar reales;
 - apertura real de carpeta de salida;
 - empaquetado Windows.
 - guardado/edicion real de presets.

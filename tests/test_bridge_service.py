@@ -1,10 +1,13 @@
 from pathlib import Path
 import base64
+from concurrent.futures import Future
+from time import sleep
 
 import pytest
 from PIL import Image
 
 from flatshot.application.config_paths import ConfigPathResolver
+from flatshot.application.export_runner import ExportRunner
 from flatshot.application.preset_service import PresetService
 from flatshot.bridge.errors import InvalidRequestError, error_response
 from flatshot.bridge.serialization import image_file_info_to_dict
@@ -21,6 +24,48 @@ def _service(config_dir: Path) -> FlatShotBridgeService:
     return FlatShotBridgeService(config_resolver=ConfigPathResolver(config_dir))
 
 
+class InlineExecutor:
+    def __init__(self, max_workers=1):
+        self.max_workers = max_workers
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.shutdown()
+
+    def submit(self, fn, arg):
+        future = Future()
+        try:
+            future.set_result(fn(arg))
+        except Exception as exc:
+            future.set_exception(exc)
+        return future
+
+    def shutdown(self, wait=True, cancel_futures=False):
+        return None
+
+
+def _export_runner_factory(**kwargs) -> ExportRunner:
+    return ExportRunner(**kwargs, executor_factory=InlineExecutor)
+
+
+def _export_service(config_dir: Path) -> FlatShotBridgeService:
+    return FlatShotBridgeService(
+        config_resolver=ConfigPathResolver(config_dir),
+        export_runner_factory=_export_runner_factory,
+    )
+
+
+def _wait_for_export(service: FlatShotBridgeService, job_id: str) -> dict:
+    for _ in range(50):
+        status = service.export_status(job_id)
+        if status["status"] in {"completed", "partial", "failed", "cancelled"}:
+            return status
+        sleep(0.02)
+    raise AssertionError("export job did not finish")
+
+
 def test_bridge_health_app_info_and_capabilities(tmp_path):
     service = _service(tmp_path / "missing-config")
 
@@ -35,8 +80,8 @@ def test_bridge_health_app_info_and_capabilities(tmp_path):
         "folderScan": True,
         "presetsRead": True,
         "previewRender": True,
-        "exportRun": False,
-        "exportProgress": False,
+        "exportRun": True,
+        "exportProgress": True,
         "nativeFolderPicker": False,
     }
 
@@ -302,6 +347,72 @@ def test_bridge_render_preview_rejects_unsupported_file(tmp_path):
         _service(tmp_path / "config").render_preview({"imagePath": str(item)})
 
     assert "Formato de imagen no soportado" in str(exc_info.value)
+
+
+def test_bridge_prepare_export_returns_real_plan(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    png = _png(source / "item.png")
+    service = _export_service(tmp_path / "config")
+
+    response = service.prepare_export(
+        {
+            "imagePaths": [str(png)],
+            "settings": {"opacity": 0, "blur": 0, "noise": 0},
+            "export": {
+                "format": "PNG",
+                "size": "8x8",
+                "destinationMode": "source",
+                "destinationValue": "_OUT",
+                "namingTemplate": "{original}{suffix}",
+            },
+        }
+    )
+
+    assert response["ok"] is True
+    assert response["sourceImages"] == 1
+    assert response["totalOutputs"] == 1
+    assert response["destinations"] == [(source / "_OUT").as_posix()]
+    assert response["activeVariants"][0]["label"] == "Web RGB230"
+
+
+def test_bridge_start_export_writes_output_and_reports_progress(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    png = _png(source / "item.png")
+    service = _export_service(tmp_path / "config")
+
+    started = service.start_export(
+        {
+            "imagePaths": [str(png)],
+            "settings": {"opacity": 0, "blur": 0, "noise": 0},
+            "export": {
+                "format": "PNG",
+                "size": "8x8",
+                "destinationMode": "source",
+                "destinationValue": "_OUT",
+                "namingTemplate": "{original}{suffix}",
+            },
+        }
+    )
+    final = _wait_for_export(service, started["jobId"])
+
+    assert final["status"] == "completed"
+    assert final["progress"] == {"processed": 1, "total": 1, "percent": 100}
+    assert final["result"]["success"] is True
+    assert (source / "_OUT" / "item_PRO.png").exists()
+
+
+def test_bridge_export_rejects_invalid_input(tmp_path):
+    with pytest.raises(InvalidRequestError):
+        _export_service(tmp_path / "config").prepare_export({"imagePaths": []})
+
+
+def test_bridge_export_unknown_job_returns_controlled_error(tmp_path):
+    with pytest.raises(Exception) as exc_info:
+        _export_service(tmp_path / "config").export_status("missing")
+
+    assert "Exportación no encontrada" in str(exc_info.value)
 
 
 def test_bridge_preview_code_does_not_import_pyqt():

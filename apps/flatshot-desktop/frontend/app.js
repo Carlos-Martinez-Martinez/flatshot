@@ -187,6 +187,10 @@ const state = {
   presetSource: "Mock",
   localOverride: false,
   exportStatus: "blocked",
+  exportJobId: null,
+  exportDestinations: [],
+  exportMessages: [],
+  exportPollTimer: null,
   destinationMode: "source",
   destinationValue: "_SALIDA_PRO",
   format: "JPG",
@@ -359,9 +363,6 @@ function validationIssues() {
   if (exportableImages().length === 0 && state.batch === "ready") {
     issues.push({ level: "error", title: "Sin imágenes exportables", detail: "Revisa los errores." });
   }
-  if (isBridgeBatch() && state.batch === "ready") {
-    issues.push({ level: "warning", title: "Exportación real pendiente", detail: "APP.7 conectará el proceso real." });
-  }
   if (!state.naming.trim()) {
     issues.push({ level: "error", title: "Naming vacío", detail: "Define una plantilla." });
   }
@@ -379,6 +380,7 @@ function isExportReady() {
 
 function setScenario(scenario) {
   clearTimers();
+  clearBridgeExportPoll();
   Object.assign(state, {
     scenario,
     batch: "ready",
@@ -388,6 +390,9 @@ function setScenario(scenario) {
     previewData: null,
     previewError: "",
     exportStatus: "ready",
+    exportJobId: null,
+    exportDestinations: [],
+    exportMessages: [],
     destinationMode: "source",
     destinationValue: "_SALIDA_PRO",
     progress: 0,
@@ -500,6 +505,7 @@ function loadBatch() {
   }
 
   clearTimers();
+  clearBridgeExportPoll();
   Object.assign(state, {
     scenario: "batch-ready",
     batch: "scanning",
@@ -545,6 +551,7 @@ function loadMockBatch() {
 }
 
 function clearBatch() {
+  clearBridgeExportPoll();
   setScenario("initial");
 }
 
@@ -696,17 +703,166 @@ function startExport(options = {}) {
     return;
   }
 
+  if (isBridgeBatch()) {
+    void startBridgeExport();
+    return;
+  }
+
   Object.assign(state, {
     scenario: options.keepScenario ? "export-running" : state.scenario,
     exportStatus: "running",
     progress: 0,
     processed: 0,
+    exportJobId: null,
+    exportDestinations: [],
+    exportMessages: [],
     errors: [],
     paused: false,
     statusText: "Preparando exportación",
   });
   render();
   scheduleExportStep();
+}
+
+async function startBridgeExport() {
+  clearBridgeExportPoll();
+  Object.assign(state, {
+    exportStatus: "running",
+    progress: 0,
+    processed: 0,
+    exportJobId: null,
+    exportDestinations: [],
+    exportMessages: [],
+    errors: [],
+    paused: false,
+    statusText: "Preparando exportación",
+  });
+  render();
+
+  try {
+    const response = await bridgeRequest("/exports/run", {
+      method: "POST",
+      body: JSON.stringify(bridgeExportPayload()),
+      timeoutMs: 10000,
+    });
+    applyBridgeExportStatus(response);
+    render();
+    scheduleBridgeExportPoll();
+  } catch (error) {
+    const message = bridgeErrorMessage(error);
+    Object.assign(state, {
+      exportStatus: "failed",
+      progress: 0,
+      processed: 0,
+      errors: [{ level: "error", title: "Exportación fallida", detail: message }],
+      statusText: "Exportación fallida",
+    });
+    render();
+  }
+}
+
+function bridgeExportPayload() {
+  return {
+    imagePaths: exportableImages()
+      .filter((image) => image.source === "bridge" && image.path)
+      .map((image) => image.path),
+    presetName: state.activePreset,
+    settings: bridgePreviewSettings(),
+    export: {
+      format: state.format,
+      size: state.size,
+      background: state.background,
+      destinationMode: state.destinationMode,
+      destinationValue: state.destinationValue,
+      outputFolderName: state.destinationMode === "source" ? state.destinationValue : "_SALIDA_PRO",
+      customOutputPath: state.destinationMode === "custom" ? state.destinationValue : "",
+      namingTemplate: state.naming,
+      suffix: "_PRO",
+    },
+  };
+}
+
+function scheduleBridgeExportPoll() {
+  clearBridgeExportPoll();
+  if (!state.exportJobId || !["running", "paused", "cancelling"].includes(state.exportStatus)) {
+    return;
+  }
+  state.exportPollTimer = window.setTimeout(async () => {
+    state.exportPollTimer = null;
+    try {
+      const response = await bridgeRequest(`/exports/jobs/${encodeURIComponent(state.exportJobId)}`, {
+        timeoutMs: 5000,
+      });
+      applyBridgeExportStatus(response);
+      render();
+      scheduleBridgeExportPoll();
+    } catch (error) {
+      const message = bridgeErrorMessage(error);
+      Object.assign(state, {
+        exportStatus: "failed",
+        paused: false,
+        errors: [{ level: "error", title: "Progreso no disponible", detail: message }],
+        statusText: "Progreso no disponible",
+      });
+      render();
+    }
+  }, 450);
+}
+
+function clearBridgeExportPoll() {
+  if (state.exportPollTimer) {
+    window.clearTimeout(state.exportPollTimer);
+    state.exportPollTimer = null;
+  }
+}
+
+function applyBridgeExportStatus(payload) {
+  state.exportJobId = payload.jobId || state.exportJobId;
+  state.exportDestinations = Array.isArray(payload.destinations) ? payload.destinations : state.exportDestinations;
+  state.exportMessages = Array.isArray(payload.messages) ? payload.messages : state.exportMessages;
+  state.progress = Number(payload.progress?.percent) || 0;
+  state.processed = Number(payload.progress?.processed) || 0;
+  state.paused = payload.status === "paused";
+
+  if (payload.status === "completed") {
+    state.exportStatus = "completed";
+    state.progress = 100;
+    state.statusText = `Exportación completada · ${state.processed}/${payload.progress?.total || state.processed}`;
+  } else if (payload.status === "partial") {
+    state.exportStatus = "partial";
+    state.progress = Number(payload.progress?.percent) || 100;
+    state.statusText = "Exportación con avisos";
+  } else if (payload.status === "failed" || payload.status === "cancelled") {
+    state.exportStatus = "failed";
+    state.paused = false;
+    state.statusText = payload.status === "cancelled" ? "Exportación cancelada" : "Exportación fallida";
+  } else if (payload.status === "paused") {
+    state.exportStatus = "running";
+    state.statusText = "Pausado";
+  } else if (payload.status === "cancelling") {
+    state.exportStatus = "running";
+    state.statusText = "Deteniendo...";
+  } else {
+    state.exportStatus = "running";
+    state.statusText = `Procesando ${state.processed}/${payload.progress?.total || "..."}`;
+  }
+
+  const failedItems = (payload.completedItems || []).filter((item) => !item.success);
+  if (["partial", "failed", "cancelled"].includes(payload.status) || failedItems.length) {
+    const messageItems = (payload.messages || []).slice(-4).map((message) => ({
+      level: payload.status === "partial" ? "warning" : "error",
+      title: "Exportación",
+      detail: message,
+    }));
+    const itemErrors = failedItems.slice(-4).map((item) => ({
+      level: "error",
+      title: item.name || "Imagen",
+      detail: "No se pudo exportar.",
+    }));
+    state.errors = [...itemErrors, ...messageItems];
+  } else {
+    state.errors = [];
+  }
 }
 
 function scheduleExportStep() {
@@ -741,6 +897,10 @@ function pauseExport() {
   if (state.exportStatus !== "running") {
     return;
   }
+  if (isBridgeBatch() && state.exportJobId) {
+    void controlBridgeExport(state.paused ? "resume" : "pause");
+    return;
+  }
   state.paused = !state.paused;
   state.statusText = state.paused ? "Pausado" : `Procesando ${state.processed}/${exportableImages().length}`;
   render();
@@ -750,7 +910,12 @@ function stopExport() {
   if (state.exportStatus !== "running") {
     return;
   }
+  if (isBridgeBatch() && state.exportJobId) {
+    void controlBridgeExport("cancel");
+    return;
+  }
   clearTimers();
+  clearBridgeExportPoll();
   Object.assign(state, {
     exportStatus: "failed",
     paused: false,
@@ -758,6 +923,26 @@ function stopExport() {
     statusText: "Exportación fallida",
   });
   render();
+}
+
+async function controlBridgeExport(action) {
+  if (!state.exportJobId) {
+    return;
+  }
+  try {
+    const response = await bridgeRequest(`/exports/jobs/${encodeURIComponent(state.exportJobId)}/${action}`, {
+      method: "POST",
+      body: JSON.stringify({}),
+      timeoutMs: 5000,
+    });
+    applyBridgeExportStatus(response);
+  } catch (error) {
+    const message = bridgeErrorMessage(error);
+    state.errors = [{ level: "error", title: "Control no disponible", detail: message }];
+    state.statusText = "Control no disponible";
+  }
+  render();
+  scheduleBridgeExportPoll();
 }
 
 function reviewErrors() {
@@ -1021,6 +1206,7 @@ async function scanBridgeFolder() {
   }
 
   clearTimers();
+  clearBridgeExportPoll();
   Object.assign(state, {
     batch: "scanning",
     batchSource: "bridge",
@@ -1031,6 +1217,9 @@ async function scanBridgeFolder() {
     exportStatus: "blocked",
     progress: 0,
     processed: 0,
+    exportJobId: null,
+    exportDestinations: [],
+    exportMessages: [],
     errors: [],
     filter: "all",
     search: "",
@@ -1247,6 +1436,9 @@ function capabilitiesSummary(capabilities) {
   if (capabilities.previewRender) {
     available.push("preview");
   }
+  if (capabilities.exportRun) {
+    available.push("export");
+  }
   return available.length ? available.join(" · ") : "Sin capacidades activas";
 }
 
@@ -1263,11 +1455,6 @@ function primaryAction() {
   }
   if (state.exportStatus === "completed" || state.exportStatus === "partial") {
     clearBatch();
-    return;
-  }
-  if (isBridgeBatch()) {
-    state.statusText = "Exportación real pendiente";
-    render();
     return;
   }
   startExport();
@@ -1913,9 +2100,9 @@ function renderExport() {
   const outputCount = exportable;
   const ready = isExportReady();
   const destinationText = state.destinationMode === "custom" ? state.destinationValue || "Sin configurar" : `origen / ${state.destinationValue}`;
-  const statusText = isBridgeBatch() ? "Salida pendiente" : ready ? "Lista" : "No lista";
+  const statusText = ready ? "Lista" : "No lista";
 
-  $("#export-readiness").textContent = isBridgeBatch() ? "Salida pendiente" : exportStatusLabel(ready);
+  $("#export-readiness").textContent = exportStatusLabel(ready);
   $("#export-count").textContent = `${outputCount} archivos`;
   $("#export-count").classList.toggle("dirty", !ready);
 
@@ -1947,9 +2134,6 @@ function exportStatusLabel(ready) {
   }
   if (state.exportStatus === "failed") {
     return "Fallida";
-  }
-  if (isBridgeBatch()) {
-    return "Salida pendiente";
   }
   return ready ? "Lista" : "Configura exportación";
 }
@@ -2001,13 +2185,10 @@ function renderFooter() {
 
   const primaryButtons = [$("#primary-action"), $("#top-primary-action")].filter(Boolean);
   const primaryDisabled = state.exportStatus === "running"
-    || isBridgeBatch()
     || (hasBatch() && !ready && validationIssues().some((issue) => issue.level === "error"));
   let primaryText = "";
   if (!hasBatch()) {
     primaryText = "Seleccionar carpeta";
-  } else if (isBridgeBatch()) {
-    primaryText = "Salida pendiente";
   } else if (state.exportStatus === "completed" || state.exportStatus === "partial") {
     primaryText = "Nuevo lote";
   } else if (!ready) {

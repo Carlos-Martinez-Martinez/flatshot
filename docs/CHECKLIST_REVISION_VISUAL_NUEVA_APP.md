@@ -50,7 +50,7 @@ Usar antes de cerrar cada tanda visual de la nueva app.
 - [ ] La primera imagen real queda seleccionada.
 - [ ] La preview muestra estado claro para imagen real.
 - [ ] La preview muestra nombre y ruta de la imagen real.
-- [ ] La exportacion queda marcada como no conectada.
+- [ ] La salida queda disponible en la pestaña `Salida`.
 - [ ] Una carpeta vacia muestra `No se encontraron PNG`.
 - [ ] Una ruta invalida muestra error controlado.
 - [ ] Una ruta vacia muestra `Ruta vacia`.
@@ -83,7 +83,7 @@ Usar antes de cerrar cada tanda visual de la nueva app.
 - [ ] Los warnings se muestran sin invadir.
 - [ ] Los errores de preview son claros.
 - [ ] Modo mock sigue funcionando.
-- [ ] Exportación sigue marcada como no conectada.
+- [ ] Exportación real sigue disponible en `Salida`.
 
 ## APP.6 — Presets y ajustes reales
 
@@ -98,7 +98,25 @@ Usar antes de cerrar cada tanda visual de la nueva app.
 - [ ] `Reset` vuelve al preset activo.
 - [ ] `Guardar preset` queda claramente pendiente en Bridge.
 - [ ] Modo mock sigue funcionando.
-- [ ] Exportación sigue marcada como no conectada.
+- [ ] Exportación real sigue disponible y no cambia al ajustar presets.
+
+## APP.7 — Exportación real y progreso
+
+- [ ] `run_dev.py --open` arranca frontend y bridge.
+- [ ] Bridge conecta correctamente.
+- [ ] Se escanea una carpeta real con PNG.
+- [ ] La pestaña `Salida` muestra formato, tamaño, destino, naming y total.
+- [ ] El botón principal muestra `Exportar N`.
+- [ ] Al exportar aparece `Preparando exportación`.
+- [ ] La barra de progreso avanza con datos reales del bridge.
+- [ ] `Pausar` pausa el job y `Reanudar` continúa.
+- [ ] `Detener` solicita cancelación sin romper la UI.
+- [ ] Al completar, aparecen archivos en `_SALIDA_PRO` o destino configurado.
+- [ ] Los nombres generados conservan el sufijo esperado.
+- [ ] Exportar a destino personalizado funciona si se configura ruta válida.
+- [ ] Un destino inválido muestra error claro.
+- [ ] Modo mock sigue simulando exportación sin bridge.
+- [ ] No hay scroll global ni horizontal durante progreso.
 
 ## UX/UI principal — Saneamiento crítico
 

@@ -4,8 +4,8 @@ Prototipo navegable de la nueva app moderna de FlatShot.
 
 Estado actual:
 
-- APP.6 completada como presets y ajustes reales conectados a la preview.
-- Saneamiento UX/UI de pantalla principal aplicado antes de APP.7.
+- APP.7 completada como exportación real con progreso por bridge local.
+- Saneamiento UX/UI de pantalla principal aplicado antes de conectar exportación real.
 - Frontend estático en HTML/CSS/JS vanilla.
 - Sin `package.json`, Tauri, Rust, Node obligatorio ni dependencias nuevas.
 - Bridge HTTP local de desarrollo en Python.
@@ -15,6 +15,7 @@ Estado actual:
 - Preview real de PNG seleccionados usando `PreviewService`.
 - Lectura real de presets desde el servicio Python.
 - Presets y ajustes principales/avanzados aplicados a la preview real.
+- Exportación real usando `ExportRunner`, sin cambiar naming ni output.
 - La app PyQt legacy sigue intacta.
 
 ## Probar visualmente la nueva app
@@ -117,8 +118,9 @@ Esto llama a:
 - `POST /folders/pick`, si usas `Seleccionar carpeta`;
 - `POST /folders/scan`.
 - `POST /preview/render`.
+- `POST /exports/run` y `GET /exports/jobs/{jobId}` al exportar.
 
-El panel de lote se actualiza con carpetas, imagenes, contadores y errores reales del bridge. La preview real se genera en Python al seleccionar imagen. Los presets reales actualizan la preview. Exportacion sigue sin motor real.
+El panel de lote se actualiza con carpetas, imagenes, contadores y errores reales del bridge. La preview real se genera en Python al seleccionar imagen. Los presets reales actualizan la preview. La exportacion se ejecuta con el runner Python existente.
 
 ## Probar APP.4 — Escaneo real de carpetas
 
@@ -144,7 +146,7 @@ Debe verse:
 - primera imagen seleccionada automaticamente;
 - preview central con imagen real o estado de carga;
 - ruta de la imagen seleccionada;
-- exportacion marcada como no conectada.
+- salida disponible en la pestaña `Salida`.
 
 Para probar carpeta vacia:
 
@@ -165,12 +167,10 @@ Para volver a mock:
 1. Abrir `Debug` y cambiar `Modo` a `Mock`, o usar el selector `Demo`.
 2. Pulsar `Lote mock` o elegir un escenario de `Revisión`.
 
-Sigue siendo simulado:
+Sigue sin conectarse:
 
 - selector nativo Tauri de carpetas;
-- ajustes aplicados por motor;
-- exportacion real;
-- progreso real.
+- apertura real de carpeta de salida desde shell nativo.
 
 ## Revisión visual APP.4.5
 
@@ -190,7 +190,7 @@ Revisar:
 - controles de revisión plegados por defecto;
 - escaneo real visible en el flujo principal;
 - preview real clara;
-- exportación real marcada como no conectada.
+- exportación real disponible desde `Salida`.
 
 ## Probar APP.5 — Preview real
 
@@ -220,12 +220,11 @@ Para reconocer errores:
 - una ruta de preview no soportada devuelve error controlado desde el bridge;
 - no aparece traceback en la UI.
 
-Sigue siendo mock o no conectado:
+Sigue sin conectarse:
 
 - selector nativo Tauri de carpetas;
 - comparación/original de preview real;
-- exportacion real;
-- progreso real.
+- apertura real de carpeta de salida desde shell nativo.
 
 ## Revisión UX/UI pantalla principal
 
@@ -296,8 +295,39 @@ Sigue sin conectarse:
 
 - guardado/edición real de presets;
 - ajustes por imagen reales;
-- exportacion real;
-- progreso real.
+- apertura real de carpeta de salida desde shell nativo.
+
+## Probar APP.7 — Exportación real y progreso
+
+1. Arrancar la app:
+
+   ```bash
+   python apps/flatshot-desktop/run_dev.py --open
+   ```
+
+2. Abrir `Debug`, cambiar `Modo` a `Bridge local` y pulsar `Comprobar bridge`.
+3. Escanear una carpeta real con PNG.
+4. Abrir la pestaña `Salida`.
+5. Revisar formato, tamaño, destino y naming.
+6. Pulsar `Exportar lote`.
+7. Esperar progreso en la barra inferior.
+
+Debe verse:
+
+- botón principal `Exportar N`;
+- estado `Preparando exportación` y luego `Procesando x/y`;
+- barra de progreso real;
+- `Exportación completada` al terminar;
+- archivos generados en `_SALIDA_PRO` o en el destino configurado;
+- errores parciales si el runner devuelve fallos.
+
+Notas:
+
+- el bridge usa `ExportRunner`;
+- no se modifica el motor de exportación;
+- no se cambia naming, formato, calidad ni comportamiento de salida;
+- `Pausar`, `Reanudar` y `Detener` llaman al job local del bridge;
+- `Abrir destino` sigue pendiente de integración nativa Tauri.
 
 ### Feedback visual recomendado
 
@@ -350,8 +380,6 @@ Todavía no existe:
 
 - Tauri;
 - selector nativo Tauri de carpetas;
-- exportación real;
-- progreso real;
 - presets editables/guardables;
 - configuración persistente completa;
 - apertura real de carpeta de salida.
@@ -403,10 +431,10 @@ Esto llama a:
 - `POST /folders/scan`.
 - `POST /preview/render`.
 
-El listado de imágenes puede venir de una carpeta real. La preview se genera con Python. Presets y ajustes de sombra se envían como settings reales al bridge; exportación sigue sin conectar.
+El listado de imágenes puede venir de una carpeta real. La preview se genera con Python. Presets y ajustes de sombra se envían como settings reales al bridge. La exportación se lanza por bridge con progreso consultable.
 
 ## Siguiente paso
 
-APP.7 — Exportación real y progreso.
+APP.8 — Gestión de errores y resultados.
 
-La siguiente tanda debe preparar exportación real y progreso, manteniendo todavía fuera Tauri y empaquetado.
+La siguiente tanda debe mejorar la presentación de resultados, errores por imagen, destinos y recuperación tras fallos, manteniendo todavía fuera Tauri y empaquetado.

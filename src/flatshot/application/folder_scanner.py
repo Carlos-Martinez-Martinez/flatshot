@@ -4,8 +4,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterable
 
-from flatshot.application.contracts import BatchScanResult, FolderScanResult, ImageFileInfo
+from PIL import Image, UnidentifiedImageError
+
+from flatshot.application.contracts import BatchScanResult, FolderScanResult, ImageFileInfo, OmittedScanItem
 from flatshot.core.overrides import has_image_override, override_key
+
+SUPPORTED_IMAGE_SUFFIXES = {".png"}
 
 
 class FolderScanner:
@@ -20,6 +24,11 @@ class FolderScanner:
         folder_results = [self._scan_folder(Path(folder), overrides) for folder in folders]
         errors = [error for result in folder_results for error in result.errors]
         total_images = sum(len(result.images) for result in folder_results)
+        total_files = sum(result.files_found for result in folder_results)
+        omitted_items = [item for result in folder_results for item in result.omitted]
+        omitted_by_reason: dict[str, int] = {}
+        for item in omitted_items:
+            omitted_by_reason[item.reason] = omitted_by_reason.get(item.reason, 0) + 1
         adjusted_images = sum(
             1
             for result in folder_results
@@ -33,6 +42,9 @@ class FolderScanner:
             total_images=total_images,
             adjusted_images=adjusted_images,
             errors=errors,
+            total_files=total_files,
+            total_omitted=len(omitted_items),
+            omitted_by_reason=omitted_by_reason,
         )
 
     def _scan_folder(self, folder: Path, image_overrides: dict) -> FolderScanResult:
@@ -57,7 +69,7 @@ class FolderScanner:
             )
 
         try:
-            image_paths = sorted(folder.glob("*.png"), key=lambda path: path.name.lower())
+            entries = sorted(folder.iterdir(), key=lambda path: path.name.lower())
         except OSError as exc:
             return FolderScanResult(
                 folder=folder,
@@ -66,6 +78,53 @@ class FolderScanner:
                 errors=[f"No se pudo leer la carpeta {folder}: {exc}"],
             )
 
+        files_found = 0
+        image_paths: list[Path] = []
+        omitted: list[OmittedScanItem] = []
+
+        for entry in entries:
+            if entry.is_dir():
+                omitted.append(
+                    OmittedScanItem(
+                        path=entry,
+                        name=entry.name,
+                        reason="subfolder_not_scanned",
+                        detail="Subcarpeta no escaneada",
+                    )
+                )
+                continue
+
+            if not entry.is_file():
+                continue
+
+            files_found += 1
+            suffix = entry.suffix.lower()
+            if suffix not in SUPPORTED_IMAGE_SUFFIXES:
+                omitted.append(
+                    OmittedScanItem(
+                        path=entry,
+                        name=entry.name,
+                        suffix=entry.suffix,
+                        reason="unsupported_extension",
+                        detail=f"Extensión no admitida: {entry.suffix or 'sin extensión'}",
+                    )
+                )
+                continue
+
+            if not self._is_readable_png(entry):
+                omitted.append(
+                    OmittedScanItem(
+                        path=entry,
+                        name=entry.name,
+                        suffix=entry.suffix,
+                        reason="read_error",
+                        detail="No se pudo leer como PNG válido",
+                    )
+                )
+                continue
+
+            image_paths.append(entry)
+
         images = [self._image_info(path, image_overrides, errors) for path in image_paths]
         return FolderScanResult(
             folder=folder,
@@ -73,6 +132,8 @@ class FolderScanner:
             is_dir=True,
             images=images,
             errors=errors,
+            files_found=files_found,
+            omitted=omitted,
         )
 
     def _image_info(self, path: Path, image_overrides: dict, errors: list[str]) -> ImageFileInfo:
@@ -91,3 +152,12 @@ class FolderScanner:
             size_bytes=size_bytes,
             has_local_override=has_image_override(image_overrides.get(local_key, {})),
         )
+
+    @staticmethod
+    def _is_readable_png(path: Path) -> bool:
+        try:
+            with Image.open(path) as image:
+                image.verify()
+            return True
+        except (OSError, UnidentifiedImageError):
+            return False

@@ -93,7 +93,9 @@ def test_bridge_http_scan_folder(tmp_path):
         status, data = request_json(port, "POST", "/folders/scan", {"folders": [str(source)]})
 
     assert status == 200
+    assert data["totalFiles"] == 1
     assert data["totalImages"] == 1
+    assert data["totalOmitted"] == 0
     assert data["folders"][0]["images"][0]["path"] == png.as_posix()
 
 

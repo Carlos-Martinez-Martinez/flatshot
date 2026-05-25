@@ -145,11 +145,30 @@ Response:
           "hasLocalOverride": false
         }
       ],
+      "filesFound": 42,
+      "validImages": 28,
+      "omittedCount": 14,
+      "omitted": [
+        {
+          "path": "C:/ruta/a/carpeta/foto.jpg",
+          "name": "foto.jpg",
+          "suffix": ".jpg",
+          "reason": "unsupported_extension",
+          "detail": "Extensión no admitida: .jpg"
+        }
+      ],
       "errors": []
     }
   ],
   "totalFolders": 1,
-  "totalImages": 1,
+  "totalImages": 28,
+  "totalFiles": 42,
+  "totalOmitted": 14,
+  "omittedByReason": {
+    "unsupported_extension": 8,
+    "read_error": 3,
+    "subfolder_not_scanned": 3
+  },
   "adjustedImages": 0,
   "errors": []
 }

@@ -99,6 +99,23 @@ Usar antes de cerrar cada tanda visual de la nueva app.
 - [ ] Modo mock sigue funcionando.
 - [ ] Exportación sigue marcada como no conectada.
 
+## UX/UI principal — Saneamiento crítico
+
+- [ ] La imagen seleccionada se ve completa por defecto.
+- [ ] `Ajustar` es el modo visual inicial del visor.
+- [ ] Una carpeta con muchas PNG muestra todas las válidas.
+- [ ] El diagnóstico muestra archivos encontrados, válidos y omitidos.
+- [ ] Las omisiones tienen motivo visible.
+- [ ] No hay scroll vertical global.
+- [ ] No hay scroll horizontal.
+- [ ] El header normal no muestra URL, capabilities ni última respuesta técnica.
+- [ ] `Debug` contiene modo mock/bridge y datos técnicos.
+- [ ] El lote muestra miniaturas compactas.
+- [ ] El inspector separa `Ajustes` y `Salida`.
+- [ ] La barra inferior no duplica todos los estados.
+- [ ] El inspector puede ocultarse y el visor gana espacio.
+- [ ] Exportación se comunica como `Salida pendiente` si aún no está conectada.
+
 ## Feedback a revisar
 
 - [ ] Jerarquía visual.

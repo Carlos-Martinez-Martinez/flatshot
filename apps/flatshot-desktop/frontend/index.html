@@ -25,24 +25,45 @@
           </div>
 
           <div class="top-actions">
-            <label class="mode-switcher">
-              <span>Modo</span>
-              <select id="app-mode" aria-label="Modo de datos">
-                <option value="mock">Mock</option>
-                <option value="bridge">Bridge local</option>
-              </select>
-            </label>
-            <button type="button" data-action="check-bridge">Comprobar bridge</button>
             <span class="bridge-chip idle" id="bridge-status">Mock</span>
-            <button type="button" data-action="clear-batch">Limpiar lote</button>
+            <button type="button" class="primary top-export" id="top-primary-action" data-action="primary">Exportar lote</button>
+            <button type="button" data-action="toggle-inspector">Ajustes</button>
+            <details class="debug-panel" id="debug-panel">
+              <summary>Debug</summary>
+              <div class="debug-content">
+                <label class="mode-switcher">
+                  <span>Modo</span>
+                  <select id="app-mode" aria-label="Modo de datos">
+                    <option value="mock">Mock</option>
+                    <option value="bridge">Bridge local</option>
+                  </select>
+                </label>
+                <button type="button" data-action="check-bridge">Comprobar bridge</button>
+                <button type="button" data-action="clear-batch">Limpiar lote</button>
+                <button type="button" data-action="load-mock-batch">Lote mock</button>
+                <label class="text-field compact-field">
+                  <span>URL bridge</span>
+                  <input id="bridge-url" type="url" value="http://127.0.0.1:8765" />
+                </label>
+                <div class="dev-status-strip" aria-live="polite">
+                  <span><strong>Modo</strong><em id="dev-mode-label">Mock</em></span>
+                  <span><strong>Bridge</strong><em id="dev-bridge-label">No activo</em></span>
+                  <span><strong>URL</strong><em id="dev-bridge-url-label">http://127.0.0.1:8765</em></span>
+                  <span><strong>Última respuesta</strong><em id="dev-last-response">Mock activo</em></span>
+                </div>
+                <div class="bridge-meta debug-meta">
+                  <div>
+                    <span>Última respuesta</span>
+                    <strong id="bridge-last-response">Sin comprobar</strong>
+                  </div>
+                  <div>
+                    <span>Capabilities</span>
+                    <strong id="bridge-capabilities">Sin comprobar</strong>
+                  </div>
+                </div>
+              </div>
+            </details>
           </div>
-        </div>
-
-        <div class="dev-status-strip" aria-live="polite">
-          <span><strong>Modo</strong><em id="dev-mode-label">Mock</em></span>
-          <span><strong>Bridge</strong><em id="dev-bridge-label">No activo</em></span>
-          <span><strong>URL</strong><em id="dev-bridge-url-label">http://127.0.0.1:8765</em></span>
-          <span><strong>Última respuesta</strong><em id="dev-last-response">Mock activo</em></span>
         </div>
       </header>
 
@@ -59,46 +80,26 @@
           <div class="source-panel" id="source-panel">
             <div class="source-panel-heading">
               <div>
-                <strong>Añadir carpeta</strong>
+                <strong id="source-title">Selecciona una carpeta</strong>
                 <span id="scan-status">Pega una ruta o usa lote mock.</span>
               </div>
-              <span class="state-chip" id="scan-source-badge">Origen: Mock</span>
+              <span class="state-chip" id="scan-source-badge">Sin lote</span>
             </div>
-            <label class="text-field">
-              <span>Ruta manual</span>
-              <input id="bridge-scan-path" type="text" placeholder="C:/ruta/lote" />
-            </label>
             <div class="button-row">
-              <button type="button" id="bridge-pick-folder" data-action="pick-bridge-folder">Seleccionar carpeta</button>
+              <button type="button" class="primary" id="bridge-pick-folder" data-action="pick-bridge-folder">Seleccionar carpeta</button>
               <button type="button" id="bridge-scan-folder" data-action="scan-bridge-folder">Escanear</button>
-              <button type="button" data-action="check-bridge">Comprobar bridge</button>
-              <button type="button" class="secondary" data-action="load-mock-batch">Lote mock</button>
             </div>
+            <details class="manual-path-panel">
+              <summary>Ruta manual</summary>
+              <label class="text-field">
+                <span>Carpeta</span>
+                <input id="bridge-scan-path" type="text" placeholder="C:/ruta/lote" />
+              </label>
+            </details>
             <div class="bridge-message" id="bridge-message">Modo mock activo.</div>
           </div>
 
           <div class="batch-summary" id="batch-summary" aria-live="polite"></div>
-
-          <div class="bridge-panel" id="bridge-panel">
-            <div class="bridge-panel-heading">
-              <strong>Bridge local</strong>
-              <span id="bridge-panel-status">Desconectado</span>
-            </div>
-            <label class="text-field compact-field">
-              <span>URL bridge</span>
-              <input id="bridge-url" type="url" value="http://127.0.0.1:8765" />
-            </label>
-            <div class="bridge-meta">
-              <div>
-                <span>Última respuesta</span>
-                <strong id="bridge-last-response">Sin comprobar</strong>
-              </div>
-              <div>
-                <span>Capabilities</span>
-                <strong id="bridge-capabilities">Sin comprobar</strong>
-              </div>
-            </div>
-          </div>
 
           <label class="search-field">
             <span>Buscar</span>
@@ -170,6 +171,8 @@
                 <button type="button" data-preview-mode="compare">Comparar</button>
               </div>
               <div class="zoom-controls" aria-label="Zoom">
+                <button type="button" data-action="zoom-fit">Ajustar</button>
+                <button type="button" data-action="zoom-100">100%</button>
                 <button type="button" data-action="zoom-out" aria-label="Reducir zoom">-</button>
                 <span id="zoom-label">100%</span>
                 <button type="button" data-action="zoom-in" aria-label="Aumentar zoom">+</button>
@@ -193,7 +196,12 @@
         </section>
 
         <aside class="settings-panel" aria-label="Ajustes y exportación">
-          <section class="settings-section">
+          <div class="inspector-tabs segmented compact" aria-label="Inspector">
+            <button type="button" data-inspector-tab="adjustments">Ajustes</button>
+            <button type="button" data-inspector-tab="output">Salida</button>
+          </div>
+
+          <section class="settings-section" data-inspector-section="adjustments">
             <div class="section-title">
               <div>
                 <span class="eyebrow">Preset</span>
@@ -209,7 +217,7 @@
             </div>
           </section>
 
-          <section class="settings-section">
+          <section class="settings-section" data-inspector-section="adjustments">
             <div class="section-title">
               <div>
                 <span class="eyebrow">Aspecto</span>
@@ -294,7 +302,7 @@
             </div>
           </section>
 
-          <section class="settings-section export-section">
+          <section class="settings-section export-section" data-inspector-section="output">
             <div class="section-title">
               <div>
                 <span class="eyebrow">Exportación</span>

@@ -129,11 +129,14 @@ def test_bridge_scan_empty_folder(tmp_path):
     response = _service(tmp_path / "config").scan_folders({"folders": [str(tmp_path)]})
 
     assert response["totalFolders"] == 1
+    assert response["totalFiles"] == 0
     assert response["totalImages"] == 0
+    assert response["totalOmitted"] == 0
     assert response["adjustedImages"] == 0
     assert response["folders"][0]["exists"] is True
     assert response["folders"][0]["isDir"] is True
     assert response["folders"][0]["images"] == []
+    assert response["folders"][0]["omitted"] == []
     assert response["errors"] == []
 
 
@@ -145,10 +148,39 @@ def test_bridge_scan_folder_with_png(tmp_path):
     response = _service(tmp_path / "config").scan_folders({"folders": [str(tmp_path)]})
 
     assert response["totalFolders"] == 1
+    assert response["totalFiles"] == 3
     assert response["totalImages"] == 2
+    assert response["totalOmitted"] == 1
+    assert response["omittedByReason"] == {"unsupported_extension": 1}
     assert [image["name"] for image in response["folders"][0]["images"]] == ["a.png", "b.png"]
     assert response["folders"][0]["images"][1]["path"] == png.as_posix()
     assert response["folders"][0]["images"][1]["sizeBytes"] > 0
+    assert response["folders"][0]["omitted"][0]["name"] == "notes.txt"
+
+
+def test_bridge_scan_reports_omitted_items(tmp_path):
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    _png(nested / "inside.png")
+    (tmp_path / "broken.png").write_bytes(b"broken")
+    (tmp_path / "photo.jpg").write_bytes(b"not supported")
+
+    response = _service(tmp_path / "config").scan_folders({"folders": [str(tmp_path)]})
+
+    assert response["totalFiles"] == 2
+    assert response["totalImages"] == 0
+    assert response["totalOmitted"] == 3
+    assert response["omittedByReason"] == {
+        "read_error": 1,
+        "subfolder_not_scanned": 1,
+        "unsupported_extension": 1,
+    }
+    reasons = {item["name"]: item["reason"] for item in response["folders"][0]["omitted"]}
+    assert reasons == {
+        "broken.png": "read_error",
+        "nested": "subfolder_not_scanned",
+        "photo.jpg": "unsupported_extension",
+    }
 
 
 def test_bridge_scan_missing_folder_returns_partial_error(tmp_path):

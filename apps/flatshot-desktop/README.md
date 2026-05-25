@@ -5,11 +5,13 @@ Prototipo navegable de la nueva app moderna de FlatShot.
 Estado actual:
 
 - APP.6 completada como presets y ajustes reales conectados a la preview.
+- Saneamiento UX/UI de pantalla principal aplicado antes de APP.7.
 - Frontend estático en HTML/CSS/JS vanilla.
 - Sin `package.json`, Tauri, Rust, Node obligatorio ni dependencias nuevas.
 - Bridge HTTP local de desarrollo en Python.
 - Escaneo real de carpetas por ruta manual usando servicios existentes.
 - Selector local de carpeta para desarrollo usando el bridge Python.
+- Diagnóstico de escaneo: archivos encontrados, imágenes válidas y omitidas.
 - Preview real de PNG seleccionados usando `PreviewService`.
 - Lectura real de presets desde el servicio Python.
 - Presets y ajustes principales/avanzados aplicados a la preview real.
@@ -136,6 +138,7 @@ Debe verse:
 
 - `Origen: Bridge local`;
 - contador de carpetas e imagenes reales;
+- diagnóstico de archivos válidos y omitidos;
 - lista de carpetas con estado;
 - lista de imagenes devuelta por `/folders/scan`;
 - primera imagen seleccionada automaticamente;
@@ -209,7 +212,7 @@ Debe verse:
 - imagen real en el panel central;
 - metadatos de dimensiones y tiempo de render;
 - `Preview real` o `Preview real con aviso`;
-- exportacion marcada como no conectada.
+- salida marcada como pendiente.
 
 Para reconocer errores:
 
@@ -223,6 +226,35 @@ Sigue siendo mock o no conectado:
 - comparación/original de preview real;
 - exportacion real;
 - progreso real.
+
+## Revisión UX/UI pantalla principal
+
+La pantalla principal queda organizada en:
+
+- header compacto con lote, estado simple y acción principal;
+- rail izquierdo de lote con miniaturas y diagnóstico;
+- visor central dominante con imagen completa por defecto;
+- inspector derecho con pestañas `Ajustes` y `Salida`;
+- barra inferior mínima con contexto del lote.
+
+El modo normal oculta:
+
+- URL del bridge;
+- capabilities;
+- última respuesta técnica;
+- selector Mock/Bridge;
+- controles de revisión.
+
+Todo eso queda detrás de `Debug`.
+
+El escaneo informa:
+
+- archivos encontrados;
+- imágenes PNG válidas;
+- archivos omitidos;
+- motivo de omisión: extensión no admitida, error de lectura o subcarpeta no escaneada.
+
+La preview usa modo `Ajustar` por defecto para que la imagen completa sea visible sin tocar zoom.
 
 ## Probar APP.6 — Presets y ajustes reales
 

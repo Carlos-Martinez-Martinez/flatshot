@@ -176,8 +176,11 @@ const state = {
   previewMode: "processed",
   previewBg: "rgb230",
   zoom: 100,
+  fitMode: "fit",
   filter: "all",
   search: "",
+  inspectorTab: "adjustments",
+  inspectorCollapsed: false,
   activePreset: "Luz cenital",
   settings: { ...defaultSettings },
   presetDirty: false,
@@ -195,19 +198,26 @@ const state = {
   errors: [],
   paused: false,
   statusText: "Añade una carpeta",
-  bridgeMode: "mock",
+  bridgeMode: "bridge",
   bridgeUrl: defaultBridgeUrl,
   bridgeStatus: "idle",
-  bridgeMessage: "Modo mock activo",
-  bridgeLastResponse: "Mock activo",
+  bridgeMessage: "Selecciona una carpeta local",
+  bridgeLastResponse: "Bridge pendiente",
   bridgeCapabilitiesSummary: "Sin comprobar",
   bridgeCapabilities: null,
   bridgePresets: [],
   bridgePresetSource: "unavailable",
   bridgePresetWarning: "",
   bridgeScanPath: "",
-  scanStatus: "Pega una ruta o usa lote mock.",
+  scanStatus: "Selecciona una carpeta para empezar.",
   scanIssues: [],
+  scanDiagnostics: {
+    totalFiles: 0,
+    totalImages: 0,
+    totalOmitted: 0,
+    omittedByReason: {},
+    omitted: [],
+  },
   realFolders: [],
   realImages: [],
 };
@@ -367,6 +377,7 @@ function setScenario(scenario) {
     processed: 0,
     errors: [],
     scanIssues: [],
+    scanDiagnostics: mockScanDiagnostics(),
     paused: false,
     statusText: "Listo para procesar",
     scanStatus: "Escenario mock activo",
@@ -380,7 +391,8 @@ function setScenario(scenario) {
       previewStatus: "empty",
       exportStatus: "blocked",
       statusText: "Añade una carpeta",
-      scanStatus: "Pega una ruta o usa lote mock.",
+      scanStatus: "Selecciona una carpeta para empezar.",
+      scanDiagnostics: emptyScanDiagnostics(),
     });
   } else if (scenario === "empty-folder") {
     Object.assign(state, {
@@ -391,6 +403,7 @@ function setScenario(scenario) {
       exportStatus: "blocked",
       statusText: "No hay PNG válidos",
       scanStatus: "Carpeta mock vacía",
+      scanDiagnostics: emptyScanDiagnostics(),
     });
   } else if (scenario === "preview-loading") {
     Object.assign(state, {
@@ -481,6 +494,7 @@ function loadBatch() {
     processed: 0,
     errors: [],
     scanIssues: [],
+    scanDiagnostics: emptyScanDiagnostics(),
     scanStatus: "Escaneando lote mock",
     statusText: "Escaneando carpeta",
   });
@@ -491,6 +505,7 @@ function loadBatch() {
       selectedImageId: "img-001",
       previewStatus: "loading",
       exportStatus: "ready",
+      scanDiagnostics: mockScanDiagnostics(),
       statusText: "Generando preview",
     });
     render();
@@ -528,6 +543,8 @@ function selectImage(imageId) {
   clearTimers();
   state.selectedImageId = image.id;
   state.localOverride = image.status === "adjusted";
+  state.fitMode = "fit";
+  state.zoom = 100;
   if (image.source === "bridge") {
     void requestBridgePreview(image);
     return;
@@ -979,6 +996,7 @@ async function scanBridgeFolder() {
     processed: 0,
     errors: [],
     scanIssues: [],
+    scanDiagnostics: emptyScanDiagnostics(),
     scanStatus: folders.length === 1 ? "Escaneando ruta" : `Escaneando ${folders.length} rutas`,
     statusText: "Escaneando ruta",
   });
@@ -1005,6 +1023,7 @@ async function scanBridgeFolder() {
       previewData: null,
       previewError: "",
       exportStatus: "blocked",
+      scanDiagnostics: emptyScanDiagnostics(),
       bridgeStatus: "disconnected",
       bridgeMessage: message,
       bridgeLastResponse: `error: ${message}`,
@@ -1018,6 +1037,7 @@ async function scanBridgeFolder() {
 }
 
 function applyBridgeScanResult(response) {
+  state.scanDiagnostics = scanDiagnosticsFromResponse(response);
   state.realFolders = (response.folders || []).map(bridgeFolderToItem);
   state.realImages = (response.folders || []).flatMap((folder, folderIndex) =>
     (folder.images || []).map((image, imageIndex) => bridgeImageToItem(image, folderIndex, imageIndex))
@@ -1038,6 +1058,13 @@ function applyBridgeScanResult(response) {
       })),
     ...responseErrors.map((detail) => ({ level: "error", title: "Escaneo", detail })),
   ];
+  if (state.scanDiagnostics.totalOmitted > 0) {
+    state.scanIssues.push({
+      level: "warning",
+      title: "Archivos omitidos",
+      detail: omittedSummaryText(state.scanDiagnostics),
+    });
+  }
 
   if (state.realImages.length) {
     state.batch = "ready";
@@ -1081,14 +1108,37 @@ function bridgeScanMessage(totalImages, warningCount) {
   return `${totalImages} imágenes encontradas`;
 }
 
+function omittedSummaryText(diagnostics = state.scanDiagnostics) {
+  if (!diagnostics.totalOmitted) {
+    return "Sin omisiones";
+  }
+  return Object.entries(diagnostics.omittedByReason || {})
+    .map(([reason, count]) => `${count} ${omissionReasonLabel(reason).toLowerCase()}`)
+    .join(" · ") || `${diagnostics.totalOmitted} omitidas`;
+}
+
+function omissionReasonLabel(reason) {
+  if (reason === "unsupported_extension") {
+    return "Extensión no admitida";
+  }
+  if (reason === "read_error") {
+    return "Error de lectura";
+  }
+  if (reason === "subfolder_not_scanned") {
+    return "Subcarpeta no escaneada";
+  }
+  return "Omitida";
+}
+
 function bridgeFolderToItem(folder, index) {
   const hasErrors = Array.isArray(folder.errors) && folder.errors.length > 0;
   const count = Array.isArray(folder.images) ? folder.images.length : 0;
+  const omittedCount = Number(folder.omittedCount) || 0;
   const exists = folder.exists !== false;
   const isDir = folder.isDir !== false;
   const status = hasErrors
     ? count ? "warning" : "error"
-    : count ? "ready" : exists && isDir ? "empty" : "error";
+    : omittedCount ? "warning" : count ? "ready" : exists && isDir ? "empty" : "error";
   return {
     id: `bridge-folder-${index}`,
     name: basename(folder.path) || `Carpeta ${index + 1}`,
@@ -1098,7 +1148,13 @@ function bridgeFolderToItem(folder, index) {
     exists,
     isDir,
     status,
-    detail: hasErrors ? folder.errors[0] : count ? `${count} PNG` : "No se encontraron PNG",
+    detail: hasErrors
+      ? folder.errors[0]
+      : omittedCount
+        ? `${count} PNG · ${omittedCount} omitidas`
+        : count ? `${count} PNG` : "No se encontraron PNG",
+    filesFound: Number(folder.filesFound) || count,
+    omittedCount,
   };
 }
 
@@ -1163,7 +1219,7 @@ function showReviewScenario(scenario) {
 
 function primaryAction() {
   if (!hasBatch()) {
-    loadBatch();
+    void pickBridgeFolder();
     return;
   }
   if (state.exportStatus === "completed" || state.exportStatus === "partial") {
@@ -1192,6 +1248,7 @@ function statusMode() {
 }
 
 function render() {
+  renderShell();
   renderTop();
   renderDevelopmentStatus();
   renderBridge();
@@ -1199,7 +1256,15 @@ function render() {
   renderPreview();
   renderSettings();
   renderExport();
+  renderInspector();
   renderFooter();
+}
+
+function renderShell() {
+  const shell = $(".app-shell");
+  shell.classList.toggle("has-batch", hasBatch() || state.batch === "empty");
+  shell.classList.toggle("is-scanning", state.batch === "scanning");
+  shell.classList.toggle("inspector-collapsed", state.inspectorCollapsed);
 }
 
 function renderDevelopmentStatus() {
@@ -1214,38 +1279,61 @@ function renderTop() {
   $("#app-mode").value = state.bridgeMode;
   $("#bridge-url").value = state.bridgeUrl;
   $("#active-batch-label").textContent = hasBatch()
-    ? `${activeImages().length} imágenes · ${sourceLabel()}`
+    ? `${activeImages().length} imágenes${state.scanDiagnostics.totalOmitted ? ` · ${state.scanDiagnostics.totalOmitted} omitidas` : ""}`
     : state.batch === "empty"
       ? "Carpeta sin PNG"
       : "Sin lote";
-  $("#top-status-text").textContent = state.statusText;
+  $("#top-status-text").textContent = topStatusText();
   $("#status-dot").className = `status-dot ${statusMode()}`;
 }
 
+function topStatusText() {
+  if (state.bridgeMode === "bridge" && state.bridgeStatus === "connected") {
+    return `${state.statusText} · Bridge conectado`;
+  }
+  if (state.bridgeMode === "bridge" && state.bridgeStatus === "disconnected") {
+    return "Bridge desconectado · Reintentar";
+  }
+  return state.statusText;
+}
+
 function renderBridge() {
-  const isBridge = state.bridgeMode === "bridge";
   const chip = $("#bridge-status");
   const sourcePanel = $("#source-panel");
   const sourceBadge = $("#scan-source-badge");
-  const panel = $("#bridge-panel");
   const message = $("#bridge-message");
 
   chip.className = `bridge-chip ${bridgeStatusClass()}`;
   chip.textContent = bridgeStatusLabel();
   sourcePanel.className = `source-panel ${sourcePanelClass()}`;
   sourceBadge.className = `state-chip ${isBridgeBatch() ? "bridge" : isMockBatch() ? "ready" : ""}`;
-  sourceBadge.textContent = `Origen: ${sourceLabel()}`;
+  sourceBadge.textContent = sourceLabel();
+  $("#source-title").textContent = hasBatch() || state.batch === "empty" ? "Cambiar carpeta" : "Selecciona una carpeta";
   $("#scan-status").textContent = state.scanStatus;
-  panel.classList.toggle("is-hidden", !isBridge);
-  $("#bridge-panel-status").textContent = bridgeStatusLabel();
   $("#bridge-scan-path").value = state.bridgeScanPath;
   $("#bridge-pick-folder").disabled = state.bridgeStatus === "checking" || state.batch === "scanning";
   $("#bridge-scan-folder").disabled = state.bridgeStatus === "checking" || state.batch === "scanning";
   $("#bridge-last-response").textContent = state.bridgeLastResponse;
   $("#bridge-capabilities").textContent = state.bridgeCapabilitiesSummary;
-  message.textContent = state.bridgeMessage;
+  message.textContent = normalBridgeMessage();
   message.className = `bridge-message ${state.bridgeStatus === "connected" ? "ready" : state.bridgeStatus === "disconnected" ? "error" : ""}`;
   renderBatchSummary();
+}
+
+function normalBridgeMessage() {
+  if (state.bridgeMode !== "bridge") {
+    return "Modo revisión con datos simulados.";
+  }
+  if (state.bridgeStatus === "connected") {
+    return "Bridge conectado.";
+  }
+  if (state.bridgeStatus === "checking") {
+    return "Comprobando bridge.";
+  }
+  if (state.bridgeStatus === "disconnected") {
+    return "Bridge desconectado. Reintenta.";
+  }
+  return "Selecciona una carpeta local.";
 }
 
 function sourcePanelClass() {
@@ -1263,12 +1351,48 @@ function sourcePanelClass() {
 
 function sourceLabel() {
   if (isBridgeBatch()) {
-    return "Bridge local";
+    return "Carpeta local";
   }
   if (isMockBatch()) {
     return "Mock";
   }
-  return state.bridgeMode === "bridge" ? "Bridge local" : "Mock";
+  return state.bridgeMode === "bridge" ? "Carpeta local" : "Mock";
+}
+
+function emptyScanDiagnostics() {
+  return {
+    totalFiles: 0,
+    totalImages: 0,
+    totalOmitted: 0,
+    omittedByReason: {},
+    omitted: [],
+  };
+}
+
+function mockScanDiagnostics() {
+  return {
+    totalFiles: mockImages.length,
+    totalImages: mockImages.length,
+    totalOmitted: 0,
+    omittedByReason: {},
+    omitted: [],
+  };
+}
+
+function scanDiagnosticsFromResponse(response) {
+  const omitted = (response.folders || []).flatMap((folder) =>
+    (folder.omitted || []).map((item) => ({
+      ...item,
+      folder: folder.path,
+    }))
+  );
+  return {
+    totalFiles: Number(response.totalFiles) || Number(response.totalImages) || 0,
+    totalImages: Number(response.totalImages) || 0,
+    totalOmitted: Number(response.totalOmitted) || omitted.length,
+    omittedByReason: response.omittedByReason || {},
+    omitted,
+  };
 }
 
 function renderBatchSummary() {
@@ -1283,23 +1407,49 @@ function renderBatchSummary() {
         : [];
   const issueCount = state.scanIssues.length + images.filter((image) => image.status === "warning" || image.status === "error").length;
   const note = batchSummaryNote(images.length, folders.length, issueCount);
+  const diagnostics = state.scanDiagnostics || emptyScanDiagnostics();
+  const filesLabel = state.batch === "scanning" ? "..." : diagnostics.totalFiles;
+  const omittedLabel = state.batch === "scanning" ? "..." : diagnostics.totalOmitted;
 
   summary.innerHTML = `
     <div class="summary-grid">
       <div class="summary-metric">
-        <span>Carpetas</span>
-        <strong>${state.batch === "scanning" ? "..." : folders.length}</strong>
+        <span>Archivos</span>
+        <strong>${escapeHtml(filesLabel)}</strong>
       </div>
       <div class="summary-metric">
-        <span>Imágenes</span>
+        <span>Válidas</span>
         <strong>${state.batch === "scanning" ? "..." : images.length}</strong>
       </div>
       <div class="summary-metric">
-        <span>Avisos</span>
-        <strong>${state.batch === "scanning" ? "..." : issueCount}</strong>
+        <span>Omitidas</span>
+        <strong>${escapeHtml(omittedLabel)}</strong>
       </div>
     </div>
     <div class="summary-note" title="${escapeHtml(note)}">${escapeHtml(note)}</div>
+    ${diagnostics.totalOmitted ? diagnosticsHtml(diagnostics) : ""}
+  `;
+}
+
+function diagnosticsHtml(diagnostics) {
+  const reasonRows = Object.entries(diagnostics.omittedByReason || {}).map(([reason, count]) => `
+    <div class="diagnostic-row">
+      <span>${escapeHtml(omissionReasonLabel(reason))}</span>
+      <strong>${escapeHtml(count)}</strong>
+    </div>
+  `).join("");
+  const sampleRows = (diagnostics.omitted || []).slice(0, 5).map((item) => `
+    <li title="${escapeHtml(item.path || item.name)}">
+      <span>${escapeHtml(item.name)}</span>
+      <small>${escapeHtml(item.detail || omissionReasonLabel(item.reason))}</small>
+    </li>
+  `).join("");
+  return `
+    <details class="batch-diagnostics">
+      <summary>Ver diagnóstico</summary>
+      <div class="diagnostic-reasons">${reasonRows}</div>
+      ${sampleRows ? `<ul>${sampleRows}</ul>` : ""}
+    </details>
   `;
 }
 
@@ -1309,7 +1459,12 @@ function batchSummaryNote(imageCount, folderCount, issueCount) {
   }
   if (isBridgeBatch()) {
     if (state.batch === "empty") {
-      return state.scanIssues[0]?.detail || "Carpeta real sin PNG válidos.";
+      return state.scanDiagnostics.totalOmitted
+        ? `0 imágenes válidas · ${state.scanDiagnostics.totalOmitted} omitidas`
+        : state.scanIssues[0]?.detail || "Carpeta real sin PNG válidos.";
+    }
+    if (state.scanDiagnostics.totalOmitted) {
+      return `${imageCount} imágenes válidas · ${state.scanDiagnostics.totalOmitted} omitidas`;
     }
     return issueCount
       ? `${imageCount} imágenes reales · ${issueCount} aviso${issueCount === 1 ? "" : "s"}`
@@ -1341,7 +1496,7 @@ function bridgeStatusLabel() {
   if (state.bridgeStatus === "disconnected") {
     return "Sin conexión";
   }
-  return "Bridge local";
+  return "Bridge pendiente";
 }
 
 function renderBatch() {
@@ -1355,7 +1510,7 @@ function renderBatch() {
     $("#batch-pill").textContent = "Sin carpeta";
     $("#folder-list").innerHTML = "";
     $("#image-list").innerHTML = "";
-    $("#batch-empty-note").textContent = state.scanIssues[0]?.detail || "Añade una carpeta para empezar.";
+    $("#batch-empty-note").textContent = state.scanIssues[0]?.detail || "Selecciona una carpeta para empezar.";
     $("#image-search").value = state.search;
     renderFilterButtons();
     return;
@@ -1363,7 +1518,7 @@ function renderBatch() {
 
   if (state.batch === "scanning") {
     $("#batch-count").textContent = "Escaneando";
-    $("#batch-pill").textContent = isBridgeBatch() ? "Bridge local" : "Carpeta mock";
+    $("#batch-pill").textContent = isBridgeBatch() ? "Carpeta local" : "Carpeta mock";
     $("#folder-list").innerHTML = folderItemHtml({
       id: "scan",
       name: isBridgeBatch() ? basename(parseFolderInput(state.bridgeScanPath)[0]) || "Ruta bridge" : "Camisetas Mayo",
@@ -1389,17 +1544,21 @@ function renderBatch() {
           status: "empty",
         }];
     $("#batch-count").textContent = "0 PNG";
-    $("#batch-pill").textContent = isBridgeBatch() ? "Bridge local" : "Sin imágenes";
+    $("#batch-pill").textContent = state.scanDiagnostics.totalOmitted
+      ? `${state.scanDiagnostics.totalOmitted} omitidas`
+      : isBridgeBatch() ? "Carpeta local" : "Sin imágenes";
     $("#folder-list").innerHTML = emptyFolders.map(folderItemHtml).join("");
     $("#image-list").innerHTML = "";
-    $("#batch-empty-note").textContent = state.scanStatus || "No hay PNG válidos.";
+    $("#batch-empty-note").textContent = state.scanDiagnostics.totalOmitted
+      ? `No hay PNG válidos. ${omittedSummaryText(state.scanDiagnostics)}.`
+      : state.scanStatus || "No hay PNG válidos.";
     renderFilterButtons();
     return;
   }
 
   $("#batch-count").textContent = `${images.length} imágenes`;
   $("#batch-pill").textContent = isBridgeBatch()
-    ? "Bridge local"
+    ? state.scanDiagnostics.totalOmitted ? `${state.scanDiagnostics.totalOmitted} omitidas` : "Carpeta local"
     : errors ? `${errors} errores` : adjusted ? `${adjusted} ajustadas` : warnings ? `${warnings} avisos` : "Listas";
   $("#folder-list").innerHTML = activeFolders().map(folderItemHtml).join("");
   $("#image-search").value = state.search;
@@ -1450,29 +1609,30 @@ function renderFilterButtons() {
 function renderPreview() {
   const image = selectedImage();
   const isBridgeImage = image?.source === "bridge";
-  const previewControlsDisabled = !image || isBridgeImage || state.previewStatus === "empty" || state.previewStatus === "error";
+  const previewControlsDisabled = !image || state.previewStatus === "empty" || state.previewStatus === "error";
+  const compareControlsDisabled = !image || isBridgeImage || state.previewStatus === "empty" || state.previewStatus === "error";
   $("#preview-name").textContent = image ? image.name : "Sin imagen seleccionada";
   $("#preview-subtitle").textContent = previewSubtitle(image);
-  $("#zoom-label").textContent = `${state.zoom}%`;
+  $("#zoom-label").textContent = state.fitMode === "fit" ? "Fit" : `${state.zoom}%`;
   $("#preview-meta").textContent = isBridgeImage
     ? bridgePreviewMeta()
     : image ? `${state.format} · ${state.size} · ${backgroundLabel(state.background)}` : "Sin imagen";
   $("#canvas-area").className = `canvas-area bg-${state.previewBg === "transparent" ? "transparent" : state.previewBg}`;
   $$(".preview-toolbar [data-preview-mode]").forEach((button) => {
     button.classList.toggle("active", button.dataset.previewMode === state.previewMode);
-    button.disabled = previewControlsDisabled;
+    button.disabled = compareControlsDisabled;
   });
   $$(".background-switch [data-preview-bg]").forEach((button) => {
     button.classList.toggle("active", button.dataset.previewBg === state.previewBg);
     button.disabled = previewControlsDisabled;
   });
-  $$("[data-action='zoom-out'], [data-action='zoom-in'], [data-action='force-preview-error']").forEach((button) => {
+  $$("[data-action='zoom-fit'], [data-action='zoom-100'], [data-action='zoom-out'], [data-action='zoom-in'], [data-action='force-preview-error']").forEach((button) => {
     button.disabled = previewControlsDisabled;
   });
 
   const canvas = $("#preview-canvas");
-  canvas.className = `preview-canvas ${state.previewMode} bg-${state.previewBg}`;
-  canvas.style.setProperty("--preview-scale", String(state.zoom / 100));
+  canvas.className = `preview-canvas ${state.previewMode} bg-${state.previewBg} ${state.fitMode === "fit" ? "fit-mode" : "zoom-mode"}`;
+  canvas.style.setProperty("--preview-scale", state.fitMode === "fit" ? "1" : String(state.zoom / 100));
 
   if (!image || state.previewStatus === "empty") {
     canvas.innerHTML = previewStateHtml("Sin imagen seleccionada", "El lote aparecerá aquí.");
@@ -1551,7 +1711,7 @@ function bridgePreviewMeta() {
   }
   if (state.previewData) {
     const warning = state.previewData.warning ? " · Aviso" : "";
-    return `${state.previewData.width}x${state.previewData.height} · ${state.previewData.renderTimeMs} ms · ${previewSettingsLabel()}${warning}`;
+    return `Preview real · ${previewSettingsLabel()}${warning}`;
   }
   return "Bridge local · Preview pendiente";
 }
@@ -1637,6 +1797,15 @@ function renderSettings() {
   $("#save-preset").textContent = state.bridgeMode === "bridge" ? "Guardar pendiente" : "Guardar preset";
 }
 
+function renderInspector() {
+  $$(".settings-panel [data-inspector-tab]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.inspectorTab === state.inspectorTab);
+  });
+  $$(".settings-panel [data-inspector-section]").forEach((section) => {
+    section.classList.toggle("is-hidden", section.dataset.inspectorSection !== state.inspectorTab);
+  });
+}
+
 function presetSourceLabel() {
   if (state.bridgeMode === "bridge") {
     const source = state.bridgePresetSource === "config"
@@ -1667,9 +1836,9 @@ function renderExport() {
   const outputCount = exportable;
   const ready = isExportReady();
   const destinationText = state.destinationMode === "custom" ? state.destinationValue || "Sin configurar" : `origen / ${state.destinationValue}`;
-  const statusText = isBridgeBatch() ? "Real pendiente" : ready ? "Lista" : "No lista";
+  const statusText = isBridgeBatch() ? "Salida pendiente" : ready ? "Lista" : "No lista";
 
-  $("#export-readiness").textContent = isBridgeBatch() ? "No conectada" : exportStatusLabel(ready);
+  $("#export-readiness").textContent = isBridgeBatch() ? "Salida pendiente" : exportStatusLabel(ready);
   $("#export-count").textContent = `${outputCount} archivos`;
   $("#export-count").classList.toggle("dirty", !ready);
 
@@ -1703,7 +1872,7 @@ function exportStatusLabel(ready) {
     return "Fallida";
   }
   if (isBridgeBatch()) {
-    return "No conectada";
+    return "Salida pendiente";
   }
   return ready ? "Lista" : "Configura exportación";
 }
@@ -1722,9 +1891,13 @@ function renderFooter() {
   const exportable = exportableImages().length;
   const issues = [...validationIssues(), ...state.errors];
   const ready = isExportReady();
+  const images = activeImages();
+  const selectedIndex = images.findIndex((image) => image.id === state.selectedImageId);
+  const selectedText = selectedIndex >= 0 ? ` · Imagen ${selectedIndex + 1}/${images.length}` : "";
+  const warningText = issues.length ? ` · ${issues.length} aviso${issues.length === 1 ? "" : "s"}` : "";
 
   $("#footer-batch").textContent = hasBatch()
-    ? `${activeImages().length} imágenes · ${sourceLabel()}`
+    ? `${images.length} imágenes${selectedText}${warningText}`
     : state.batch === "empty"
       ? `0 PNG · ${sourceLabel()}`
       : "Sin lote";
@@ -1745,21 +1918,26 @@ function renderFooter() {
   $("#stop-export").classList.toggle("is-hidden", state.exportStatus !== "running");
   $("#open-output").disabled = !(state.exportStatus === "completed" || state.exportStatus === "partial");
 
-  const primary = $("#primary-action");
-  primary.disabled = state.exportStatus === "running"
+  const primaryButtons = [$("#primary-action"), $("#top-primary-action")].filter(Boolean);
+  const primaryDisabled = state.exportStatus === "running"
     || isBridgeBatch()
     || (hasBatch() && !ready && validationIssues().some((issue) => issue.level === "error"));
+  let primaryText = "";
   if (!hasBatch()) {
-    primary.textContent = "Añadir carpeta";
+    primaryText = "Seleccionar carpeta";
   } else if (isBridgeBatch()) {
-    primary.textContent = "Exportación pendiente";
+    primaryText = "Salida pendiente";
   } else if (state.exportStatus === "completed" || state.exportStatus === "partial") {
-    primary.textContent = "Nuevo lote";
+    primaryText = "Nuevo lote";
   } else if (!ready) {
-    primary.textContent = "Configura exportación";
+    primaryText = "Preparar salida";
   } else {
-    primary.textContent = `Procesar ${exportable} imágenes`;
+    primaryText = `Exportar ${exportable}`;
   }
+  primaryButtons.forEach((primary) => {
+    primary.disabled = primaryDisabled;
+    primary.textContent = primaryText;
+  });
 }
 
 function previewFooterLabel() {
@@ -1800,6 +1978,10 @@ function handleAction(action) {
     loadMockBatch();
   } else if (action === "check-bridge") {
     void checkBridge();
+  } else if (action === "toggle-inspector") {
+    state.inspectorCollapsed = !state.inspectorCollapsed;
+    state.statusText = state.inspectorCollapsed ? "Inspector oculto" : "Inspector visible";
+    render();
   } else if (action === "pick-bridge-folder") {
     void pickBridgeFolder();
   } else if (action === "scan-bridge-folder") {
@@ -1814,10 +1996,22 @@ function handleAction(action) {
       state.statusText = "Preview no disponible";
       render();
     }
+  } else if (action === "zoom-fit") {
+    state.fitMode = "fit";
+    state.zoom = 100;
+    state.statusText = "Imagen ajustada";
+    render();
+  } else if (action === "zoom-100") {
+    state.fitMode = "manual";
+    state.zoom = 100;
+    state.statusText = "Zoom 100%";
+    render();
   } else if (action === "zoom-in") {
+    state.fitMode = "manual";
     state.zoom = Math.min(160, state.zoom + 10);
     render();
   } else if (action === "zoom-out") {
+    state.fitMode = "manual";
     state.zoom = Math.max(70, state.zoom - 10);
     render();
   } else if (action === "reset-settings") {
@@ -1897,6 +2091,12 @@ document.addEventListener("click", (event) => {
   if (presetTarget) {
     applyPresetSettings(presetTarget.dataset.preset);
   }
+
+  const inspectorTarget = event.target.closest("[data-inspector-tab]");
+  if (inspectorTarget) {
+    state.inspectorTab = inspectorTarget.dataset.inspectorTab;
+    render();
+  }
 });
 
 $("#demo-scenario").addEventListener("change", (event) => {
@@ -1909,7 +2109,7 @@ $("#app-mode").addEventListener("change", (event) => {
   state.bridgeMode = event.target.value;
   state.statusText = state.bridgeMode === "bridge" ? "Bridge local" : "Modo mock";
   state.bridgeLastResponse = state.bridgeMode === "bridge" ? "Bridge pendiente" : "Mock activo";
-  state.scanStatus = state.bridgeMode === "bridge" ? "Pega una ruta y escanea." : "Escenarios mock activos.";
+  state.scanStatus = state.bridgeMode === "bridge" ? "Selecciona una carpeta para empezar." : "Escenarios mock activos.";
   render();
 });
 

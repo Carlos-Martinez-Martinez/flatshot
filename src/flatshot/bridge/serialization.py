@@ -8,7 +8,13 @@ from typing import Any
 
 from PIL import Image
 
-from flatshot.application.contracts import BatchScanResult, FolderScanResult, ImageFileInfo, PreviewResult
+from flatshot.application.contracts import (
+    BatchScanResult,
+    FolderScanResult,
+    ImageFileInfo,
+    OmittedScanItem,
+    PreviewResult,
+)
 
 
 def serialize_path(path: str | Path) -> str:
@@ -26,6 +32,16 @@ def image_file_info_to_dict(image: ImageFileInfo) -> dict[str, Any]:
     }
 
 
+def omitted_scan_item_to_dict(item: OmittedScanItem) -> dict[str, Any]:
+    return {
+        "path": serialize_path(item.path),
+        "name": item.name,
+        "suffix": item.suffix,
+        "reason": item.reason,
+        "detail": item.detail,
+    }
+
+
 def folder_scan_result_to_dict(folder: FolderScanResult) -> dict[str, Any]:
     return {
         "path": serialize_path(folder.folder),
@@ -33,6 +49,10 @@ def folder_scan_result_to_dict(folder: FolderScanResult) -> dict[str, Any]:
         "isDir": folder.is_dir,
         "images": [image_file_info_to_dict(image) for image in folder.images],
         "errors": list(folder.errors),
+        "filesFound": folder.files_found,
+        "validImages": len(folder.images),
+        "omittedCount": len(folder.omitted),
+        "omitted": [omitted_scan_item_to_dict(item) for item in folder.omitted],
     }
 
 
@@ -42,6 +62,9 @@ def batch_scan_result_to_dict(result: BatchScanResult) -> dict[str, Any]:
         "totalFolders": result.total_folders,
         "totalImages": result.total_images,
         "adjustedImages": result.adjusted_images,
+        "totalFiles": result.total_files,
+        "totalOmitted": result.total_omitted,
+        "omittedByReason": dict(result.omitted_by_reason),
         "errors": list(result.errors),
     }
 

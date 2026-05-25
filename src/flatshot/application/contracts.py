@@ -20,12 +20,23 @@ class ImageFileInfo:
 
 
 @dataclass(frozen=True)
+class OmittedScanItem:
+    path: Path
+    name: str
+    reason: str
+    detail: str
+    suffix: str = ""
+
+
+@dataclass(frozen=True)
 class FolderScanResult:
     folder: Path
     exists: bool
     is_dir: bool
     images: list[ImageFileInfo] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    files_found: int = 0
+    omitted: list[OmittedScanItem] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -35,6 +46,9 @@ class BatchScanResult:
     total_images: int = 0
     adjusted_images: int = 0
     errors: list[str] = field(default_factory=list)
+    total_files: int = 0
+    total_omitted: int = 0
+    omitted_by_reason: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

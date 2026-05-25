@@ -36,16 +36,42 @@ def test_scan_missing_folder_returns_error_without_raising(tmp_path):
 def test_scan_folder_counts_png_and_ignores_non_png(tmp_path):
     first = _png(tmp_path / "b.png")
     second = _png(tmp_path / "a.png")
+    upper = _png(tmp_path / "c.PNG")
     (tmp_path / "notes.txt").write_text("ignore", encoding="utf-8")
     Image.new("RGB", (4, 4)).save(tmp_path / "photo.jpg")
 
     result = FolderScanner().scan_folders([tmp_path])
 
     assert result.total_folders == 1
-    assert result.total_images == 2
-    assert [image.path for image in result.folders[0].images] == [second, first]
-    assert [image.name for image in result.folders[0].images] == ["a.png", "b.png"]
+    assert result.total_files == 5
+    assert result.total_images == 3
+    assert result.total_omitted == 2
+    assert result.omitted_by_reason == {"unsupported_extension": 2}
+    assert [image.path for image in result.folders[0].images] == [second, first, upper]
+    assert [image.name for image in result.folders[0].images] == ["a.png", "b.png", "c.PNG"]
     assert all(image.size_bytes > 0 for image in result.folders[0].images)
+    assert [item.name for item in result.folders[0].omitted] == ["notes.txt", "photo.jpg"]
+
+
+def test_scan_reports_subfolders_and_corrupt_png(tmp_path):
+    _png(tmp_path / "valid.png")
+    (tmp_path / "broken.png").write_bytes(b"not a real png")
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    _png(nested / "inside.png")
+
+    result = FolderScanner().scan_folders([tmp_path])
+
+    assert result.total_files == 2
+    assert result.total_images == 1
+    assert result.total_omitted == 2
+    assert result.omitted_by_reason == {
+        "read_error": 1,
+        "subfolder_not_scanned": 1,
+    }
+    omitted = {item.name: item for item in result.folders[0].omitted}
+    assert omitted["broken.png"].detail == "No se pudo leer como PNG válido"
+    assert omitted["nested"].detail == "Subcarpeta no escaneada"
 
 
 def test_scan_multiple_folders_accumulates_totals(tmp_path):

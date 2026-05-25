@@ -10,7 +10,12 @@ from uuid import uuid4
 from flatshot.application.config_paths import ConfigPathResolver
 from flatshot.application.contracts import ExportJobRequest, PreviewRequest
 from flatshot.application.export_config_service import ExportConfigService
-from flatshot.application.export_runner import ExportRunner, get_enabled_export_variants
+from flatshot.application.export_runner import (
+    ExportRunner,
+    OutputPathValidationError,
+    get_enabled_export_variants,
+    validate_export_requests_outputs,
+)
 from flatshot.application.folder_scanner import FolderScanner
 from flatshot.application.preset_service import PresetService
 from flatshot.application.preview_service import PreviewService
@@ -187,6 +192,7 @@ class FlatShotBridgeService:
 
     def prepare_export(self, payload: Mapping[str, Any]) -> dict[str, Any]:
         requests, config = self._export_requests(payload)
+        self._validate_export_outputs(requests)
         image_count = sum(len(request.input_files or []) for request in requests)
         variants = get_enabled_export_variants(config)
         destinations = self.export_config_service.destinations_for_folders(
@@ -212,6 +218,7 @@ class FlatShotBridgeService:
 
     def start_export(self, payload: Mapping[str, Any]) -> dict[str, Any]:
         requests, config = self._export_requests(payload)
+        self._validate_export_outputs(requests)
         image_count = sum(len(request.input_files or []) for request in requests)
         variants = get_enabled_export_variants(config)
         destinations = self.export_config_service.destinations_for_folders(
@@ -318,6 +325,13 @@ class FlatShotBridgeService:
             ],
             export_config,
         )
+
+    @staticmethod
+    def _validate_export_outputs(requests: list[ExportJobRequest]) -> None:
+        try:
+            validate_export_requests_outputs(requests)
+        except OutputPathValidationError as exc:
+            raise BridgeError("export_output_collision", str(exc), status=409) from exc
 
     @staticmethod
     def _export_image_paths(raw_paths: Any) -> list[Path]:

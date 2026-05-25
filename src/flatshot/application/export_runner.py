@@ -35,6 +35,16 @@ from flatshot.core.overrides import apply_image_override, override_key
 from flatshot.utils.render_cache import RenderCache
 
 
+EXPORT_OUTPUT_COLLISION_MESSAGE = (
+    "Hay archivos de salida repetidos o ya existentes. "
+    "Cambia el destino, el sufijo o el patrón de nombre antes de exportar."
+)
+
+
+class OutputPathValidationError(ValueError):
+    """Raised when planned export outputs are not safe to write."""
+
+
 class ExportEventSink(Protocol):
     def emit(self, event: ExportEvent) -> None:
         ...
@@ -137,7 +147,7 @@ def _path_collision_key(path: Path) -> str:
     return os.path.normcase(os.path.abspath(str(path)))
 
 
-def validate_output_path_collisions(planned_outputs: list[dict]) -> None:
+def validate_output_path_collisions(planned_outputs: list[dict], *, check_existing: bool = True) -> None:
     seen: dict[str, dict] = {}
     for item in planned_outputs:
         key = _path_collision_key(Path(item["save_path"]))
@@ -149,16 +159,93 @@ def validate_output_path_collisions(planned_outputs: list[dict]) -> None:
         current_variant = item["variant"]
         previous_variant = previous["variant"]
         if current_variant.id != previous_variant.id:
-            raise ValueError(
+            raise OutputPathValidationError(
+                f"{EXPORT_OUTPUT_COLLISION_MESSAGE} "
                 "Las variantes "
                 f"{previous_variant.label} y {current_variant.label} generarían el mismo archivo. "
                 "Cambia el sufijo o la subcarpeta."
             )
 
-        raise ValueError(
+        raise OutputPathValidationError(
+            f"{EXPORT_OUTPUT_COLLISION_MESSAGE} "
             f"Dos entradas generarían el mismo archivo: {Path(item['save_path']).name}. "
             "Cambia la plantilla de nombre, el sufijo o la subcarpeta."
         )
+
+    if not check_existing:
+        return
+
+    for item in planned_outputs:
+        save_path = Path(item["save_path"])
+        try:
+            exists = save_path.exists()
+        except OSError as exc:
+            raise OutputPathValidationError(
+                f"{EXPORT_OUTPUT_COLLISION_MESSAGE} "
+                f"No se pudo comprobar la salida {save_path.name}."
+            ) from exc
+        if exists:
+            raise OutputPathValidationError(
+                f"{EXPORT_OUTPUT_COLLISION_MESSAGE} "
+                f"Ya existe una salida llamada {save_path.name}."
+            )
+
+
+def planned_output_paths_for_request(request: ExportJobRequest) -> list[dict]:
+    """Plan the output paths for a single request without touching the filesystem."""
+    if request.input_files is not None:
+        image_paths = [Path(p) for p in request.input_files]
+        image_paths = [p for p in image_paths if p.is_file() and p.suffix.lower() == ".png"]
+    else:
+        image_paths = [
+            path
+            for path in request.input_folder.iterdir()
+            if path.is_file() and path.suffix.lower() == ".png"
+        ]
+
+    base_output_folder = ExportRunner._base_output_folder(request)
+    enabled_variants = get_enabled_export_variants(request.export_config)
+    parent_folder_name = request.input_folder.name
+    planned_outputs: list[dict] = []
+
+    for index, img_path in enumerate(sorted(image_paths, key=lambda path: path.name), start=1):
+        for variant in enabled_variants:
+            save_path, fmt = build_variant_output_path(
+                base_output_folder,
+                request.export_config,
+                variant,
+                img_path.stem,
+                parent_folder_name,
+                index,
+            )
+            planned_outputs.append(
+                {
+                    "save_path": save_path,
+                    "variant": variant,
+                    "image_path": img_path,
+                    "format": fmt,
+                    "input_folder": request.input_folder,
+                }
+            )
+
+    return planned_outputs
+
+
+def planned_output_paths_for_requests(requests: list[ExportJobRequest]) -> list[dict]:
+    planned_outputs: list[dict] = []
+    for request in requests:
+        planned_outputs.extend(planned_output_paths_for_request(request))
+    return planned_outputs
+
+
+def validate_export_requests_outputs(
+    requests: list[ExportJobRequest],
+    *,
+    check_existing: bool = True,
+) -> list[dict]:
+    planned_outputs = planned_output_paths_for_requests(requests)
+    validate_output_path_collisions(planned_outputs, check_existing=check_existing)
+    return planned_outputs
 
 
 def process_single_image(args):
@@ -384,7 +471,10 @@ class ExportRunner:
                 for folder in destinations:
                     folder.mkdir(parents=True, exist_ok=True)
             except Exception as exc:
-                self._emit(ExportLogEvent(str(exc)))
+                message = str(exc)
+                if isinstance(exc, OutputPathValidationError):
+                    message = f"Error: Exportación: {message}"
+                self._emit(ExportLogEvent(message))
                 duration = time() - start_time
                 result = ExportJobResult(False, 0, total, 0, duration, destinations)
                 self._emit(ExportFinishedEvent(False, 0, total, 0, duration))

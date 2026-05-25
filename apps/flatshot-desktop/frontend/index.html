@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>FlatShot Desktop Mock</title>
+    <title>FlatShot Desktop</title>
     <link rel="icon" href="data:," />
     <link rel="stylesheet" href="./styles.css" />
   </head>
@@ -25,7 +25,7 @@
           </div>
 
           <div class="top-actions">
-            <span class="bridge-chip idle" id="bridge-status">Mock</span>
+            <span class="bridge-chip idle" id="bridge-status">Bridge pendiente</span>
             <button type="button" class="primary top-export" id="top-primary-action" data-action="primary">Exportar lote</button>
             <button type="button" data-action="toggle-inspector">Inspector</button>
             <details class="debug-panel" id="debug-panel">
@@ -81,7 +81,7 @@
             <div class="source-panel-heading">
               <div>
                 <strong id="source-title">Selecciona una carpeta</strong>
-                <span id="scan-status">Pega una ruta o usa lote mock.</span>
+                <span id="scan-status">Selecciona una carpeta con PNG para empezar.</span>
               </div>
               <span class="state-chip" id="scan-source-badge">Sin lote</span>
             </div>
@@ -96,7 +96,7 @@
                 <input id="bridge-scan-path" type="text" placeholder="C:/ruta/lote" />
               </label>
             </details>
-            <div class="bridge-message" id="bridge-message">Modo mock activo.</div>
+            <div class="bridge-message" id="bridge-message">Selecciona una carpeta local.</div>
           </div>
 
           <div class="batch-summary" id="batch-summary" aria-live="polite"></div>
@@ -209,7 +209,7 @@
               <div>
                 <span class="eyebrow">Preset</span>
                 <strong id="active-preset">Luz cenital</strong>
-                <small id="preset-source">Mock</small>
+                <small id="preset-source">Bridge local</small>
               </div>
               <span class="change-chip" id="preset-dirty">Sin cambios</span>
             </div>

@@ -21,7 +21,11 @@ from flatshot.application.events import (
     QueueStartedEvent,
 )
 from flatshot.application.execution_control import CancellationToken, PauseToken
-from flatshot.application.export_runner import ExportRunner
+from flatshot.application.export_runner import (
+    ExportRunner,
+    OutputPathValidationError,
+    validate_export_requests_outputs,
+)
 from flatshot.core.models import JobItem, normalize_export_variants
 
 
@@ -101,6 +105,37 @@ class QueueRunner:
         completed = 0
         errors = 0
         total_images = 0
+        planned_requests: list[ExportJobRequest] = []
+
+        for job in request.jobs:
+            folder_path = Path(job.folder_path)
+            images = self._job_images(job, folder_path)
+            if not images:
+                continue
+            planned_requests.append(
+                ExportJobRequest(
+                    input_folder=folder_path,
+                    settings=request.settings,
+                    export_config=request.export_config,
+                    curve_data=request.curve_data,
+                    preset_name=request.preset_name,
+                    input_files=[Path(p) for p in images],
+                    image_overrides=request.image_overrides,
+                )
+            )
+
+        if not self.cancellation_token.cancelled:
+            try:
+                validate_export_requests_outputs(planned_requests)
+            except OutputPathValidationError as exc:
+                for job in request.jobs:
+                    job.status = "error"
+                    job.error_message = str(exc)
+                self._emit(ExportLogEvent(f"Error: Exportación: {exc}"))
+                if self.logger:
+                    self.logger.log_queue_complete(0, total_jobs, 0)
+                self._emit(QueueFinishedEvent(0, total_jobs, 0))
+                return QueueRunResult(0, total_jobs, 0, cancelled=self.cancellation_token.cancelled)
 
         for index, job in enumerate(request.jobs):
             if self.cancellation_token.cancelled:

@@ -1473,6 +1473,32 @@ small {
   display: none !important;
 }
 
+html:not(.dev-mode) .debug-panel,
+html:not(.dev-mode) .review-panel,
+html:not(.dev-mode) #save-preset,
+html:not(.dev-mode) .local-adjustment,
+html:not(.dev-mode) [data-preview-mode="original"],
+html:not(.dev-mode) [data-preview-mode="compare"] {
+  display: none !important;
+}
+
+html:not(.dev-mode) .app-shell:not(.has-batch) .settings-panel,
+html:not(.dev-mode) .app-shell:not(.has-batch) .bottom-bar,
+html:not(.dev-mode) .app-shell:not(.has-batch) .search-field,
+html:not(.dev-mode) .app-shell:not(.has-batch) .folder-list,
+html:not(.dev-mode) .app-shell:not(.has-batch) .batch-filter,
+html:not(.dev-mode) .app-shell:not(.has-batch) .image-list,
+html:not(.dev-mode) .app-shell:not(.has-batch) .batch-summary,
+html:not(.dev-mode) .app-shell:not(.has-batch) .preview-toolbar,
+html:not(.dev-mode) .app-shell:not(.has-batch) .preview-footer,
+html:not(.dev-mode) .app-shell:not(.has-batch) [data-action="toggle-inspector"] {
+  display: none !important;
+}
+
+html:not(.dev-mode) .app-shell:not(.has-batch) .workspace {
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+}
+
 /* Refactor UX: normal mode is a visual production shell; debug lives behind a menu. */
 .top-bar {
   grid-template-rows: minmax(58px, auto);

@@ -9,10 +9,10 @@ from PIL import Image
 from flatshot.application.config_paths import ConfigPathResolver
 from flatshot.application.export_runner import ExportRunner
 from flatshot.application.preset_service import PresetService
-from flatshot.bridge.errors import InvalidRequestError, error_response
+from flatshot.bridge.errors import BridgeError, InvalidRequestError, error_response
 from flatshot.bridge.serialization import image_file_info_to_dict
 from flatshot.bridge.service import FlatShotBridgeService
-from flatshot.application.contracts import ImageFileInfo
+from flatshot.application.contracts import ExportJobResult, ImageFileInfo
 
 
 def _png(path: Path) -> Path:
@@ -56,6 +56,21 @@ def _failing_export_runner_factory(**kwargs) -> ExportRunner:
         return False, f"{image_path.name}: fallo controlado", None
 
     return ExportRunner(**kwargs, executor_factory=InlineExecutor, image_processor=fail_image)
+
+
+def _false_result_export_runner_factory(**kwargs):
+    class FalseResultRunner:
+        def run(self, request):
+            return ExportJobResult(
+                success=False,
+                processed=0,
+                total=len(request.input_files or []),
+                errors=0,
+                duration=0.0,
+                destinations=[],
+            )
+
+    return FalseResultRunner()
 
 
 def _export_service(config_dir: Path) -> FlatShotBridgeService:
@@ -411,6 +426,124 @@ def test_bridge_start_export_writes_output_and_reports_progress(tmp_path):
     assert (source / "_OUT" / "item_PRO.png").exists()
 
 
+def test_bridge_export_rejects_same_filename_across_folders_with_common_destination(tmp_path):
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    output = tmp_path / "out"
+    first.mkdir()
+    second.mkdir()
+    output.mkdir()
+    first_png = _png(first / "same.png")
+    second_png = _png(second / "same.png")
+    service = _export_service(tmp_path / "config")
+
+    with pytest.raises(BridgeError) as exc_info:
+        service.start_export(
+            {
+                "imagePaths": [str(first_png), str(second_png)],
+                "settings": {"opacity": 0, "blur": 0, "noise": 0},
+                "export": {
+                    "format": "PNG",
+                    "size": "8x8",
+                    "destinationMode": "custom",
+                    "customOutputPath": str(output),
+                    "namingTemplate": "{original}{suffix}",
+                },
+            }
+        )
+
+    assert exc_info.value.code == "export_output_collision"
+    assert "archivos de salida repetidos" in str(exc_info.value)
+    assert list(output.iterdir()) == []
+
+
+def test_bridge_export_rejects_template_collision_without_partial_outputs(tmp_path):
+    source = tmp_path / "source"
+    output = tmp_path / "out"
+    source.mkdir()
+    output.mkdir()
+    first_png = _png(source / "first.png")
+    second_png = _png(source / "second.png")
+    service = _export_service(tmp_path / "config")
+
+    with pytest.raises(BridgeError) as exc_info:
+        service.start_export(
+            {
+                "imagePaths": [str(first_png), str(second_png)],
+                "settings": {"opacity": 0, "blur": 0, "noise": 0},
+                "export": {
+                    "format": "PNG",
+                    "size": "8x8",
+                    "destinationMode": "custom",
+                    "customOutputPath": str(output),
+                    "namingTemplate": "flatshot{suffix}",
+                },
+            }
+        )
+
+    assert exc_info.value.code == "export_output_collision"
+    assert list(output.iterdir()) == []
+
+
+def test_bridge_export_rejects_existing_output_without_overwriting(tmp_path):
+    source = tmp_path / "source"
+    output = tmp_path / "out"
+    source.mkdir()
+    output.mkdir()
+    png = _png(source / "item.png")
+    existing = output / "item_PRO.png"
+    existing.write_bytes(b"existing-output")
+    service = _export_service(tmp_path / "config")
+
+    with pytest.raises(BridgeError) as exc_info:
+        service.start_export(
+            {
+                "imagePaths": [str(png)],
+                "settings": {"opacity": 0, "blur": 0, "noise": 0},
+                "export": {
+                    "format": "PNG",
+                    "size": "8x8",
+                    "destinationMode": "custom",
+                    "customOutputPath": str(output),
+                    "namingTemplate": "{original}{suffix}",
+                },
+            }
+        )
+
+    assert exc_info.value.code == "export_output_collision"
+    assert existing.read_bytes() == b"existing-output"
+
+
+def test_bridge_export_allows_valid_common_destination_without_collisions(tmp_path):
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    output = tmp_path / "out"
+    first.mkdir()
+    second.mkdir()
+    first_png = _png(first / "one.png")
+    second_png = _png(second / "two.png")
+    service = _export_service(tmp_path / "config")
+
+    started = service.start_export(
+        {
+            "imagePaths": [str(first_png), str(second_png)],
+            "settings": {"opacity": 0, "blur": 0, "noise": 0},
+            "export": {
+                "format": "PNG",
+                "size": "8x8",
+                "destinationMode": "custom",
+                "customOutputPath": str(output),
+                "namingTemplate": "{original}{suffix}",
+            },
+        }
+    )
+    final = _wait_for_export(service, started["jobId"])
+
+    assert final["status"] == "completed"
+    assert (output / "one_PRO.png").exists()
+    assert (output / "two_PRO.png").exists()
+
+
 def test_bridge_start_export_reports_structured_item_errors(tmp_path):
     source = tmp_path / "source"
     source.mkdir()
@@ -435,6 +568,28 @@ def test_bridge_start_export_reports_structured_item_errors(tmp_path):
     assert final["issues"][0]["title"] == "item.png"
     assert "fallo controlado" in final["issues"][0]["detail"]
     assert final["completedItems"][0] == {"name": "item.png", "success": False}
+
+
+def test_bridge_start_export_marks_false_runner_result_as_failed(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    png = _png(source / "item.png")
+    service = FlatShotBridgeService(
+        config_resolver=ConfigPathResolver(tmp_path / "config"),
+        export_runner_factory=_false_result_export_runner_factory,
+    )
+
+    started = service.start_export(
+        {
+            "imagePaths": [str(png)],
+            "settings": {"opacity": 0, "blur": 0, "noise": 0},
+            "export": {"format": "PNG", "size": "8x8", "destinationValue": "_OUT"},
+        }
+    )
+    final = _wait_for_export(service, started["jobId"])
+
+    assert final["status"] == "failed"
+    assert final["issues"][0]["title"] == "Exportación"
 
 
 def test_bridge_export_rejects_invalid_input(tmp_path):

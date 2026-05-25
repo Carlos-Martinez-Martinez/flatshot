@@ -357,9 +357,12 @@ Notas:
 
 - solo acepta PNG en esta fase;
 - no borra ni mueve fuentes;
+- valida todas las salidas del job antes de escribir y bloquea colisiones internas o archivos ya existentes;
 - respeta `ExportRunner`, naming, sufijos, formatos, calidad y dimensiones existentes;
 - escribe en `_SALIDA_PRO` por defecto o en el destino personalizado indicado;
 - los jobs viven en memoria del proceso bridge de desarrollo.
+
+Si la validacion detecta salidas repetidas o ya existentes, devuelve `409` con `error.code = "export_output_collision"` y no crea job ni escribe archivos.
 
 ### `GET /exports/jobs/{jobId}`
 

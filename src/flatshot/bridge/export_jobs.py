@@ -136,6 +136,16 @@ class BridgeExportJob:
                 elif error_count:
                     self.status = "partial"
                     success = False
+                elif not success:
+                    self.status = "failed"
+                    if not self.issues:
+                        self.issues.append(
+                            {
+                                "level": "error",
+                                "title": "Exportación",
+                                "detail": "No se pudo completar la exportación.",
+                            }
+                        )
                 else:
                     self.status = "completed"
                 self._finished_at = perf_counter()

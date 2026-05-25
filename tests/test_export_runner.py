@@ -1,6 +1,7 @@
 import threading
 from concurrent.futures import Future
 
+import pytest
 from PIL import Image
 
 import flatshot.application.export_runner as export_runner_module
@@ -11,7 +12,11 @@ from flatshot.application.events import (
     ExportProgressEvent,
 )
 from flatshot.application.execution_control import CancellationToken, PauseToken
-from flatshot.application.export_runner import ExportRunner
+from flatshot.application.export_runner import (
+    ExportRunner,
+    OutputPathValidationError,
+    validate_export_requests_outputs,
+)
 from flatshot.core.models import CurveData, ExportConfig, ShadowSettings
 
 
@@ -59,6 +64,16 @@ def _source(folder):
 def _request(folder, config=None, settings=None):
     return ExportJobRequest(
         input_folder=folder,
+        settings=settings or ShadowSettings(opacity=0, blur=0, noise=0),
+        export_config=config or ExportConfig(format="PNG", output_width=8, output_height=8),
+        curve_data=_curve(),
+    )
+
+
+def _request_with_files(folder, files, config=None, settings=None):
+    return ExportJobRequest(
+        input_folder=folder,
+        input_files=list(files),
         settings=settings or ShadowSettings(opacity=0, blur=0, noise=0),
         export_config=config or ExportConfig(format="PNG", output_width=8, output_height=8),
         curve_data=_curve(),
@@ -119,6 +134,45 @@ def test_export_runner_exports_to_custom_destination(tmp_path):
     assert result.success
     assert (custom_output / "source_PRO.png").exists()
     assert result.destinations == [custom_output]
+
+
+def test_export_validation_rejects_same_template_output_without_writing(tmp_path):
+    first = _source(tmp_path)
+    second = tmp_path / "second.png"
+    Image.new("RGBA", (8, 8), (20, 40, 60, 255)).save(second)
+    config = ExportConfig(
+        format="PNG",
+        output_width=8,
+        output_height=8,
+        naming_template="flatshot{suffix}",
+    )
+
+    with pytest.raises(OutputPathValidationError, match="archivos de salida repetidos"):
+        validate_export_requests_outputs([_request_with_files(tmp_path, [first, second], config=config)])
+
+    runner = ExportRunner(executor_factory=InlineExecutor)
+    result = runner.run(_request_with_files(tmp_path, [first, second], config=config))
+
+    assert not result.success
+    assert not (tmp_path / "_SALIDA_PRO").exists()
+
+
+def test_export_validation_rejects_existing_output_without_overwriting(tmp_path):
+    source = _source(tmp_path)
+    output_folder = tmp_path / "_SALIDA_PRO"
+    output_folder.mkdir()
+    existing = output_folder / "source_PRO.png"
+    existing.write_bytes(b"existing-output")
+    config = ExportConfig(format="PNG", output_width=8, output_height=8)
+
+    with pytest.raises(OutputPathValidationError, match="ya existentes"):
+        validate_export_requests_outputs([_request_with_files(tmp_path, [source], config=config)])
+
+    runner = ExportRunner(executor_factory=InlineExecutor)
+    result = runner.run(_request_with_files(tmp_path, [source], config=config))
+
+    assert not result.success
+    assert existing.read_bytes() == b"existing-output"
 
 
 def test_export_runner_honors_cancellation_before_rendering(tmp_path):

@@ -287,6 +287,41 @@ def test_bridge_http_export_prepare_and_run(tmp_path):
     assert (source / "_OUT" / "item_PRO.png").exists()
 
 
+def test_bridge_http_export_collision_returns_json_error(tmp_path):
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    output = tmp_path / "out"
+    first.mkdir()
+    second.mkdir()
+    output.mkdir()
+    first_png = _png(first / "same.png")
+    second_png = _png(second / "same.png")
+    service = FlatShotBridgeService(
+        config_resolver=ConfigPathResolver(tmp_path / "config"),
+        export_runner_factory=_export_runner_factory,
+    )
+    payload = {
+        "imagePaths": [str(first_png), str(second_png)],
+        "settings": {"opacity": 0, "blur": 0, "noise": 0},
+        "export": {
+            "format": "PNG",
+            "size": "8x8",
+            "destinationMode": "custom",
+            "customOutputPath": str(output),
+            "namingTemplate": "{original}{suffix}",
+        },
+    }
+
+    with running_bridge(tmp_path / "config", service=service) as port:
+        status, data = request_json(port, "POST", "/exports/run", payload)
+
+    assert status == 409
+    assert data["ok"] is False
+    assert data["error"]["code"] == "export_output_collision"
+    assert "archivos de salida repetidos" in data["error"]["message"]
+    assert list(output.iterdir()) == []
+
+
 def test_bridge_http_export_unknown_job_returns_json_error(tmp_path):
     with running_bridge(tmp_path / "config") as port:
         status, data = request_json(port, "GET", "/exports/jobs/missing")

@@ -1,10 +1,12 @@
 # FlatShot Desktop
 
-Prototipo navegable de la nueva app moderna de FlatShot.
+Interfaz web/bridge de FlatShot para el MVP actual. La ruta normal de usuario trabaja con carpetas reales mediante el bridge local; el mock queda reservado para desarrollo explícito con `?dev=1`.
 
 Estado actual:
 
+- MVP web/bridge decidido para la fase de cierre P0/P1.
 - APP.7 completada como exportación real con progreso por bridge local.
+- Validación previa de salidas para bloquear colisiones internas y archivos ya existentes antes de escribir.
 - Saneamiento UX/UI de pantalla principal aplicado antes de conectar exportación real.
 - Frontend estático en HTML/CSS/JS vanilla.
 - Sin `package.json`, Tauri, Rust, Node obligatorio ni dependencias nuevas.
@@ -86,14 +88,16 @@ Abrir:
 http://127.0.0.1:4173
 ```
 
-### Probar modo mock
+### Herramientas de desarrollo mock
 
-1. Abrir `http://127.0.0.1:4173`.
-2. Mantener el modo normal en Mock o abrir `Debug` para confirmar `Modo: Mock`.
-3. Usar el selector `Demo` dentro de `Debug` o el panel `Revisión`.
-4. Recorrer estados: sin lote, lote listo, preview loading/error, exportacion lista, en curso, completada y con errores.
+El modo mock ya no aparece en la ruta normal. Para revisar estados visuales:
 
-El header normal muestra sólo estado operativo. `Debug` muestra:
+1. Abrir `http://127.0.0.1:4173?dev=1`.
+2. Abrir `Debug`.
+3. Cambiar `Modo` a `Mock` si hace falta.
+4. Usar el selector `Demo` o el panel `Revisión`.
+
+`Debug` muestra:
 
 - modo activo;
 - estado del bridge;
@@ -103,16 +107,14 @@ El header normal muestra sólo estado operativo. `Debug` muestra:
 ### Probar bridge local
 
 1. Arrancar con `python apps/flatshot-desktop/run_dev.py --open`.
-2. Abrir `Debug` y cambiar `Modo` a `Bridge local`.
-3. Confirmar URL `http://127.0.0.1:8765`.
-4. Pulsar `Comprobar bridge`.
-5. Verificar `Bridge: Conectado` y `Última respuesta: health OK`.
-6. Pulsar `Seleccionar carpeta` o escribir una ruta real en `Ruta manual`.
-7. Si escribiste la ruta manualmente, pulsar `Escanear`.
+2. Usar `Seleccionar carpeta`.
+3. Como alternativa, abrir `Ruta manual`, escribir una ruta real y pulsar `Escanear`.
+4. Revisar lote, preview, ajustes y salida.
+5. Pulsar `Exportar N` cuando la salida esté lista.
 
 Esto llama a:
 
-- `GET /health`;
+- `GET /health`, si se comprueba desde modo desarrollo;
 - `GET /capabilities`;
 - `GET /presets`;
 - `POST /folders/pick`, si usas `Seleccionar carpeta`;
@@ -131,10 +133,8 @@ El panel de lote se actualiza con carpetas, imagenes, contadores y errores reale
    ```
 
 2. Abrir `http://127.0.0.1:4173` si el navegador no se abre solo.
-3. Abrir `Debug`, cambiar `Modo` a `Bridge local` y confirmar que el header resume la conexión.
-4. Pulsar `Comprobar bridge` y comprobar `health OK`.
-5. Pulsar `Seleccionar carpeta` o pegar en `Ruta manual` una carpeta real con PNG.
-6. Si pegaste la ruta manualmente, pulsar `Escanear`.
+3. Pulsar `Seleccionar carpeta` o pegar en `Ruta manual` una carpeta real con PNG.
+4. Si pegaste la ruta manualmente, pulsar `Escanear`.
 
 Debe verse:
 
@@ -162,9 +162,10 @@ Para probar ruta invalida:
 
 Para probar varias carpetas, separarlas con `;` en `Ruta manual`.
 
-Para volver a mock:
+Para usar mock de desarrollo:
 
-1. Abrir `Debug` y cambiar `Modo` a `Mock`, o usar el selector `Demo`.
+1. Abrir `http://127.0.0.1:4173?dev=1`.
+2. Abrir `Debug` y cambiar `Modo` a `Mock`, o usar el selector `Demo`.
 2. Pulsar `Lote mock` o elegir un escenario de `Revisión`.
 
 Sigue sin conectarse:
@@ -186,8 +187,8 @@ Revisar:
 - sin scroll vertical global;
 - paneles laterales con scroll propio;
 - barra inferior siempre visible;
-- mock/bridge legible;
-- controles de revisión plegados por defecto;
+- bridge legible;
+- controles de revisión ocultos en modo normal;
 - escaneo real visible en el flujo principal;
 - preview real clara;
 - exportación real disponible desde `Salida`.
@@ -200,12 +201,10 @@ Revisar:
    python apps/flatshot-desktop/run_dev.py --open
    ```
 
-2. Abrir `Debug` y cambiar `Modo` a `Bridge local`.
-3. Pulsar `Comprobar bridge`.
-4. Pegar una carpeta real con PNG en `Ruta manual`.
-5. Pulsar `Escanear`.
-6. Seleccionar una imagen del lote.
-7. Esperar `Generando preview`.
+2. Pulsar `Seleccionar carpeta` o pegar una carpeta real con PNG en `Ruta manual`.
+3. Si usaste ruta manual, pulsar `Escanear`.
+4. Seleccionar una imagen del lote.
+5. Esperar `Generando preview`.
 
 Debe verse:
 
@@ -272,14 +271,12 @@ El rediseño profundo de la pantalla principal refuerza estas decisiones:
    python apps/flatshot-desktop/run_dev.py --open
    ```
 
-2. Abrir `Debug` y cambiar `Modo` a `Bridge local`.
-3. Pulsar `Comprobar bridge`.
-4. Revisar el panel `Preset`.
-5. Seleccionar `Luz cenital` o `Estándar oscuro`.
-6. Escanear una carpeta real con PNG.
-7. Seleccionar una imagen.
-8. Cambiar opacidad, blur, distancia o padding.
-9. Abrir `Avanzado` y cambiar ruido, contacto, escala o motor.
+2. Escanear una carpeta real con PNG.
+3. Revisar el panel `Preset`.
+4. Seleccionar `Luz cenital` o `Estándar oscuro`.
+5. Seleccionar una imagen.
+6. Cambiar opacidad, blur, distancia o padding.
+7. Abrir `Avanzado` y cambiar ruido, contacto, escala o motor.
 
 Debe verse:
 
@@ -289,7 +286,7 @@ Debe verse:
 - preview real regenerada al cambiar preset o ajuste;
 - `Sin guardar` al modificar un ajuste;
 - `Reset` vuelve al preset activo;
-- `Guardar preset` queda pendiente en modo bridge.
+- `Guardar preset` no aparece en la ruta normal porque el guardado real queda fuera del MVP.
 
 Sigue sin conectarse:
 
@@ -305,8 +302,7 @@ Sigue sin conectarse:
    python apps/flatshot-desktop/run_dev.py --open
    ```
 
-2. Abrir `Debug`, cambiar `Modo` a `Bridge local` y pulsar `Comprobar bridge`.
-3. Escanear una carpeta real con PNG.
+2. Escanear una carpeta real con PNG.
 4. Abrir la pestaña `Salida`.
 5. Revisar formato, tamaño, destino y naming.
 6. Pulsar `Exportar lote`.
@@ -320,12 +316,14 @@ Debe verse:
 - `Exportación completada` al terminar;
 - archivos generados en `_SALIDA_PRO` o en el destino configurado;
 - errores parciales si el runner devuelve fallos.
+- bloqueo claro si hay salidas repetidas o archivos ya existentes en destino.
 
 Notas:
 
 - el bridge usa `ExportRunner`;
 - no se modifica el motor de exportación;
 - no se cambia naming, formato, calidad ni comportamiento de salida;
+- no se sobrescriben salidas existentes ni colisiones internas sin bloquear primero;
 - `Pausar`, `Reanudar` y `Detener` llaman al job local del bridge;
 - la ruta de destino se muestra en `Salida`; abrir la carpeta sigue pendiente de integración nativa Tauri.
 
@@ -337,8 +335,7 @@ Notas:
    python apps/flatshot-desktop/run_dev.py --open
    ```
 
-2. Abrir `Debug`, usar `Bridge local` y comprobar conexión.
-3. Escanear una carpeta real con PNG.
+2. Escanear una carpeta real con PNG.
 4. Abrir `Salida` y pulsar `Exportar lote`.
 5. Revisar el bloque de resultado bajo el resumen de salida.
 
@@ -364,14 +361,20 @@ No hay apertura nativa de carpeta de salida todavía. La ruta queda visible para
 Revisar especialmente:
 
 - jerarquia entre lote, preview y ajustes;
-- claridad del modo `Mock` frente a `Bridge local`;
+- claridad de la ruta real web/bridge;
 - estados vacios, loading y error;
 - si la preview mantiene protagonismo;
 - si exportacion se entiende de un vistazo;
 - textos largos o redundantes;
 - controles que parezcan reales pero sigan siendo mock.
 
-## Estados mock incluidos
+## Estados mock incluidos en modo desarrollo
+
+Disponible sólo abriendo:
+
+```text
+http://127.0.0.1:4173?dev=1
+```
 
 El selector `Demo` permite recorrer sin editar código:
 
@@ -418,7 +421,7 @@ El frontend no procesa imágenes ni duplica lógica del motor.
 
 ## Modo mock
 
-El modo por defecto es `Mock`. Permite validar la UX sin backend:
+El modo mock no es el modo por defecto. Permite validar la UX sin backend sólo en modo desarrollo:
 
 - estados de lote;
 - preview simulada;
@@ -426,7 +429,7 @@ El modo por defecto es `Mock`. Permite validar la UX sin backend:
 - exportación simulada;
 - errores y resultados simulados.
 
-El selector `Demo` sigue disponible para recorrer los estados principales.
+El selector `Demo` sigue disponible con `?dev=1`.
 
 ## Modo bridge local
 
@@ -446,11 +449,8 @@ python -m http.server 4173 --bind 127.0.0.1 --directory apps/flatshot-desktop/fr
 
 En la UI:
 
-1. Abrir `Debug` y cambiar `Modo` a `Bridge local`.
-2. Mantener `Bridge` como `http://127.0.0.1:8765`.
-3. Pulsar `Comprobar bridge`.
-4. Pulsar `Seleccionar carpeta` o escribir una ruta real en `Ruta manual`.
-5. Si escribiste la ruta manualmente, pulsar `Escanear`.
+1. Pulsar `Seleccionar carpeta` o escribir una ruta real en `Ruta manual`.
+2. Si escribiste la ruta manualmente, pulsar `Escanear`.
 
 Esto llama a:
 

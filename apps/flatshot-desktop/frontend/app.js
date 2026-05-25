@@ -73,6 +73,8 @@ const mockPresets = [
 ];
 
 const defaultBridgeUrl = "http://127.0.0.1:8765";
+const devMode = new URLSearchParams(window.location.search).get("dev") === "1";
+document.documentElement.classList.toggle("dev-mode", devMode);
 
 const statusLabels = {
   ready: "Lista",
@@ -184,7 +186,7 @@ const state = {
   activePreset: "Luz cenital",
   settings: { ...defaultSettings },
   presetDirty: false,
-  presetSource: "Mock",
+  presetSource: "Bridge local",
   localOverride: false,
   exportStatus: "blocked",
   exportJobId: null,
@@ -304,10 +306,10 @@ function activePresetItems() {
   }
   return mockPresets.map((name) => ({
     name,
-    category: "Mock",
-    categoryId: "mock",
+    category: devMode ? "Mock" : "Fallback local",
+    categoryId: devMode ? "mock" : "fallback",
     settings: normalizeSettings(mockPresetSettings[name]),
-    source: "mock",
+    source: devMode ? "mock" : "fallback",
   }));
 }
 
@@ -615,6 +617,9 @@ function loadBatch() {
 }
 
 function loadMockBatch() {
+  if (!devMode) {
+    return;
+  }
   state.bridgeMode = "mock";
   state.bridgeLastResponse = "Estado mock: lote listo";
   loadBatch();
@@ -626,6 +631,9 @@ function clearBatch() {
 }
 
 function showEmptyFolder() {
+  if (!devMode) {
+    return;
+  }
   state.bridgeMode = "mock";
   state.bridgeLastResponse = "Estado mock: carpeta vacía";
   setScenario("empty-folder");
@@ -708,7 +716,7 @@ function applyPresetSettings(name, options = {}) {
   state.presetDirty = false;
   state.presetSource = preset.source === "bridge"
     ? `Bridge local · ${preset.category || "Preset"}`
-    : "Mock";
+    : devMode ? "Mock" : "Fallback local";
   state.statusText = options.statusText || `Preset: ${preset.name}`;
   if (options.refresh !== false) {
     refreshPreviewAfterSettingChange();
@@ -722,14 +730,14 @@ function resetActivePresetSettings() {
   }
   state.settings = { ...defaultSettings };
   state.presetDirty = false;
-  state.presetSource = state.bridgeMode === "bridge" ? "Bridge local · defaults" : "Mock";
+  state.presetSource = state.bridgeMode === "bridge" || !devMode ? "Bridge local · defaults" : "Mock";
   state.statusText = "Ajustes restaurados";
   refreshPreviewAfterSettingChange();
 }
 
 function markPresetDirty() {
   state.presetDirty = true;
-  state.presetSource = state.bridgeMode === "bridge" ? "Bridge local · modificado" : "Mock · modificado";
+  state.presetSource = state.bridgeMode === "bridge" || !devMode ? "Bridge local · modificado" : "Mock · modificado";
   refreshPreviewAfterSettingChange();
 }
 
@@ -775,6 +783,20 @@ function startExport(options = {}) {
 
   if (isBridgeBatch()) {
     void startBridgeExport();
+    return;
+  }
+
+  if (!devMode) {
+    Object.assign(state, {
+      exportStatus: "blocked",
+      errors: [{
+        level: "error",
+        title: "Lote real requerido",
+        detail: "Selecciona una carpeta local antes de exportar.",
+      }],
+      statusText: "Selecciona una carpeta local",
+    });
+    render();
     return;
   }
 
@@ -1546,6 +1568,9 @@ function capabilitiesSummary(capabilities) {
 }
 
 function showReviewScenario(scenario) {
+  if (!devMode) {
+    return;
+  }
   state.bridgeMode = "mock";
   state.bridgeLastResponse = `Estado mock: ${scenarioLabels[scenario] || scenario}`;
   setScenario(scenario);
@@ -1591,6 +1616,7 @@ function render() {
 
 function renderShell() {
   const shell = $(".app-shell");
+  shell.classList.toggle("dev-mode", devMode);
   shell.classList.toggle("has-batch", hasBatch() || state.batch === "empty");
   shell.classList.toggle("is-scanning", state.batch === "scanning");
   shell.classList.toggle("inspector-collapsed", state.inspectorCollapsed);
@@ -1651,7 +1677,7 @@ function renderBridge() {
 
 function normalBridgeMessage() {
   if (state.bridgeMode !== "bridge") {
-    return "Modo revisión con datos simulados.";
+    return devMode ? "Modo revisión con datos simulados." : "Selecciona una carpeta local.";
   }
   if (state.bridgeStatus === "connected") {
     return "Bridge conectado.";
@@ -1683,9 +1709,9 @@ function sourceLabel() {
     return "Carpeta local";
   }
   if (isMockBatch()) {
-    return "Mock";
+    return devMode ? "Mock" : "Carpeta local";
   }
-  return state.bridgeMode === "bridge" ? "Carpeta local" : "Mock";
+  return state.bridgeMode === "bridge" || !devMode ? "Carpeta local" : "Mock";
 }
 
 function emptyScanDiagnostics() {
@@ -1784,7 +1810,7 @@ function diagnosticsHtml(diagnostics) {
 
 function batchSummaryNote(imageCount, folderCount, issueCount) {
   if (state.batch === "scanning") {
-    return isBridgeBatch() ? "Leyendo PNG reales desde bridge." : "Leyendo lote mock.";
+    return isBridgeBatch() || !devMode ? "Leyendo PNG reales desde bridge." : "Leyendo lote mock.";
   }
   if (isBridgeBatch()) {
     if (state.batch === "empty") {
@@ -1800,20 +1826,22 @@ function batchSummaryNote(imageCount, folderCount, issueCount) {
       : `${imageCount} imágenes reales desde ${folderCount} carpeta${folderCount === 1 ? "" : "s"}`;
   }
   if (isMockBatch()) {
-    return state.batch === "empty" ? "Escenario mock: carpeta vacía." : "Escenario mock para revisión visual.";
+    return devMode
+      ? (state.batch === "empty" ? "Escenario mock: carpeta vacía." : "Escenario mock para revisión visual.")
+      : "Selecciona una carpeta local.";
   }
   return "Sin lote cargado.";
 }
 
 function bridgeStatusClass() {
-  if (state.bridgeMode !== "bridge") {
+  if (state.bridgeMode !== "bridge" && devMode) {
     return "idle";
   }
   return state.bridgeStatus;
 }
 
 function bridgeStatusLabel() {
-  if (state.bridgeMode !== "bridge") {
+  if (state.bridgeMode !== "bridge" && devMode) {
     return "Mock";
   }
   if (state.bridgeStatus === "connected") {
@@ -1848,12 +1876,12 @@ function renderBatch() {
 
   if (state.batch === "scanning") {
     $("#batch-count").textContent = "Escaneando";
-    $("#batch-pill").textContent = isBridgeBatch() ? "Carpeta local" : "Carpeta mock";
+    $("#batch-pill").textContent = isBridgeBatch() || !devMode ? "Carpeta local" : "Carpeta mock";
     $("#folder-list").innerHTML = folderItemHtml({
       id: "scan",
-      name: isBridgeBatch() ? basename(parseFolderInput(state.bridgeScanPath)[0]) || "Ruta bridge" : "Camisetas Mayo",
+      name: isBridgeBatch() || !devMode ? basename(parseFolderInput(state.bridgeScanPath)[0]) || "Ruta bridge" : "Camisetas Mayo",
       path: state.bridgeScanPath,
-      detail: isBridgeBatch() ? "Leyendo PNG reales" : "Leyendo PNG",
+      detail: isBridgeBatch() || !devMode ? "Leyendo PNG reales" : "Leyendo PNG",
       count: "...",
       status: "ready",
     });
@@ -1987,7 +2015,9 @@ function renderPreview() {
   $("#canvas-area").className = `canvas-area bg-${state.previewBg === "transparent" ? "transparent" : state.previewBg}`;
   $$(".preview-toolbar [data-preview-mode]").forEach((button) => {
     button.classList.toggle("active", button.dataset.previewMode === state.previewMode);
-    button.disabled = compareControlsDisabled;
+    button.disabled = button.dataset.previewMode === "processed"
+      ? previewControlsDisabled
+      : compareControlsDisabled;
   });
   $$(".background-switch [data-preview-bg]").forEach((button) => {
     button.classList.toggle("active", button.dataset.previewBg === state.previewBg);
@@ -2162,9 +2192,14 @@ function renderSettings() {
   const image = selectedImage();
   const localActive = state.localOverride || image?.status === "adjusted";
   $("#local-adjustment").classList.toggle("active", localActive);
-  $("#local-adjustment-text").textContent = localActive ? "Ajuste local activo" : "Sin ajuste local";
+  $("#local-adjustment-text").textContent = devMode
+    ? (localActive ? "Ajuste local activo" : "Sin ajuste local")
+    : "Fuera del MVP";
   $("#save-preset").disabled = state.bridgeMode === "bridge";
-  $("#save-preset").textContent = state.bridgeMode === "bridge" ? "Guardar pendiente" : "Guardar preset";
+  $("#save-preset").title = state.bridgeMode === "bridge"
+    ? "Guardado de presets fuera del MVP web/bridge actual"
+    : "";
+  $("#save-preset").textContent = state.bridgeMode === "bridge" ? "Guardar no disponible" : "Guardar preset";
 }
 
 function renderInspector() {
@@ -2190,7 +2225,9 @@ function presetSourceLabel() {
     }
     return state.presetDirty ? `${source} · modificado` : source;
   }
-  return state.presetDirty ? "Mock · modificado" : "Mock";
+  return devMode
+    ? (state.presetDirty ? "Mock · modificado" : "Mock")
+    : (state.presetDirty ? "Fallback local · modificado" : "Fallback local");
 }
 
 function renderExport() {
@@ -2483,7 +2520,7 @@ function handleAction(action) {
     resetActivePresetSettings();
   } else if (action === "save-preset") {
     if (state.bridgeMode === "bridge") {
-      state.statusText = "Guardar preset pendiente";
+      state.statusText = "Guardado de presets fuera del MVP";
       render();
       return;
     }
@@ -2492,6 +2529,11 @@ function handleAction(action) {
     state.statusText = "Preset guardado";
     render();
   } else if (action === "toggle-local-adjustment") {
+    if (!devMode) {
+      state.statusText = "Ajuste por imagen fuera del MVP";
+      render();
+      return;
+    }
     state.localOverride = !state.localOverride;
     state.statusText = state.localOverride ? "Ajuste local activo" : "Ajuste local quitado";
     render();
@@ -2502,7 +2544,7 @@ function handleAction(action) {
   } else if (action === "review-errors") {
     reviewErrors();
   } else if (action === "open-output") {
-    state.statusText = "Destino visible en Salida";
+    state.statusText = "Apertura nativa fuera del MVP";
     render();
   } else if (action === "primary") {
     primaryAction();
@@ -2565,12 +2607,21 @@ document.addEventListener("click", (event) => {
 });
 
 $("#demo-scenario").addEventListener("change", (event) => {
+  if (!devMode) {
+    return;
+  }
   state.bridgeMode = "mock";
   state.bridgeLastResponse = `Estado mock: ${scenarioLabels[event.target.value] || event.target.value}`;
   setScenario(event.target.value);
 });
 
 $("#app-mode").addEventListener("change", (event) => {
+  if (!devMode && event.target.value !== "bridge") {
+    event.target.value = "bridge";
+    state.bridgeMode = "bridge";
+    render();
+    return;
+  }
   state.bridgeMode = event.target.value;
   state.statusText = state.bridgeMode === "bridge" ? "Bridge local" : "Modo mock";
   state.bridgeLastResponse = state.bridgeMode === "bridge" ? "Bridge pendiente" : "Mock activo";

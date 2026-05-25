@@ -45,7 +45,7 @@ Usar antes de cerrar cada tanda visual de la nueva app.
 - [ ] `Comprobar bridge` muestra `health OK`.
 - [ ] Escanear una carpeta con PNG actualiza carpetas, imagenes y contadores.
 - [ ] La primera imagen real queda seleccionada.
-- [ ] La preview muestra `Preview real pendiente`.
+- [ ] La preview muestra estado claro para imagen real.
 - [ ] La preview muestra nombre y ruta de la imagen real.
 - [ ] La exportacion queda marcada como no conectada.
 - [ ] Una carpeta vacia muestra `No se encontraron PNG`.
@@ -66,6 +66,21 @@ Usar antes de cerrar cada tanda visual de la nueva app.
 - [ ] Mock y Bridge se distinguen claramente.
 - [ ] El panel derecho no desborda.
 - [ ] La app es usable en 1920×1080.
+
+## APP.5 — Preview real
+
+- [ ] `run_dev.py --open` arranca frontend y bridge.
+- [ ] Bridge conecta correctamente.
+- [ ] Se escanea una carpeta real con PNG.
+- [ ] Al seleccionar una imagen aparece loading.
+- [ ] La preview real aparece en el panel central.
+- [ ] La imagen no rompe el layout.
+- [ ] No hay scroll global.
+- [ ] No hay scroll horizontal.
+- [ ] Los warnings se muestran sin invadir.
+- [ ] Los errores de preview son claros.
+- [ ] Modo mock sigue funcionando.
+- [ ] Exportación sigue marcada como no conectada.
 
 ## Feedback a revisar
 

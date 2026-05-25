@@ -59,6 +59,8 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(self.server.service.list_presets())
             elif path == "/folders/scan":
                 raise MethodNotAllowedError("Use POST for /folders/scan.")
+            elif path == "/preview/render":
+                raise MethodNotAllowedError("Use POST for /preview/render.")
             else:
                 raise NotFoundError()
         except Exception as exc:
@@ -67,12 +69,14 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         try:
             path = urlparse(self.path).path
-            if path != "/folders/scan":
+            if path == "/folders/scan":
+                self._send_json(self.server.service.scan_folders(self._read_json_body()))
+            elif path == "/preview/render":
+                self._send_json(self.server.service.render_preview(self._read_json_body()))
+            else:
                 if path in {"/health", "/app-info", "/capabilities", "/presets"}:
                     raise MethodNotAllowedError("Use GET for this endpoint.")
                 raise NotFoundError()
-
-            self._send_json(self.server.service.scan_folders(self._read_json_body()))
         except Exception as exc:
             self._send_error(exc)
 

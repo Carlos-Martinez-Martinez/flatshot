@@ -8,7 +8,7 @@ Estado actual:
 - bind por defecto a `127.0.0.1`;
 - implementado con stdlib, sin dependencias nuevas;
 - sin PyQt;
-- sin preview real;
+- preview real por endpoint JSON;
 - sin exportacion real;
 - sin Tauri.
 
@@ -62,11 +62,11 @@ Real. Devuelve informacion basica de FlatShot, version de bridge y tipo de UI.
 
 ### `GET /capabilities`
 
-Real. Declara lo disponible en APP.3:
+Real. Declara lo disponible en APP.5:
 
 - `folderScan`: `true`;
 - `presetsRead`: `true`;
-- `previewRender`: `false`;
+- `previewRender`: `true`;
 - `exportRun`: `false`;
 - `exportProgress`: `false`;
 - `nativeFolderPicker`: `false`.
@@ -129,6 +129,58 @@ $body = @{ folders = @("C:/ruta/a/carpeta") } | ConvertTo-Json
 Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8765/folders/scan -ContentType "application/json" -Body $body
 ```
 
+### `POST /preview/render`
+
+Real. Genera una preview con `flatshot.application.preview_service.PreviewService`.
+
+Request:
+
+```json
+{
+  "imagePath": "C:/ruta/a/carpeta/imagen.png",
+  "targetWidth": 675,
+  "targetHeight": 900,
+  "settings": {
+    "presetName": "Luz cenital",
+    "opacity": 20,
+    "blur": 30,
+    "distance": 25,
+    "padding": 10,
+    "bgColor": [230, 230, 230],
+    "transparentBg": false
+  }
+}
+```
+
+Response:
+
+```json
+{
+  "ok": true,
+  "image": {
+    "mimeType": "image/png",
+    "dataBase64": "...",
+    "width": 675,
+    "height": 900
+  },
+  "source": {
+    "path": "C:/ruta/a/carpeta/imagen.png",
+    "name": "imagen.png"
+  },
+  "warning": null,
+  "renderTimeMs": 123
+}
+```
+
+Notas:
+
+- sólo soporta PNG en esta fase;
+- no modifica archivos;
+- no escribe configuracion;
+- limita cada lado de preview a 1200 px;
+- los sliders `opacity`, `blur`, `distance` y `padding` se envian como ajustes reales parciales;
+- `presetName` se conserva como contexto, pero APP.6 conectara presets reales completos.
+
 ## Errores JSON
 
 Las rutas desconocidas, metodos incorrectos e inputs invalidos devuelven errores controlados:
@@ -145,13 +197,14 @@ Las rutas desconocidas, metodos incorrectos e inputs invalidos devuelven errores
 
 No se devuelve traceback bruto en JSON.
 
-## Seguridad de APP.3
+## Seguridad de APP.5
 
 - Solo lectura.
 - No ejecuta comandos arbitrarios.
 - No borra, mueve ni modifica imagenes.
 - No escribe configuracion.
-- No expone preview ni exportacion.
+- Expone preview de lectura para rutas solicitadas por la UI.
+- No expone exportacion.
 - El servidor rechaza binds distintos de `127.0.0.1` o `localhost` desde el CLI.
 - CORS esta limitado a origenes locales de desarrollo del prototipo.
 
@@ -159,7 +212,6 @@ No se devuelve traceback bruto en JSON.
 
 - Tauri;
 - selector nativo de carpetas;
-- preview real;
 - exportacion real;
 - progreso real;
 - cola;

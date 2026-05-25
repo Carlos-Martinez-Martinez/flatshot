@@ -109,6 +109,9 @@ const state = {
   batchSource: "none",
   selectedImageId: null,
   previewStatus: "empty",
+  previewRequestId: 0,
+  previewData: null,
+  previewError: "",
   previewMode: "processed",
   previewBg: "rgb230",
   zoom: 100,
@@ -277,6 +280,8 @@ function setScenario(scenario) {
     batchSource: "mock",
     selectedImageId: "img-001",
     previewStatus: "ready",
+    previewData: null,
+    previewError: "",
     exportStatus: "ready",
     destinationMode: "source",
     destinationValue: "_SALIDA_PRO",
@@ -391,6 +396,8 @@ function loadBatch() {
     batchSource: "mock",
     selectedImageId: null,
     previewStatus: "empty",
+    previewData: null,
+    previewError: "",
     exportStatus: "blocked",
     progress: 0,
     processed: 0,
@@ -444,12 +451,12 @@ function selectImage(imageId) {
   state.selectedImageId = image.id;
   state.localOverride = image.status === "adjusted";
   if (image.source === "bridge") {
-    state.previewStatus = "real-placeholder";
-    state.statusText = `Imagen real: ${image.name}`;
-    render();
+    void requestBridgePreview(image);
     return;
   }
   state.previewStatus = "loading";
+  state.previewData = null;
+  state.previewError = "";
   state.statusText = "Generando preview";
   render();
   setTimer(() => {
@@ -466,9 +473,18 @@ function markPresetDirty() {
 
 function refreshPreviewAfterSettingChange() {
   if (selectedImage()?.source === "bridge") {
-    state.previewStatus = "real-placeholder";
-    state.statusText = "Preview real pendiente";
+    state.previewStatus = "loading";
+    state.previewData = null;
+    state.previewError = "";
+    state.statusText = "Generando preview";
     render();
+    clearTimers();
+    setTimer(() => {
+      const image = selectedImage();
+      if (image?.source === "bridge") {
+        void requestBridgePreview(image);
+      }
+    }, 360);
     return;
   }
   if (hasBatch() && state.previewStatus !== "error") {
@@ -574,14 +590,16 @@ function normalizedBridgeUrl() {
 
 async function bridgeRequest(path, options = {}) {
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), 3500);
+  const timeoutMs = options.timeoutMs || 3500;
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   const headers = options.body
     ? { "Content-Type": "application/json", ...(options.headers || {}) }
     : { ...(options.headers || {}) };
+  const { timeoutMs: _timeoutMs, ...fetchOptions } = options;
 
   try {
     const response = await fetch(`${normalizedBridgeUrl()}${path}`, {
-      ...options,
+      ...fetchOptions,
       headers,
       signal: controller.signal,
     });
@@ -593,6 +611,96 @@ async function bridgeRequest(path, options = {}) {
   } finally {
     window.clearTimeout(timer);
   }
+}
+
+async function requestBridgePreview(image) {
+  const requestId = state.previewRequestId + 1;
+  state.previewRequestId = requestId;
+  state.previewStatus = "loading";
+  state.previewData = null;
+  state.previewError = "";
+  state.statusText = "Generando preview";
+  render();
+
+  try {
+    const response = await bridgeRequest("/preview/render", {
+      method: "POST",
+      body: JSON.stringify({
+        imagePath: image.path,
+        ...previewTargetSize(),
+        settings: bridgePreviewSettings(),
+      }),
+      timeoutMs: 20000,
+    });
+
+    if (isStalePreviewResponse(requestId, image)) {
+      return;
+    }
+
+    state.previewData = previewResponseToData(response);
+    state.previewStatus = response.warning ? "warning" : "ready";
+    state.statusText = response.warning ? "Preview con aviso" : "Preview lista";
+  } catch (error) {
+    if (isStalePreviewResponse(requestId, image)) {
+      return;
+    }
+    const message = bridgeErrorMessage(error);
+    state.previewStatus = "error";
+    state.previewData = null;
+    state.previewError = message;
+    state.statusText = "Preview no disponible";
+  }
+
+  render();
+}
+
+function isStalePreviewResponse(requestId, image) {
+  return requestId !== state.previewRequestId || state.selectedImageId !== image.id;
+}
+
+function previewResponseToData(response) {
+  return {
+    src: `data:${response.image.mimeType};base64,${response.image.dataBase64}`,
+    width: response.image.width,
+    height: response.image.height,
+    sourceName: response.source?.name || selectedImage()?.name || "imagen.png",
+    sourcePath: response.source?.path || selectedImage()?.path || "",
+    warning: response.warning || "",
+    renderTimeMs: Number(response.renderTimeMs) || 0,
+  };
+}
+
+function bridgePreviewSettings() {
+  return {
+    presetName: state.activePreset,
+    opacity: state.settings.opacity,
+    blur: state.settings.blur,
+    distance: state.settings.distance,
+    padding: state.settings.padding,
+    transparentBg: state.background === "transparent",
+    bgColor: backgroundColorTuple(state.background),
+  };
+}
+
+function previewTargetSize() {
+  const match = /^(\d+)x(\d+)$/.exec(state.size);
+  if (!match) {
+    return { targetWidth: 900, targetHeight: 900 };
+  }
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  const scale = Math.min(900 / Math.max(width, height), 1);
+  return {
+    targetWidth: Math.max(1, Math.round(width * scale)),
+    targetHeight: Math.max(1, Math.round(height * scale)),
+  };
+}
+
+function backgroundColorTuple(value) {
+  if (value === "white") {
+    return [255, 255, 255];
+  }
+  return [230, 230, 230];
 }
 
 async function checkBridge() {
@@ -661,6 +769,8 @@ async function scanBridgeFolder() {
     batchSource: "bridge",
     selectedImageId: null,
     previewStatus: "empty",
+    previewData: null,
+    previewError: "",
     exportStatus: "blocked",
     progress: 0,
     processed: 0,
@@ -685,6 +795,8 @@ async function scanBridgeFolder() {
       batchSource: "none",
       selectedImageId: null,
       previewStatus: "empty",
+      previewData: null,
+      previewError: "",
       exportStatus: "blocked",
       bridgeStatus: "disconnected",
       bridgeMessage: message,
@@ -723,18 +835,23 @@ function applyBridgeScanResult(response) {
   if (state.realImages.length) {
     state.batch = "ready";
     state.selectedImageId = state.realImages[0].id;
-    state.previewStatus = "real-placeholder";
+    state.previewStatus = "loading";
+    state.previewData = null;
+    state.previewError = "";
     state.exportStatus = "blocked";
     state.scanStatus = state.scanIssues.length
       ? `Escaneo completado con ${state.scanIssues.length} aviso${state.scanIssues.length === 1 ? "" : "s"}`
       : `${state.realImages.length} imágenes encontradas`;
-    state.statusText = "Lote real escaneado";
+    state.statusText = "Generando preview";
+    void requestBridgePreview(state.realImages[0]);
     return;
   }
 
   state.batch = "empty";
   state.selectedImageId = null;
   state.previewStatus = "empty";
+  state.previewData = null;
+  state.previewError = "";
   state.exportStatus = "blocked";
   state.scanStatus = state.scanIssues.length ? state.scanIssues[0].detail : "No se encontraron PNG";
   state.statusText = state.scanIssues.length ? "Revisa carpeta" : "No hay PNG válidos";
@@ -824,6 +941,9 @@ function capabilitiesSummary(capabilities) {
   }
   if (capabilities.presetsRead) {
     available.push("presets");
+  }
+  if (capabilities.previewRender) {
+    available.push("preview");
   }
   return available.length ? available.join(" · ") : "Sin capacidades activas";
 }
@@ -1121,12 +1241,13 @@ function renderFilterButtons() {
 
 function renderPreview() {
   const image = selectedImage();
-  const previewControlsDisabled = !image || image.source === "bridge" || state.previewStatus === "empty" || state.previewStatus === "error";
+  const isBridgeImage = image?.source === "bridge";
+  const previewControlsDisabled = !image || isBridgeImage || state.previewStatus === "empty" || state.previewStatus === "error";
   $("#preview-name").textContent = image ? image.name : "Sin imagen seleccionada";
   $("#preview-subtitle").textContent = previewSubtitle(image);
   $("#zoom-label").textContent = `${state.zoom}%`;
-  $("#preview-meta").textContent = image?.source === "bridge"
-    ? "Bridge local · Preview pendiente"
+  $("#preview-meta").textContent = isBridgeImage
+    ? bridgePreviewMeta()
     : image ? `${state.format} · ${state.size} · ${backgroundLabel(state.background)}` : "Sin imagen";
   $("#canvas-area").className = `canvas-area bg-${state.previewBg === "transparent" ? "transparent" : state.previewBg}`;
   $$(".preview-toolbar [data-preview-mode]").forEach((button) => {
@@ -1150,8 +1271,8 @@ function renderPreview() {
     return;
   }
 
-  if (image.source === "bridge") {
-    canvas.innerHTML = realPreviewPlaceholderHtml(image);
+  if (isBridgeImage) {
+    canvas.innerHTML = realPreviewHtml(image);
     return;
   }
 
@@ -1180,16 +1301,51 @@ function renderPreview() {
   `;
 }
 
-function realPreviewPlaceholderHtml(image) {
+function realPreviewHtml(image) {
+  if (state.previewStatus === "loading") {
+    return `
+      <div class="preview-state">
+        <span class="loader" aria-hidden="true"></span>
+        <strong>Generando preview</strong>
+        <span>${escapeHtml(image.name)}</span>
+      </div>
+    `;
+  }
+
+  if (state.previewStatus === "error") {
+    return previewStateHtml("Preview no disponible", state.previewError || "Revisa la imagen fuente.");
+  }
+
+  if (state.previewData?.src) {
+    return `
+      <img class="preview-image" src="${escapeHtml(state.previewData.src)}" alt="Preview real de ${escapeHtml(image.name)}" />
+      ${state.previewData.warning ? `<div class="preview-warning-card">${escapeHtml(state.previewData.warning)}</div>` : ""}
+    `;
+  }
+
   return `
     <div class="real-preview-placeholder">
       <span class="state-chip bridge">Bridge local</span>
       <strong>Preview real pendiente</strong>
       <span>Imagen seleccionada: ${escapeHtml(image.name)}</span>
       <small class="path-line">Ruta: ${escapeHtml(image.path || "Sin ruta")}</small>
-      <small>APP.5 conectará render real.</small>
+      <small>Genera la preview al seleccionar la imagen.</small>
     </div>
   `;
+}
+
+function bridgePreviewMeta() {
+  if (state.previewStatus === "loading") {
+    return "Bridge local · Generando preview";
+  }
+  if (state.previewStatus === "error") {
+    return state.previewError || "Bridge local · Preview no disponible";
+  }
+  if (state.previewData) {
+    const warning = state.previewData.warning ? " · Aviso" : "";
+    return `${state.previewData.width}x${state.previewData.height} · ${state.previewData.renderTimeMs} ms · Ajustes parciales${warning}`;
+  }
+  return "Bridge local · Preview pendiente";
 }
 
 function previewStateHtml(title, detail) {
@@ -1206,7 +1362,19 @@ function previewSubtitle(image) {
     return "Sin preview";
   }
   if (image.source === "bridge") {
-    return "Preview real pendiente";
+    if (state.previewStatus === "loading") {
+      return "Generando preview";
+    }
+    if (state.previewStatus === "warning") {
+      return "Preview real con aviso";
+    }
+    if (state.previewStatus === "error") {
+      return "Preview no disponible";
+    }
+    if (state.previewStatus === "ready") {
+      return "Preview real";
+    }
+    return "Preview pendiente";
   }
   if (state.previewStatus === "loading") {
     return "Generando preview";
@@ -1357,6 +1525,18 @@ function renderFooter() {
 
 function previewFooterLabel() {
   if (selectedImage()?.source === "bridge") {
+    if (state.previewStatus === "loading") {
+      return "Generando";
+    }
+    if (state.previewStatus === "warning") {
+      return "Con aviso";
+    }
+    if (state.previewStatus === "error") {
+      return "Error";
+    }
+    if (state.previewStatus === "ready") {
+      return "Real";
+    }
     return "Pendiente";
   }
   if (state.previewStatus === "loading") {
@@ -1526,6 +1706,11 @@ $("#format-select").addEventListener("change", (event) => {
 $("#size-select").addEventListener("change", (event) => {
   state.size = event.target.value;
   state.statusText = `Tamaño: ${state.size}`;
+  const image = selectedImage();
+  if (image?.source === "bridge") {
+    void requestBridgePreview(image);
+    return;
+  }
   render();
 });
 
@@ -1533,6 +1718,11 @@ $("#background-select").addEventListener("change", (event) => {
   state.background = event.target.value;
   state.previewBg = event.target.value;
   state.statusText = `Fondo: ${backgroundLabel(state.background)}`;
+  const image = selectedImage();
+  if (image?.source === "bridge") {
+    void requestBridgePreview(image);
+    return;
+  }
   render();
 });
 

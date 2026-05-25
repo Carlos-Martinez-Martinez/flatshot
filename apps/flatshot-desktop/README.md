@@ -4,11 +4,12 @@ Prototipo navegable de la nueva app moderna de FlatShot.
 
 Estado actual:
 
-- APP.4.5 completada como consolidación del shell visual.
+- APP.5 completada como preview real conectada al motor.
 - Frontend estático en HTML/CSS/JS vanilla.
 - Sin `package.json`, Tauri, Rust, Node obligatorio ni dependencias nuevas.
 - Bridge HTTP local de desarrollo en Python.
 - Escaneo real de carpetas por ruta manual usando servicios existentes.
+- Preview real de PNG seleccionados usando `PreviewService`.
 - Lectura real/parcial de presets desde el servicio Python.
 - La app PyQt legacy sigue intacta.
 
@@ -110,8 +111,9 @@ Esto llama a:
 - `GET /capabilities`;
 - `GET /presets`;
 - `POST /folders/scan`.
+- `POST /preview/render`.
 
-El panel de lote se actualiza con carpetas, imagenes, contadores y errores reales del bridge. La preview muestra un placeholder de imagen real pendiente. Ajustes y exportacion siguen sin motor real.
+El panel de lote se actualiza con carpetas, imagenes, contadores y errores reales del bridge. La preview real se genera en Python al seleccionar imagen. Exportacion sigue sin motor real.
 
 ## Probar APP.4 — Escaneo real de carpetas
 
@@ -134,7 +136,7 @@ Debe verse:
 - lista de carpetas con estado;
 - lista de imagenes devuelta por `/folders/scan`;
 - primera imagen seleccionada automaticamente;
-- preview central con `Preview real pendiente`;
+- preview central con imagen real o estado de carga;
 - ruta de la imagen seleccionada;
 - exportacion marcada como no conectada.
 
@@ -160,7 +162,6 @@ Para volver a mock:
 Sigue siendo simulado:
 
 - selector nativo de carpetas;
-- preview real;
 - ajustes aplicados por motor;
 - exportacion real;
 - progreso real.
@@ -182,8 +183,44 @@ Revisar:
 - mock/bridge legible;
 - controles de revisión plegados por defecto;
 - escaneo real visible en el flujo principal;
-- preview pendiente clara;
+- preview real clara;
 - exportación real marcada como no conectada.
+
+## Probar APP.5 — Preview real
+
+1. Arrancar la app:
+
+   ```bash
+   python apps/flatshot-desktop/run_dev.py --open
+   ```
+
+2. Cambiar `Modo` a `Bridge local`.
+3. Pulsar `Comprobar bridge`.
+4. Pegar una carpeta real con PNG en `Ruta manual`.
+5. Pulsar `Escanear`.
+6. Seleccionar una imagen del lote.
+7. Esperar `Generando preview`.
+
+Debe verse:
+
+- imagen real en el panel central;
+- metadatos de dimensiones y tiempo de render;
+- `Preview real` o `Preview real con aviso`;
+- exportacion marcada como no conectada.
+
+Para reconocer errores:
+
+- un PNG corrupto o ilegible muestra `Preview no disponible`;
+- una ruta de preview no soportada devuelve error controlado desde el bridge;
+- no aparece traceback en la UI.
+
+Sigue siendo mock o no conectado:
+
+- selector nativo de carpetas;
+- comparación/original de preview real;
+- presets reales completos aplicados a sliders;
+- exportacion real;
+- progreso real.
 
 ### Feedback visual recomendado
 
@@ -236,7 +273,6 @@ Todavía no existe:
 
 - Tauri;
 - selector nativo de carpetas;
-- preview real;
 - exportación real;
 - progreso real;
 - presets editables;
@@ -287,11 +323,12 @@ Esto llama a:
 - `GET /capabilities`;
 - `GET /presets`;
 - `POST /folders/scan`.
+- `POST /preview/render`.
 
-El listado de imágenes puede venir de una carpeta real. La preview muestra placeholder de imagen real pendiente. Ajustes y exportación siguen siendo simulados o no conectados.
+El listado de imágenes puede venir de una carpeta real. La preview se genera con Python. Ajustes principales se envían parcialmente; exportación sigue sin conectar.
 
 ## Siguiente paso
 
-APP.5 — Preview real conectada al motor.
+APP.6 — Presets y ajustes reales en la nueva UI.
 
-La siguiente tanda debe conectar la preview real sin duplicar lógica de imagen en frontend, manteniendo todavía fuera Tauri y exportación real.
+La siguiente tanda debe conectar presets y ajustes reales de forma completa, manteniendo todavía fuera Tauri y exportación real.

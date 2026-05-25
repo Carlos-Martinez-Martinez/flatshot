@@ -22,7 +22,7 @@ def capabilities() -> dict:
     return {
         "folderScan": True,
         "presetsRead": True,
-        "previewRender": False,
+        "previewRender": True,
         "exportRun": False,
         "exportProgress": False,
         "nativeFolderPicker": False,

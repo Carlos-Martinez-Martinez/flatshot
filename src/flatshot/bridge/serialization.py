@@ -1,10 +1,14 @@
 """JSON serialization helpers for bridge contracts."""
 from __future__ import annotations
 
+import base64
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
-from flatshot.application.contracts import BatchScanResult, FolderScanResult, ImageFileInfo
+from PIL import Image
+
+from flatshot.application.contracts import BatchScanResult, FolderScanResult, ImageFileInfo, PreviewResult
 
 
 def serialize_path(path: str | Path) -> str:
@@ -68,3 +72,32 @@ def categorized_presets_to_dict(categorized) -> dict[str, Any]:
         )
 
     return {"items": items}
+
+
+def preview_result_to_dict(
+    result: PreviewResult,
+    *,
+    source_path: str | Path,
+    render_time_ms: int,
+) -> dict[str, Any]:
+    image = Image.frombytes("RGB", (result.width, result.height), result.bytes_rgb)
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+    source = Path(source_path)
+
+    return {
+        "ok": True,
+        "image": {
+            "mimeType": "image/png",
+            "dataBase64": encoded,
+            "width": result.width,
+            "height": result.height,
+        },
+        "source": {
+            "path": serialize_path(source),
+            "name": source.name,
+        },
+        "warning": result.warning,
+        "renderTimeMs": render_time_ms,
+    }

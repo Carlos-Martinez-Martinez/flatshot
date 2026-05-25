@@ -1,4 +1,5 @@
 from pathlib import Path
+import base64
 
 import pytest
 from PIL import Image
@@ -33,7 +34,7 @@ def test_bridge_health_app_info_and_capabilities(tmp_path):
     assert service.capabilities() == {
         "folderScan": True,
         "presetsRead": True,
-        "previewRender": False,
+        "previewRender": True,
         "exportRun": False,
         "exportProgress": False,
         "nativeFolderPicker": False,
@@ -145,3 +146,83 @@ def test_bridge_scan_missing_folder_returns_partial_error(tmp_path):
 def test_bridge_scan_rejects_invalid_input(payload, tmp_path):
     with pytest.raises(InvalidRequestError):
         _service(tmp_path / "config").scan_folders(payload)
+
+
+def test_bridge_render_preview_returns_png_payload(tmp_path):
+    image = _png(tmp_path / "source.png")
+
+    response = _service(tmp_path / "config").render_preview(
+        {
+            "imagePath": str(image),
+            "targetWidth": 32,
+            "targetHeight": 32,
+            "settings": {"opacity": 0, "blur": 0, "noise": 0, "bgColor": [230, 230, 230]},
+        }
+    )
+
+    assert response["ok"] is True
+    assert response["image"]["mimeType"] == "image/png"
+    assert response["image"]["width"] == 32
+    assert response["image"]["height"] == 32
+    assert response["source"]["name"] == "source.png"
+    assert response["renderTimeMs"] >= 0
+    assert base64.b64decode(response["image"]["dataBase64"]).startswith(b"\x89PNG")
+
+
+def test_bridge_render_preview_clamps_target_size(tmp_path):
+    image = _png(tmp_path / "source.png")
+
+    response = _service(tmp_path / "config").render_preview(
+        {"imagePath": str(image), "targetWidth": 5000, "targetHeight": 5000}
+    )
+
+    assert response["image"]["width"] == 1200
+    assert response["image"]["height"] == 1200
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"imagePath": ""},
+        {"imagePath": 123},
+        {"imagePath": "missing.png"},
+        {"imagePath": None},
+        {"imagePath": "item.png", "settings": []},
+        {"imagePath": "item.png", "targetWidth": 0},
+        {"imagePath": "item.png", "targetHeight": "no"},
+    ],
+)
+def test_bridge_render_preview_rejects_invalid_input(payload, tmp_path):
+    if payload.get("imagePath") == "item.png":
+        payload = dict(payload, imagePath=str(_png(tmp_path / "item.png")))
+
+    with pytest.raises(Exception) as exc_info:
+        _service(tmp_path / "config").render_preview(payload)
+
+    message = str(exc_info.value)
+    assert "Traceback" not in message
+
+
+def test_bridge_render_preview_rejects_unsupported_file(tmp_path):
+    item = tmp_path / "item.txt"
+    item.write_text("not an image", encoding="utf-8")
+
+    with pytest.raises(Exception) as exc_info:
+        _service(tmp_path / "config").render_preview({"imagePath": str(item)})
+
+    assert "Formato de imagen no soportado" in str(exc_info.value)
+
+
+def test_bridge_preview_code_does_not_import_pyqt():
+    bridge_files = [
+        Path("src/flatshot/bridge/service.py"),
+        Path("src/flatshot/bridge/http_server.py"),
+        Path("src/flatshot/bridge/serialization.py"),
+    ]
+
+    for path in bridge_files:
+        source = path.read_text(encoding="utf-8")
+        assert "PyQt6" not in source
+        assert "QImage" not in source
+        assert "QPixmap" not in source

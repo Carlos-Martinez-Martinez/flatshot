@@ -20,8 +20,8 @@ def _png(path: Path) -> Path:
 
 
 @contextmanager
-def running_bridge(config_dir: Path):
-    service = FlatShotBridgeService(config_resolver=ConfigPathResolver(config_dir))
+def running_bridge(config_dir: Path, service: FlatShotBridgeService | None = None):
+    service = service or FlatShotBridgeService(config_resolver=ConfigPathResolver(config_dir))
     server = create_server("127.0.0.1", 0, service=service)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -95,6 +95,35 @@ def test_bridge_http_scan_folder(tmp_path):
     assert status == 200
     assert data["totalImages"] == 1
     assert data["folders"][0]["images"][0]["path"] == png.as_posix()
+
+
+def test_bridge_http_pick_folder(tmp_path):
+    selected = tmp_path / "selected"
+    selected.mkdir()
+    service = FlatShotBridgeService(
+        config_resolver=ConfigPathResolver(tmp_path / "config"),
+        folder_picker=lambda initial_path: selected,
+    )
+
+    with running_bridge(tmp_path / "config", service=service) as port:
+        status, data = request_json(port, "POST", "/folders/pick", {})
+
+    assert status == 200
+    assert data == {"ok": True, "selected": True, "path": selected.as_posix()}
+
+
+def test_bridge_http_pick_folder_rejects_invalid_initial_path(tmp_path):
+    service = FlatShotBridgeService(
+        config_resolver=ConfigPathResolver(tmp_path / "config"),
+        folder_picker=lambda initial_path: tmp_path,
+    )
+
+    with running_bridge(tmp_path / "config", service=service) as port:
+        status, data = request_json(port, "POST", "/folders/pick", {"initialPath": 123})
+
+    assert status == 400
+    assert data["ok"] is False
+    assert data["error"]["code"] == "invalid_request"
 
 
 def test_bridge_http_render_preview(tmp_path):

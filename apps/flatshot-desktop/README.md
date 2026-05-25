@@ -9,6 +9,7 @@ Estado actual:
 - Sin `package.json`, Tauri, Rust, Node obligatorio ni dependencias nuevas.
 - Bridge HTTP local de desarrollo en Python.
 - Escaneo real de carpetas por ruta manual usando servicios existentes.
+- Selector local de carpeta para desarrollo usando el bridge Python.
 - Preview real de PNG seleccionados usando `PreviewService`.
 - Lectura real de presets desde el servicio Python.
 - Presets y ajustes principales/avanzados aplicados a la preview real.
@@ -103,14 +104,15 @@ La franja superior indica:
 3. Confirmar URL `http://127.0.0.1:8765`.
 4. Pulsar `Comprobar bridge`.
 5. Verificar `Bridge: Conectado` y `Última respuesta: health OK`.
-6. Escribir una ruta real en `Ruta manual`.
-7. Pulsar `Escanear`.
+6. Pulsar `Seleccionar carpeta` o escribir una ruta real en `Ruta manual`.
+7. Si escribiste la ruta manualmente, pulsar `Escanear`.
 
 Esto llama a:
 
 - `GET /health`;
 - `GET /capabilities`;
 - `GET /presets`;
+- `POST /folders/pick`, si usas `Seleccionar carpeta`;
 - `POST /folders/scan`.
 - `POST /preview/render`.
 
@@ -127,8 +129,8 @@ El panel de lote se actualiza con carpetas, imagenes, contadores y errores reale
 2. Abrir `http://127.0.0.1:4173` si el navegador no se abre solo.
 3. Confirmar que la franja superior muestra `Bridge local` cuando cambias `Modo`.
 4. Pulsar `Comprobar bridge` y comprobar `health OK`.
-5. Pegar en `Ruta manual` una carpeta real con PNG.
-6. Pulsar `Escanear`.
+5. Pulsar `Seleccionar carpeta` o pegar en `Ruta manual` una carpeta real con PNG.
+6. Si pegaste la ruta manualmente, pulsar `Escanear`.
 
 Debe verse:
 
@@ -162,7 +164,7 @@ Para volver a mock:
 
 Sigue siendo simulado:
 
-- selector nativo de carpetas;
+- selector nativo Tauri de carpetas;
 - ajustes aplicados por motor;
 - exportacion real;
 - progreso real.
@@ -217,7 +219,7 @@ Para reconocer errores:
 
 Sigue siendo mock o no conectado:
 
-- selector nativo de carpetas;
+- selector nativo Tauri de carpetas;
 - comparación/original de preview real;
 - exportacion real;
 - progreso real.
@@ -306,7 +308,7 @@ También hay interacciones simuladas para:
 Todavía no existe:
 
 - Tauri;
-- selector nativo de carpetas;
+- selector nativo Tauri de carpetas;
 - exportación real;
 - progreso real;
 - presets editables/guardables;
@@ -348,14 +350,15 @@ En la UI:
 1. Cambiar `Modo` a `Bridge local`.
 2. Mantener `Bridge` como `http://127.0.0.1:8765`.
 3. Pulsar `Comprobar bridge`.
-4. Escribir una ruta real en `Ruta manual`.
-5. Pulsar `Escanear`.
+4. Pulsar `Seleccionar carpeta` o escribir una ruta real en `Ruta manual`.
+5. Si escribiste la ruta manualmente, pulsar `Escanear`.
 
 Esto llama a:
 
 - `GET /health`;
 - `GET /capabilities`;
 - `GET /presets`;
+- `POST /folders/pick`, si usas selector local;
 - `POST /folders/scan`.
 - `POST /preview/render`.
 

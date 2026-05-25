@@ -875,6 +875,50 @@ async function checkBridge() {
   render();
 }
 
+async function pickBridgeFolder() {
+  state.bridgeMode = "bridge";
+  state.bridgeStatus = "checking";
+  state.bridgeMessage = "Abriendo selector";
+  state.bridgeLastResponse = "Solicitando /folders/pick";
+  state.scanStatus = "Selecciona una carpeta";
+  state.statusText = "Selecciona una carpeta";
+  render();
+
+  try {
+    const selected = await bridgeRequest("/folders/pick", {
+      method: "POST",
+      body: JSON.stringify({ initialPath: parseFolderInput(state.bridgeScanPath)[0] || "" }),
+      timeoutMs: 300000,
+    });
+    state.bridgeStatus = "connected";
+    if (!selected.selected || !selected.path) {
+      state.bridgeMessage = "Selección cancelada";
+      state.bridgeLastResponse = "folder pick cancelado";
+      state.scanStatus = "Selección cancelada";
+      state.statusText = "Selección cancelada";
+      render();
+      return;
+    }
+
+    state.bridgeScanPath = selected.path;
+    state.bridgeMessage = "Carpeta seleccionada";
+    state.bridgeLastResponse = "folder pick OK";
+    state.scanStatus = "Carpeta seleccionada";
+    state.statusText = "Carpeta seleccionada";
+    render();
+    await scanBridgeFolder();
+  } catch (error) {
+    const message = bridgeErrorMessage(error);
+    state.bridgeStatus = "disconnected";
+    state.bridgeMessage = message;
+    state.bridgeLastResponse = `error: ${message}`;
+    state.scanStatus = "No se pudo seleccionar";
+    state.scanIssues = [{ level: "error", title: "Selector no disponible", detail: message }];
+    state.statusText = "Selector no disponible";
+    render();
+  }
+}
+
 function applyBridgePresets(payload) {
   const items = Array.isArray(payload.items)
     ? payload.items.map(normalizePresetItem).filter(Boolean)
@@ -1195,6 +1239,7 @@ function renderBridge() {
   panel.classList.toggle("is-hidden", !isBridge);
   $("#bridge-panel-status").textContent = bridgeStatusLabel();
   $("#bridge-scan-path").value = state.bridgeScanPath;
+  $("#bridge-pick-folder").disabled = state.bridgeStatus === "checking" || state.batch === "scanning";
   $("#bridge-scan-folder").disabled = state.bridgeStatus === "checking" || state.batch === "scanning";
   $("#bridge-last-response").textContent = state.bridgeLastResponse;
   $("#bridge-capabilities").textContent = state.bridgeCapabilitiesSummary;
@@ -1755,6 +1800,8 @@ function handleAction(action) {
     loadMockBatch();
   } else if (action === "check-bridge") {
     void checkBridge();
+  } else if (action === "pick-bridge-folder") {
+    void pickBridgeFolder();
   } else if (action === "scan-bridge-folder") {
     void scanBridgeFolder();
   } else if (action === "clear-batch") {

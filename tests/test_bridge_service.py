@@ -177,6 +177,35 @@ def test_bridge_scan_rejects_invalid_input(payload, tmp_path):
         _service(tmp_path / "config").scan_folders(payload)
 
 
+def test_bridge_pick_folder_returns_selected_path(tmp_path):
+    selected = tmp_path / "selected"
+    selected.mkdir()
+    service = FlatShotBridgeService(
+        config_resolver=ConfigPathResolver(tmp_path / "config"),
+        folder_picker=lambda initial_path: selected,
+    )
+
+    response = service.pick_folder({"initialPath": str(tmp_path)})
+
+    assert response == {"ok": True, "selected": True, "path": selected.as_posix()}
+
+
+def test_bridge_pick_folder_handles_cancel(tmp_path):
+    service = FlatShotBridgeService(
+        config_resolver=ConfigPathResolver(tmp_path / "config"),
+        folder_picker=lambda initial_path: None,
+    )
+
+    response = service.pick_folder({})
+
+    assert response == {"ok": True, "selected": False, "path": None}
+
+
+def test_bridge_pick_folder_rejects_invalid_initial_path(tmp_path):
+    with pytest.raises(InvalidRequestError):
+        _service(tmp_path / "config").pick_folder({"initialPath": 123})
+
+
 def test_bridge_render_preview_returns_png_payload(tmp_path):
     image = _png(tmp_path / "source.png")
 

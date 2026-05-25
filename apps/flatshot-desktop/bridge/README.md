@@ -162,6 +162,45 @@ $body = @{ folders = @("C:/ruta/a/carpeta") } | ConvertTo-Json
 Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8765/folders/scan -ContentType "application/json" -Body $body
 ```
 
+### `POST /folders/pick`
+
+Real de desarrollo. Abre un selector local de carpeta desde el proceso Python del bridge usando stdlib (`tkinter`).
+
+Request:
+
+```json
+{
+  "initialPath": "C:/ruta/opcional"
+}
+```
+
+Response con carpeta seleccionada:
+
+```json
+{
+  "ok": true,
+  "selected": true,
+  "path": "C:/ruta/a/carpeta"
+}
+```
+
+Response si se cancela:
+
+```json
+{
+  "ok": true,
+  "selected": false,
+  "path": null
+}
+```
+
+Notas:
+
+- no escanea ni modifica archivos por si mismo;
+- la UI llama despues a `/folders/scan`;
+- no sustituye al selector nativo Tauri futuro;
+- si `tkinter` no esta disponible, devuelve error JSON controlado.
+
 ### `POST /preview/render`
 
 Real. Genera una preview con `flatshot.application.preview_service.PreviewService`.
@@ -246,6 +285,7 @@ No se devuelve traceback bruto en JSON.
 - No borra, mueve ni modifica imagenes.
 - No escribe configuracion.
 - No guarda ni edita presets.
+- El selector de carpeta solo devuelve una ruta seleccionada por el usuario.
 - Expone preview de lectura para rutas solicitadas por la UI.
 - No expone exportacion.
 - El servidor rechaza binds distintos de `127.0.0.1` o `localhost` desde el CLI.
@@ -254,7 +294,7 @@ No se devuelve traceback bruto en JSON.
 ## No implementado todavia
 
 - Tauri;
-- selector nativo de carpetas;
+- selector nativo Tauri de carpetas;
 - exportacion real;
 - progreso real;
 - cola;

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from time import perf_counter
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from flatshot.application.config_paths import ConfigPathResolver
 from flatshot.application.contracts import PreviewRequest
@@ -12,7 +12,12 @@ from flatshot.application.preset_service import PresetService
 from flatshot.application.preview_service import PreviewService
 from flatshot.bridge import app_info as bridge_app_info
 from flatshot.bridge.errors import BridgeError, InvalidRequestError
-from flatshot.bridge.serialization import batch_scan_result_to_dict, categorized_presets_to_dict, preview_result_to_dict
+from flatshot.bridge.serialization import (
+    batch_scan_result_to_dict,
+    categorized_presets_to_dict,
+    preview_result_to_dict,
+    serialize_path,
+)
 
 
 MAX_PREVIEW_SIDE = 1200
@@ -54,10 +59,12 @@ class FlatShotBridgeService:
         folder_scanner: FolderScanner | None = None,
         preview_service: PreviewService | None = None,
         config_resolver: ConfigPathResolver | None = None,
+        folder_picker: Callable[[Path | None], Path | None] | None = None,
     ) -> None:
         self.folder_scanner = folder_scanner or FolderScanner()
         self.preview_service = preview_service or PreviewService()
         self.config_resolver = config_resolver or ConfigPathResolver()
+        self.folder_picker = folder_picker or pick_folder_with_tk
 
     def health(self) -> dict[str, Any]:
         return {
@@ -122,6 +129,23 @@ class FlatShotBridgeService:
         result = self.folder_scanner.scan_folders(folders, dict(image_overrides))
         return batch_scan_result_to_dict(result)
 
+    def pick_folder(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+        if not isinstance(payload, Mapping):
+            raise InvalidRequestError("Expected a JSON object.")
+
+        initial_path = self._folder_picker_initial_path(payload.get("initialPath"))
+        try:
+            selected = self.folder_picker(initial_path)
+        except BridgeError:
+            raise
+        except Exception as exc:
+            raise BridgeError("folder_picker_unavailable", "Selector de carpeta no disponible.", status=503) from exc
+
+        if selected is None:
+            return {"ok": True, "selected": False, "path": None}
+
+        return {"ok": True, "selected": True, "path": serialize_path(selected)}
+
     def render_preview(self, payload: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(payload, Mapping):
             raise InvalidRequestError("Expected a JSON object.")
@@ -183,6 +207,47 @@ class FlatShotBridgeService:
             if normalized_key in PREVIEW_SETTING_KEYS:
                 settings[normalized_key] = value
         return settings
+
+    @staticmethod
+    def _folder_picker_initial_path(value: Any) -> Path | None:
+        if value in (None, ""):
+            return None
+        if not isinstance(value, str):
+            raise InvalidRequestError("Field 'initialPath' must be a path string when provided.")
+
+        path = Path(value).expanduser()
+        if path.exists() and path.is_dir():
+            return path
+        if path.exists() and path.is_file():
+            return path.parent
+        return None
+
+
+def pick_folder_with_tk(initial_path: Path | None = None) -> Path | None:
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+    except Exception as exc:
+        raise BridgeError("folder_picker_unavailable", "Selector de carpeta no disponible.", status=503) from exc
+
+    root = tk.Tk()
+    root.withdraw()
+    root.update()
+    try:
+        try:
+            root.attributes("-topmost", True)
+        except tk.TclError:
+            pass
+        selected = filedialog.askdirectory(
+            parent=root,
+            title="Seleccionar carpeta FlatShot",
+            initialdir=str(initial_path or Path.home()),
+            mustexist=True,
+        )
+    finally:
+        root.destroy()
+
+    return Path(selected).expanduser() if selected else None
 
 
 def _positive_int(value: Any, field_name: str, *, default: int) -> int:

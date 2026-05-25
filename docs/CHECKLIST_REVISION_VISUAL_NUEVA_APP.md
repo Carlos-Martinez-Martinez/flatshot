@@ -35,6 +35,7 @@ Usar antes de cerrar cada tanda visual de la nueva app.
 - [ ] Health OK.
 - [ ] Capabilities visibles.
 - [ ] Presets cargan o fallback claro.
+- [ ] `Seleccionar carpeta` abre selector local en modo bridge.
 - [ ] Escaneo real por ruta funciona.
 - [ ] Error de ruta se muestra bien.
 - [ ] La UI diferencia claramente escaneo real de estados simulados.
@@ -43,6 +44,7 @@ Usar antes de cerrar cada tanda visual de la nueva app.
 
 - [ ] `Modo` en `Bridge local` muestra el panel de ruta en el flujo principal.
 - [ ] `Comprobar bridge` muestra `health OK`.
+- [ ] `Seleccionar carpeta` rellena la ruta y escanea.
 - [ ] Escanear una carpeta con PNG actualiza carpetas, imagenes y contadores.
 - [ ] La primera imagen real queda seleccionada.
 - [ ] La preview muestra estado claro para imagen real.

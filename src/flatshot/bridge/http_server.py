@@ -59,6 +59,8 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(self.server.service.list_presets())
             elif path == "/folders/scan":
                 raise MethodNotAllowedError("Use POST for /folders/scan.")
+            elif path == "/folders/pick":
+                raise MethodNotAllowedError("Use POST for /folders/pick.")
             elif path == "/preview/render":
                 raise MethodNotAllowedError("Use POST for /preview/render.")
             else:
@@ -71,6 +73,8 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
             path = urlparse(self.path).path
             if path == "/folders/scan":
                 self._send_json(self.server.service.scan_folders(self._read_json_body()))
+            elif path == "/folders/pick":
+                self._send_json(self.server.service.pick_folder(self._read_json_body()))
             elif path == "/preview/render":
                 self._send_json(self.server.service.render_preview(self._read_json_body()))
             else:

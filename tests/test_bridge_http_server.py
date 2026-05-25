@@ -283,6 +283,7 @@ def test_bridge_http_export_prepare_and_run(tmp_path):
     assert run_status == 202
     assert final["status"] == "completed"
     assert final["progress"]["percent"] == 100
+    assert final["issues"] == []
     assert (source / "_OUT" / "item_PRO.png").exists()
 
 

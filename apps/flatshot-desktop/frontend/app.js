@@ -190,6 +190,9 @@ const state = {
   exportJobId: null,
   exportDestinations: [],
   exportMessages: [],
+  exportCompletedItems: [],
+  exportIssues: [],
+  exportResult: null,
   exportPollTimer: null,
   destinationMode: "source",
   destinationValue: "_SALIDA_PRO",
@@ -316,6 +319,29 @@ function exportableImages() {
   return activeImages().filter((image) => image.exportable);
 }
 
+function exportItemState(image) {
+  const items = Array.isArray(state.exportCompletedItems) ? state.exportCompletedItems : [];
+  if (!items.length || !image?.name) {
+    return null;
+  }
+  const sourceName = image.name.toLowerCase();
+  const sourceStem = sourceName.replace(/\.[^.]+$/, "");
+  const matches = items.filter((item) => {
+    const itemName = String(item.name || "").toLowerCase();
+    return itemName === sourceName
+      || itemName === sourceStem
+      || itemName.startsWith(`${sourceStem}.`)
+      || itemName.startsWith(`${sourceStem}_`);
+  });
+  if (matches.some((item) => item.success === false)) {
+    return { status: "error", label: "Error" };
+  }
+  if (matches.some((item) => item.success === true)) {
+    return { status: "exported", label: "Exportada" };
+  }
+  return null;
+}
+
 function filteredImages() {
   const term = state.search.trim().toLowerCase();
   return activeImages().filter((image) => {
@@ -329,7 +355,7 @@ function filteredImages() {
       return image.status === "warning";
     }
     if (state.filter === "errors") {
-      return image.status === "error";
+      return image.status === "error" || exportItemState(image)?.status === "error";
     }
     return true;
   });
@@ -393,6 +419,9 @@ function setScenario(scenario) {
     exportJobId: null,
     exportDestinations: [],
     exportMessages: [],
+    exportCompletedItems: [],
+    exportIssues: [],
+    exportResult: null,
     destinationMode: "source",
     destinationValue: "_SALIDA_PRO",
     progress: 0,
@@ -470,6 +499,15 @@ function setScenario(scenario) {
       exportStatus: "completed",
       progress: 100,
       processed: exportableImages().length,
+      exportCompletedItems: exportableImages().map((image) => ({ name: image.name, success: true })),
+      exportDestinations: ["Mock / _SALIDA_PRO"],
+      exportResult: {
+        success: true,
+        processed: exportableImages().length,
+        total: exportableImages().length,
+        errors: 0,
+        destinations: ["Mock / _SALIDA_PRO"],
+      },
       statusText: "Exportación completada",
     });
   } else if (scenario === "export-partial") {
@@ -477,6 +515,22 @@ function setScenario(scenario) {
       exportStatus: "partial",
       progress: 100,
       processed: exportableImages().length,
+      exportCompletedItems: [
+        { name: "camiseta_001.png", success: true },
+        { name: "chaqueta_004.png", success: false },
+      ],
+      exportDestinations: ["Mock / _SALIDA_PRO"],
+      exportIssues: [
+        { level: "error", title: "chaqueta_004.png", detail: "No se pudo leer alpha." },
+        { level: "warning", title: "chaqueta_003.png", detail: "Preview renderizada con fallback." },
+      ],
+      exportResult: {
+        success: false,
+        processed: exportableImages().length,
+        total: exportableImages().length,
+        errors: 1,
+        destinations: ["Mock / _SALIDA_PRO"],
+      },
       errors: [
         { level: "error", title: "chaqueta_004.png", detail: "No se pudo leer alpha." },
         { level: "warning", title: "chaqueta_003.png", detail: "Preview renderizada con fallback." },
@@ -488,6 +542,16 @@ function setScenario(scenario) {
       exportStatus: "failed",
       progress: 38,
       processed: 2,
+      exportIssues: [
+        { level: "error", title: "Destino no disponible", detail: "La carpeta ya no existe." },
+      ],
+      exportResult: {
+        success: false,
+        processed: 2,
+        total: exportableImages().length,
+        errors: 1,
+        destinations: [],
+      },
       errors: [
         { level: "error", title: "Destino no disponible", detail: "La carpeta ya no existe." },
       ],
@@ -515,6 +579,12 @@ function loadBatch() {
     previewData: null,
     previewError: "",
     exportStatus: "blocked",
+    exportJobId: null,
+    exportDestinations: [],
+    exportMessages: [],
+    exportCompletedItems: [],
+    exportIssues: [],
+    exportResult: null,
     progress: 0,
     processed: 0,
     errors: [],
@@ -716,6 +786,9 @@ function startExport(options = {}) {
     exportJobId: null,
     exportDestinations: [],
     exportMessages: [],
+    exportCompletedItems: [],
+    exportIssues: [],
+    exportResult: null,
     errors: [],
     paused: false,
     statusText: "Preparando exportación",
@@ -733,6 +806,9 @@ async function startBridgeExport() {
     exportJobId: null,
     exportDestinations: [],
     exportMessages: [],
+    exportCompletedItems: [],
+    exportIssues: [],
+    exportResult: null,
     errors: [],
     paused: false,
     statusText: "Preparando exportación",
@@ -754,6 +830,8 @@ async function startBridgeExport() {
       exportStatus: "failed",
       progress: 0,
       processed: 0,
+      exportIssues: [{ level: "error", title: "Exportación fallida", detail: message }],
+      exportResult: null,
       errors: [{ level: "error", title: "Exportación fallida", detail: message }],
       statusText: "Exportación fallida",
     });
@@ -820,6 +898,9 @@ function applyBridgeExportStatus(payload) {
   state.exportJobId = payload.jobId || state.exportJobId;
   state.exportDestinations = Array.isArray(payload.destinations) ? payload.destinations : state.exportDestinations;
   state.exportMessages = Array.isArray(payload.messages) ? payload.messages : state.exportMessages;
+  state.exportCompletedItems = Array.isArray(payload.completedItems) ? payload.completedItems : state.exportCompletedItems;
+  state.exportIssues = Array.isArray(payload.issues) ? payload.issues.map(normalizeBridgeIssue) : state.exportIssues;
+  state.exportResult = payload.result || state.exportResult;
   state.progress = Number(payload.progress?.percent) || 0;
   state.processed = Number(payload.progress?.processed) || 0;
   state.paused = payload.status === "paused";
@@ -847,8 +928,8 @@ function applyBridgeExportStatus(payload) {
     state.statusText = `Procesando ${state.processed}/${payload.progress?.total || "..."}`;
   }
 
-  const failedItems = (payload.completedItems || []).filter((item) => !item.success);
-  if (["partial", "failed", "cancelled"].includes(payload.status) || failedItems.length) {
+  const failedItems = state.exportCompletedItems.filter((item) => !item.success);
+  if (["partial", "failed", "cancelled"].includes(payload.status) || failedItems.length || state.exportIssues.length) {
     const messageItems = (payload.messages || []).slice(-4).map((message) => ({
       level: payload.status === "partial" ? "warning" : "error",
       title: "Exportación",
@@ -859,10 +940,19 @@ function applyBridgeExportStatus(payload) {
       title: item.name || "Imagen",
       detail: "No se pudo exportar.",
     }));
-    state.errors = [...itemErrors, ...messageItems];
+    state.errors = state.exportIssues.length ? state.exportIssues : [...itemErrors, ...messageItems];
   } else {
     state.errors = [];
   }
+}
+
+function normalizeBridgeIssue(issue) {
+  const source = issue && typeof issue === "object" ? issue : {};
+  return {
+    level: source.level === "error" ? "error" : "warning",
+    title: String(source.title || "Exportación"),
+    detail: String(source.detail || "Revisa el resultado."),
+  };
 }
 
 function scheduleExportStep() {
@@ -883,6 +973,16 @@ function scheduleExportStep() {
       state.exportStatus = "completed";
       state.progress = 100;
       state.processed = total;
+      state.exportCompletedItems = exportableImages().map((image) => ({ name: image.name, success: true }));
+      state.exportDestinations = ["Mock / _SALIDA_PRO"];
+      state.exportIssues = [];
+      state.exportResult = {
+        success: true,
+        processed: total,
+        total,
+        errors: 0,
+        destinations: ["Mock / _SALIDA_PRO"],
+      };
       state.statusText = "Exportación completada";
       render();
       return;
@@ -1220,6 +1320,9 @@ async function scanBridgeFolder() {
     exportJobId: null,
     exportDestinations: [],
     exportMessages: [],
+    exportCompletedItems: [],
+    exportIssues: [],
+    exportResult: null,
     errors: [],
     filter: "all",
     search: "",
@@ -1730,7 +1833,7 @@ function renderBatch() {
   const adjusted = images.filter((image) => image.status === "adjusted").length;
   const valid = images.filter((image) => image.status === "ready" || image.status === "adjusted").length;
   const warnings = images.filter((image) => image.status === "warning").length;
-  const errors = images.filter((image) => image.status === "error").length;
+  const errors = images.filter((image) => image.status === "error" || exportItemState(image)?.status === "error").length;
 
   if (state.batch === "none") {
     $("#batch-count").textContent = "0 imágenes";
@@ -1842,7 +1945,10 @@ function folderItemHtml(folder) {
 
 function imageItemHtml(image) {
   const selected = image.id === state.selectedImageId ? "active" : "";
-  const chipClass = image.status === "warning" ? "warning" : image.status === "error" ? "error" : "";
+  const exportState = exportItemState(image);
+  const effectiveStatus = exportState?.status || image.status;
+  const chipClass = effectiveStatus === "warning" ? "warning" : effectiveStatus === "error" ? "error" : effectiveStatus === "exported" ? "exported" : "";
+  const chipLabel = exportState?.label || statusLabels[image.status];
   const title = image.path || image.name;
   return `
     <button type="button" class="image-item ${selected} ${chipClass}" data-image-id="${escapeHtml(image.id)}" title="${escapeHtml(title)}">
@@ -1851,7 +1957,7 @@ function imageItemHtml(image) {
         <strong>${escapeHtml(image.name)}</strong>
         <small>${escapeHtml(image.detail)}</small>
       </span>
-      <span class="state-chip ${chipClass}">${escapeHtml(statusLabels[image.status])}</span>
+      <span class="state-chip ${chipClass}">${escapeHtml(chipLabel)}</span>
     </button>
   `;
 }
@@ -2114,12 +2220,102 @@ function renderExport() {
     <div class="summary-line"><span>Resumen</span><strong>${exportable} imágenes · ${statusText}</strong></div>
   `;
 
+  renderExportResult();
+
   $("#issue-list").innerHTML = issues.map((issue) => `
     <div class="issue-item ${issue.level === "error" ? "error" : ""}">
       <strong>${escapeHtml(issue.title)}</strong>
       <span>${escapeHtml(issue.detail)}</span>
     </div>
   `).join("");
+}
+
+function renderExportResult() {
+  const target = $("#export-result");
+  const resultStatuses = ["running", "completed", "partial", "failed"];
+  const shouldShow = resultStatuses.includes(state.exportStatus) || state.exportJobId || state.exportResult;
+  if (!shouldShow) {
+    target.innerHTML = "";
+    return;
+  }
+
+  const total = Number(state.exportResult?.total ?? exportableImages().length ?? 0);
+  const processed = Number(state.exportResult?.processed ?? state.processed ?? 0);
+  const errors = Number(state.exportResult?.errors ?? state.exportIssues.filter((issue) => issue.level === "error").length ?? 0);
+  const destinations = state.exportDestinations.length
+    ? state.exportDestinations
+    : Array.isArray(state.exportResult?.destinations)
+      ? state.exportResult.destinations
+      : [];
+  const issues = state.exportIssues.length ? state.exportIssues : state.errors;
+  const items = Array.isArray(state.exportCompletedItems) ? state.exportCompletedItems.slice(-8) : [];
+  const title = exportResultTitle();
+  const resultClass = state.exportStatus === "failed"
+    ? "error"
+    : state.exportStatus === "partial"
+      ? "warning"
+      : state.exportStatus === "completed"
+        ? "ready"
+        : "running";
+
+  const destinationHtml = destinations.length
+    ? destinations.slice(0, 3).map((path) => `
+      <div class="result-path" title="${escapeHtml(path)}">
+        <span>Destino</span>
+        <strong>${escapeHtml(path)}</strong>
+      </div>
+    `).join("")
+    : `<div class="result-path muted"><span>Destino</span><strong>${escapeHtml(destinationFallbackLabel())}</strong></div>`;
+
+  const issuesHtml = issues.length ? `
+    <div class="result-issues">
+      <strong>${errors ? `${errors} error${errors === 1 ? "" : "es"}` : `${issues.length} aviso${issues.length === 1 ? "" : "s"}`}</strong>
+      <span>${escapeHtml(issues[0].title)} · ${escapeHtml(issues[0].detail)}</span>
+    </div>
+  ` : "";
+
+  const itemsHtml = items.length ? `
+    <div class="result-items" aria-label="Archivos procesados">
+      ${items.map((item) => `
+        <span class="result-item ${item.success ? "ready" : "error"}" title="${escapeHtml(item.name || "Archivo")}">
+          ${escapeHtml(item.name || "Archivo")}
+        </span>
+      `).join("")}
+    </div>
+  ` : "";
+
+  target.innerHTML = `
+    <div class="result-header ${resultClass}">
+      <strong>${escapeHtml(title)}</strong>
+      <span>${escapeHtml(processed)}/${escapeHtml(total)} archivos</span>
+    </div>
+    ${destinationHtml}
+    ${issuesHtml}
+    ${itemsHtml}
+  `;
+}
+
+function exportResultTitle() {
+  if (state.exportStatus === "running") {
+    return state.paused ? "Exportación pausada" : "Exportando";
+  }
+  if (state.exportStatus === "completed") {
+    return "Exportación completada";
+  }
+  if (state.exportStatus === "partial") {
+    return "Completada con avisos";
+  }
+  if (state.exportStatus === "failed") {
+    return "Exportación fallida";
+  }
+  return "Resultado";
+}
+
+function destinationFallbackLabel() {
+  if (state.destinationMode === "custom") {
+    return state.destinationValue || "Destino sin configurar";
+  }
+  return `origen / ${state.destinationValue}`;
 }
 
 function exportStatusLabel(ready) {
@@ -2173,14 +2369,15 @@ function renderFooter() {
   $("#progress-fill").style.width = `${state.progress}%`;
   $("#progress-fill").className = state.exportStatus === "failed" ? "error" : state.exportStatus === "partial" ? "warning" : "";
 
-  const hasReviewIssues = issues.length > 0 || activeImages().some((image) => image.status === "error" || image.status === "warning");
+  const hasReviewIssues = issues.length > 0
+    || activeImages().some((image) => image.status === "error" || image.status === "warning" || exportItemState(image)?.status === "error");
   $("#review-errors").classList.toggle("is-hidden", !hasReviewIssues);
   $("#review-errors").disabled = !hasReviewIssues;
   $("#pause-export").classList.toggle("is-hidden", state.exportStatus !== "running");
   $("#pause-export").textContent = state.paused ? "Reanudar" : "Pausar";
   $("#stop-export").classList.toggle("is-hidden", state.exportStatus !== "running");
-  $("#open-output").classList.toggle("is-hidden", !(state.exportStatus === "completed" || state.exportStatus === "partial"));
-  $("#open-output").disabled = !(state.exportStatus === "completed" || state.exportStatus === "partial");
+  $("#open-output").classList.add("is-hidden");
+  $("#open-output").disabled = true;
   $("#primary-action").classList.add("is-hidden");
 
   const primaryButtons = [$("#primary-action"), $("#top-primary-action")].filter(Boolean);
@@ -2305,7 +2502,7 @@ function handleAction(action) {
   } else if (action === "review-errors") {
     reviewErrors();
   } else if (action === "open-output") {
-    state.statusText = "Destino listo para abrir";
+    state.statusText = "Destino visible en Salida";
     render();
   } else if (action === "primary") {
     primaryAction();

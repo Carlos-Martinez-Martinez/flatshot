@@ -50,6 +50,14 @@ def _export_runner_factory(**kwargs) -> ExportRunner:
     return ExportRunner(**kwargs, executor_factory=InlineExecutor)
 
 
+def _failing_export_runner_factory(**kwargs) -> ExportRunner:
+    def fail_image(args):
+        image_path = Path(args[0])
+        return False, f"{image_path.name}: fallo controlado", None
+
+    return ExportRunner(**kwargs, executor_factory=InlineExecutor, image_processor=fail_image)
+
+
 def _export_service(config_dir: Path) -> FlatShotBridgeService:
     return FlatShotBridgeService(
         config_resolver=ConfigPathResolver(config_dir),
@@ -403,9 +411,54 @@ def test_bridge_start_export_writes_output_and_reports_progress(tmp_path):
     assert (source / "_OUT" / "item_PRO.png").exists()
 
 
+def test_bridge_start_export_reports_structured_item_errors(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    png = _png(source / "item.png")
+    service = FlatShotBridgeService(
+        config_resolver=ConfigPathResolver(tmp_path / "config"),
+        export_runner_factory=_failing_export_runner_factory,
+    )
+
+    started = service.start_export(
+        {
+            "imagePaths": [str(png)],
+            "settings": {"opacity": 0, "blur": 0, "noise": 0},
+            "export": {"format": "PNG", "size": "8x8", "destinationValue": "_OUT"},
+        }
+    )
+    final = _wait_for_export(service, started["jobId"])
+
+    assert final["status"] == "partial"
+    assert final["progress"] == {"processed": 1, "total": 1, "percent": 100}
+    assert final["issues"][0]["level"] == "error"
+    assert final["issues"][0]["title"] == "item.png"
+    assert "fallo controlado" in final["issues"][0]["detail"]
+    assert final["completedItems"][0] == {"name": "item.png", "success": False}
+
+
 def test_bridge_export_rejects_invalid_input(tmp_path):
     with pytest.raises(InvalidRequestError):
         _export_service(tmp_path / "config").prepare_export({"imagePaths": []})
+
+
+def test_bridge_export_rejects_custom_destination_without_path(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    png = _png(source / "item.png")
+
+    with pytest.raises(InvalidRequestError) as exc_info:
+        _export_service(tmp_path / "config").prepare_export(
+            {
+                "imagePaths": [str(png)],
+                "export": {
+                    "destinationMode": "custom",
+                    "destinationValue": "",
+                },
+            }
+        )
+
+    assert "destino personalizado" in str(exc_info.value)
 
 
 def test_bridge_export_unknown_job_returns_controlled_error(tmp_path):

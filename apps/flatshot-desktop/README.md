@@ -327,7 +327,37 @@ Notas:
 - no se modifica el motor de exportación;
 - no se cambia naming, formato, calidad ni comportamiento de salida;
 - `Pausar`, `Reanudar` y `Detener` llaman al job local del bridge;
-- `Abrir destino` sigue pendiente de integración nativa Tauri.
+- la ruta de destino se muestra en `Salida`; abrir la carpeta sigue pendiente de integración nativa Tauri.
+
+## Probar APP.8 — Errores y resultados
+
+1. Arrancar la app:
+
+   ```bash
+   python apps/flatshot-desktop/run_dev.py --open
+   ```
+
+2. Abrir `Debug`, usar `Bridge local` y comprobar conexión.
+3. Escanear una carpeta real con PNG.
+4. Abrir `Salida` y pulsar `Exportar lote`.
+5. Revisar el bloque de resultado bajo el resumen de salida.
+
+Debe verse:
+
+- estado final `Exportación completada`, `Completada con avisos` o `Exportación fallida`;
+- contador de archivos procesados;
+- destino generado o destino configurado;
+- últimos archivos procesados;
+- errores o avisos estructurados cuando existan;
+- miniaturas marcadas como `Exportada` o `Error` si el bridge informa resultado por imagen.
+
+Para probar errores controlados:
+
+- dejar `Destino` como `Carpeta personalizada` sin ruta debe bloquear exportación con `Destino sin configurar`;
+- detener un job en curso debe mostrar estado de fallo/cancelación sin traceback;
+- un fallo del runner se muestra en `Salida` y en `Revisar errores`.
+
+No hay apertura nativa de carpeta de salida todavía. La ruta queda visible para revisión.
 
 ### Feedback visual recomendado
 
@@ -372,7 +402,7 @@ También hay interacciones simuladas para:
 - cambiar formato, tamaño, fondo, destino y naming;
 - iniciar, pausar, reanudar y detener exportación mock;
 - revisar errores;
-- abrir destino simulado.
+- ver resultado y destino de exportación.
 
 ## Qué no está conectado
 
@@ -430,11 +460,12 @@ Esto llama a:
 - `POST /folders/pick`, si usas selector local;
 - `POST /folders/scan`.
 - `POST /preview/render`.
+- `POST /exports/run` y `GET /exports/jobs/{jobId}`.
 
 El listado de imágenes puede venir de una carpeta real. La preview se genera con Python. Presets y ajustes de sombra se envían como settings reales al bridge. La exportación se lanza por bridge con progreso consultable.
 
 ## Siguiente paso
 
-APP.8 — Gestión de errores y resultados.
+APP.9 — Paridad funcional básica con app legacy.
 
-La siguiente tanda debe mejorar la presentación de resultados, errores por imagen, destinos y recuperación tras fallos, manteniendo todavía fuera Tauri y empaquetado.
+La siguiente tanda debe revisar paridad funcional básica frente a la app legacy sin eliminarla ni cambiar el output de imágenes.

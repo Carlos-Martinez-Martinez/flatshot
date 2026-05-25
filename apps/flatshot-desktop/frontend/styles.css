@@ -412,6 +412,12 @@ small {
   color: var(--accent-strong);
 }
 
+.state-chip.exported {
+  border: 1px solid #b9d8cf;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
 .state-chip.error {
   border: 1px solid #efb8be;
   background: var(--danger-soft);
@@ -1240,6 +1246,110 @@ small {
   text-align: right;
 }
 
+.export-result {
+  display: grid;
+  gap: 8px;
+}
+
+.export-result:empty {
+  display: none;
+}
+
+.result-header,
+.result-path,
+.result-issues {
+  display: grid;
+  gap: 3px;
+  border-radius: 7px;
+  padding: 9px 10px;
+}
+
+.result-header {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  background: var(--surface-muted);
+}
+
+.result-header.ready {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.result-header.warning {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.result-header.error {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.result-header.running {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.result-header span,
+.result-path span,
+.result-issues span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.result-path {
+  border: 1px solid var(--line);
+  background: #ffffff;
+}
+
+.result-path strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.result-path.muted strong {
+  color: var(--muted);
+}
+
+.result-issues {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.result-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.result-item {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  padding: 3px 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.result-item.ready {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.result-item.error {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
 .issue-list {
   display: grid;
   gap: 8px;
@@ -1924,6 +2034,10 @@ summary {
 
 .image-item.error {
   box-shadow: inset 0 0 0 1px rgba(183, 61, 68, 0.35);
+}
+
+.image-item.exported {
+  box-shadow: inset 0 0 0 1px rgba(20, 122, 99, 0.3);
 }
 
 .thumb {

@@ -118,6 +118,20 @@ Usar antes de cerrar cada tanda visual de la nueva app.
 - [ ] Modo mock sigue simulando exportación sin bridge.
 - [ ] No hay scroll global ni horizontal durante progreso.
 
+## APP.8 — Gestión de errores y resultados
+
+- [ ] Al completar exportación aparece un bloque de resultado en `Salida`.
+- [ ] El resultado muestra estado, procesadas/total y destino.
+- [ ] Los últimos archivos procesados son visibles.
+- [ ] Las miniaturas exportadas muestran `Exportada`.
+- [ ] Una exportación parcial muestra errores/avisos estructurados.
+- [ ] `Revisar errores` filtra imágenes con error real o de exportación.
+- [ ] Un destino personalizado vacío bloquea la exportación con mensaje claro.
+- [ ] Detener exportación muestra estado controlado sin traceback.
+- [ ] `Abrir destino` no se presenta como acción real mientras no exista integración nativa.
+- [ ] Modo mock sigue mostrando resultados simulados.
+- [ ] No cambia el output de imágenes.
+
 ## UX/UI principal — Saneamiento crítico
 
 - [ ] La imagen seleccionada se ve completa por defecto.

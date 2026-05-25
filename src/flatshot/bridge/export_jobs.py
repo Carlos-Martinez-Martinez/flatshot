@@ -37,6 +37,7 @@ class BridgeExportJob:
     percent: int = 0
     messages: list[str] = field(default_factory=list)
     completed_items: list[dict] = field(default_factory=list)
+    issues: list[dict] = field(default_factory=list)
     result: ExportJobResult | None = None
 
     def __post_init__(self) -> None:
@@ -94,6 +95,7 @@ class BridgeExportJob:
                 "errors": self.errors,
                 "messages": list(self.messages[-20:]),
                 "completedItems": list(self.completed_items[-50:]),
+                "issues": list(self.issues[-50:]),
                 "destinations": [serialize_path(path) for path in self.destinations],
                 "durationMs": int(round(self._duration_seconds_locked() * 1000)),
                 "result": self._result_dict(),
@@ -173,10 +175,28 @@ class BridgeExportJob:
                 self.completed_items.append({"name": event.image_name, "success": event.success})
                 if not event.success:
                     self.errors += 1
+                    self.issues.append(
+                        {
+                            "level": "error",
+                            "title": event.image_name,
+                            "detail": "No se pudo exportar.",
+                        }
+                    )
             elif isinstance(event, ExportLogEvent):
                 self.messages.append(event.message)
+                issue = _issue_from_log_message(event.message)
+                if issue:
+                    self.issues.append(issue)
             elif isinstance(event, ExportFinishedEvent):
                 self.errors = max(self.errors, event.errors)
+                if not event.success and event.errors and not self.issues:
+                    self.issues.append(
+                        {
+                            "level": "error",
+                            "title": "Exportación",
+                            "detail": f"{event.errors} errores durante la exportación.",
+                        }
+                    )
 
     def _duration_seconds_locked(self) -> float:
         if not self._started_at:
@@ -210,3 +230,24 @@ def _percent(processed: int, total: int) -> int:
     if total <= 0:
         return 0
     return max(0, min(100, int(round((processed / total) * 100))))
+
+
+def _issue_from_log_message(message: str) -> dict | None:
+    text = str(message or "").strip()
+    if text.startswith("Error:"):
+        detail = text.removeprefix("Error:").strip()
+        title, _, rest = detail.partition(":")
+        return {
+            "level": "error",
+            "title": title.strip() or "Exportación",
+            "detail": rest.strip() or detail or "No se pudo exportar.",
+        }
+    if text.startswith("Aviso:"):
+        detail = text.removeprefix("Aviso:").strip()
+        title, _, rest = detail.partition(":")
+        return {
+            "level": "warning",
+            "title": title.strip() or "Exportación",
+            "detail": rest.strip() or detail,
+        }
+    return None

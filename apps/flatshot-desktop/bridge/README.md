@@ -376,6 +376,39 @@ Estados posibles:
 - `failed`;
 - `cancelled`.
 
+Respuesta resumida:
+
+```json
+{
+  "ok": true,
+  "jobId": "abc123",
+  "status": "completed",
+  "progress": {
+    "processed": 1,
+    "total": 1,
+    "percent": 100
+  },
+  "completedItems": [
+    {
+      "name": "imagen_PRO.jpg",
+      "success": true
+    }
+  ],
+  "issues": [],
+  "destinations": ["C:/ruta/a/carpeta/_SALIDA_PRO"],
+  "result": {
+    "success": true,
+    "processed": 1,
+    "total": 1,
+    "errors": 0,
+    "durationMs": 230,
+    "destinations": ["C:/ruta/a/carpeta/_SALIDA_PRO"]
+  }
+}
+```
+
+`issues` contiene errores/avisos estructurados derivados de eventos del runner. No incluye tracebacks brutos.
+
 ### `POST /exports/jobs/{jobId}/pause`
 
 Real. Pausa el job usando `PauseToken`.

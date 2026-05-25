@@ -40,7 +40,7 @@ const mockImages = [
     id: "img-003",
     folderId: "chaquetas",
     name: "chaqueta_003.png",
-    detail: "Preview con aviso",
+    detail: "Vista con aviso",
     status: "warning",
     tone: "tone-c",
     exportable: true,
@@ -87,9 +87,9 @@ const scenarioLabels = {
   initial: "Sin lote",
   "batch-ready": "Lote listo",
   "empty-folder": "Carpeta vacía",
-  "preview-loading": "Preview cargando",
-  "preview-warning": "Preview con aviso",
-  "preview-error": "Error de preview",
+  "preview-loading": "Vista cargando",
+  "preview-warning": "Vista con aviso",
+  "preview-error": "Error de vista",
   "export-blocked": "Destino sin configurar",
   "export-ready": "Exportación lista",
   "export-running": "Exportación en curso",
@@ -193,12 +193,15 @@ const state = {
   fitMode: "fit",
   filter: "all",
   search: "",
-  inspectorTab: "adjustments",
+  inspectorTab: "output",
   inspectorCollapsed: false,
+  outputEditMode: false,
+  presetEditorOpen: false,
   activePreset: "Luz cenital",
+  presetOutputSettings: {},
   settings: { ...defaultSettings },
   presetDirty: false,
-  presetSource: "Bridge local",
+  presetSource: "Preset activo",
   localOverride: false,
   exportStatus: "blocked",
   exportJobId: null,
@@ -208,6 +211,7 @@ const state = {
   exportIssues: [],
   exportResult: null,
   exportPollTimer: null,
+  outputDraft: null,
   destinationMode: "source",
   destinationValue: "_SALIDA_PRO",
   format: "JPG",
@@ -218,7 +222,7 @@ const state = {
   processed: 0,
   errors: [],
   paused: false,
-  statusText: "Añade una carpeta",
+  statusText: "Selecciona una carpeta",
   bridgeMode: "bridge",
   bridgeUrl: defaultBridgeUrl,
   bridgeStatus: "idle",
@@ -318,10 +322,10 @@ function activePresetItems() {
   }
   return mockPresets.map((name) => ({
     name,
-    category: devMode ? "Mock" : "Fallback local",
+    category: devMode ? "Demo" : "Preset local",
     categoryId: devMode ? "mock" : "fallback",
     settings: normalizeSettings(mockPresetSettings[name]),
-    source: devMode ? "mock" : "fallback",
+    source: devMode ? "demo" : "fallback",
   }));
 }
 
@@ -378,7 +382,7 @@ function filteredImages() {
 function filterDisplayName(filter = state.filter) {
   const labels = {
     all: "todas",
-    valid: "válidas",
+    valid: "exportables",
     warnings: "avisos",
     errors: "errores",
   };
@@ -395,10 +399,10 @@ function filterStatusText(filter = state.filter) {
 function validationIssues() {
   const issues = [];
   if (state.batch === "none") {
-    issues.push({ level: "warning", title: "Sin lote", detail: "Añade una carpeta." });
+    issues.push({ level: "error", title: "Sin lote", detail: "Selecciona una carpeta con imágenes para iniciar el lote." });
   }
   if (state.batch === "empty") {
-    issues.push({ level: "warning", title: "No hay PNG válidos", detail: "Elige otra carpeta." });
+    issues.push({ level: "warning", title: "No hay PNG válidos", detail: "Elige otra carpeta o revisa el diagnóstico." });
   }
   if (exportableImages().length === 0 && state.batch === "ready") {
     issues.push({ level: "error", title: "Sin imágenes exportables", detail: "Revisa los errores." });
@@ -421,7 +425,7 @@ function preflightIssues() {
   if (omitted > 0 && hasBatch()) {
     issues.push({
       level: "warning",
-      title: "Imágenes omitidas",
+      title: `${omitted} omitida${omitted === 1 ? "" : "s"}`,
       detail: omittedSummaryText(state.scanDiagnostics),
     });
   }
@@ -457,6 +461,50 @@ function isExportReady() {
     && exportableImages().length > 0;
 }
 
+function uiState() {
+  const counts = preflightCounts();
+  const image = selectedImage();
+  const visibleWarnings = visibleWarningCount();
+  return {
+    hasBatch: hasBatch(),
+    hasBatchContext: hasBatch() || state.batch === "empty" || state.batch === "scanning",
+    hasSelectedImage: Boolean(image),
+    isBridgeReady: state.bridgeMode === "bridge" && state.bridgeStatus === "connected",
+    canExport: isExportReady(),
+    hasWarnings: visibleWarnings > 0 || counts.warnings > 0,
+    hasBlockingErrors: counts.errors > 0 || state.exportStatus === "failed",
+    isProcessing: state.batch === "scanning" || state.previewStatus === "loading" || state.exportStatus === "running",
+    isExporting: state.exportStatus === "running",
+  };
+}
+
+function visibleWarningCount() {
+  return Number(state.scanDiagnostics?.totalOmitted || 0)
+    + activeImages().filter((image) => image.status === "warning" || image.status === "error" || exportItemState(image)?.status === "error").length
+    + state.errors.length;
+}
+
+function batchSummaryLabel() {
+  const count = activeImages().length;
+  if (state.batch === "none") {
+    return "Sin lote";
+  }
+  if (state.batch === "scanning") {
+    return "Escaneando";
+  }
+  if (state.batch === "empty") {
+    return "Sin imágenes";
+  }
+  const warnings = visibleWarningCount();
+  return `${count} imagen${count === 1 ? "" : "es"}${warnings ? ` · ${warnings} aviso${warnings === 1 ? "" : "s"}` : ""}`;
+}
+
+function firstBlockingIssue() {
+  return preflightIssues().find((issue) => issue.level === "error")
+    || preflightIssues()[0]
+    || null;
+}
+
 function setScenario(scenario) {
   clearTimers();
   clearBridgeExportPoll();
@@ -482,6 +530,9 @@ function setScenario(scenario) {
     errors: [],
     filter: "all",
     search: "",
+    inspectorTab: "output",
+    outputEditMode: false,
+    presetEditorOpen: false,
     scanIssues: [],
     scanDiagnostics: mockScanDiagnostics(),
     paused: false,
@@ -496,7 +547,7 @@ function setScenario(scenario) {
       selectedImageId: null,
       previewStatus: "empty",
       exportStatus: "blocked",
-      statusText: "Añade una carpeta",
+      statusText: "Selecciona una carpeta",
       scanStatus: "Selecciona una carpeta con PNG.",
       scanDiagnostics: emptyScanDiagnostics(),
     });
@@ -515,21 +566,21 @@ function setScenario(scenario) {
     Object.assign(state, {
       previewStatus: "loading",
       exportStatus: "ready",
-      statusText: "Generando preview",
+      statusText: "Generando vista",
     });
   } else if (scenario === "preview-warning") {
     Object.assign(state, {
       selectedImageId: "img-003",
       previewStatus: "warning",
       exportStatus: "ready",
-      statusText: "Preview con aviso",
+      statusText: "Vista con aviso",
     });
   } else if (scenario === "preview-error") {
     Object.assign(state, {
       selectedImageId: "img-004",
       previewStatus: "error",
       exportStatus: "blocked",
-      statusText: "Preview no disponible",
+      statusText: "Vista no disponible",
     });
   } else if (scenario === "export-blocked") {
     Object.assign(state, {
@@ -575,7 +626,7 @@ function setScenario(scenario) {
       exportDestinations: ["Mock / _SALIDA_PRO"],
       exportIssues: [
         { level: "error", title: "chaqueta_004.png", detail: "No se pudo leer alpha." },
-        { level: "warning", title: "chaqueta_003.png", detail: "Preview renderizada con fallback." },
+        { level: "warning", title: "chaqueta_003.png", detail: "Vista renderizada con fallback." },
       ],
       exportResult: {
         success: false,
@@ -586,7 +637,7 @@ function setScenario(scenario) {
       },
       errors: [
         { level: "error", title: "chaqueta_004.png", detail: "No se pudo leer alpha." },
-        { level: "warning", title: "chaqueta_003.png", detail: "Preview renderizada con fallback." },
+        { level: "warning", title: "chaqueta_003.png", detail: "Vista renderizada con fallback." },
       ],
       statusText: "Exportación con errores",
     });
@@ -678,6 +729,8 @@ function loadMockBatch() {
 
 function clearBatch() {
   clearBridgeExportPoll();
+  state.outputEditMode = false;
+  state.presetEditorOpen = false;
   setScenario("initial");
 }
 
@@ -707,11 +760,11 @@ function selectImage(imageId) {
   state.previewStatus = "loading";
   state.previewData = null;
   state.previewError = "";
-  state.statusText = "Generando preview";
+  state.statusText = "Generando vista";
   render();
   setTimer(() => {
     state.previewStatus = image.status === "error" ? "error" : image.status === "warning" ? "warning" : "ready";
-    state.statusText = state.previewStatus === "error" ? "Preview no disponible" : "Preview lista";
+    state.statusText = state.previewStatus === "error" ? "Vista no disponible" : "Vista lista";
     render();
   }, 380);
 }
@@ -764,10 +817,11 @@ function applyPresetSettings(name, options = {}) {
   }
   state.activePreset = preset.name;
   state.settings = normalizeSettings(preset.settings);
+  if (state.presetOutputSettings[preset.name]) {
+    Object.assign(state, state.presetOutputSettings[preset.name]);
+  }
   state.presetDirty = false;
-  state.presetSource = preset.source === "bridge"
-    ? `Bridge local · ${preset.category || "Preset"}`
-    : devMode ? "Mock" : "Fallback local";
+  state.presetSource = preset.category || "Preset activo";
   const advanced = $("#advanced-settings");
   if (advanced) {
     advanced.open = false;
@@ -785,14 +839,14 @@ function resetActivePresetSettings() {
   }
   state.settings = { ...defaultSettings };
   state.presetDirty = false;
-  state.presetSource = state.bridgeMode === "bridge" || !devMode ? "Bridge local · defaults" : "Mock";
+  state.presetSource = "Preset activo";
   state.statusText = "Ajustes restaurados";
   refreshPreviewAfterSettingChange();
 }
 
 function markPresetDirty() {
   state.presetDirty = true;
-  state.presetSource = state.bridgeMode === "bridge" || !devMode ? "Bridge local · modificado" : "Mock · modificado";
+  state.presetSource = "Modificado";
   refreshPreviewAfterSettingChange();
 }
 
@@ -801,7 +855,7 @@ function refreshPreviewAfterSettingChange() {
     state.previewStatus = "loading";
     state.previewData = null;
     state.previewError = "";
-    state.statusText = "Generando preview";
+    state.statusText = "Generando vista";
     render();
     clearTimers();
     setTimer(() => {
@@ -814,12 +868,12 @@ function refreshPreviewAfterSettingChange() {
   }
   if (hasBatch() && state.previewStatus !== "error") {
     state.previewStatus = "loading";
-    state.statusText = "Generando preview";
+    state.statusText = "Generando vista";
     render();
     clearTimers();
     setTimer(() => {
       state.previewStatus = selectedImage()?.status === "warning" ? "warning" : "ready";
-      state.statusText = "Preview lista";
+      state.statusText = "Vista lista";
       render();
     }, 420);
   } else {
@@ -1127,8 +1181,10 @@ function reviewErrors() {
   if (!hasBatch()) {
     return;
   }
-  state.filter = "errors";
-  state.statusText = state.errors.length ? "Revisa errores de exportación" : "Mostrando errores";
+  const hasErrors = activeImages().some((image) => image.status === "error" || exportItemState(image)?.status === "error") || state.errors.some((issue) => issue.level === "error");
+  const hasWarnings = activeImages().some((image) => image.status === "warning");
+  state.filter = hasErrors ? "errors" : hasWarnings ? "warnings" : "all";
+  state.statusText = "Mostrando avisos";
   render();
 }
 
@@ -1174,7 +1230,7 @@ async function requestBridgePreview(image) {
   state.previewStatus = "loading";
   state.previewData = null;
   state.previewError = "";
-  state.statusText = "Generando preview";
+  state.statusText = "Generando vista";
   render();
 
   try {
@@ -1194,7 +1250,7 @@ async function requestBridgePreview(image) {
 
     state.previewData = previewResponseToData(response);
     state.previewStatus = response.warning ? "warning" : "ready";
-    state.statusText = response.warning ? "Preview con aviso" : "Preview lista";
+    state.statusText = response.warning ? "Vista con aviso" : "Vista lista";
   } catch (error) {
     if (isStalePreviewResponse(requestId, image)) {
       return;
@@ -1203,7 +1259,7 @@ async function requestBridgePreview(image) {
     state.previewStatus = "error";
     state.previewData = null;
     state.previewError = message;
-    state.statusText = "Preview no disponible";
+    state.statusText = "Vista no disponible";
   }
 
   render();
@@ -1272,11 +1328,11 @@ async function checkBridge() {
     state.bridgeCapabilitiesSummary = capabilitiesSummary(capabilities);
     state.bridgeMessage = `${health.service} conectado`;
     state.bridgeLastResponse = "health OK";
-    state.scanStatus = "Bridge conectado";
+    state.scanStatus = "Conexión local lista";
     if (state.batch === "none") {
       state.scanIssues = [];
     }
-    state.statusText = "Bridge conectado";
+    state.statusText = "Listo";
     applyBridgePresets(presetPayload);
   } catch (error) {
     const message = bridgeErrorMessage(error);
@@ -1285,8 +1341,8 @@ async function checkBridge() {
     state.bridgeCapabilitiesSummary = "Sin comprobar";
     state.bridgeMessage = message;
     state.bridgeLastResponse = `error: ${message}`;
-    state.scanStatus = "Bridge desconectado";
-    state.statusText = "Bridge sin conexión";
+    state.scanStatus = "Conexión local no disponible";
+    state.statusText = "Conexión local no disponible";
   }
 
   render();
@@ -1344,7 +1400,7 @@ function applyBridgePresets(payload) {
   state.bridgePresetSource = payload.source || "unavailable";
   state.bridgePresetWarning = payload.warning || "";
   if (!items.length) {
-    state.presetSource = "Bridge local · sin presets";
+    state.presetSource = "Sin presets";
     return;
   }
 
@@ -1436,8 +1492,8 @@ async function scanBridgeFolder() {
       bridgeStatus: "disconnected",
       bridgeMessage: message,
       bridgeLastResponse: `error: ${message}`,
-      scanStatus: "Bridge desconectado",
-      scanIssues: [{ level: "error", title: "Bridge desconectado", detail: message }],
+      scanStatus: "Conexión local no disponible",
+      scanIssues: [{ level: "error", title: "Conexión local no disponible", detail: message }],
       statusText: "No se pudo escanear",
     });
   }
@@ -1572,7 +1628,7 @@ function bridgeImageToItem(image, folderIndex, imageIndex) {
     id: `bridge-${folderIndex}-${imageIndex}`,
     folderId: `bridge-folder-${folderIndex}`,
     name: image.name,
-    detail: `${formatBytes(image.sizeBytes)} · Bridge local`,
+    detail: formatBytes(image.sizeBytes),
     status: image.hasLocalOverride ? "adjusted" : "ready",
     tone: `tone-${["a", "b", "c", "d", "e"][imageIndex % 5]}`,
     exportable: true,
@@ -1598,9 +1654,9 @@ function formatBytes(bytes) {
 
 function bridgeErrorMessage(error) {
   if (error?.name === "AbortError") {
-    return "Bridge no responde";
+    return "La conexión local no responde";
   }
-  return error?.message || "Bridge no disponible";
+  return error?.message || "Conexión local no disponible";
 }
 
 function capabilitiesSummary(capabilities) {
@@ -1633,12 +1689,22 @@ function showReviewScenario(scenario) {
 }
 
 function primaryAction() {
+  if (state.exportStatus === "running") {
+    stopExport();
+    return;
+  }
   if (!hasBatch()) {
     void pickBridgeFolder();
     return;
   }
   if (state.exportStatus === "completed" || state.exportStatus === "partial") {
     clearBatch();
+    return;
+  }
+  if (!isExportReady()) {
+    state.inspectorTab = "output";
+    state.statusText = firstBlockingIssue()?.title || "Revisa salida";
+    render();
     return;
   }
   startExport();
@@ -1649,6 +1715,9 @@ function statusMode() {
     return "error";
   }
   if (state.exportStatus === "running" || state.previewStatus === "loading" || state.batch === "scanning") {
+    return "busy";
+  }
+  if (state.bridgeMode === "bridge" && state.bridgeStatus !== "connected") {
     return "busy";
   }
   if (state.exportStatus === "partial" || state.previewStatus === "warning" || validationIssues().length) {
@@ -1672,8 +1741,15 @@ function render() {
 
 function renderShell() {
   const shell = $(".app-shell");
+  const derived = uiState();
   shell.classList.toggle("dev-mode", devMode);
-  shell.classList.toggle("has-batch", hasBatch() || state.batch === "empty");
+  shell.classList.toggle("no-batch", state.batch === "none");
+  shell.classList.toggle("empty-batch", state.batch === "empty");
+  shell.classList.toggle("has-batch", derived.hasBatchContext);
+  shell.classList.toggle("has-selected-image", derived.hasSelectedImage);
+  shell.classList.toggle("no-selected-image", !derived.hasSelectedImage);
+  shell.classList.toggle("can-export", derived.canExport);
+  shell.classList.toggle("is-exporting", derived.isExporting);
   shell.classList.toggle("is-scanning", state.batch === "scanning");
   shell.classList.toggle("inspector-collapsed", state.inspectorCollapsed);
 }
@@ -1689,11 +1765,7 @@ function renderTop() {
   $("#demo-scenario").value = scenarioLabels[state.scenario] ? state.scenario : "batch-ready";
   $("#app-mode").value = state.bridgeMode;
   $("#bridge-url").value = state.bridgeUrl;
-  $("#active-batch-label").textContent = hasBatch()
-    ? `${activeImages().length} imágenes${state.scanDiagnostics.totalOmitted ? ` · ${state.scanDiagnostics.totalOmitted} omitidas` : ""}`
-    : state.batch === "empty"
-      ? "Carpeta sin PNG"
-      : "Sin lote";
+  $("#active-batch-label").textContent = batchSummaryLabel();
   $("#top-status-text").textContent = topStatusText();
   $("#status-dot").className = `status-dot ${statusMode()}`;
   const preflight = $("#top-preflight-status");
@@ -1709,58 +1781,55 @@ function topStatusText() {
     return "Escaneando carpeta";
   }
   if (!hasBatch()) {
-    return state.batch === "empty" ? "No hay PNG válidos" : "Añade una carpeta";
+    return state.batch === "empty" ? "No hay imágenes compatibles" : "Selecciona una carpeta";
   }
   if (state.exportStatus === "running") {
     const total = exportableImages().length;
-    return state.paused ? "Pausado" : `Procesando ${state.processed}/${total}`;
+    return state.paused ? "Pausado" : `Exportando ${state.processed}/${total}`;
   }
   if (state.previewStatus === "loading") {
-    return "Generando preview";
+    return "Generando vista";
   }
   if (state.previewStatus === "error") {
-    return "Preview no disponible";
+    return "Vista no disponible";
   }
   if (state.previewStatus === "warning") {
-    return "Preview con aviso";
-  }
-  if (image?.source === "bridge" && state.previewStatus === "ready") {
-    return "Preview real";
+    return "Revisa avisos";
   }
   if (image && state.previewStatus === "ready") {
-    return devMode ? "Preview simulada" : "Preview lista";
+    return "Listo";
   }
   if (state.bridgeMode === "bridge" && state.bridgeStatus === "disconnected") {
-    return "Revisa el bridge";
+    return "Conexión local no disponible";
   }
   return state.statusText;
 }
 
 function preflightStatusLabel() {
   if (state.exportStatus === "running") {
-    return state.paused ? "Pausado" : "Procesando";
+    return state.paused ? "Salida pausada" : "Exportando";
   }
   if (state.exportStatus === "completed") {
-    return "Completada";
+    return "Salida completada";
   }
   if (state.exportStatus === "partial") {
-    return "Con avisos";
+    return "Avisos";
   }
   if (state.exportStatus === "failed") {
-    return "Bloqueado";
+    return "Revisar";
   }
   const ready = isExportReady();
   const counts = preflightCounts();
   if (!ready && counts.errors > 0) {
-    return "Bloqueado";
+    return "Revisar";
   }
   if (!ready) {
-    return "Bloqueado";
+    return "Pendiente";
   }
   if (counts.warnings > 0) {
     return `${counts.warnings} aviso${counts.warnings === 1 ? "" : "s"}`;
   }
-  return "Preflight listo";
+  return "Listo";
 }
 
 function preflightStatusClass() {
@@ -1795,6 +1864,8 @@ function renderBridge() {
   $("#source-title").textContent = hasBatch() || state.batch === "empty" ? "Cambiar carpeta" : "Selecciona una carpeta";
   $("#scan-status").textContent = state.scanStatus;
   $("#bridge-scan-path").value = state.bridgeScanPath;
+  $("#bridge-pick-folder").textContent = hasBatch() || state.batch === "empty" ? "Cambiar" : "Seleccionar carpeta";
+  $("#bridge-scan-folder").textContent = hasBatch() || state.batch === "empty" ? "Reescanear" : "Escanear";
   $("#bridge-pick-folder").disabled = state.bridgeStatus === "checking" || state.batch === "scanning";
   $("#bridge-scan-folder").disabled = state.bridgeStatus === "checking" || state.batch === "scanning";
   $("#bridge-last-response").textContent = state.bridgeLastResponse;
@@ -1806,16 +1877,16 @@ function renderBridge() {
 
 function normalBridgeMessage() {
   if (state.bridgeMode !== "bridge") {
-    return devMode ? "Modo revisión con datos simulados." : "Selecciona una carpeta local.";
+    return devMode ? "Modo revisión activo." : "Selecciona una carpeta local.";
   }
   if (state.bridgeStatus === "connected") {
-    return "Bridge conectado.";
+    return "Listo.";
   }
   if (state.bridgeStatus === "checking") {
-    return "Comprobando bridge.";
+    return "Comprobando conexión.";
   }
   if (state.bridgeStatus === "disconnected") {
-    return "Bridge desconectado. Reintenta.";
+    return "Conexión local no disponible.";
   }
   return "Selecciona una carpeta local.";
 }
@@ -1835,12 +1906,12 @@ function sourcePanelClass() {
 
 function sourceLabel() {
   if (isBridgeBatch()) {
-    return "Carpeta local";
+    return "Local";
   }
   if (isMockBatch()) {
-    return devMode ? "Mock" : "Carpeta local";
+    return devMode ? "Demo" : "Local";
   }
-  return state.bridgeMode === "bridge" || !devMode ? "Carpeta local" : "Mock";
+  return state.bridgeMode === "bridge" || !devMode ? "Local" : "Demo";
 }
 
 function emptyScanDiagnostics() {
@@ -1902,11 +1973,11 @@ function renderBatchSummary() {
         <strong>${escapeHtml(filesLabel)}</strong>
       </div>
       <div class="summary-metric">
-        <span>Válidas</span>
+        <span>Exportables</span>
         <strong>${state.batch === "scanning" ? "..." : images.length}</strong>
       </div>
       <div class="summary-metric">
-        <span>Omitidas</span>
+        <span>Avisos</span>
         <strong>${escapeHtml(omittedLabel)}</strong>
       </div>
     </div>
@@ -1916,6 +1987,7 @@ function renderBatchSummary() {
 }
 
 function diagnosticsHtml(diagnostics) {
+  const open = state.scanIssues.some((issue) => issue.level === "error") ? " open" : "";
   const reasonRows = Object.entries(diagnostics.omittedByReason || {}).map(([reason, count]) => `
     <div class="diagnostic-row">
       <span>${escapeHtml(omissionReasonLabel(reason))}</span>
@@ -1929,7 +2001,7 @@ function diagnosticsHtml(diagnostics) {
     </li>
   `).join("");
   return `
-    <details class="batch-diagnostics">
+    <details class="batch-diagnostics"${open}>
       <summary>Ver diagnóstico</summary>
       <div class="diagnostic-reasons">${reasonRows}</div>
       ${sampleRows ? `<ul>${sampleRows}</ul>` : ""}
@@ -1939,16 +2011,16 @@ function diagnosticsHtml(diagnostics) {
 
 function batchSummaryNote(imageCount, folderCount, issueCount) {
   if (state.batch === "scanning") {
-    return isBridgeBatch() || !devMode ? "Leyendo PNG reales desde bridge." : "Leyendo lote mock.";
+    return "Leyendo imágenes.";
   }
   if (isBridgeBatch()) {
     if (state.batch === "empty") {
       return state.scanDiagnostics.totalOmitted
-        ? `0 imágenes válidas · ${state.scanDiagnostics.totalOmitted} omitida${state.scanDiagnostics.totalOmitted === 1 ? "" : "s"}`
+        ? `0 exportables · ${state.scanDiagnostics.totalOmitted} aviso${state.scanDiagnostics.totalOmitted === 1 ? "" : "s"}`
         : state.scanIssues[0]?.detail || "Carpeta real sin PNG válidos.";
     }
     if (state.scanDiagnostics.totalOmitted) {
-      return `${imageCount} imágenes válidas · ${state.scanDiagnostics.totalOmitted} omitida${state.scanDiagnostics.totalOmitted === 1 ? "" : "s"}`;
+      return `${imageCount} exportables · ${state.scanDiagnostics.totalOmitted} aviso${state.scanDiagnostics.totalOmitted === 1 ? "" : "s"}`;
     }
     return issueCount
       ? `${imageCount} imágenes reales · ${issueCount} aviso${issueCount === 1 ? "" : "s"}`
@@ -1956,7 +2028,7 @@ function batchSummaryNote(imageCount, folderCount, issueCount) {
   }
   if (isMockBatch()) {
     return devMode
-      ? (state.batch === "empty" ? "Escenario mock: carpeta vacía." : "Escenario mock para revisión visual.")
+      ? (state.batch === "empty" ? "Carpeta vacía." : "Revisión visual.")
       : "Selecciona una carpeta local.";
   }
   return "Sin lote cargado.";
@@ -1971,18 +2043,18 @@ function bridgeStatusClass() {
 
 function bridgeStatusLabel() {
   if (state.bridgeMode !== "bridge" && devMode) {
-    return "Mock";
+    return "Demo";
   }
   if (state.bridgeStatus === "connected") {
-    return "Bridge conectado";
+    return "Listo";
   }
   if (state.bridgeStatus === "checking") {
-    return "Comprobando bridge";
+    return "Comprobando";
   }
   if (state.bridgeStatus === "disconnected") {
-    return "Bridge desconectado";
+    return "Sin conexión local";
   }
-  return "Bridge pendiente";
+  return "Pendiente";
 }
 
 function renderBatch() {
@@ -1991,13 +2063,15 @@ function renderBatch() {
   const valid = images.filter((image) => image.status === "ready" || image.status === "adjusted").length;
   const warnings = images.filter((image) => image.status === "warning").length;
   const errors = images.filter((image) => image.status === "error" || exportItemState(image)?.status === "error").length;
+  const omitted = Number(state.scanDiagnostics?.totalOmitted || 0);
+  const warningCount = omitted + warnings + errors;
 
   if (state.batch === "none") {
     $("#batch-count").textContent = "0 imágenes";
     $("#batch-pill").textContent = "Sin carpeta";
     $("#folder-list").innerHTML = "";
     $("#image-list").innerHTML = "";
-    $("#batch-empty-note").textContent = state.scanIssues[0]?.detail || "Selecciona una carpeta para empezar.";
+    $("#batch-empty-note").innerHTML = "";
     $("#image-search").value = state.search;
     renderFilterButtons();
     return;
@@ -2005,12 +2079,12 @@ function renderBatch() {
 
   if (state.batch === "scanning") {
     $("#batch-count").textContent = "Escaneando";
-    $("#batch-pill").textContent = isBridgeBatch() || !devMode ? "Carpeta local" : "Carpeta mock";
+    $("#batch-pill").textContent = "Escaneando";
     $("#folder-list").innerHTML = folderItemHtml({
       id: "scan",
-      name: isBridgeBatch() || !devMode ? basename(parseFolderInput(state.bridgeScanPath)[0]) || "Ruta bridge" : "Camisetas Mayo",
+      name: isBridgeBatch() || !devMode ? basename(parseFolderInput(state.bridgeScanPath)[0]) || "Ruta" : "Camisetas Mayo",
       path: state.bridgeScanPath,
-      detail: isBridgeBatch() || !devMode ? "Leyendo PNG reales" : "Leyendo PNG",
+      detail: "Leyendo imágenes",
       count: "...",
       status: "ready",
     });
@@ -2033,20 +2107,18 @@ function renderBatch() {
     $("#batch-count").textContent = "0 PNG";
     $("#batch-pill").textContent = state.scanDiagnostics.totalOmitted
       ? `${state.scanDiagnostics.totalOmitted} omitida${state.scanDiagnostics.totalOmitted === 1 ? "" : "s"}`
-      : isBridgeBatch() ? "Carpeta local" : "Sin imágenes";
+      : "Sin imágenes";
     $("#folder-list").innerHTML = emptyFolders.map(folderItemHtml).join("");
     $("#image-list").innerHTML = "";
-    $("#batch-empty-note").textContent = state.scanDiagnostics.totalOmitted
-      ? `No hay PNG válidos. ${omittedSummaryText(state.scanDiagnostics)}.`
-      : state.scanStatus || "No hay PNG válidos.";
+    $("#batch-empty-note").innerHTML = emptyBatchNoteHtml();
     renderFilterButtons();
     return;
   }
 
   $("#batch-count").textContent = `${images.length} imágenes`;
-  $("#batch-pill").textContent = isBridgeBatch()
-    ? state.scanDiagnostics.totalOmitted ? `${state.scanDiagnostics.totalOmitted} omitida${state.scanDiagnostics.totalOmitted === 1 ? "" : "s"}` : "Carpeta local"
-    : errors ? `${errors} error${errors === 1 ? "" : "es"}` : adjusted ? `${adjusted} ajustada${adjusted === 1 ? "" : "s"}` : warnings ? `${warnings} aviso${warnings === 1 ? "" : "s"}` : "Listas";
+  $("#batch-pill").textContent = warningCount
+    ? `${warningCount} aviso${warningCount === 1 ? "" : "s"}`
+    : adjusted ? `${adjusted} ajustada${adjusted === 1 ? "" : "s"}` : "Listo";
   $("#folder-list").innerHTML = activeFolders().map(folderItemHtml).join("");
   $("#image-search").value = state.search;
   renderFilterButtons();
@@ -2061,7 +2133,7 @@ function filteredEmptyHtml(total, valid, warnings, errors) {
     return "No hay imágenes en este lote.";
   }
   const labels = {
-    valid: "válidas",
+    valid: "exportables",
     warnings: "con avisos",
     errors: "con errores",
   };
@@ -2082,6 +2154,17 @@ function filteredEmptyHtml(total, valid, warnings, errors) {
     <strong>No hay imágenes ${escapeHtml(label)}.</strong>
     <small>${escapeHtml(total)} imágenes en el lote · ${escapeHtml(count)} en este filtro</small>
     <button type="button" data-action="clear-filter">Ver todas</button>
+  `;
+}
+
+function emptyBatchNoteHtml() {
+  const detail = state.scanDiagnostics.totalOmitted
+    ? `No hay PNG válidos. ${omittedSummaryText(state.scanDiagnostics)}.`
+    : state.scanStatus || "No hay PNG válidos.";
+  return `
+    <strong>No se encontraron imágenes compatibles</strong>
+    <span>${escapeHtml(detail)}</span>
+    <button type="button" data-action="pick-bridge-folder">Cambiar carpeta</button>
   `;
 }
 
@@ -2107,21 +2190,41 @@ function imageItemHtml(image) {
   const chipClass = effectiveStatus === "warning" ? "warning" : effectiveStatus === "error" ? "error" : effectiveStatus === "exported" ? "exported" : "";
   const chipLabel = exportState?.label || statusLabels[image.status];
   const title = image.path || image.name;
+  const showChip = effectiveStatus && !["ready"].includes(effectiveStatus);
+  const detail = image.detail === "Lista" ? "" : image.detail;
   return `
     <button type="button" class="image-item ${selected} ${chipClass}" data-image-id="${escapeHtml(image.id)}" title="${escapeHtml(title)}">
       <span class="thumb ${escapeHtml(image.tone)}"></span>
       <span class="image-copy">
         <strong>${escapeHtml(image.name)}</strong>
-        <small>${escapeHtml(image.detail)}</small>
+        ${detail ? `<small>${escapeHtml(detail)}</small>` : ""}
       </span>
-      <span class="state-chip ${chipClass}">${escapeHtml(chipLabel)}</span>
+      ${showChip ? `<span class="state-chip ${chipClass}">${escapeHtml(chipLabel)}</span>` : ""}
     </button>
   `;
 }
 
 function renderFilterButtons() {
+  const images = activeImages();
+  const counts = {
+    all: images.length,
+    valid: images.filter((image) => image.status === "ready" || image.status === "adjusted").length,
+    warnings: images.filter((image) => image.status === "warning").length,
+    errors: images.filter((image) => image.status === "error" || exportItemState(image)?.status === "error").length,
+  };
+  const labels = {
+    all: "Todas",
+    valid: "Exportables",
+    warnings: "Avisos",
+    errors: "Errores",
+  };
   $$(".batch-filter button").forEach((button) => {
+    const filter = button.dataset.filter;
+    button.textContent = `${labels[filter]} ${counts[filter] || 0}`;
     button.classList.toggle("active", button.dataset.filter === state.filter);
+    const hidden = filter === "valid" || (filter !== "all" && !counts[filter]);
+    button.classList.toggle("is-empty", hidden);
+    button.hidden = hidden && button.dataset.filter !== state.filter;
   });
 }
 
@@ -2130,17 +2233,23 @@ function renderPreview() {
   const isBridgeImage = image?.source === "bridge";
   const previewControlsDisabled = !image || state.previewStatus === "empty" || state.previewStatus === "error";
   const compareControlsDisabled = !image || isBridgeImage || state.previewStatus === "empty" || state.previewStatus === "error";
-  $("#preview-name").textContent = image ? image.name : "Sin imagen seleccionada";
+  $("#preview-name").textContent = image
+    ? image.name
+    : state.batch === "none"
+      ? "Empieza con una carpeta"
+      : state.batch === "empty"
+        ? "Carpeta sin imágenes"
+        : "Selecciona una imagen";
   $("#preview-subtitle").textContent = previewSubtitle(image);
-  $("#zoom-label").textContent = state.fitMode === "fit" ? "Fit" : `${state.zoom}%`;
+  $("#zoom-label").textContent = `${state.zoom}%`;
   const visibleImages = filteredImages();
   const visibleIndex = visibleImages.findIndex((item) => item.id === state.selectedImageId);
   $("#viewer-position").textContent = visibleIndex >= 0
-    ? `Imagen ${visibleIndex + 1} de ${visibleImages.length}`
+    ? `${visibleIndex + 1} / ${visibleImages.length}`
     : activeImages().length ? "Fuera del filtro" : "Sin imagen";
   $("#preview-meta").textContent = isBridgeImage
     ? bridgePreviewMeta()
-    : image ? `${state.format} · ${state.size} · ${backgroundLabel(state.background)}` : "Sin imagen";
+    : image ? state.activePreset : "Selecciona carpeta";
   $("#canvas-area").className = `canvas-area bg-${state.previewBg === "transparent" ? "transparent" : state.previewBg}`;
   $$(".preview-toolbar [data-preview-mode]").forEach((button) => {
     button.classList.toggle("active", button.dataset.previewMode === state.previewMode);
@@ -2155,6 +2264,9 @@ function renderPreview() {
   $$("[data-action='zoom-fit'], [data-action='zoom-100'], [data-action='zoom-out'], [data-action='zoom-in'], [data-action='force-preview-error']").forEach((button) => {
     button.disabled = previewControlsDisabled;
   });
+  $$("[data-action='zoom-fit'], [data-action='zoom-100']").forEach((button) => {
+    button.classList.toggle("active", button.dataset.action === "zoom-fit" ? state.fitMode === "fit" : state.fitMode !== "fit" && state.zoom === 100);
+  });
   $$("[data-action='previous-image'], [data-action='next-image']").forEach((button) => {
     button.disabled = visibleImages.length < 2;
   });
@@ -2163,8 +2275,41 @@ function renderPreview() {
   canvas.className = `preview-canvas ${state.previewMode} bg-${state.previewBg} ${state.fitMode === "fit" ? "fit-mode" : "zoom-mode"}`;
   canvas.style.setProperty("--preview-scale", state.fitMode === "fit" ? "1" : String(state.zoom / 100));
 
+  if (state.batch === "none") {
+    canvas.innerHTML = emptyStateHtml({
+      variant: "onboarding",
+      title: "Empieza con una carpeta de imágenes",
+      detail: "Selecciona una carpeta local con PNG o JPG para generar el lote de revisión.",
+      actionLabel: "Seleccionar carpeta",
+      action: "pick-bridge-folder",
+      meta: "La vista previa aparecerá al seleccionar una imagen",
+    });
+    return;
+  }
+
+  if (state.batch === "empty") {
+    canvas.innerHTML = emptyStateHtml({
+      variant: "warning",
+      title: "No se encontraron imágenes compatibles",
+      detail: state.scanDiagnostics.totalOmitted
+        ? omittedSummaryText(state.scanDiagnostics)
+        : "La carpeta seleccionada no contiene PNG o JPG procesables.",
+      actionLabel: "Cambiar carpeta",
+      action: "pick-bridge-folder",
+      meta: state.scanStatus || "Revisa el diagnóstico del lote",
+    });
+    return;
+  }
+
   if (!image || state.previewStatus === "empty") {
-    canvas.innerHTML = previewStateHtml("Sin imagen seleccionada", "El lote aparecerá aquí.");
+    canvas.innerHTML = emptyStateHtml({
+      variant: "inline",
+      title: "Selecciona una imagen",
+      detail: "Elige una miniatura del lote para revisar el preview.",
+      actionLabel: activeImages().length ? "Seleccionar primera" : "",
+      action: activeImages().length ? "select-first-image" : "",
+      meta: activeImages().length ? `${activeImages().length} imágenes en el lote` : "",
+    });
     return;
   }
 
@@ -2185,7 +2330,7 @@ function renderPreview() {
   }
 
   if (state.previewStatus === "error") {
-    canvas.innerHTML = previewStateHtml("Preview no disponible", "Revisa alpha o archivo fuente.");
+    canvas.innerHTML = previewStateHtml("Vista no disponible", "Revisa alpha o archivo fuente.");
     return;
   }
 
@@ -2210,20 +2355,19 @@ function realPreviewHtml(image) {
   }
 
   if (state.previewStatus === "error") {
-    return previewStateHtml("Preview no disponible", state.previewError || "Revisa la imagen fuente.");
+    return previewStateHtml("Vista no disponible", state.previewError || "Revisa la imagen fuente.");
   }
 
   if (state.previewData?.src) {
     return `
-      <img class="preview-image" src="${escapeHtml(state.previewData.src)}" alt="Preview real de ${escapeHtml(image.name)}" />
+      <img class="preview-image" src="${escapeHtml(state.previewData.src)}" alt="Vista previa de ${escapeHtml(image.name)}" />
       ${state.previewData.warning ? `<div class="preview-warning-card">${escapeHtml(state.previewData.warning)}</div>` : ""}
     `;
   }
 
   return `
     <div class="real-preview-placeholder">
-      <span class="state-chip bridge">Bridge local</span>
-      <strong>Preview real pendiente</strong>
+      <strong>Vista pendiente</strong>
       <span>Imagen seleccionada: ${escapeHtml(image.name)}</span>
       <small class="path-line">Ruta: ${escapeHtml(image.path || "Sin ruta")}</small>
       <small>Genera la preview al seleccionar la imagen.</small>
@@ -2233,61 +2377,77 @@ function realPreviewHtml(image) {
 
 function bridgePreviewMeta() {
   if (state.previewStatus === "loading") {
-    return "Bridge local · Generando preview";
+    return "Generando vista";
   }
   if (state.previewStatus === "error") {
-    return state.previewError || "Bridge local · Preview no disponible";
+    return state.previewError || "Vista no disponible";
   }
   if (state.previewData) {
-    const warning = state.previewData.warning ? " · Aviso" : "";
-    return `Preview real · ${previewSettingsLabel()}${warning}`;
+    return state.previewData.warning ? "Vista con aviso" : state.activePreset;
   }
-  return "Bridge local · Preview pendiente";
+  return "Vista pendiente";
 }
 
 function previewSettingsLabel() {
   if (state.bridgeMode === "bridge" && activePresetItem()?.source === "bridge") {
-    return state.presetDirty ? "Ajustes reales modificados" : "Preset real";
+    return state.presetDirty ? "Ajustes modificados" : "Preset activo";
   }
   return state.presetDirty ? "Ajustes modificados" : "Ajustes";
 }
 
 function previewStateHtml(title, detail) {
+  return emptyStateHtml({ variant: "inline", title, detail });
+}
+
+function emptyStateHtml({ variant = "inline", title, detail, actionLabel = "", action = "", meta = "" }) {
+  const actionHtml = actionLabel && action
+    ? `<button type="button" class="primary" data-action="${escapeHtml(action)}">${escapeHtml(actionLabel)}</button>`
+    : "";
+  const metaHtml = meta ? `<small>${escapeHtml(meta)}</small>` : "";
   return `
-    <div class="preview-state">
+    <div class="empty-state ${escapeHtml(variant)}">
+      <span class="empty-icon" aria-hidden="true"></span>
       <strong>${escapeHtml(title)}</strong>
       <span>${escapeHtml(detail)}</span>
+      ${actionHtml}
+      ${metaHtml}
     </div>
   `;
 }
 
 function previewSubtitle(image) {
   if (!image) {
-    return "Sin preview";
+    if (state.batch === "none") {
+      return "Selecciona una carpeta local con PNG o JPG";
+    }
+    if (state.batch === "empty") {
+      return state.scanStatus || "No hay PNG válidos";
+    }
+    return "Sin selección";
   }
   if (image.source === "bridge") {
     if (state.previewStatus === "loading") {
       return "Generando preview";
     }
     if (state.previewStatus === "warning") {
-      return "Preview real con aviso";
+      return "Vista con aviso";
     }
     if (state.previewStatus === "error") {
-      return "Preview no disponible";
+      return "Vista no disponible";
     }
     if (state.previewStatus === "ready") {
-      return "Preview real";
+      return "Vista previa";
     }
-    return "Preview pendiente";
+    return "Vista pendiente";
   }
   if (state.previewStatus === "loading") {
     return "Generando preview";
   }
   if (state.previewStatus === "warning") {
-    return "Preview con aviso";
+    return "Vista con aviso";
   }
   if (state.previewStatus === "error") {
-    return "Preview no disponible";
+    return "Vista no disponible";
   }
   return image.detail;
 }
@@ -2321,35 +2481,142 @@ function renderSettings() {
   const image = selectedImage();
   const localActive = state.localOverride || image?.status === "adjusted";
   $("#local-adjustment").classList.toggle("active", localActive);
-  $("#local-adjustment-text").textContent = devMode
-    ? (localActive ? "Ajuste local activo" : "Sin ajuste local")
-    : "Fuera del MVP";
-  $("#save-preset").disabled = state.bridgeMode === "bridge";
-  $("#save-preset").title = state.bridgeMode === "bridge"
-    ? "Guardado de presets fuera del MVP web/bridge actual"
-    : "";
-  $("#save-preset").textContent = state.bridgeMode === "bridge" ? "Guardar no disponible" : "Guardar preset";
+  $("#local-adjustment-text").textContent = localActive ? "Ajuste local activo" : "Sin ajuste local";
+  $("#save-preset").disabled = false;
+  $("#save-preset").title = "Guardar cambios del preset";
+  $("#save-preset").textContent = "Guardar preset";
   const advanced = $("#advanced-settings");
+  const advancedSummary = advanced?.querySelector("summary");
+  if (advancedSummary) {
+    const dirtyCount = advancedDirtyCount();
+    advancedSummary.textContent = dirtyCount ? `Avanzado · ${dirtyCount} cambio${dirtyCount === 1 ? "" : "s"}` : "Avanzado";
+  }
   if (advanced && advancedSettingsDirty()) {
     advanced.open = true;
   }
 }
 
-function advancedSettingsDirty() {
+function advancedDirtyCount() {
   if (!state.presetDirty) {
-    return false;
+    return 0;
   }
   const presetSettings = normalizeSettings(activePresetItem()?.settings || defaultSettings);
-  return advancedSettingKeys.some((key) => state.settings[key] !== presetSettings[key]);
+  return advancedSettingKeys.filter((key) => state.settings[key] !== presetSettings[key]).length;
+}
+
+function advancedSettingsDirty() {
+  return advancedDirtyCount() > 0;
 }
 
 function renderInspector() {
+  const image = selectedImage();
+  const contextOnly = state.batch === "none" || state.batch === "empty" || state.batch === "scanning" || !image;
+  const panel = $(".settings-panel");
+  panel.classList.toggle("is-editing-output", state.outputEditMode);
+  panel.classList.toggle("is-editing-preset", state.presetEditorOpen);
+  const start = $("#inspector-start");
+  start.classList.toggle("is-hidden", !contextOnly);
+  if (contextOnly) {
+    start.innerHTML = contextualInspectorHtml();
+  } else {
+    start.innerHTML = "";
+  }
+  $(".inspector-tabs").classList.toggle("is-hidden", true);
   $$(".settings-panel [data-inspector-tab]").forEach((button) => {
     button.classList.toggle("active", button.dataset.inspectorTab === state.inspectorTab);
   });
   $$(".settings-panel [data-inspector-section]").forEach((section) => {
-    section.classList.toggle("is-hidden", section.dataset.inspectorSection !== state.inspectorTab);
+    const isOutput = section.dataset.inspectorSection === "output";
+    const isAdjustments = section.dataset.inspectorSection === "adjustments";
+    section.classList.toggle("is-hidden", contextOnly || (isAdjustments && !state.presetEditorOpen) || (!isOutput && !isAdjustments));
   });
+}
+
+function contextualInspectorHtml() {
+  if (state.batch === "scanning") {
+    return `
+      <div class="context-panel">
+        <div class="context-header">
+          <span class="eyebrow">Preparación</span>
+          <strong>Escaneando carpeta</strong>
+          <small>${escapeHtml(state.scanStatus || "Leyendo imágenes")}</small>
+        </div>
+        ${progressPanelHtml("Preparando lote", state.progress || 0)}
+        ${preflightListHtml([
+          { state: "pending", title: "Carpeta seleccionada", detail: "Leyendo origen" },
+          { state: "pending", title: "Exportables", detail: "Contando archivos" },
+          { state: "pending", title: "Destino", detail: "Se configurará después" },
+        ])}
+      </div>
+    `;
+  }
+
+  if (state.batch === "none") {
+    return `
+      <div class="context-panel">
+        <div class="context-header">
+          <span class="eyebrow">Preparación</span>
+          <strong>Selecciona una carpeta</strong>
+          <small>El preset y la salida se preparan automáticamente.</small>
+        </div>
+        ${preflightListHtml([
+          { state: "pending", title: "Carpeta seleccionada", detail: "Pendiente" },
+          { state: "pending", title: "Exportables", detail: "Pendiente" },
+          { state: "pending", title: "Destino de salida", detail: "Origen / _SALIDA_PRO" },
+        ])}
+        <div class="default-stack">
+          <span>Valores por defecto</span>
+          <strong>${escapeHtml(state.format)} · ${escapeHtml(state.size)} · ${escapeHtml(backgroundLabel(state.background))}</strong>
+          <small>Preset ${escapeHtml(state.activePreset)}</small>
+        </div>
+        <button type="button" class="primary" data-action="pick-bridge-folder">Seleccionar carpeta</button>
+      </div>
+    `;
+  }
+
+  if (state.batch === "empty") {
+    return `
+      <div class="context-panel warning">
+        <div class="context-header">
+          <span class="eyebrow">Salida</span>
+          <strong>Exportación bloqueada</strong>
+          <small>${escapeHtml(state.scanStatus || "La carpeta no contiene imágenes procesables.")}</small>
+        </div>
+        ${preflightListHtml([
+          { state: "warning", title: "Carpeta revisada", detail: state.scanDiagnostics.totalFiles ? `${state.scanDiagnostics.totalFiles} archivos encontrados` : "Sin archivos compatibles" },
+          { state: "error", title: "Exportables", detail: "0 imágenes" },
+          { state: state.scanDiagnostics.totalOmitted ? "warning" : "pending", title: "Avisos", detail: omittedSummaryText(state.scanDiagnostics) },
+          { state: "pending", title: "Destino", detail: "Pendiente hasta cargar un lote" },
+        ])}
+        <button type="button" class="primary" data-action="pick-bridge-folder">Cambiar carpeta</button>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="context-panel">
+      <div class="context-header">
+        <span class="eyebrow">Lote</span>
+        <strong>Selecciona una imagen</strong>
+        <small>Elige una miniatura para revisar la imagen.</small>
+      </div>
+      ${preflightListHtml([
+        { state: "ok", title: "Lote cargado", detail: `${activeImages().length} imágenes` },
+        { state: isExportReady() ? "ok" : "warning", title: "Salida", detail: exportPanelStatusLabel(isExportReady(), preflightIssues()) },
+        { state: "pending", title: "Imagen seleccionada", detail: "Pendiente" },
+      ])}
+      <button type="button" class="primary" data-action="select-first-image">Seleccionar primera imagen</button>
+    </div>
+  `;
+}
+
+function progressPanelHtml(label, value) {
+  return `
+    <div class="context-progress">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(Math.round(value))}%</strong>
+    </div>
+  `;
 }
 
 function presetSourceLabel() {
@@ -2360,15 +2627,13 @@ function presetSourceLabel() {
         ? "Config legacy"
         : state.bridgePresetSource === "defaults"
           ? "Defaults"
-          : "Bridge local";
+          : "Preset activo";
     if (state.bridgePresetWarning) {
       return `${source} · aviso`;
     }
     return state.presetDirty ? `${source} · modificado` : source;
   }
-  return devMode
-    ? (state.presetDirty ? "Mock · modificado" : "Mock")
-    : (state.presetDirty ? "Fallback local · modificado" : "Fallback local");
+  return state.presetDirty ? "Modificado" : "Preset activo";
 }
 
 function renderExport() {
@@ -2383,55 +2648,181 @@ function renderExport() {
   const exportable = exportableImages().length;
   const outputCount = exportable;
   const ready = isExportReady();
-  const destinationText = state.destinationMode === "custom" ? state.destinationValue || "Sin configurar" : `origen / ${state.destinationValue}`;
+  const destinationText = destinationCompactLabel();
   const statusText = exportPanelStatusLabel(ready, issues);
 
-  $("#export-readiness").textContent = statusText;
-  $("#export-count").textContent = `${outputCount} imágenes`;
+  $("#export-readiness").textContent = state.outputEditMode ? "Editar salida" : "Salida";
+  $("#export-count").textContent = outputCount ? `${outputCount} img` : "Pendiente";
   $("#export-count").classList.toggle("dirty", !ready);
 
-  $("#export-summary").innerHTML = `
-    <div class="summary-line"><span>Formato</span><strong>${escapeHtml(state.format)} · ${escapeHtml(state.size)}</strong></div>
-    <div class="summary-line"><span>Fondo</span><strong>${escapeHtml(backgroundLabel(state.background))}</strong></div>
-    <div class="summary-line"><span>Destino</span><strong>${escapeHtml(destinationText)}</strong></div>
-    <div class="summary-line"><span>Naming</span><strong>${escapeHtml(state.naming || "Sin plantilla")}</strong></div>
-    <div class="summary-line output-example"><span>Ejemplo</span><strong>${escapeHtml(namingExample())}</strong></div>
-    <div class="summary-line"><span>Preflight</span><strong>${escapeHtml(exportPreflightSummary(issues, exportable, ready))}</strong></div>
+  const warningSummary = outputWarningSummary(issues);
+  const editActions = state.outputEditMode ? `
+    <div class="inspector-actions">
+      <button type="button" class="primary" data-action="apply-output-edit">Aplicar</button>
+      <button type="button" data-action="save-preset">Guardar como preset</button>
+      <button type="button" data-action="cancel-output-edit">Cancelar</button>
+      <button type="button" data-action="reset-settings">Restaurar preset</button>
+    </div>
+  ` : "";
+  const presetActions = !state.outputEditMode ? `
+    <div class="inspector-actions">
+      <button type="button" data-action="open-preset-editor">Cambiar preset</button>
+      <button type="button" data-action="edit-output">Editar</button>
+    </div>
+  ` : "";
+
+  $("#export-summary").innerHTML = state.outputEditMode ? `
+    <div class="compact-panel">
+      <div>
+        <span>Preset activo</span>
+        <strong>${escapeHtml(state.activePreset)}</strong>
+      </div>
+      <small>${escapeHtml(presetSummaryLine())}</small>
+    </div>
+    ${editActions}
+  ` : `
+    <div class="preset-summary-card">
+      <div class="preset-summary-main">
+        <span>Preset activo</span>
+        <strong>${escapeHtml(state.activePreset)}</strong>
+        <small>${escapeHtml(presetSummaryLine())}</small>
+      </div>
+      <div class="preset-summary-row">
+        <span>Destino</span>
+        <strong title="${escapeHtml(destinationText)}">${escapeHtml(destinationText)}</strong>
+      </div>
+      <div class="preset-summary-row">
+        <span>Nombre</span>
+        <strong>${escapeHtml(namingHumanLabel())}</strong>
+      </div>
+    </div>
+    ${warningSummary}
+    ${presetActions}
   `;
 
   renderExportResult();
 
-  $("#issue-list").innerHTML = issues.map((issue) => `
-    <div class="issue-item ${issue.level === "error" ? "error" : ""}">
-      <strong>${escapeHtml(issue.title)}</strong>
-      <span>${escapeHtml(issue.detail)}</span>
+  $("#issue-list").innerHTML = "";
+}
+
+function presetSummaryLine() {
+  return `${state.format} · ${state.size} · ${backgroundLabel(state.background)}`;
+}
+
+function destinationCompactLabel() {
+  if (state.destinationMode === "custom") {
+    return state.destinationValue || "Sin destino";
+  }
+  return state.destinationValue || "_SALIDA_PRO";
+}
+
+function namingHumanLabel() {
+  if (state.naming === "{original}{suffix}") {
+    return "original + _PRO";
+  }
+  return state.naming || "Sin plantilla";
+}
+
+function outputWarningSummary(issues) {
+  const warnings = issues.filter((issue) => issue.title !== "Sin lote");
+  if (!warnings.length) {
+    return "";
+  }
+  const first = warnings[0];
+  const count = Math.max(warnings.length, visibleWarningCount());
+  return `
+    <div class="warning-summary ${warnings.some((issue) => issue.level === "error") ? "error" : ""}">
+      <strong>${count} aviso${count === 1 ? "" : "s"} antes de exportar</strong>
+      <span>${escapeHtml(first.title)}${first.detail ? `: ${escapeHtml(first.detail)}` : ""}</span>
+      <button type="button" data-action="review-errors">Ver detalle</button>
     </div>
-  `).join("");
+  `;
+}
+
+function exportStatusClass(ready, issues = preflightIssues()) {
+  if (state.exportStatus === "failed" || issues.some((issue) => issue.level === "error")) {
+    return "error";
+  }
+  if (state.exportStatus === "running") {
+    return "running";
+  }
+  if (state.exportStatus === "partial" || issues.length || (hasBatch() && !ready)) {
+    return "warning";
+  }
+  return ready ? "ready" : "pending";
+}
+
+function exportPreflightRows(issues, exportable, ready) {
+  if (state.batch === "none") {
+    return [
+      { state: "error", title: "Carpeta de origen", detail: "Selecciona una carpeta para empezar" },
+      { state: "pending", title: "Exportables", detail: "Pendiente" },
+      { state: "pending", title: "Destino", detail: destinationFallbackLabel() },
+    ];
+  }
+  if (state.batch === "empty") {
+    return [
+      { state: "error", title: "Exportables", detail: "0 imágenes" },
+      { state: state.scanDiagnostics.totalOmitted ? "warning" : "pending", title: "Avisos", detail: omittedSummaryText(state.scanDiagnostics) },
+      { state: "pending", title: "Destino", detail: "Pendiente" },
+    ];
+  }
+  const rows = [
+    { state: exportable > 0 ? "ok" : "error", title: "Exportables", detail: `${exportable} imagen${exportable === 1 ? "" : "es"}` },
+    { state: state.scanDiagnostics.totalOmitted ? "warning" : "ok", title: "Avisos", detail: state.scanDiagnostics.totalOmitted ? omittedSummaryText(state.scanDiagnostics) : "Sin avisos" },
+    { state: state.destinationMode === "custom" && !state.destinationValue.trim() ? "error" : "ok", title: "Destino", detail: destinationFallbackLabel() },
+    { state: state.naming.trim() ? "ok" : "error", title: "Naming", detail: state.naming.trim() ? namingExample() : "Plantilla vacía" },
+  ];
+  issues
+    .filter((issue) => !["Sin lote", "No hay PNG válidos", "Naming vacío", "Destino sin configurar", "Sin imágenes exportables"].includes(issue.title))
+    .forEach((issue) => {
+      rows.push({ state: issue.level === "error" ? "error" : "warning", title: issue.title, detail: issue.detail });
+    });
+  if (ready && !issues.length) {
+    rows.push({ state: "ok", title: "Preflight", detail: "Sin bloqueos ni avisos" });
+  }
+  return rows;
+}
+
+function preflightListHtml(rows) {
+  return `
+    <div class="preflight-list">
+      ${rows.map((row) => `
+        <div class="preflight-item ${escapeHtml(row.state)}">
+          <span aria-hidden="true"></span>
+          <div>
+            <strong>${escapeHtml(row.title)}</strong>
+            <small title="${escapeHtml(row.detail)}">${escapeHtml(row.detail)}</small>
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  `;
 }
 
 function exportPanelStatusLabel(ready, issues = preflightIssues()) {
   if (state.exportStatus === "running") {
-    return state.paused ? "Salida pausada" : "Exportando";
+    return state.paused ? "Pausado" : "Exportando";
   }
   if (state.exportStatus === "completed") {
-    return "Salida completada";
+    return "Exportado";
   }
   if (state.exportStatus === "partial") {
-    return "Salida con avisos";
+    return "Exportado con avisos";
   }
   if (state.exportStatus === "failed") {
-    return "Salida bloqueada";
+    return "Revisar antes de exportar";
   }
   if (issues.some((issue) => issue.level === "error")) {
-    return "Salida bloqueada";
+    return "Revisar antes de exportar";
   }
   if (state.batch === "empty" || (hasBatch() && !ready)) {
-    return "Salida bloqueada";
+    return "Pendiente";
   }
   if (ready && issues.length) {
-    return "Salida con avisos";
+    return `${issues.length} aviso${issues.length === 1 ? "" : "s"} antes de exportar`;
   }
-  return ready ? "Salida lista" : "Configura salida";
+  return ready ? "Listo para exportar" : "Configura salida";
 }
 
 function exportPreflightSummary(issues, exportable, ready) {
@@ -2553,7 +2944,82 @@ function destinationFallbackLabel() {
   if (state.destinationMode === "custom") {
     return state.destinationValue || "Destino sin configurar";
   }
-  return `origen / ${state.destinationValue}`;
+  return state.destinationValue || "_SALIDA_PRO";
+}
+
+function beginOutputEdit() {
+  state.outputDraft = {
+    format: state.format,
+    size: state.size,
+    background: state.background,
+    destinationMode: state.destinationMode,
+    destinationValue: state.destinationValue,
+    naming: state.naming,
+  };
+  state.outputEditMode = true;
+  state.presetEditorOpen = false;
+  state.statusText = "Editando salida";
+  render();
+}
+
+function applyOutputEdit() {
+  state.outputDraft = null;
+  state.outputEditMode = false;
+  state.exportStatus = isExportReady() ? "ready" : "blocked";
+  state.statusText = "Salida actualizada";
+  render();
+}
+
+function cancelOutputEdit() {
+  if (state.outputDraft) {
+    Object.assign(state, state.outputDraft);
+  }
+  state.outputDraft = null;
+  state.outputEditMode = false;
+  state.exportStatus = isExportReady() ? "ready" : "blocked";
+  state.statusText = "Edición cancelada";
+  render();
+}
+
+function saveCurrentPreset() {
+  const outputSettings = {
+    format: state.format,
+    size: state.size,
+    background: state.background,
+    destinationMode: state.destinationMode,
+    destinationValue: state.destinationValue,
+    naming: state.naming,
+  };
+  state.presetOutputSettings[state.activePreset] = outputSettings;
+
+  const preset = presetItemByName(state.activePreset);
+  if (preset) {
+    preset.settings = normalizeSettings(state.settings);
+  }
+  if (mockPresetSettings[state.activePreset]) {
+    mockPresetSettings[state.activePreset] = normalizeSettings(state.settings);
+  }
+
+  state.presetDirty = false;
+  state.presetSource = "Preset activo";
+  state.outputDraft = null;
+  state.outputEditMode = false;
+  state.exportStatus = isExportReady() ? "ready" : "blocked";
+  state.statusText = "Preset guardado";
+  render();
+}
+
+function openPresetEditor() {
+  state.presetEditorOpen = true;
+  state.outputEditMode = false;
+  state.statusText = "Cambia o ajusta el preset";
+  render();
+}
+
+function closePresetEditor() {
+  state.presetEditorOpen = false;
+  state.statusText = "Preset aplicado";
+  render();
 }
 
 function exportStatusLabel(ready) {
@@ -2586,23 +3052,7 @@ function renderFooter() {
   const exportable = exportableImages().length;
   const issues = [...validationIssues(), ...state.errors];
   const ready = isExportReady();
-  const images = activeImages();
-  const selectedIndex = images.findIndex((image) => image.id === state.selectedImageId);
-  const selectedText = selectedIndex >= 0 ? ` · Imagen ${selectedIndex + 1}/${images.length}` : "";
-  const warningText = issues.length ? ` · ${issues.length} aviso${issues.length === 1 ? "" : "s"}` : "";
-
-  $("#footer-batch").textContent = hasBatch()
-    ? `${images.length} imágenes${selectedText}${warningText}`
-    : state.batch === "empty"
-      ? `0 PNG · ${sourceLabel()}`
-      : "Sin lote";
-  $("#footer-preview").textContent = previewFooterLabel();
-  $("#footer-export").textContent = exportPanelStatusLabel(ready, preflightIssues());
-  $("#footer-destination").textContent = !hasBatch()
-    ? "Sin destino"
-    : state.destinationMode === "custom"
-      ? state.destinationValue || "Sin configurar"
-      : `origen / ${state.destinationValue}`;
+  $("#footer-statusline").textContent = statusBarText();
   $("#bottom-status").textContent = state.statusText;
   $("#progress-fill").style.width = `${state.progress}%`;
   $("#progress-fill").className = state.exportStatus === "failed" ? "error" : state.exportStatus === "partial" ? "warning" : "";
@@ -2614,6 +3064,7 @@ function renderFooter() {
   );
   $("#review-errors").classList.toggle("is-hidden", !hasReviewIssues);
   $("#review-errors").disabled = !hasReviewIssues;
+  $("#review-errors").textContent = "Ver avisos";
   $("#pause-export").classList.toggle("is-hidden", state.exportStatus !== "running");
   $("#pause-export").textContent = state.paused ? "Reanudar" : "Pausar";
   $("#stop-export").classList.toggle("is-hidden", state.exportStatus !== "running");
@@ -2622,22 +3073,53 @@ function renderFooter() {
   $("#primary-action").classList.add("is-hidden");
 
   const primaryButtons = [$("#primary-action"), $("#top-primary-action")].filter(Boolean);
-  const primaryDisabled = state.exportStatus === "running"
-    || (hasBatch() && !ready && validationIssues().some((issue) => issue.level === "error"));
+  const primaryDisabled = false;
   let primaryText = "";
-  if (!hasBatch()) {
+  let primaryTitle = "";
+  if (state.exportStatus === "running") {
+    primaryText = state.paused ? "Detener pausa" : "Detener";
+    primaryTitle = "Detener exportación en curso";
+  } else if (!hasBatch()) {
     primaryText = "Seleccionar carpeta";
+    primaryTitle = "Selecciona una carpeta local con imágenes";
   } else if (state.exportStatus === "completed" || state.exportStatus === "partial") {
     primaryText = "Nuevo lote";
   } else if (!ready) {
-    primaryText = "Preparar salida";
+    primaryText = "Revisar salida";
+    primaryTitle = firstBlockingIssue()?.detail || "Revisa el panel Salida";
   } else {
     primaryText = `Exportar ${exportable}`;
+    primaryTitle = `${exportable} imágenes preparadas`;
   }
   primaryButtons.forEach((primary) => {
     primary.disabled = primaryDisabled;
     primary.textContent = primaryText;
+    primary.title = primaryTitle;
   });
+}
+
+function statusBarText() {
+  const images = activeImages();
+  const selectedIndex = images.findIndex((image) => image.id === state.selectedImageId);
+  const selectedText = selectedIndex >= 0 ? `Imagen ${selectedIndex + 1}/${images.length}` : "Sin selección";
+  const destination = state.destinationMode === "custom"
+    ? state.destinationValue || "sin destino"
+    : `origen / ${state.destinationValue}`;
+
+  if (state.exportStatus === "running") {
+    const total = exportableImages().length;
+    return `${state.paused ? "Pausado" : "Exportando"} ${state.processed}/${total} · ${state.statusText}`;
+  }
+  if (state.batch === "none") {
+    return "Sin lote · Selecciona una carpeta para empezar";
+  }
+  if (state.batch === "scanning") {
+    return `Escaneando · ${state.scanStatus}`;
+  }
+  if (state.batch === "empty") {
+    return `0 imágenes · ${state.scanStatus || "Cambia de carpeta"}`;
+  }
+  return `${images.length} imágenes · ${selectedText} · Salida: ${destination}`;
 }
 
 function previewFooterLabel() {
@@ -2693,7 +3175,7 @@ function handleAction(action) {
   } else if (action === "force-preview-error") {
     if (hasBatch()) {
       state.previewStatus = "error";
-      state.statusText = "Preview no disponible";
+      state.statusText = "Vista no disponible";
       render();
     }
   } else if (action === "previous-image") {
@@ -2702,6 +3184,21 @@ function handleAction(action) {
     selectAdjacentImage(1);
   } else if (action === "clear-filter") {
     clearFilter();
+  } else if (action === "select-first-image") {
+    const image = filteredImages()[0] || activeImages()[0];
+    if (image) {
+      selectImage(image.id);
+    }
+  } else if (action === "edit-output") {
+    beginOutputEdit();
+  } else if (action === "apply-output-edit") {
+    applyOutputEdit();
+  } else if (action === "cancel-output-edit") {
+    cancelOutputEdit();
+  } else if (action === "open-preset-editor") {
+    openPresetEditor();
+  } else if (action === "close-preset-editor") {
+    closePresetEditor();
   } else if (action === "zoom-fit") {
     state.fitMode = "fit";
     state.zoom = 100;
@@ -2723,18 +3220,10 @@ function handleAction(action) {
   } else if (action === "reset-settings") {
     resetActivePresetSettings();
   } else if (action === "save-preset") {
-    if (state.bridgeMode === "bridge") {
-      state.statusText = "Guardado de presets fuera del MVP";
-      render();
-      return;
-    }
-    state.presetDirty = false;
-    state.presetSource = "Mock";
-    state.statusText = "Preset guardado";
-    render();
+    saveCurrentPreset();
   } else if (action === "toggle-local-adjustment") {
     if (!devMode) {
-      state.statusText = "Ajuste por imagen fuera del MVP";
+      state.statusText = "Ajuste por imagen no disponible";
       render();
       return;
     }
@@ -2748,7 +3237,7 @@ function handleAction(action) {
   } else if (action === "review-errors") {
     reviewErrors();
   } else if (action === "open-output") {
-    state.statusText = "Apertura nativa fuera del MVP";
+    state.statusText = "Apertura no disponible";
     render();
   } else if (action === "primary") {
     primaryAction();
@@ -2827,8 +3316,8 @@ $("#app-mode").addEventListener("change", (event) => {
     return;
   }
   state.bridgeMode = event.target.value;
-  state.statusText = state.bridgeMode === "bridge" ? "Bridge local" : "Modo mock";
-  state.bridgeLastResponse = state.bridgeMode === "bridge" ? "Bridge pendiente" : "Mock activo";
+  state.statusText = state.bridgeMode === "bridge" ? "Conexión local" : "Modo demo";
+  state.bridgeLastResponse = state.bridgeMode === "bridge" ? "Conexión pendiente" : "Demo activo";
   state.scanStatus = state.bridgeMode === "bridge" ? "Selecciona una carpeta con PNG." : "Escenarios mock activos.";
   render();
 });

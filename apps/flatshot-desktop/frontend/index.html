@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>FlatShot Desktop</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./styles.css?v=20260525-ui6" />
+    <link rel="stylesheet" href="./styles.css?v=20260525-ui7" />
   </head>
   <body>
     <main class="app-shell" aria-label="FlatShot nueva app">
@@ -21,14 +21,14 @@
 
           <div class="top-summary" aria-live="polite">
             <span class="status-dot" id="status-dot"></span>
-            <span id="top-status-text">Añade una carpeta</span>
+            <span id="top-status-text">Selecciona una carpeta</span>
             <span class="bridge-chip idle" id="bridge-status">Bridge pendiente</span>
           </div>
 
           <div class="top-actions">
-            <span class="preflight-chip" id="top-preflight-status">Bloqueado</span>
-            <button type="button" class="primary top-export" id="top-primary-action" data-action="primary">Exportar lote</button>
-            <button type="button" data-action="toggle-inspector">Inspección</button>
+            <span class="preflight-chip" id="top-preflight-status">Exportación bloqueada</span>
+            <button type="button" class="primary top-export" id="top-primary-action" data-action="primary">Seleccionar carpeta</button>
+            <button type="button" data-action="toggle-inspector">Diagnóstico</button>
             <details class="debug-panel" id="debug-panel">
               <summary>Debug</summary>
               <div class="debug-content">
@@ -98,6 +98,11 @@
               </label>
             </details>
             <div class="bridge-message" id="bridge-message">Selecciona una carpeta local.</div>
+            <ul class="import-requirements" aria-label="Requisitos de importación">
+              <li>Carpeta local</li>
+              <li>Imágenes PNG o JPG</li>
+              <li>Salida configurable después</li>
+            </ul>
           </div>
 
           <div class="batch-summary" id="batch-summary" aria-live="polite"></div>
@@ -111,7 +116,7 @@
 
           <div class="segmented batch-filter" aria-label="Filtro de imágenes">
             <button type="button" data-filter="all">Todas</button>
-            <button type="button" data-filter="valid">Válidas</button>
+            <button type="button" data-filter="valid">Exportables</button>
             <button type="button" data-filter="warnings">Avisos</button>
             <button type="button" data-filter="errors">Errores</button>
           </div>
@@ -127,9 +132,9 @@
                 <option value="initial">Sin lote</option>
                 <option value="batch-ready">Lote listo</option>
                 <option value="empty-folder">Carpeta vacía</option>
-                <option value="preview-loading">Preview cargando</option>
-                <option value="preview-warning">Preview con aviso</option>
-                <option value="preview-error">Error de preview</option>
+                <option value="preview-loading">Vista cargando</option>
+                <option value="preview-warning">Vista con aviso</option>
+                <option value="preview-error">Error de vista</option>
                 <option value="export-blocked">Destino sin configurar</option>
                 <option value="export-ready">Exportación lista</option>
                 <option value="export-running">Exportación en curso</option>
@@ -142,8 +147,8 @@
               <button type="button" data-review-scenario="initial">Sin lote</button>
               <button type="button" data-review-scenario="batch-ready">Lote listo</button>
               <button type="button" data-review-scenario="empty-folder">Carpeta vacía</button>
-              <button type="button" data-review-scenario="preview-loading">Preview loading</button>
-              <button type="button" data-review-scenario="preview-error">Preview error</button>
+              <button type="button" data-review-scenario="preview-loading">Vista cargando</button>
+              <button type="button" data-review-scenario="preview-error">Error de vista</button>
               <button type="button" data-review-scenario="export-ready">Exportación lista</button>
               <button type="button" data-review-scenario="export-running">En curso</button>
               <button type="button" data-review-scenario="export-completed">Completada</button>
@@ -152,23 +157,23 @@
             <div class="review-actions">
               <button type="button" data-action="check-bridge">Bridge health</button>
               <button type="button" data-action="scan-bridge-folder">Escaneo real</button>
-              <button type="button" data-action="force-preview-error">Preview error</button>
+              <button type="button" data-action="force-preview-error">Error de vista</button>
             </div>
             <p>Estados simulados salvo health y escaneo por ruta.</p>
           </details>
         </aside>
 
-        <section class="preview-panel" aria-label="Preview principal">
+        <section class="preview-panel" aria-label="Vista principal">
           <div class="preview-header">
             <div class="preview-title-block">
               <span class="eyebrow">Imagen</span>
-              <h2 id="preview-name">Sin imagen seleccionada</h2>
-              <span id="preview-subtitle">Sin preview</span>
+              <h2 id="preview-name">Empieza con una carpeta</h2>
+              <span id="preview-subtitle">Selecciona una carpeta local con PNG o JPG</span>
             </div>
 
             <div class="preview-toolbar" aria-label="Herramientas de preview">
-              <div class="segmented compact" aria-label="Modo de preview">
-                <button type="button" data-preview-mode="processed">Procesada</button>
+              <div class="segmented compact preview-mode-switch" aria-label="Modo de preview">
+                <button type="button" data-preview-mode="processed">Vista</button>
                 <button type="button" data-preview-mode="original">Original</button>
                 <button type="button" data-preview-mode="compare">Comparar</button>
               </div>
@@ -200,7 +205,9 @@
         </section>
 
         <aside class="settings-panel" aria-label="Ajustes y exportación">
-          <div class="inspector-tabs segmented compact" aria-label="Inspector">
+          <section class="inspector-start" id="inspector-start" aria-live="polite"></section>
+
+          <div class="inspector-tabs segmented compact" aria-label="Panel derecho">
             <button type="button" data-inspector-tab="adjustments">Ajustes</button>
             <button type="button" data-inspector-tab="output">Salida</button>
           </div>
@@ -210,12 +217,13 @@
               <div>
                 <span class="eyebrow">Preset</span>
                 <strong id="active-preset">Luz cenital</strong>
-                <small id="preset-source">Bridge local</small>
+                <small id="preset-source">Preset activo</small>
               </div>
               <span class="change-chip" id="preset-dirty">Sin cambios</span>
             </div>
             <div class="preset-list" id="preset-list" aria-label="Presets disponibles"></div>
             <div class="button-row">
+              <button type="button" class="primary" data-action="close-preset-editor">Aplicar preset</button>
               <button type="button" data-action="reset-settings">Reset</button>
               <button type="button" id="save-preset" data-action="save-preset">Guardar preset</button>
             </div>
@@ -366,27 +374,10 @@
       </section>
 
       <footer class="bottom-bar">
-        <div class="status-grid" aria-live="polite">
-          <div>
-            <span>Lote</span>
-            <strong id="footer-batch">Sin lote</strong>
-          </div>
-          <div>
-            <span>Preview</span>
-            <strong id="footer-preview">Sin imagen</strong>
-          </div>
-          <div>
-            <span>Exportación</span>
-            <strong id="footer-export">No lista</strong>
-          </div>
-          <div>
-            <span>Destino</span>
-            <strong id="footer-destination">Sin configurar</strong>
-          </div>
-        </div>
+        <div class="status-sentence" id="footer-statusline" aria-live="polite">Sin lote · Selecciona una carpeta para empezar</div>
 
         <div class="progress-block">
-          <span id="bottom-status">Añade una carpeta</span>
+          <span id="bottom-status">Selecciona una carpeta</span>
           <div class="progress-track" aria-hidden="true">
             <span id="progress-fill"></span>
           </div>
@@ -402,6 +393,6 @@
       </footer>
     </main>
 
-    <script src="./app.js?v=20260525-ui6"></script>
+    <script src="./app.js?v=20260525-ui7"></script>
   </body>
 </html>

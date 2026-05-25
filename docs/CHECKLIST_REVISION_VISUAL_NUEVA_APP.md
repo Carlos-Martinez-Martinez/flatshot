@@ -6,7 +6,8 @@ Usar antes de cerrar cada tanda visual de la nueva app.
 
 - [ ] `python apps/flatshot-desktop/run_dev.py --open` arranca sin errores.
 - [ ] El navegador abre la app.
-- [ ] La UI indica modo mock/bridge.
+- [ ] El header muestra estado operativo sin datos técnicos.
+- [ ] `Debug` indica modo mock/bridge cuando se abre.
 - [ ] El bridge aparece conectado si está activo.
 - [ ] `Ctrl+C` detiene bridge y frontend.
 
@@ -115,6 +116,25 @@ Usar antes de cerrar cada tanda visual de la nueva app.
 - [ ] La barra inferior no duplica todos los estados.
 - [ ] El inspector puede ocultarse y el visor gana espacio.
 - [ ] Exportación se comunica como `Salida pendiente` si aún no está conectada.
+
+## UX/UI principal — Rediseño profundo
+
+- [ ] El visor central domina claramente sobre header, footer y paneles laterales.
+- [ ] El header normal sólo muestra FlatShot, lote, contador, conexión resumida y acción principal.
+- [ ] URL, capabilities, modo Mock/Bridge, health y controles técnicos sólo aparecen dentro de `Debug`.
+- [ ] El panel izquierdo se lee como rail de lote, no como panel técnico.
+- [ ] `Seleccionar carpeta` sigue visible, pero no domina cuando hay lote cargado.
+- [ ] La lista de miniaturas mantiene tamaño estable al filtrar o seleccionar.
+- [ ] Filtro sin resultados muestra un mensaje contextual y botón `Ver todas`.
+- [ ] No parece que el lote esté vacío cuando sólo está filtrado.
+- [ ] `Válidas`, `Avisos`, `Errores` y `Omitidas` se entienden como categorías distintas.
+- [ ] `Ver diagnóstico` explica omisiones sin invadir el flujo principal.
+- [ ] El visor muestra `Imagen n de m` y permite anterior/siguiente.
+- [ ] Los controles `Ajustar`, `100%`, `Original`, `Procesada` y `Comparar` son discretos.
+- [ ] El control de error simulado no aparece en modo usuario normal.
+- [ ] El inspector separa `Ajustes` y `Salida` sin mostrar todo a la vez.
+- [ ] El footer es fino, contextual y no duplica información técnica.
+- [ ] La pantalla se siente como herramienta visual, no como dashboard de debug.
 
 ## Feedback a revisar
 

@@ -21,6 +21,7 @@ DEFAULT_ALLOWED_ORIGINS = {
     "http://127.0.0.1:4173",
     "http://localhost:4173",
 }
+CLIENT_DISCONNECT_ERRORS = (BrokenPipeError, ConnectionAbortedError, ConnectionResetError)
 
 
 class FlatShotBridgeHTTPServer(ThreadingHTTPServer):
@@ -65,6 +66,8 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
                 raise MethodNotAllowedError("Use POST for /preview/render.")
             else:
                 raise NotFoundError()
+        except CLIENT_DISCONNECT_ERRORS:
+            return
         except Exception as exc:
             self._send_error(exc)
 
@@ -81,6 +84,8 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
                 if path in {"/health", "/app-info", "/capabilities", "/presets"}:
                     raise MethodNotAllowedError("Use GET for this endpoint.")
                 raise NotFoundError()
+        except CLIENT_DISCONNECT_ERRORS:
+            return
         except Exception as exc:
             self._send_error(exc)
 
@@ -117,20 +122,25 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
         return parsed
 
     def _send_error(self, exc: Exception) -> None:
+        if isinstance(exc, CLIENT_DISCONNECT_ERRORS):
+            return
         status = exc.status if isinstance(exc, BridgeError) else 500
         self._send_json(error_response(exc), status=status)
 
     def _send_json(self, payload: dict[str, Any], *, status: int = 200) -> None:
         body = b"" if status == 204 else json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Cache-Control", "no-store")
-        self._send_cors_headers()
-        if status != 204:
-            self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        if body:
-            self.wfile.write(body)
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self._send_cors_headers()
+            if status != 204:
+                self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            if body:
+                self.wfile.write(body)
+        except CLIENT_DISCONNECT_ERRORS:
+            return
 
     def _send_cors_headers(self) -> None:
         origin = self.headers.get("Origin")

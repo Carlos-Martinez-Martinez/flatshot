@@ -1657,3 +1657,505 @@ small {
     grid-column: 1 / -1;
   }
 }
+
+/* Main review screen polish: quieter shell, stronger viewer, compact batch rail. */
+:root {
+  --bg: #f3f5f4;
+  --surface: #fbfcfb;
+  --surface-muted: #f6f8f7;
+  --surface-raised: #ffffff;
+  --line: #e1e7e4;
+  --line-strong: #c5d0cc;
+  --text: #171f1d;
+  --muted: #65716d;
+  --quiet: #9ba5a1;
+  --shadow: 0 10px 28px rgba(20, 29, 26, 0.08);
+}
+
+button,
+input,
+select,
+summary {
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+
+.top-bar {
+  border-bottom-color: var(--line);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.brand-block {
+  min-width: 210px;
+}
+
+.brand-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  box-shadow: none;
+}
+
+.brand-copy strong {
+  font-size: 15px;
+}
+
+.brand-copy span,
+#top-status-text {
+  font-size: 13px;
+}
+
+.top-summary {
+  color: var(--muted);
+}
+
+.top-export {
+  min-width: 142px;
+}
+
+.bridge-chip {
+  border-color: transparent;
+  background: transparent;
+  padding-inline: 2px;
+}
+
+.bridge-chip.connected {
+  border-color: transparent;
+  background: transparent;
+}
+
+.debug-panel summary {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  padding-inline: 8px;
+}
+
+.debug-panel[open] summary,
+.debug-panel summary:hover {
+  border-color: var(--line);
+  background: var(--surface-muted);
+}
+
+.workspace {
+  grid-template-columns: minmax(252px, 308px) minmax(0, 1fr) minmax(292px, 340px);
+  gap: 0;
+  background: var(--line);
+}
+
+.batch-panel,
+.settings-panel {
+  padding: 12px;
+}
+
+.batch-panel {
+  background: #fafbfa;
+}
+
+.settings-panel {
+  background: #fcfdfc;
+}
+
+.panel-heading {
+  align-items: center;
+  min-height: 38px;
+}
+
+.panel-heading h1 {
+  font-size: 18px;
+  font-weight: 760;
+}
+
+.pill,
+.state-chip,
+.change-chip {
+  border: 0;
+  min-height: 22px;
+  padding: 2px 8px;
+}
+
+.source-panel,
+.batch-summary,
+.folder-item,
+.image-item,
+.advanced-block,
+.local-adjustment,
+.export-summary,
+.issue-item,
+.empty-note {
+  border-radius: 7px;
+}
+
+.source-panel {
+  border-color: transparent;
+  background: transparent;
+  padding: 0;
+}
+
+.source-panel.bridge,
+.source-panel.scanning,
+.source-panel.error {
+  border-color: transparent;
+  background: transparent;
+}
+
+.source-panel-heading {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.source-panel-heading > div > span {
+  font-size: 12px;
+}
+
+.source-panel .button-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.source-panel .button-row button {
+  flex: none;
+}
+
+.manual-path-panel {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #ffffff;
+  padding: 7px 9px;
+}
+
+.manual-path-panel[open] {
+  display: grid;
+  gap: 8px;
+}
+
+.app-shell.has-batch .source-panel {
+  margin-top: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.batch-summary {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.summary-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.summary-metric {
+  border: 0;
+  background: transparent;
+  padding: 4px 0;
+}
+
+.summary-metric strong {
+  font-size: 16px;
+}
+
+.summary-note {
+  margin-top: 2px;
+}
+
+.batch-diagnostics {
+  margin-top: 8px;
+  border-top-color: var(--line);
+}
+
+.search-field {
+  margin-top: 10px;
+}
+
+.folder-list {
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.folder-item {
+  min-height: 40px;
+  border-color: transparent;
+  background: transparent;
+  padding: 4px 0;
+}
+
+.folder-item .state-chip {
+  background: var(--surface-muted);
+}
+
+.batch-filter {
+  margin-top: 10px;
+  border-color: transparent;
+  background: var(--surface-muted);
+}
+
+.segmented button.active {
+  border-color: transparent;
+  box-shadow: 0 1px 3px rgba(18, 31, 28, 0.08);
+}
+
+.image-list {
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.image-item {
+  min-height: 108px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.image-item:hover:not(:disabled) {
+  border-color: var(--line);
+  background: var(--surface-raised);
+}
+
+.image-item.active {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.image-item.warning {
+  box-shadow: inset 0 0 0 1px rgba(167, 101, 20, 0.28);
+}
+
+.image-item.error {
+  box-shadow: inset 0 0 0 1px rgba(183, 61, 68, 0.35);
+}
+
+.thumb {
+  border-color: rgba(23, 31, 29, 0.08);
+  border-radius: 7px;
+}
+
+.empty-note {
+  min-height: 112px;
+  border-color: var(--line);
+  background: #ffffff;
+  color: var(--muted);
+}
+
+.empty-note strong,
+.empty-note span,
+.empty-note small {
+  display: block;
+}
+
+.empty-note button {
+  margin-top: 8px;
+}
+
+.review-panel {
+  margin-top: 10px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.review-panel summary {
+  padding: 7px 0;
+  color: var(--quiet);
+}
+
+.review-panel[open] {
+  border-color: var(--line);
+  background: #ffffff;
+  padding: 0 8px 8px;
+}
+
+.review-panel[open] summary {
+  padding: 8px 0;
+  color: var(--muted);
+}
+
+.review-grid,
+.review-switcher,
+.review-actions,
+.review-panel p {
+  padding-inline: 0;
+}
+
+.preview-panel {
+  background: #f7f8f7;
+}
+
+.preview-header {
+  min-height: 58px;
+  background: rgba(251, 252, 251, 0.92);
+}
+
+.preview-title-block h2 {
+  font-size: 17px;
+}
+
+.preview-title-block span:last-child {
+  font-size: 13px;
+}
+
+.preview-toolbar .segmented,
+.zoom-controls {
+  border-color: transparent;
+  background: transparent;
+}
+
+.preview-toolbar .segmented button,
+.zoom-controls button {
+  color: var(--muted);
+}
+
+.preview-toolbar .segmented button.active,
+.zoom-controls button:hover:not(:disabled) {
+  color: var(--text);
+  background: #ffffff;
+}
+
+#viewer-position {
+  min-width: 92px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.canvas-area {
+  padding: clamp(12px, 2vh, 24px);
+  background: #e8ebe9;
+}
+
+.canvas-area.bg-white {
+  background: #f7f8f7;
+}
+
+.canvas-area.bg-rgb230 {
+  background: #e7e9e8;
+}
+
+.canvas-area.bg-transparent {
+  background:
+    linear-gradient(45deg, rgba(0, 0, 0, 0.025) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(0, 0, 0, 0.025) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(0, 0, 0, 0.025) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(0, 0, 0, 0.025) 75%),
+    #f4f5f4;
+  background-size: 26px 26px;
+  background-position: 0 0, 0 13px, 13px -13px, -13px 0;
+}
+
+.preview-image {
+  filter: drop-shadow(0 12px 20px rgba(18, 28, 25, 0.08));
+}
+
+.preview-state {
+  color: var(--muted);
+}
+
+.preview-footer {
+  min-height: 44px;
+  padding: 7px 16px;
+  background: rgba(251, 252, 251, 0.92);
+}
+
+.settings-section {
+  gap: 10px;
+  border-bottom-color: var(--line);
+}
+
+.section-title strong {
+  font-size: 14px;
+}
+
+.preset-list {
+  gap: 5px;
+}
+
+.preset-chip {
+  min-width: 0;
+  min-height: 30px;
+  border-color: transparent;
+  background: var(--surface-muted);
+}
+
+.control-row {
+  grid-template-columns: 74px minmax(0, 1fr) 34px;
+}
+
+.advanced-block,
+.local-adjustment,
+.export-summary {
+  border-color: var(--line);
+  background: #ffffff;
+}
+
+.advanced-block summary {
+  padding: 9px 10px;
+  color: var(--muted);
+}
+
+.issue-item {
+  border: 0;
+}
+
+.bottom-bar {
+  grid-template-columns: minmax(360px, 1fr) minmax(180px, 0.45fr) auto;
+  min-height: 44px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.status-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.55fr);
+  gap: 12px;
+}
+
+.status-grid span {
+  display: none;
+}
+
+.status-grid strong {
+  font-size: 12px;
+}
+
+.progress-block {
+  gap: 5px;
+}
+
+.progress-track {
+  height: 4px;
+}
+
+.bottom-actions {
+  gap: 6px;
+}
+
+.bottom-actions button {
+  min-height: 30px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.bottom-actions button:hover:not(:disabled) {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+@media (max-width: 1360px) {
+  .workspace {
+    grid-template-columns: minmax(238px, 286px) minmax(0, 1fr) minmax(284px, 324px);
+  }
+
+  .preview-toolbar {
+    gap: 4px;
+  }
+
+  .zoom-controls button {
+    min-width: 30px;
+    padding: 0 6px;
+  }
+
+  #viewer-position {
+    min-width: 74px;
+  }
+}

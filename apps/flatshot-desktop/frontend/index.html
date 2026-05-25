@@ -27,7 +27,7 @@
           <div class="top-actions">
             <span class="bridge-chip idle" id="bridge-status">Mock</span>
             <button type="button" class="primary top-export" id="top-primary-action" data-action="primary">Exportar lote</button>
-            <button type="button" data-action="toggle-inspector">Ajustes</button>
+            <button type="button" data-action="toggle-inspector">Inspector</button>
             <details class="debug-panel" id="debug-panel">
               <summary>Debug</summary>
               <div class="debug-content">
@@ -110,7 +110,7 @@
 
           <div class="segmented batch-filter" aria-label="Filtro de imágenes">
             <button type="button" data-filter="all">Todas</button>
-            <button type="button" data-filter="adjusted">Ajustadas</button>
+            <button type="button" data-filter="valid">Válidas</button>
             <button type="button" data-filter="warnings">Avisos</button>
             <button type="button" data-filter="errors">Errores</button>
           </div>
@@ -151,6 +151,7 @@
             <div class="review-actions">
               <button type="button" data-action="check-bridge">Bridge health</button>
               <button type="button" data-action="scan-bridge-folder">Escaneo real</button>
+              <button type="button" data-action="force-preview-error">Preview error</button>
             </div>
             <p>Estados simulados salvo health y escaneo por ruta.</p>
           </details>
@@ -171,6 +172,9 @@
                 <button type="button" data-preview-mode="compare">Comparar</button>
               </div>
               <div class="zoom-controls" aria-label="Zoom">
+                <button type="button" data-action="previous-image" aria-label="Imagen anterior">‹</button>
+                <span id="viewer-position">Sin imagen</span>
+                <button type="button" data-action="next-image" aria-label="Imagen siguiente">›</button>
                 <button type="button" data-action="zoom-fit">Ajustar</button>
                 <button type="button" data-action="zoom-100">100%</button>
                 <button type="button" data-action="zoom-out" aria-label="Reducir zoom">-</button>
@@ -191,7 +195,6 @@
               <button type="button" data-preview-bg="transparent">Transparente</button>
             </div>
             <span id="preview-meta">Sin imagen</span>
-            <button type="button" class="link-button" data-action="force-preview-error">Simular error</button>
           </div>
         </section>
 

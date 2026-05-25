@@ -318,8 +318,8 @@ function filteredImages() {
     if (term && !image.name.toLowerCase().includes(term)) {
       return false;
     }
-    if (state.filter === "adjusted") {
-      return image.status === "adjusted";
+    if (state.filter === "valid") {
+      return image.status === "ready" || image.status === "adjusted";
     }
     if (state.filter === "warnings") {
       return image.status === "warning";
@@ -329,6 +329,23 @@ function filteredImages() {
     }
     return true;
   });
+}
+
+function filterDisplayName(filter = state.filter) {
+  const labels = {
+    all: "todas",
+    valid: "válidas",
+    warnings: "avisos",
+    errors: "errores",
+  };
+  return labels[filter] || "imágenes";
+}
+
+function filterStatusText(filter = state.filter) {
+  if (filter === "all") {
+    return "Mostrando todo";
+  }
+  return `Mostrando ${filterDisplayName(filter)}`;
 }
 
 function validationIssues() {
@@ -376,6 +393,8 @@ function setScenario(scenario) {
     progress: 0,
     processed: 0,
     errors: [],
+    filter: "all",
+    search: "",
     scanIssues: [],
     scanDiagnostics: mockScanDiagnostics(),
     paused: false,
@@ -561,6 +580,17 @@ function selectImage(imageId) {
   }, 380);
 }
 
+function selectAdjacentImage(delta) {
+  const images = filteredImages();
+  if (!images.length) {
+    return;
+  }
+  const currentIndex = images.findIndex((image) => image.id === state.selectedImageId);
+  const startIndex = currentIndex >= 0 ? currentIndex : 0;
+  const nextIndex = Math.max(0, Math.min(images.length - 1, startIndex + delta));
+  selectImage(images[nextIndex].id);
+}
+
 function normalizeSettings(settings = {}) {
   const source = settings && typeof settings === "object" ? settings : {};
   const normalized = { ...defaultSettings };
@@ -735,7 +765,14 @@ function reviewErrors() {
     return;
   }
   state.filter = "errors";
-  state.statusText = state.errors.length ? "Revisa errores de exportación" : "Filtro: errores";
+  state.statusText = state.errors.length ? "Revisa errores de exportación" : "Mostrando errores";
+  render();
+}
+
+function clearFilter() {
+  state.filter = "all";
+  state.search = "";
+  state.statusText = "Mostrando todo";
   render();
 }
 
@@ -995,6 +1032,8 @@ async function scanBridgeFolder() {
     progress: 0,
     processed: 0,
     errors: [],
+    filter: "all",
+    search: "",
     scanIssues: [],
     scanDiagnostics: emptyScanDiagnostics(),
     scanStatus: folders.length === 1 ? "Escaneando ruta" : `Escaneando ${folders.length} rutas`,
@@ -1502,6 +1541,7 @@ function bridgeStatusLabel() {
 function renderBatch() {
   const images = activeImages();
   const adjusted = images.filter((image) => image.status === "adjusted").length;
+  const valid = images.filter((image) => image.status === "ready" || image.status === "adjusted").length;
   const warnings = images.filter((image) => image.status === "warning").length;
   const errors = images.filter((image) => image.status === "error").length;
 
@@ -1566,7 +1606,36 @@ function renderBatch() {
 
   const visible = filteredImages();
   $("#image-list").innerHTML = visible.map(imageItemHtml).join("");
-  $("#batch-empty-note").textContent = visible.length ? "" : "Sin resultados.";
+  $("#batch-empty-note").innerHTML = visible.length ? "" : filteredEmptyHtml(images.length, valid, warnings, errors);
+}
+
+function filteredEmptyHtml(total, valid, warnings, errors) {
+  if (!total) {
+    return "No hay imágenes en este lote.";
+  }
+  const labels = {
+    valid: "válidas",
+    warnings: "con avisos",
+    errors: "con errores",
+  };
+  if (state.search.trim()) {
+    const searchDetail = state.filter === "all"
+      ? "La búsqueda no coincide con ninguna imagen."
+      : "La búsqueda no coincide con el filtro actual.";
+    return `
+      <strong>No hay resultados.</strong>
+      <span>${escapeHtml(searchDetail)}</span>
+      <button type="button" data-action="clear-filter">Ver todas</button>
+    `;
+  }
+  const counts = { valid, warnings, errors };
+  const label = labels[state.filter] || "con este filtro";
+  const count = counts[state.filter] || 0;
+  return `
+    <strong>No hay imágenes ${escapeHtml(label)}.</strong>
+    <small>${escapeHtml(total)} imágenes en el lote · ${escapeHtml(count)} en este filtro</small>
+    <button type="button" data-action="clear-filter">Ver todas</button>
+  `;
 }
 
 function folderItemHtml(folder) {
@@ -1614,6 +1683,11 @@ function renderPreview() {
   $("#preview-name").textContent = image ? image.name : "Sin imagen seleccionada";
   $("#preview-subtitle").textContent = previewSubtitle(image);
   $("#zoom-label").textContent = state.fitMode === "fit" ? "Fit" : `${state.zoom}%`;
+  const visibleImages = filteredImages();
+  const visibleIndex = visibleImages.findIndex((item) => item.id === state.selectedImageId);
+  $("#viewer-position").textContent = visibleIndex >= 0
+    ? `Imagen ${visibleIndex + 1} de ${visibleImages.length}`
+    : activeImages().length ? "Fuera del filtro" : "Sin imagen";
   $("#preview-meta").textContent = isBridgeImage
     ? bridgePreviewMeta()
     : image ? `${state.format} · ${state.size} · ${backgroundLabel(state.background)}` : "Sin imagen";
@@ -1628,6 +1702,9 @@ function renderPreview() {
   });
   $$("[data-action='zoom-fit'], [data-action='zoom-100'], [data-action='zoom-out'], [data-action='zoom-in'], [data-action='force-preview-error']").forEach((button) => {
     button.disabled = previewControlsDisabled;
+  });
+  $$("[data-action='previous-image'], [data-action='next-image']").forEach((button) => {
+    button.disabled = visibleImages.length < 2;
   });
 
   const canvas = $("#preview-canvas");
@@ -1912,11 +1989,15 @@ function renderFooter() {
   $("#progress-fill").style.width = `${state.progress}%`;
   $("#progress-fill").className = state.exportStatus === "failed" ? "error" : state.exportStatus === "partial" ? "warning" : "";
 
-  $("#review-errors").disabled = issues.length === 0 && activeImages().every((image) => image.status !== "error");
+  const hasReviewIssues = issues.length > 0 || activeImages().some((image) => image.status === "error" || image.status === "warning");
+  $("#review-errors").classList.toggle("is-hidden", !hasReviewIssues);
+  $("#review-errors").disabled = !hasReviewIssues;
   $("#pause-export").classList.toggle("is-hidden", state.exportStatus !== "running");
   $("#pause-export").textContent = state.paused ? "Reanudar" : "Pausar";
   $("#stop-export").classList.toggle("is-hidden", state.exportStatus !== "running");
+  $("#open-output").classList.toggle("is-hidden", !(state.exportStatus === "completed" || state.exportStatus === "partial"));
   $("#open-output").disabled = !(state.exportStatus === "completed" || state.exportStatus === "partial");
+  $("#primary-action").classList.add("is-hidden");
 
   const primaryButtons = [$("#primary-action"), $("#top-primary-action")].filter(Boolean);
   const primaryDisabled = state.exportStatus === "running"
@@ -1996,6 +2077,12 @@ function handleAction(action) {
       state.statusText = "Preview no disponible";
       render();
     }
+  } else if (action === "previous-image") {
+    selectAdjacentImage(-1);
+  } else if (action === "next-image") {
+    selectAdjacentImage(1);
+  } else if (action === "clear-filter") {
+    clearFilter();
   } else if (action === "zoom-fit") {
     state.fitMode = "fit";
     state.zoom = 100;
@@ -2066,7 +2153,7 @@ document.addEventListener("click", (event) => {
   const filterTarget = event.target.closest("[data-filter]");
   if (filterTarget) {
     state.filter = filterTarget.dataset.filter;
-    state.statusText = `Filtro: ${filterTarget.textContent.trim()}`;
+    state.statusText = filterStatusText(state.filter);
     render();
     return;
   }

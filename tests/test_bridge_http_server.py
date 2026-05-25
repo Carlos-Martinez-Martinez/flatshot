@@ -6,11 +6,12 @@ import base64
 import threading
 from contextlib import contextmanager
 from pathlib import Path
+from types import SimpleNamespace
 
 from PIL import Image
 
 from flatshot.application.config_paths import ConfigPathResolver
-from flatshot.bridge.http_server import create_server
+from flatshot.bridge.http_server import FlatShotBridgeRequestHandler, create_server
 from flatshot.bridge.service import FlatShotBridgeService
 
 
@@ -52,6 +53,34 @@ def request_json(port: int, method: str, path: str, body: dict | str | None = No
         return response.status, data
     finally:
         connection.close()
+
+
+class _DisconnectedWriter:
+    def write(self, body: bytes) -> None:
+        raise ConnectionAbortedError("client disconnected")
+
+
+def _handler_with_disconnected_writer() -> FlatShotBridgeRequestHandler:
+    handler = object.__new__(FlatShotBridgeRequestHandler)
+    handler.server = SimpleNamespace(allowed_origins=set())
+    handler.headers = {}
+    handler.wfile = _DisconnectedWriter()
+    handler.send_response = lambda status: None
+    handler.send_header = lambda name, value: None
+    handler.end_headers = lambda: None
+    return handler
+
+
+def test_bridge_http_send_json_ignores_client_disconnect():
+    handler = _handler_with_disconnected_writer()
+
+    handler._send_json({"ok": True})
+
+
+def test_bridge_http_send_error_ignores_client_disconnect():
+    handler = _handler_with_disconnected_writer()
+
+    handler._send_error(RuntimeError("boom"))
 
 
 def test_bridge_http_health(tmp_path):

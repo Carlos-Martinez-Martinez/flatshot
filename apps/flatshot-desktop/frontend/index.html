@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>FlatShot Desktop</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=20260525-ui6" />
   </head>
   <body>
     <main class="app-shell" aria-label="FlatShot nueva app">
@@ -22,12 +22,13 @@
           <div class="top-summary" aria-live="polite">
             <span class="status-dot" id="status-dot"></span>
             <span id="top-status-text">Añade una carpeta</span>
+            <span class="bridge-chip idle" id="bridge-status">Bridge pendiente</span>
           </div>
 
           <div class="top-actions">
-            <span class="bridge-chip idle" id="bridge-status">Bridge pendiente</span>
+            <span class="preflight-chip" id="top-preflight-status">Bloqueado</span>
             <button type="button" class="primary top-export" id="top-primary-action" data-action="primary">Exportar lote</button>
-            <button type="button" data-action="toggle-inspector">Inspector</button>
+            <button type="button" data-action="toggle-inspector">Inspección</button>
             <details class="debug-panel" id="debug-panel">
               <summary>Debug</summary>
               <div class="debug-content">
@@ -81,7 +82,7 @@
             <div class="source-panel-heading">
               <div>
                 <strong id="source-title">Selecciona una carpeta</strong>
-                <span id="scan-status">Selecciona una carpeta con PNG para empezar.</span>
+                <span id="scan-status">Selecciona una carpeta con PNG.</span>
               </div>
               <span class="state-chip" id="scan-source-badge">Sin lote</span>
             </div>
@@ -160,7 +161,7 @@
         <section class="preview-panel" aria-label="Preview principal">
           <div class="preview-header">
             <div class="preview-title-block">
-              <span class="eyebrow">Imagen seleccionada</span>
+              <span class="eyebrow">Imagen</span>
               <h2 id="preview-name">Sin imagen seleccionada</h2>
               <span id="preview-subtitle">Sin preview</span>
             </div>
@@ -175,7 +176,7 @@
                 <button type="button" data-action="previous-image" aria-label="Imagen anterior">‹</button>
                 <span id="viewer-position">Sin imagen</span>
                 <button type="button" data-action="next-image" aria-label="Imagen siguiente">›</button>
-                <button type="button" data-action="zoom-fit">Ajustar</button>
+                <button type="button" data-action="zoom-fit">Fit</button>
                 <button type="button" data-action="zoom-100">100%</button>
                 <button type="button" data-action="zoom-out" aria-label="Reducir zoom">-</button>
                 <span id="zoom-label">100%</span>
@@ -251,7 +252,7 @@
               </label>
             </div>
 
-            <details class="advanced-block">
+            <details class="advanced-block" id="advanced-settings">
               <summary>Avanzado</summary>
               <div class="advanced-grid">
                 <label>
@@ -401,6 +402,6 @@
       </footer>
     </main>
 
-    <script src="./app.js"></script>
+    <script src="./app.js?v=20260525-ui6"></script>
   </body>
 </html>

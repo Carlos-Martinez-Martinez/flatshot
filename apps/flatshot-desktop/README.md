@@ -20,6 +20,16 @@ Estado actual:
 - Exportación real usando `ExportRunner`, sin cambiar naming ni output.
 - La app PyQt legacy sigue intacta.
 
+## Rediseño UX/UI 2026-05-25
+
+Se consolidó la pantalla principal como shell de producción: topbar de estado/CTA, navegador de lote, visor central dominante, panel contextual `Ajustes`/`Salida` y status bar siempre visible. El cambio es de interfaz; no modifica el bridge, el runner de exportación ni el pipeline de imagen.
+
+Para revisar:
+
+- arrancar con `python apps/flatshot-desktop/run_dev.py --open`;
+- probar sin lote, carpeta vacía, carpeta con PNG, búsqueda/filtros, selección de imagen, fondos de preview, sliders básicos, `Avanzado`, `Salida` y exportación temporal;
+- comprobar que no hay scroll global, que los paneles laterales usan scroll interno y que el CTA superior refleja `Exportar N`, `Nuevo lote` o bloqueo de preflight.
+
 ## Probar visualmente la nueva app
 
 ### Requisitos

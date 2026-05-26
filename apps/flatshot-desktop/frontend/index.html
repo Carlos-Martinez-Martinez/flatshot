@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>FlatShot Desktop</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./styles.css?v=20260526-ui-system14" />
+    <link rel="stylesheet" href="./styles.css?v=20260526-ux-foundation1" />
+    <link rel="stylesheet" href="./ux-foundation.css?v=20260526-ux-foundation1" />
   </head>
   <body>
     <main class="app-shell" aria-label="FlatShot nueva app">
@@ -28,7 +29,9 @@
           <div class="top-actions">
             <span class="preflight-chip" id="top-preflight-status">Exportación bloqueada</span>
             <button type="button" class="primary top-export" id="top-primary-action" data-action="primary">Elegir carpeta</button>
-            <button type="button" data-action="toggle-inspector">Diagnóstico</button>
+            <button type="button" class="top-secondary-action" id="top-secondary-action" data-action="secondary-primary" hidden></button>
+            <button type="button" data-action="open-app-settings">Configuración</button>
+            <button type="button" data-action="toggle-inspector">Detalle técnico</button>
             <details class="debug-panel" id="debug-panel">
               <summary>Debug</summary>
               <div class="debug-content">
@@ -133,7 +136,7 @@
                 <option value="preview-loading">Vista cargando</option>
                 <option value="preview-warning">Vista con aviso</option>
                 <option value="preview-error">Error de vista</option>
-                <option value="export-blocked">Destino sin configurar</option>
+                <option value="export-blocked">Carpeta de salida sin configurar</option>
                 <option value="export-ready">Exportación lista</option>
                 <option value="export-running">Exportación en curso</option>
                 <option value="export-completed">Exportación completada</option>
@@ -180,7 +183,7 @@
 
             <div class="segmented batch-filter gallery-filter" aria-label="Filtro de imágenes">
               <button type="button" data-filter="all">Todas</button>
-              <button type="button" data-filter="valid">Correctas</button>
+              <button type="button" data-filter="valid">Listas</button>
               <button type="button" data-filter="warnings">Avisos</button>
               <button type="button" data-filter="omitted">Omitidas</button>
             </div>
@@ -225,19 +228,19 @@
           </div>
         </section>
 
-        <aside class="settings-panel" aria-label="Ajustes y exportación">
+        <aside class="settings-panel" aria-label="Aspecto, salida y avisos">
           <section class="inspector-start" id="inspector-start" aria-live="polite"></section>
 
           <div class="inspector-tabs segmented compact" aria-label="Panel derecho">
+            <button type="button" data-inspector-tab="adjustments">Aspecto</button>
             <button type="button" data-inspector-tab="output">Salida</button>
-            <button type="button" data-inspector-tab="adjustments">Ajustes</button>
             <button type="button" data-inspector-tab="warnings">Avisos</button>
           </div>
 
           <details class="settings-section inspector-disclosure preset-section" data-inspector-section="adjustments">
             <summary>
               <span class="summary-copy">
-                <span class="eyebrow">Preset actual</span>
+                <span class="eyebrow">Ajuste activo</span>
                 <strong id="active-preset">Luz cenital</strong>
                 <small id="preset-source">Salida</small>
               </span>
@@ -245,17 +248,17 @@
             </summary>
             <div class="inspector-disclosure__body">
               <div class="preset-group-heading">
-                <span>Presets disponibles</span>
+                <span>Ajustes guardados</span>
                 <strong id="preset-count">0</strong>
               </div>
-              <div class="preset-list" id="preset-list" aria-label="Cambiar preset"></div>
+              <div class="preset-list" id="preset-list" aria-label="Cambiar ajuste"></div>
               <div class="preset-action-panel">
                 <div class="preset-group-heading">
-                  <span>Acciones de preset</span>
+                  <span>Gestionar ajuste</span>
                 </div>
                 <div class="button-row preset-actions">
                   <button type="button" id="save-preset" data-action="save-preset">Guardar</button>
-                  <button type="button" id="export-presets" data-action="export-presets">Exportar presets</button>
+                  <button type="button" id="export-presets" data-action="export-presets">Exportar ajustes</button>
                   <button type="button" id="delete-preset" class="danger-subtle" data-action="delete-preset">Eliminar</button>
                   <button type="button" data-action="reset-settings">Restaurar</button>
                   <button type="button" data-action="close-preset-editor">Listo</button>
@@ -268,8 +271,8 @@
             <summary>
               <span class="summary-copy">
                 <span class="eyebrow">Aspecto</span>
-                <strong>Ajustes principales</strong>
-                <small>Preset completo del lote</small>
+                <strong>Controles principales</strong>
+                <small>Ajuste global del lote</small>
               </span>
             </summary>
             <div class="inspector-disclosure__body control-stack">
@@ -279,7 +282,7 @@
                 <output id="opacity-output">20</output>
               </label>
               <label class="control-row">
-                <span>Blur</span>
+                <span>Desenfoque</span>
                 <input id="blur-input" type="range" min="0" max="80" value="30" data-setting="blur" />
                 <output id="blur-output">30</output>
               </label>
@@ -306,7 +309,7 @@
             </summary>
             <div class="inspector-disclosure__body">
               <div class="segmented compact background-switch inspector-background-switch" aria-label="Fondo de revisión">
-                <button type="button" data-preview-bg="rgb230">RGB230</button>
+                <button type="button" data-preview-bg="rgb230">Gris claro</button>
                 <button type="button" data-preview-bg="white">Blanco</button>
                 <button type="button" data-preview-bg="transparent">Transparente</button>
               </div>
@@ -316,9 +319,9 @@
           <details class="settings-section inspector-disclosure advanced-block" id="advanced-settings" data-inspector-section="adjustments">
             <summary>
               <span class="summary-copy">
-                <span class="eyebrow">Técnico</span>
+                <span class="eyebrow">Avanzado</span>
                 <strong>Avanzado</strong>
-                <small>Motor y parámetros finos</small>
+                <small>Procesamiento avanzado</small>
               </span>
             </summary>
             <div class="inspector-disclosure__body control-stack advanced-controls">
@@ -394,7 +397,7 @@
                 <output id="local-shadow_delta-output">0</output>
               </label>
               <label class="local-control-row">
-                <span>Blur</span>
+                  <span>Desenfoque</span>
                 <input type="range" min="-40" max="40" value="0" data-local-setting="blur_delta" />
                 <output id="local-blur_delta-output">0</output>
               </label>
@@ -407,15 +410,23 @@
           <section class="settings-section export-section" data-inspector-section="output">
             <div class="section-title">
               <div>
-                <span class="eyebrow">Exportación</span>
-                <strong id="export-readiness">Configura exportación</strong>
+                <span class="eyebrow">Salida</span>
+                <strong id="export-readiness">Configura salida</strong>
               </div>
               <span class="change-chip" id="export-count">0 archivos</span>
             </div>
 
+            <div class="output-profile-row">
+              <label>
+                <span>Formato de salida</span>
+                <select id="output-profile-select"></select>
+              </label>
+              <button type="button" class="btn-linklike" data-action="open-app-settings">Gestionar</button>
+            </div>
+
             <div class="form-grid">
               <label>
-                <span>Formato</span>
+                <span>Archivo</span>
                 <select id="format-select">
                   <option value="JPG">JPG</option>
                   <option value="PNG">PNG</option>
@@ -423,16 +434,12 @@
               </label>
               <label>
                 <span>Tamaño</span>
-                <select id="size-select">
-                  <option value="1800x2400">1800x2400</option>
-                  <option value="2000x2000">2000x2000</option>
-                  <option value="1200x1600">1200x1600</option>
-                </select>
+                <input id="size-select" type="text" value="1800x2400" inputmode="numeric" placeholder="1800x2400" />
               </label>
               <label>
                 <span>Fondo</span>
                 <select id="background-select">
-                  <option value="rgb230">RGB230</option>
+                  <option value="rgb230">Gris claro · RGB 230</option>
                   <option value="white">Blanco</option>
                   <option value="transparent">Transparente</option>
                 </select>
@@ -447,12 +454,12 @@
             </div>
 
             <label class="text-field">
-              <span>Ruta destino</span>
+              <span>Carpeta de salida</span>
               <input id="destination-input" type="text" value="_SALIDA_PRO" />
             </label>
 
             <label class="text-field">
-              <span>Naming</span>
+              <span>Nombre de archivo</span>
               <input id="naming-input" type="text" value="{original}{suffix}" />
             </label>
 
@@ -465,13 +472,98 @@
               <div>
                 <span class="eyebrow">Avisos</span>
                 <strong id="warnings-readiness">Sin avisos</strong>
-                <small>Diagnóstico contextual del lote</small>
+                <small>Detalle técnico del lote</small>
               </div>
             </div>
             <div class="issue-list" id="issue-list" aria-live="polite"></div>
           </section>
         </aside>
       </section>
+
+      <div class="app-settings-backdrop is-hidden" id="app-settings-modal" role="dialog" aria-modal="true" aria-labelledby="app-settings-title">
+        <section class="app-settings-dialog">
+          <header class="app-settings-header">
+            <div>
+              <span class="eyebrow">Configuración</span>
+              <h2 id="app-settings-title">Formatos de salida</h2>
+            </div>
+            <button type="button" class="icon-button" data-action="close-app-settings" aria-label="Cerrar ajustes">×</button>
+          </header>
+
+          <div class="app-settings-content">
+            <aside class="output-format-list" aria-label="Formatos de salida">
+              <div class="settings-toolbar">
+                <strong>Formatos</strong>
+                <div class="settings-toolbar-actions">
+                  <button type="button" data-action="new-output-profile">Nuevo</button>
+                  <button type="button" data-action="duplicate-output-profile">Duplicar</button>
+                  <button type="button" class="danger-subtle" data-action="delete-output-profile">Eliminar</button>
+                </div>
+              </div>
+              <div id="output-profile-list"></div>
+            </aside>
+
+            <form class="output-format-form" id="output-profile-form">
+              <label class="text-field">
+                <span>Nombre</span>
+                <input id="profile-name-input" type="text" autocomplete="off" />
+              </label>
+              <div class="form-grid">
+                <label>
+                  <span>Archivo</span>
+                  <select id="profile-format-input">
+                    <option value="JPG">JPG</option>
+                    <option value="PNG">PNG</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Fondo</span>
+                  <select id="profile-background-input">
+                    <option value="rgb230">Gris claro · RGB 230</option>
+                    <option value="white">Blanco</option>
+                    <option value="transparent">Transparente</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Ancho</span>
+                  <input id="profile-width-input" type="number" min="1" step="1" />
+                </label>
+                <label>
+                  <span>Alto</span>
+                  <input id="profile-height-input" type="number" min="1" step="1" />
+                </label>
+              </div>
+              <div class="form-grid">
+                <label>
+                  <span>Destino</span>
+                  <select id="profile-destination-mode-input">
+                    <option value="source">Junto al origen</option>
+                    <option value="custom">Carpeta personalizada</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Sufijo</span>
+                  <input id="profile-suffix-input" type="text" value="_PRO" />
+                </label>
+              </div>
+              <label class="text-field">
+                <span>Carpeta de salida</span>
+                <input id="profile-destination-input" type="text" value="_SALIDA_PRO" />
+              </label>
+              <label class="text-field">
+                <span>Nombre de archivo</span>
+                <input id="profile-naming-input" type="text" value="{original}{suffix}" />
+              </label>
+            </form>
+          </div>
+
+          <footer class="app-settings-footer">
+            <button type="button" class="primary" data-action="save-output-profile">Guardar formato</button>
+            <button type="button" data-action="apply-output-profile">Usar en este lote</button>
+            <button type="button" data-action="close-app-settings">Cerrar</button>
+          </footer>
+        </section>
+      </div>
 
       <footer class="bottom-bar">
         <div class="status-sentence" id="footer-statusline" aria-live="polite">Sin lote · Elige una carpeta para empezar</div>
@@ -493,6 +585,6 @@
       </footer>
     </main>
 
-    <script src="./app.js?v=20260526-ui-system14"></script>
+    <script src="./app.js?v=20260526-ux-foundation1"></script>
   </body>
 </html>

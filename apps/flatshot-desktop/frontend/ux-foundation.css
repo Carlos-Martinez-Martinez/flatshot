@@ -1,0 +1,149 @@
+/* Tanda 1 UX foundation: loaded after legacy stylesheet on purpose. */
+:root {
+  --ui-panel-gap: var(--space-4);
+  --ui-card-padding: var(--space-4);
+  --ui-border: var(--color-border);
+  --ui-border-strong: var(--color-border-strong);
+  --ui-radius: var(--radius-md);
+  --ui-radius-control: var(--radius-sm);
+  --ui-shadow-card: var(--shadow-xs);
+  --ui-state-ready: var(--color-success);
+  --ui-state-warning: var(--color-warning);
+  --ui-state-error: var(--color-error);
+  --ui-state-info: #256b8f;
+}
+
+.top-secondary-action {
+  color: var(--color-text);
+}
+
+.top-secondary-action[hidden] {
+  display: none !important;
+}
+
+.batch-summary-card {
+  gap: var(--ui-panel-gap);
+  border-radius: var(--ui-radius);
+  padding: var(--ui-card-padding);
+  box-shadow: var(--ui-shadow-card);
+}
+
+.batch-summary-card.is-idle {
+  border-color: var(--ui-border);
+  background: var(--color-bg-soft);
+}
+
+.batch-summary-card.is-busy {
+  border-color: var(--ui-border-strong);
+  background: linear-gradient(180deg, var(--color-bg-panel), var(--color-bg-soft));
+}
+
+.batch-summary-card.is-error {
+  border-color: var(--color-error-border);
+  background: linear-gradient(180deg, var(--color-bg-panel), var(--color-error-soft));
+}
+
+.batch-summary-section {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.batch-summary-section strong,
+.batch-summary-section small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.batch-summary-section strong {
+  color: var(--color-text-strong);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.batch-summary-section small {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  white-space: normal;
+}
+
+.batch-summary-lines--compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.batch-summary-lines--compact .batch-summary__line {
+  gap: 2px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-panel);
+  padding: var(--space-2);
+}
+
+.batch-summary-lines--compact .batch-summary__line strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.context-progress {
+  position: relative;
+  min-height: 30px;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-soft);
+  padding: 0 var(--space-3);
+}
+
+.context-progress.is-indeterminate::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
+  animation: flatshot-indeterminate 1.2s ease-in-out infinite;
+}
+
+@keyframes flatshot-indeterminate {
+  0% {
+    transform: translateX(-80%);
+  }
+
+  100% {
+    transform: translateX(80%);
+  }
+}
+
+.app-shell[data-ui-state="scanning"] #batch-visible-count,
+.app-shell[data-ui-state="no_folder"] #batch-visible-count,
+.app-shell[data-ui-state="batch_empty"] #batch-visible-count,
+.app-shell[data-ui-state="scan_empty"] #batch-visible-count,
+.app-shell[data-ui-state="scanning"] .gallery-search,
+.app-shell[data-ui-state="scanning"] .gallery-filter,
+.app-shell[data-ui-state="no_folder"] .gallery-search,
+.app-shell[data-ui-state="no_folder"] .gallery-filter,
+.app-shell[data-ui-state="batch_empty"] .gallery-search,
+.app-shell[data-ui-state="batch_empty"] .gallery-filter,
+.app-shell[data-ui-state="scan_empty"] .gallery-search,
+.app-shell[data-ui-state="scan_empty"] .gallery-filter {
+  display: none !important;
+}
+
+.app-shell[data-ui-state="scanning"] .gallery-header {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-shell[data-ui-state="ready_with_warnings"] .top-export,
+.app-shell[data-ui-state="ready_with_omitted"] .top-export {
+  border-color: var(--color-warning-border);
+  background: var(--color-warning);
+}
+
+.app-shell[data-ui-state="ready_with_warnings"] .top-export:hover:not(:disabled),
+.app-shell[data-ui-state="ready_with_omitted"] .top-export:hover:not(:disabled) {
+  border-color: var(--color-warning);
+  background: #946200;
+}

@@ -77,6 +77,8 @@ const devMode = new URLSearchParams(window.location.search).get("dev") === "1";
 const STORAGE_KEYS = {
   bridgeScanPath: "flatshot.bridgeScanPath",
   selectedImagePath: "flatshot.selectedImagePath",
+  outputProfiles: "flatshot.outputProfiles",
+  activeOutputProfile: "flatshot.activeOutputProfile",
 };
 document.documentElement.classList.toggle("dev-mode", devMode);
 
@@ -94,7 +96,7 @@ const scenarioLabels = {
   "preview-loading": "Vista cargando",
   "preview-warning": "Vista con aviso",
   "preview-error": "Error de vista",
-  "export-blocked": "Destino sin configurar",
+  "export-blocked": "Carpeta de salida sin configurar",
   "export-ready": "Exportación lista",
   "export-running": "Exportación en curso",
   "export-completed": "Exportación completada",
@@ -189,6 +191,50 @@ const mockPresetSettings = {
   },
 };
 
+const defaultOutputProfiles = [
+  {
+    id: "jpg-rgb230-1800x2400",
+    name: "JPG gris claro 1800x2400",
+    format: "JPG",
+    width: 1800,
+    height: 2400,
+    background: "rgb230",
+    destinationMode: "source",
+    destinationValue: "_SALIDA_PRO",
+    naming: "{original}{suffix}",
+    suffix: "_PRO",
+  },
+  {
+    id: "png-transparent-1800x2400",
+    name: "PNG transparente 1800x2400",
+    format: "PNG",
+    width: 1800,
+    height: 2400,
+    background: "transparent",
+    destinationMode: "source",
+    destinationValue: "_SALIDA_PRO",
+    naming: "{original}{suffix}",
+    suffix: "_PRO",
+  },
+  {
+    id: "jpg-white-2000x2000",
+    name: "JPG blanco 2000x2000",
+    format: "JPG",
+    width: 2000,
+    height: 2000,
+    background: "white",
+    destinationMode: "source",
+    destinationValue: "_SALIDA_PRO",
+    naming: "{original}{suffix}",
+    suffix: "_PRO",
+  },
+];
+const initialOutputProfiles = readOutputProfiles();
+const initialOutputProfileId = readPersistentValue(STORAGE_KEYS.activeOutputProfile);
+const initialOutputProfile = initialOutputProfiles.find((profile) => profile.id === initialOutputProfileId)
+  || initialOutputProfiles[0]
+  || defaultOutputProfiles[0];
+
 const state = {
   scenario: "initial",
   batch: "none",
@@ -209,7 +255,7 @@ const state = {
   panY: 0,
   filter: "all",
   search: "",
-  inspectorTab: "output",
+  inspectorTab: "adjustments",
   inspectorCollapsed: false,
   outputEditMode: false,
   presetEditorOpen: false,
@@ -228,12 +274,18 @@ const state = {
   exportResult: null,
   exportPollTimer: null,
   outputDraft: null,
-  destinationMode: "source",
-  destinationValue: "_SALIDA_PRO",
-  format: "JPG",
-  size: "1800x2400",
-  background: "rgb230",
-  naming: "{original}{suffix}",
+  appSettingsOpen: false,
+  outputProfiles: initialOutputProfiles,
+  activeOutputProfileId: initialOutputProfile.id,
+  outputProfileEditorId: initialOutputProfile.id,
+  outputProfileDraft: null,
+  destinationMode: initialOutputProfile.destinationMode,
+  destinationValue: initialOutputProfile.destinationValue,
+  format: initialOutputProfile.format,
+  size: outputProfileSize(initialOutputProfile),
+  background: initialOutputProfile.background,
+  naming: initialOutputProfile.naming,
+  suffix: initialOutputProfile.suffix,
   progress: 0,
   processed: 0,
   errors: [],
@@ -294,6 +346,18 @@ function readPersistentValue(key) {
   }
 }
 
+function readPersistentJson(key, fallback) {
+  const raw = readPersistentValue(key);
+  if (!raw) {
+    return fallback;
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    return fallback;
+  }
+}
+
 function writePersistentValue(key, value) {
   const normalized = String(value || "").trim();
   try {
@@ -304,6 +368,14 @@ function writePersistentValue(key, value) {
     }
   } catch (error) {
     // Persistence is a convenience; the app must still work if storage is blocked.
+  }
+}
+
+function writePersistentJson(key, value) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    // Settings persistence is local convenience; runtime state remains usable.
   }
 }
 
@@ -327,6 +399,152 @@ function setTimer(callback, delay) {
 function clearTimers() {
   timers.forEach((timer) => window.clearTimeout(timer));
   timers.clear();
+}
+
+function normalizeOutputProfile(profile, index = 0) {
+  const source = profile && typeof profile === "object" ? profile : {};
+  const width = Math.max(1, Number.parseInt(source.width, 10) || 1800);
+  const height = Math.max(1, Number.parseInt(source.height, 10) || 2400);
+  const format = normalizeExportFormat(source.format);
+  const background = ["rgb230", "white", "transparent"].includes(source.background)
+    ? source.background
+    : "rgb230";
+  const destinationMode = source.destinationMode === "custom" ? "custom" : "source";
+  return {
+    id: String(source.id || uniqueOutputProfileId("formato", index)).trim(),
+    name: outputProfileNameForDisplay(String(source.name || `Formato ${index + 1}`).trim()),
+    format,
+    width,
+    height,
+    background,
+    destinationMode,
+    destinationValue: String(source.destinationValue || (destinationMode === "custom" ? "" : "_SALIDA_PRO")),
+    naming: String(source.naming || "{original}{suffix}"),
+    suffix: source.suffix === undefined || source.suffix === null ? "_PRO" : String(source.suffix),
+  };
+}
+
+function outputProfileNameForDisplay(name) {
+  return String(name || "")
+    .replace(/\bRGB\s*230\b/gi, "gris claro")
+    .replace(/\bRGB230\b/gi, "gris claro");
+}
+
+function normalizeExportFormat(value) {
+  const text = String(value || "JPG").trim().toUpperCase().replace(/^\./, "");
+  if (text === "JPEG") {
+    return "JPG";
+  }
+  return text === "PNG" ? "PNG" : "JPG";
+}
+
+function readOutputProfiles() {
+  const saved = readPersistentJson(STORAGE_KEYS.outputProfiles, null);
+  const profiles = Array.isArray(saved) ? saved : defaultOutputProfiles;
+  const normalized = profiles.map(normalizeOutputProfile).filter((profile) => profile.name);
+  return normalized.length ? dedupeOutputProfileIds(normalized) : defaultOutputProfiles.map(normalizeOutputProfile);
+}
+
+function dedupeOutputProfileIds(profiles) {
+  const seen = new Set();
+  return profiles.map((profile, index) => {
+    let id = profile.id || uniqueOutputProfileId(profile.name, index);
+    while (seen.has(id)) {
+      id = uniqueOutputProfileId(profile.name, index + seen.size);
+    }
+    seen.add(id);
+    return { ...profile, id };
+  });
+}
+
+function uniqueOutputProfileId(name = "formato", seed = Date.now()) {
+  const base = String(name)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    || "formato";
+  return `${base}-${String(seed).replace(/\D/g, "").slice(-6) || Date.now()}`;
+}
+
+function outputProfileSize(profile) {
+  return `${Math.max(1, Number(profile?.width) || 1800)}x${Math.max(1, Number(profile?.height) || 2400)}`;
+}
+
+function parseOutputSize(value) {
+  const match = /^(\d+)\s*[x×]\s*(\d+)$/i.exec(String(value || "").trim());
+  if (!match) {
+    return { width: 1800, height: 2400, normalized: "1800x2400" };
+  }
+  const width = Math.max(1, Number.parseInt(match[1], 10) || 1800);
+  const height = Math.max(1, Number.parseInt(match[2], 10) || 2400);
+  return { width, height, normalized: `${width}x${height}` };
+}
+
+function activeOutputProfile() {
+  return state.outputProfiles.find((profile) => profile.id === state.activeOutputProfileId)
+    || state.outputProfiles[0]
+    || defaultOutputProfiles[0];
+}
+
+function currentOutputProfileData() {
+  const size = parseOutputSize(state.size);
+  return normalizeOutputProfile({
+    id: state.activeOutputProfileId || uniqueOutputProfileId("actual"),
+    name: activeOutputProfile()?.name || "Formato actual",
+    format: state.format,
+    width: size.width,
+    height: size.height,
+    background: state.background,
+    destinationMode: state.destinationMode,
+    destinationValue: state.destinationValue,
+    naming: state.naming,
+    suffix: state.suffix,
+  });
+}
+
+function outputMatchesProfile(profile = activeOutputProfile()) {
+  if (!profile) {
+    return false;
+  }
+  const current = currentOutputProfileData();
+  return current.format === profile.format
+    && current.width === profile.width
+    && current.height === profile.height
+    && current.background === profile.background
+    && current.destinationMode === profile.destinationMode
+    && current.destinationValue === profile.destinationValue
+    && current.naming === profile.naming
+    && current.suffix === profile.suffix;
+}
+
+function persistOutputProfiles() {
+  writePersistentJson(STORAGE_KEYS.outputProfiles, state.outputProfiles);
+  writePersistentValue(STORAGE_KEYS.activeOutputProfile, state.activeOutputProfileId);
+}
+
+function applyOutputProfile(profileId, options = {}) {
+  const profile = state.outputProfiles.find((item) => item.id === profileId);
+  if (!profile) {
+    return false;
+  }
+  state.activeOutputProfileId = profile.id;
+  state.format = profile.format;
+  state.size = outputProfileSize(profile);
+  state.background = profile.background;
+  state.previewBg = profile.background;
+  state.destinationMode = profile.destinationMode;
+  state.destinationValue = profile.destinationValue;
+  state.naming = profile.naming;
+  state.suffix = profile.suffix;
+  state.exportStatus = isExportReady() ? "ready" : "blocked";
+  state.statusText = options.statusText || `Formato: ${profile.name}`;
+  persistOutputProfiles();
+  if (options.render !== false) {
+    render();
+  }
+  return true;
 }
 
 function selectedImage() {
@@ -377,7 +595,7 @@ function activePresetItems() {
   }
   return mockPresets.map((name) => ({
     name,
-    category: devMode ? "Demo" : "Preset local",
+    category: devMode ? "Demo" : "Ajuste local",
     categoryId: devMode ? "mock" : "fallback",
     settings: normalizeSettings(mockPresetSettings[name]),
     source: devMode ? "demo" : "fallback",
@@ -390,6 +608,60 @@ function activePresetItem() {
 
 function exportableImages() {
   return activeImages().filter((image) => image.exportable);
+}
+
+function countText(count, singular, plural = `${singular}s`) {
+  const value = Number(count) || 0;
+  return `${value} ${value === 1 ? singular : plural}`;
+}
+
+function blockingValidationIssues() {
+  return validationIssues().filter((issue) => issue.level === "error" && issue.title !== "Sin lote");
+}
+
+function batchCounts() {
+  const images = activeImages();
+  const diagnostics = state.scanDiagnostics || emptyScanDiagnostics();
+  const omittedFiles = Number(diagnostics.totalOmitted || 0);
+  const filesFound = state.batch === "scanning"
+    ? null
+    : Math.max(
+      Number(diagnostics.totalFiles || 0),
+      Number(diagnostics.totalImages || 0) + omittedFiles,
+      images.length + omittedFiles
+    );
+  const validImages = state.batch === "scanning"
+    ? null
+    : Math.max(Number(diagnostics.totalImages || 0), images.length);
+  const exportables = exportableImages();
+  const exportedErrors = new Set(
+    images
+      .filter((image) => exportItemState(image)?.status === "error")
+      .map((image) => image.id)
+  );
+  const exportableWarningImages = exportables.filter((image) => image.status === "warning").length;
+  const nonExportableImages = images.filter((image) =>
+    !image.exportable || image.status === "error" || exportedErrors.has(image.id)
+  ).length;
+  const warningImages = exportableWarningImages + nonExportableImages;
+  const readyImages = exportables.filter((image) =>
+    !["warning", "error"].includes(image.status) && !exportedErrors.has(image.id)
+  ).length;
+  const stateErrors = state.errors.filter((issue) => issue.level === "error").length;
+  const stateWarnings = state.errors.length - stateErrors;
+  const blockingErrors = blockingValidationIssues().length + (state.exportStatus === "failed" ? 1 : 0);
+
+  return {
+    filesFound,
+    validImages,
+    exportableImages: exportables.length,
+    readyImages,
+    warningImages,
+    omittedFiles,
+    nonExportableImages,
+    blockingErrors,
+    nonBlockingWarnings: omittedFiles + warningImages + stateWarnings,
+  };
 }
 
 function exportItemState(image) {
@@ -437,8 +709,8 @@ function filteredImages() {
 function filterDisplayName(filter = state.filter) {
   const labels = {
     all: "todas",
-    valid: "correctas",
-    warnings: "avisos",
+    valid: "listas",
+    warnings: "con aviso",
     omitted: "omitidas",
   };
   return labels[filter] || "imágenes";
@@ -457,16 +729,16 @@ function validationIssues() {
     issues.push({ level: "error", title: "Sin lote", detail: "Elige una carpeta con imágenes para iniciar el lote." });
   }
   if (state.batch === "empty") {
-    issues.push({ level: "warning", title: "No hay PNG ni JPG válidos", detail: "Elige otra carpeta o revisa el diagnóstico." });
+    issues.push({ level: "warning", title: "No hay imágenes válidas", detail: "Elige otra carpeta o revisa el detalle técnico." });
   }
   if (exportableImages().length === 0 && state.batch === "ready") {
     issues.push({ level: "error", title: "Sin imágenes exportables", detail: "Revisa los errores." });
   }
   if (!state.naming.trim()) {
-    issues.push({ level: "error", title: "Naming vacío", detail: "Define una plantilla." });
+    issues.push({ level: "error", title: "Nombre de archivo vacío", detail: "Define una plantilla de nombre." });
   }
   if (state.destinationMode === "custom" && !state.destinationValue.trim()) {
-    issues.push({ level: "error", title: "Destino sin configurar", detail: "Elige una carpeta." });
+    issues.push({ level: "error", title: "Carpeta de salida sin configurar", detail: "Elige una carpeta de salida." });
   }
   return issues;
 }
@@ -518,25 +790,23 @@ function isExportReady() {
 
 function uiState() {
   const counts = preflightCounts();
+  const lotCounts = batchCounts();
   const image = selectedImage();
-  const visibleWarnings = visibleWarningCount();
   return {
     hasBatch: hasBatch(),
     hasBatchContext: hasBatch() || state.batch === "empty" || state.batch === "scanning",
     hasSelectedImage: Boolean(image),
     isBridgeReady: state.bridgeMode === "bridge" && state.bridgeStatus === "connected",
     canExport: isExportReady(),
-    hasWarnings: visibleWarnings > 0 || counts.warnings > 0,
-    hasBlockingErrors: counts.errors > 0 || state.exportStatus === "failed",
+    hasWarnings: lotCounts.nonBlockingWarnings > 0 || counts.warnings > 0,
+    hasBlockingErrors: lotCounts.blockingErrors > 0,
     isProcessing: state.batch === "scanning" || state.previewStatus === "loading" || state.exportStatus === "running",
     isExporting: state.exportStatus === "running",
   };
 }
 
 function visibleWarningCount() {
-  return Number(state.scanDiagnostics?.totalOmitted || 0)
-    + activeImages().filter((image) => image.status === "warning" || image.status === "error" || exportItemState(image)?.status === "error").length
-    + state.errors.length;
+  return batchCounts().nonBlockingWarnings;
 }
 
 function warningCountLabel(count = visibleWarningCount()) {
@@ -631,6 +901,162 @@ function firstBlockingIssue() {
     || null;
 }
 
+function getVisibleAppState() {
+  const counts = batchCounts();
+  const blockers = blockingValidationIssues();
+  const hasWarnings = counts.nonBlockingWarnings > 0;
+  const output = batchOutputLine();
+  const destination = batchDestinationLine();
+  const summary = readyBatchSummaryText(counts);
+
+  if (state.exportStatus === "running") {
+    const total = counts.exportableImages;
+    return {
+      id: "exporting",
+      tone: "busy",
+      title: state.paused ? "Exportación pausada" : "Exportando lote",
+      subtitle: state.paused ? `Pausado · ${state.processed}/${total}` : `Procesando ${state.processed}/${total}`,
+      topSummary: state.paused ? `Pausado · ${state.processed}/${total}` : `Exportando ${state.processed}/${total}`,
+      primaryAction: { label: state.paused ? "Exportación pausada" : "Exportando...", action: "", enabled: false },
+      secondaryAction: { label: "Detener", action: "stop-export", enabled: true },
+      nextStep: state.paused ? "Reanudar o detener" : "Esperar a que termine la exportación",
+      counts,
+    };
+  }
+
+  if (state.exportStatus === "completed" || state.exportStatus === "partial") {
+    const processed = Number(state.exportResult?.processed ?? state.processed ?? counts.exportableImages);
+    const total = Number(state.exportResult?.total ?? counts.exportableImages);
+    return {
+      id: "export_done",
+      tone: state.exportStatus === "partial" ? "warning" : "ready",
+      title: state.exportStatus === "partial" ? "Exportación finalizada con avisos" : "Exportación finalizada",
+      subtitle: `${processed}/${total} imágenes exportadas · ${destination}`,
+      topSummary: state.exportStatus === "partial"
+        ? `Exportación con avisos · ${processed}/${total}`
+        : `Exportación completada · ${processed}/${total}`,
+      primaryAction: { label: "Abrir carpeta de salida", action: "open-output", enabled: Boolean(outputDestinationToOpen()) },
+      secondaryAction: { label: "Exportar de nuevo", action: "start-export", enabled: isExportReady() },
+      nextStep: outputDestinationToOpen() ? "Abrir carpeta de salida" : "Revisar resultado de exportación",
+      counts,
+    };
+  }
+
+  if (state.exportStatus === "failed") {
+    const issue = firstBlockingIssue();
+    return {
+      id: "ready_with_blockers",
+      tone: "error",
+      title: "Exportación con errores",
+      subtitle: issue?.detail || "Revisa el detalle antes de continuar.",
+      topSummary: `Exportación fallida · ${issue?.title || "Revisar salida"}`,
+      primaryAction: { label: "Ver detalle técnico", action: "review-warnings", enabled: true },
+      secondaryAction: isExportReady() ? { label: "Exportar de nuevo", action: "start-export", enabled: true } : null,
+      nextStep: "Revisar errores",
+      counts,
+    };
+  }
+
+  if (state.batch === "scanning") {
+    return {
+      id: "scanning",
+      tone: "busy",
+      title: "Leyendo carpeta",
+      subtitle: state.scanStatus || "Preparando el lote.",
+      topSummary: "Leyendo carpeta...",
+      primaryAction: { label: "Escaneando...", action: "", enabled: false },
+      secondaryAction: null,
+      nextStep: "Esperar a que termine la lectura",
+      counts,
+    };
+  }
+
+  if (state.batch === "none") {
+    return {
+      id: "no_folder",
+      tone: "idle",
+      title: "Sin carpeta seleccionada",
+      subtitle: "Selecciona una carpeta local con imágenes PNG o JPG.",
+      topSummary: "Sin lote · Selecciona una carpeta para empezar",
+      primaryAction: { label: "Seleccionar carpeta", action: "pick-bridge-folder", enabled: state.bridgeStatus !== "checking" },
+      secondaryAction: null,
+      nextStep: "Seleccionar carpeta",
+      counts,
+    };
+  }
+
+  if (state.batch === "empty") {
+    const hasFoundFiles = counts.filesFound > 0 || counts.omittedFiles > 0;
+    return {
+      id: hasFoundFiles ? "scan_empty" : "batch_empty",
+      tone: "warning",
+      title: hasFoundFiles ? "Carpeta sin imágenes válidas" : "Lote vacío",
+      subtitle: hasFoundFiles
+        ? `${countText(counts.filesFound, "archivo encontrado", "archivos encontrados")} · ${countText(counts.omittedFiles, "omitido", "omitidos")}`
+        : "No hay archivos compatibles en esta carpeta.",
+      topSummary: hasFoundFiles
+        ? `${countText(counts.filesFound, "archivo encontrado", "archivos encontrados")} · 0 exportables`
+        : "Carpeta sin imágenes compatibles",
+      primaryAction: { label: "Elegir otra carpeta", action: "pick-bridge-folder", enabled: state.bridgeStatus !== "checking" },
+      secondaryAction: counts.omittedFiles ? { label: "Ver detalle técnico", action: "review-warnings", enabled: true } : null,
+      nextStep: "Elegir otra carpeta",
+      counts,
+    };
+  }
+
+  if (blockers.length) {
+    const issue = blockers[0];
+    return {
+      id: "ready_with_blockers",
+      tone: "error",
+      title: "Lote con errores bloqueantes",
+      subtitle: issue.detail || "Hay un problema que impide exportar.",
+      topSummary: `${summary} · ${countText(blockers.length, "bloqueo", "bloqueos")}`,
+      primaryAction: { label: "Resolver problemas", action: "review-output", enabled: true },
+      secondaryAction: null,
+      nextStep: "Resolver problemas",
+      counts,
+    };
+  }
+
+  if (hasWarnings) {
+    return {
+      id: counts.omittedFiles ? "ready_with_omitted" : "ready_with_warnings",
+      tone: "warning",
+      title: counts.omittedFiles ? "Lote preparado con archivos omitidos" : "Lote preparado con avisos",
+      subtitle: `${summary} · ${countText(counts.nonBlockingWarnings, "aviso", "avisos")} no bloqueante${counts.nonBlockingWarnings === 1 ? "" : "s"}`,
+      topSummary: `${summary} · ${countText(counts.nonBlockingWarnings, "aviso", "avisos")}`,
+      primaryAction: { label: "Revisar avisos", action: "review-warnings", enabled: true },
+      secondaryAction: isExportReady() ? { label: "Exportar igualmente", action: "start-export", enabled: true } : null,
+      nextStep: "Revisar avisos",
+      counts,
+    };
+  }
+
+  return {
+    id: "ready_clean",
+    tone: "ready",
+    title: "Listo para exportar",
+    subtitle: `${summary} · ${output} · ${destination}`,
+    topSummary: `${summary} · Sin avisos`,
+    primaryAction: { label: `Exportar ${counts.exportableImages} imágenes`, action: "start-export", enabled: isExportReady() },
+    secondaryAction: null,
+    nextStep: `Exportar ${counts.exportableImages} imágenes`,
+    counts,
+  };
+}
+
+function readyBatchSummaryText(counts = batchCounts()) {
+  const format = detectedFormatLabel(activeImages());
+  if (counts.filesFound === null) {
+    return "Leyendo archivos";
+  }
+  if (counts.filesFound > 0 || counts.exportableImages > 0) {
+    return `${format} · ${countText(counts.filesFound, "archivo encontrado", "archivos encontrados")} · ${counts.exportableImages} exportables`;
+  }
+  return `${format} · 0 exportables`;
+}
+
 function setScenario(scenario) {
   clearTimers();
   thumbnailPreloads.clear();
@@ -666,13 +1092,13 @@ function setScenario(scenario) {
     zoom: 100,
     panX: 0,
     panY: 0,
-    inspectorTab: "output",
+    inspectorTab: "adjustments",
     outputEditMode: false,
     presetEditorOpen: false,
     scanIssues: [],
     scanDiagnostics: mockScanDiagnostics(),
     paused: false,
-    statusText: "Listo para procesar",
+    statusText: "Listo para exportar",
     scanStatus: "Escenario mock activo",
   });
 
@@ -694,7 +1120,7 @@ function setScenario(scenario) {
       selectedImageId: null,
       previewStatus: "empty",
       exportStatus: "blocked",
-      statusText: "No hay PNG válidos",
+      statusText: "No hay imágenes válidas",
       scanStatus: "Carpeta mock vacía",
       scanDiagnostics: emptyScanDiagnostics(),
     });
@@ -723,7 +1149,7 @@ function setScenario(scenario) {
       destinationMode: "custom",
       destinationValue: "",
       exportStatus: "blocked",
-      statusText: "Destino sin configurar",
+      statusText: "Carpeta de salida sin configurar",
     });
   } else if (scenario === "export-running") {
     Object.assign(state, {
@@ -852,7 +1278,7 @@ function loadBatch() {
     setTimer(() => {
       Object.assign(state, {
         previewStatus: "ready",
-        statusText: "Listo para procesar",
+        statusText: "Listo para exportar",
       });
       render();
     }, 550);
@@ -1115,7 +1541,7 @@ function applyPresetSettings(name, options = {}) {
   if (advanced) {
     advanced.open = false;
   }
-  state.statusText = options.statusText || `Preset: ${preset.name}`;
+  state.statusText = options.statusText || `Ajuste: ${preset.name}`;
   if (options.refresh !== false) {
     refreshPreviewAfterSettingChange();
   }
@@ -1123,13 +1549,13 @@ function applyPresetSettings(name, options = {}) {
 }
 
 function resetActivePresetSettings() {
-  if (applyPresetSettings(state.activePreset, { statusText: "Ajustes restaurados" })) {
+  if (applyPresetSettings(state.activePreset, { statusText: "Ajuste restaurado" })) {
     return;
   }
   state.settings = { ...defaultSettings };
   state.presetDirty = false;
   state.presetSource = "Salida";
-  state.statusText = "Ajustes restaurados";
+  state.statusText = "Ajuste restaurado";
   refreshPreviewAfterSettingChange();
 }
 
@@ -1174,7 +1600,7 @@ function startExport(options = {}) {
   clearTimers();
   if (!isExportReady()) {
     state.exportStatus = "blocked";
-    state.statusText = validationIssues()[0]?.title || "Configura exportación";
+    state.statusText = validationIssues()[0]?.title || "Configura salida";
     render();
     return;
   }
@@ -1276,7 +1702,7 @@ function bridgeExportPayload() {
       outputFolderName: state.destinationMode === "source" ? state.destinationValue : "_SALIDA_PRO",
       customOutputPath: state.destinationMode === "custom" ? state.destinationValue : "",
       namingTemplate: state.naming,
-      suffix: "_PRO",
+      suffix: state.suffix,
     },
   };
 }
@@ -1468,16 +1894,7 @@ async function controlBridgeExport(action) {
 }
 
 function reviewErrors() {
-  if (!hasBatch()) {
-    return;
-  }
-  const hasErrors = activeImages().some((image) => image.status === "error" || exportItemState(image)?.status === "error") || state.errors.some((issue) => issue.level === "error");
-  const hasWarnings = activeImages().some((image) => image.status === "warning");
-  const hasOmitted = Number(state.scanDiagnostics?.totalOmitted || 0) > 0;
-  state.filter = hasErrors || hasWarnings ? "warnings" : hasOmitted ? "omitted" : "all";
-  state.inspectorTab = "warnings";
-  state.statusText = "Mostrando avisos";
-  render();
+  reviewWarnings();
 }
 
 function clearFilter() {
@@ -1701,7 +2118,7 @@ function applyBridgePresets(payload) {
   state.bridgePresetSource = payload.source || "unavailable";
   state.bridgePresetWarning = payload.warning || "";
   if (!items.length) {
-    state.presetSource = "Sin presets";
+    state.presetSource = "Sin ajustes";
     return;
   }
 
@@ -2020,25 +2437,82 @@ function showReviewScenario(scenario) {
 }
 
 function primaryAction() {
-  if (state.exportStatus === "running") {
-    stopExport();
+  const visible = getVisibleAppState();
+  runVisibleAction(visible.primaryAction?.action);
+}
+
+function runVisibleAction(action) {
+  if (!action) {
     return;
   }
-  if (!hasBatch()) {
+  if (action === "pick-bridge-folder") {
     void pickBridgeFolder();
-    return;
+  } else if (action === "review-warnings") {
+    reviewWarnings();
+  } else if (action === "review-output") {
+    reviewOutput();
+  } else if (action === "start-export") {
+    startExport();
+  } else if (action === "open-output") {
+    openOutputFolder();
+  } else if (action === "stop-export") {
+    stopExport();
   }
-  if (state.exportStatus === "completed" || state.exportStatus === "partial") {
-    clearBatch();
-    return;
+}
+
+function reviewWarnings() {
+  const counts = batchCounts();
+  const blockingCount = preflightCounts().errors;
+  state.inspectorTab = "warnings";
+  if (counts.warningImages || counts.nonExportableImages) {
+    state.filter = "warnings";
+  } else if (counts.omittedFiles) {
+    state.filter = "omitted";
   }
-  if (!isExportReady()) {
-    state.inspectorTab = "output";
-    state.statusText = firstBlockingIssue()?.title || "Revisa salida";
+  const issueCount = counts.nonBlockingWarnings + blockingCount;
+  state.statusText = issueCount
+    ? `${countText(issueCount, "aviso", "avisos")} para revisar`
+    : "Sin avisos";
+  render();
+}
+
+function reviewOutput() {
+  state.inspectorTab = "output";
+  state.statusText = firstBlockingIssue()?.title || "Revisa salida";
+  render();
+}
+
+function outputDestinationToOpen() {
+  if (state.exportDestinations.length) {
+    return state.exportDestinations[0];
+  }
+  if (Array.isArray(state.exportResult?.destinations) && state.exportResult.destinations.length) {
+    return state.exportResult.destinations[0];
+  }
+  return "";
+}
+
+function openOutputFolder() {
+  const destination = outputDestinationToOpen();
+  if (!destination) {
+    state.statusText = "No hay carpeta de salida registrada";
     render();
     return;
   }
-  startExport();
+  const opened = window.open(pathToFileUrl(destination), "_blank", "noopener");
+  state.statusText = opened ? "Carpeta de salida abierta" : "No se pudo abrir la carpeta de salida";
+  render();
+}
+
+function pathToFileUrl(path) {
+  const normalized = String(path || "").replaceAll("\\", "/");
+  if (/^[a-z]:\//i.test(normalized)) {
+    return `file:///${encodeURI(normalized)}`;
+  }
+  if (normalized.startsWith("/")) {
+    return `file://${encodeURI(normalized)}`;
+  }
+  return encodeURI(normalized);
 }
 
 function statusMode() {
@@ -2069,6 +2543,7 @@ function render() {
   renderPreview();
   renderSettings();
   renderExport();
+  renderAppSettings();
   renderInspector();
   renderFooter();
   syncOpenInspectorDisclosureHeights();
@@ -2219,6 +2694,7 @@ function toggleInspectorDisclosure(details) {
 function renderShell() {
   const shell = $(".app-shell");
   const derived = uiState();
+  const visible = getVisibleAppState();
   const hasStatusFooter = state.batch === "scanning"
     || state.exportStatus === "running"
     || state.exportStatus === "completed"
@@ -2236,6 +2712,7 @@ function renderShell() {
   shell.classList.toggle("has-status-footer", hasStatusFooter);
   shell.classList.toggle("export-completed", ["completed", "partial", "failed"].includes(state.exportStatus));
   shell.classList.toggle("inspector-collapsed", state.inspectorCollapsed);
+  shell.dataset.uiState = visible.id;
 }
 
 function keepActiveThumbnailVisible() {
@@ -2315,16 +2792,27 @@ function thumbnailStats() {
 }
 
 function renderTop() {
+  const visible = getVisibleAppState();
   $("#demo-scenario").value = scenarioLabels[state.scenario] ? state.scenario : "batch-ready";
   $("#app-mode").value = state.bridgeMode;
   $("#bridge-url").value = state.bridgeUrl;
-  $("#active-batch-label").textContent = "Producción visual";
-  $("#top-status-text").textContent = topStatusText();
+  $("#active-batch-label").textContent = visible.title;
+  $("#top-status-text").textContent = visible.topSummary || topStatusText();
+  $("#top-status-text").title = visible.subtitle || visible.topSummary || "";
   $("#status-dot").className = `status-dot ${statusMode()}`;
   const preflight = $("#top-preflight-status");
   if (preflight) {
     preflight.textContent = preflightStatusLabel();
     preflight.className = `preflight-chip ${preflightStatusClass()}`;
+  }
+  const secondary = $("#top-secondary-action");
+  if (secondary) {
+    const action = visible.secondaryAction;
+    secondary.hidden = !action;
+    secondary.disabled = !action?.enabled;
+    secondary.textContent = action?.label || "";
+    secondary.dataset.stateAction = action?.action || "";
+    secondary.title = action?.label || "";
   }
 }
 
@@ -2338,7 +2826,7 @@ function topStatusText() {
     return "Sin lote";
   }
   if (state.batch === "empty") {
-    return "No hay PNG válidos";
+    return "No hay imágenes válidas";
   }
   if (state.exportStatus === "running") {
     const total = exportableImages().length;
@@ -2409,7 +2897,7 @@ function renderBridge() {
   sourcePanel.className = `source-panel batch-rail__source ${sourcePanelClass()}`;
   sourceBadge.className = `state-chip ${isBridgeBatch() ? "bridge" : isMockBatch() ? "ready" : ""}`;
   sourceBadge.textContent = sourceLabel();
-  $("#source-title").textContent = hasBatch() || state.batch === "empty" ? "Entrada" : "Elegir carpeta";
+  $("#source-title").textContent = hasBatch() || state.batch === "empty" ? "Entrada" : "Seleccionar carpeta";
   const sourceName = $("#source-folder-name");
   if (sourceName) {
     sourceName.textContent = sourceFolderName();
@@ -2417,7 +2905,7 @@ function renderBridge() {
   }
   $("#scan-status").textContent = compactScanStatus();
   $("#bridge-scan-path").value = state.bridgeScanPath;
-  $("#bridge-pick-folder").textContent = hasBatch() || state.batch === "empty" ? "Cambiar" : "Elegir carpeta";
+  $("#bridge-pick-folder").textContent = hasBatch() || state.batch === "empty" ? "Cambiar" : "Seleccionar carpeta";
   $("#bridge-scan-folder").textContent = hasBatch() || state.batch === "empty" ? "↻" : "Escanear";
   $("#bridge-scan-folder").title = hasBatch() || state.batch === "empty" ? "Actualizar lote" : "Escanear carpeta";
   $("#bridge-scan-folder").setAttribute("aria-label", $("#bridge-scan-folder").title);
@@ -2431,16 +2919,14 @@ function renderBridge() {
 }
 
 function compactScanStatus() {
+  const counts = batchCounts();
   if (state.batch === "ready") {
-    const exportable = exportableImages().length;
-    const omitted = Number(state.scanDiagnostics?.totalOmitted || 0);
-    return omitted
-      ? `${pluralizeCount(exportable, "lista")} · ${pluralizeCount(omitted, "omitida")}`
-      : `${pluralizeCount(exportable, "lista")} para procesar`;
+    return counts.omittedFiles
+      ? `${counts.exportableImages} exportables · ${countText(counts.omittedFiles, "omitido", "omitidos")}`
+      : `${counts.exportableImages} exportables`;
   }
   if (state.batch === "empty") {
-    const omitted = Number(state.scanDiagnostics?.totalOmitted || 0);
-    return omitted ? `0 listas · ${pluralizeCount(omitted, "omitida")}` : "Sin imágenes compatibles";
+    return counts.omittedFiles ? `0 exportables · ${countText(counts.omittedFiles, "omitido", "omitidos")}` : "Sin imágenes compatibles";
   }
   if (state.batch === "scanning") {
     return "Leyendo imágenes";
@@ -2547,60 +3033,107 @@ function scanDiagnosticsFromResponse(response) {
 
 function renderBatchSummary() {
   const summary = $("#batch-summary");
-  const images = activeImages();
-  const folders = state.batch === "ready"
-    ? activeFolders()
-    : state.batch === "empty" && isBridgeBatch()
-      ? state.realFolders
-      : state.batch === "empty" && isMockBatch()
-        ? [{ status: "empty" }]
-        : [];
+  const visible = getVisibleAppState();
+  const counts = visible.counts;
   const diagnostics = state.scanDiagnostics || emptyScanDiagnostics();
-  const issueCount = state.scanIssues.length + images.filter((image) => image.status === "warning" || image.status === "error").length;
-  const totalIssues = state.batch === "scanning" ? 0 : visibleWarningCount();
-  const exportable = state.batch === "scanning" ? "..." : exportableImages().length;
-  const filesLabel = state.batch === "scanning" ? "..." : diagnostics.totalFiles || images.length;
-  const omittedLabel = state.batch === "scanning" ? "..." : Number(diagnostics.totalOmitted || 0);
-  const tone = batchSummaryTone(totalIssues);
-  const statusTitle = batchStatusTitle(totalIssues);
-  const statusDetail = batchStatusDetail(exportable, totalIssues, diagnostics, issueCount);
-  const nextStep = batchNextStep(exportable, totalIssues);
+  const tone = batchSummaryToneFromVisible(visible);
+  const sourcePath = state.batch === "ready"
+    ? activeFolders()[0]?.path || state.bridgeScanPath
+    : state.batch === "empty" && state.realFolders.length
+      ? state.realFolders[0]?.path || state.bridgeScanPath
+      : state.bridgeScanPath;
+  const filesLabel = counts.filesFound === null ? "Leyendo" : counts.filesFound;
+  const validLabel = counts.validImages === null ? "Leyendo" : counts.validImages;
   const outputLine = batchOutputLine();
   const destinationLine = batchDestinationLine();
+  const warningsLabel = counts.nonBlockingWarnings ? countText(counts.nonBlockingWarnings, "aviso", "avisos") : "Sin avisos";
 
   summary.innerHTML = `
     <div class="batch-summary-card ${tone}">
-      <div class="batch-summary__top">
-        <span class="batch-rail__section-title">Estado del lote</span>
-        <strong>${escapeHtml(statusTitle)}</strong>
-        <small title="${escapeHtml(statusDetail)}">${escapeHtml(statusDetail)}</small>
+      <div class="batch-summary-section">
+        <span class="batch-rail__section-title">Entrada</span>
+        <strong title="${escapeHtml(sourcePath || visible.subtitle)}">${escapeHtml(sourceFolderName())}</strong>
+        <small title="${escapeHtml(sourcePath || visible.subtitle)}">${escapeHtml(sourceInputDetail(filesLabel, validLabel))}</small>
       </div>
 
       <div class="batch-metric-grid" aria-label="Datos del lote">
-        ${batchMetricHtml("Listas", exportable)}
-        ${batchMetricHtml("Archivos", filesLabel)}
-        ${batchMetricHtml("Omitidas", omittedLabel)}
-        ${batchMetricHtml("Tipo", batchInputFormatLabel(images))}
+        ${batchMetricHtml("Archivos encontrados", filesLabel)}
+        ${batchMetricHtml("Imágenes válidas", validLabel)}
+        ${batchMetricHtml("Imágenes exportables", counts.exportableImages)}
+        ${batchMetricHtml("Archivos omitidos", counts.omittedFiles)}
+      </div>
+
+      <div class="batch-summary-section">
+        <span class="batch-rail__section-title">Estado del lote</span>
+        <strong>${escapeHtml(visible.title)}</strong>
+        <small title="${escapeHtml(visible.subtitle)}">${escapeHtml(visible.subtitle)}</small>
+      </div>
+
+      <div class="batch-summary-lines batch-summary-lines--compact">
+        <div class="batch-summary__line">
+          <span>Listas</span>
+          <strong>${escapeHtml(counts.readyImages)}</strong>
+        </div>
+        <div class="batch-summary__line">
+          <span>Con aviso</span>
+          <strong>${escapeHtml(counts.warningImages)}</strong>
+        </div>
+        <div class="batch-summary__line">
+          <span>Bloqueos</span>
+          <strong>${escapeHtml(counts.blockingErrors)}</strong>
+        </div>
+      </div>
+
+      <div class="batch-summary-section">
+        <span class="batch-rail__section-title">Salida</span>
+        <strong title="${escapeHtml(outputLine)}">${escapeHtml(outputProfileDisplayName())}</strong>
+        <small title="${escapeHtml(`${outputLine} · ${destinationLine}`)}">${escapeHtml(`${outputLine} · ${destinationLine}`)}</small>
       </div>
 
       <div class="batch-summary-lines">
         <div class="batch-summary__line">
-          <span>Salida</span>
-          <strong title="${escapeHtml(outputLine)}">${escapeHtml(outputLine)}</strong>
+          <span>Nombre de archivo</span>
+          <strong title="${escapeHtml(namingExample())}">${escapeHtml(namingHumanLabel())}</strong>
         </div>
         <div class="batch-summary__line">
-          <span>Destino</span>
-          <strong title="${escapeHtml(destinationLine)}">${escapeHtml(destinationLine)}</strong>
+          <span>Avisos</span>
+          <strong>${escapeHtml(warningsLabel)}</strong>
         </div>
       </div>
 
       <div class="batch-next">
         <span>Siguiente</span>
-        <strong>${escapeHtml(nextStep)}</strong>
+        <strong>${escapeHtml(visible.nextStep)}</strong>
       </div>
-      ${diagnostics.totalOmitted ? diagnosticsHtml(diagnostics) : `<div class="diagnostic-ok">${totalIssues ? "Avisos en la galería" : "Sin avisos"}</div>`}
+      ${diagnostics.totalOmitted || counts.blockingErrors ? diagnosticsHtml(diagnostics) : `<div class="diagnostic-ok">${counts.nonBlockingWarnings ? "Avisos en la galería" : "Sin avisos"}</div>`}
     </div>
   `;
+}
+
+function sourceInputDetail(filesLabel, validLabel) {
+  if (state.batch === "none") {
+    return "Pendiente";
+  }
+  if (state.batch === "scanning") {
+    return "Leyendo imágenes";
+  }
+  return `${filesLabel} archivos encontrados · ${validLabel} imágenes válidas`;
+}
+
+function batchSummaryToneFromVisible(visible) {
+  if (visible.tone === "error") {
+    return "is-error";
+  }
+  if (visible.tone === "warning") {
+    return "is-warning";
+  }
+  if (visible.tone === "busy") {
+    return "is-busy";
+  }
+  if (visible.tone === "ready") {
+    return "is-ready";
+  }
+  return "is-idle";
 }
 
 function batchMetricHtml(label, value) {
@@ -2610,105 +3143,6 @@ function batchMetricHtml(label, value) {
       <strong title="${escapeHtml(value)}">${escapeHtml(value)}</strong>
     </div>
   `;
-}
-
-function batchSummaryTone(totalIssues) {
-  if (state.batch === "scanning") {
-    return "is-busy";
-  }
-  if (state.batch === "empty") {
-    return "is-warning";
-  }
-  if (state.batch === "none") {
-    return "is-idle";
-  }
-  return totalIssues ? "is-warning" : "is-ready";
-}
-
-function batchStatusTitle(totalIssues) {
-  if (state.batch === "scanning") {
-    return "Leyendo carpeta";
-  }
-  if (state.batch === "none") {
-    return "Empieza el lote";
-  }
-  if (state.batch === "empty") {
-    return "Sin imágenes compatibles";
-  }
-  const blocking = validationIssues().find((issue) => issue.level === "error" && issue.title !== "Sin lote");
-  if (blocking) {
-    return "Falta preparar salida";
-  }
-  if (totalIssues) {
-    return `${warningCountLabel(totalIssues)} para revisar`;
-  }
-  return "Listo para procesar";
-}
-
-function batchStatusDetail(exportable, totalIssues, diagnostics, issueCount) {
-  if (state.batch === "scanning") {
-    return "La información del lote aparecerá al terminar la lectura.";
-  }
-  if (state.batch === "none") {
-    return "Elige una carpeta local con imágenes PNG o JPG.";
-  }
-  if (state.batch === "empty") {
-    return diagnostics.totalOmitted
-      ? omittedSummaryText(diagnostics)
-      : state.scanIssues[0]?.detail || "Elige otra carpeta para continuar.";
-  }
-  const blocking = validationIssues().find((issue) => issue.level === "error" && issue.title !== "Sin lote");
-  if (blocking) {
-    return blocking.detail;
-  }
-  if (totalIssues) {
-    return issueCount
-      ? `${pluralizeCount(exportable, "imagen")} preparada${Number(exportable) === 1 ? "" : "s"}; revisa la galería antes de procesar.`
-      : `${pluralizeCount(exportable, "imagen")} preparada${Number(exportable) === 1 ? "" : "s"}; las omisiones no bloquean la salida.`;
-  }
-  return `${pluralizeCount(exportable, "imagen")} preparada${Number(exportable) === 1 ? "" : "s"} con el preset ${state.activePreset}.`;
-}
-
-function batchNextStep(exportable, totalIssues) {
-  if (state.batch === "scanning") {
-    return "Esperar a que termine la lectura";
-  }
-  if (state.batch === "none") {
-    return "Elegir carpeta";
-  }
-  if (state.batch === "empty") {
-    return "Elegir otra carpeta";
-  }
-  const blocking = validationIssues().find((issue) => issue.level === "error" && issue.title !== "Sin lote");
-  if (blocking) {
-    return "Revisar salida";
-  }
-  if (totalIssues) {
-    return `Revisar avisos o procesar ${exportable}`;
-  }
-  return `Procesar ${exportable} imágenes`;
-}
-
-function batchInputFormatLabel(images) {
-  if (state.batch === "scanning") {
-    return "...";
-  }
-  if (!images.length) {
-    return "Pendiente";
-  }
-  const counts = images.reduce((acc, image) => {
-    const suffix = String(image.name || image.suffix || "")
-      .split(".")
-      .pop()
-      ?.toUpperCase() || "PNG";
-    acc[suffix] = (acc[suffix] || 0) + 1;
-    return acc;
-  }, {});
-  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  if (entries.length === 1) {
-    return entries[0][0];
-  }
-  return entries.map(([suffix, count]) => `${suffix} ${count}`).join(" · ");
 }
 
 function batchOutputLine() {
@@ -2722,7 +3156,7 @@ function batchBackgroundLabel(value) {
   if (value === "white") {
     return "Blanco";
   }
-  return "Fondo gris";
+  return "Gris claro · RGB 230";
 }
 
 function batchDestinationLine() {
@@ -2748,7 +3182,7 @@ function diagnosticsHtml(diagnostics) {
   `).join("");
   return `
     <details class="batch-diagnostics"${open}>
-      <summary>${escapeHtml(diagnostics.totalOmitted ? "Ver diagnóstico" : "Diagnóstico")}</summary>
+      <summary>${escapeHtml(diagnostics.totalOmitted ? "Ver detalle técnico" : "Detalle técnico")}</summary>
       <div class="diagnostic-reasons">${reasonRows}</div>
       ${sampleRows ? `<ul>${sampleRows}</ul>` : ""}
     </details>
@@ -2844,7 +3278,7 @@ function renderBatch() {
       : [{
           id: "empty",
           name: "Carpeta vacía",
-          detail: "No hay PNG ni JPG",
+          detail: "No hay imágenes válidas",
           count: "0",
           status: "empty",
         }];
@@ -2868,7 +3302,7 @@ function renderBatch() {
   }
 
   const exportable = exportableImages().length;
-  $("#batch-count").textContent = exportable ? `${pluralizeCount(exportable, "lista")}` : "Sin exportables";
+  $("#batch-count").textContent = exportable ? `${exportable} exportables` : "Sin exportables";
   setBatchPill(
     warningCount
       ? warningCountLabel(warningCount)
@@ -2921,7 +3355,7 @@ function filteredEmptyHtml(total, valid, warnings, errors) {
     return "No hay imágenes en este lote.";
   }
   const labels = {
-    valid: "correctas",
+    valid: "listas",
     warnings: "con avisos",
     omitted: "omitidas",
   };
@@ -2950,8 +3384,8 @@ function filteredEmptyHtml(total, valid, warnings, errors) {
 
 function emptyBatchNoteHtml() {
   const detail = state.scanDiagnostics.totalOmitted
-    ? `Esta carpeta no contiene PNG ni JPG compatibles. ${omittedSummaryText(state.scanDiagnostics)}.`
-    : state.scanStatus || "Esta carpeta no contiene PNG ni JPG.";
+    ? `Esta carpeta no contiene imágenes compatibles. ${omittedSummaryText(state.scanDiagnostics)}.`
+    : state.scanStatus || "Esta carpeta no contiene imágenes compatibles.";
   return `
     <strong>No se encontraron imágenes compatibles</strong>
     <span>${escapeHtml(detail)}</span>
@@ -3248,9 +3682,9 @@ function imageItemHtml(image) {
         <strong>${escapeHtml(image.name)}</strong>
         <small>${escapeHtml(`${compactDetail}${previewNote}`)}</small>
       </span>
-      <span class="asset-state ${chipClass}" title="${escapeHtml(chipLabel || "Correcta")}">
+      <span class="asset-state ${chipClass}" title="${escapeHtml(chipLabel || "Lista")}">
         <span aria-hidden="true"></span>
-        <em>${escapeHtml(chipLabel || "Correcta")}</em>
+        <em>${escapeHtml(chipLabel || "Lista")}</em>
       </span>
     </button>
   `;
@@ -3266,12 +3700,12 @@ function compactImageDetail(detail) {
 
 function assetStatusLabel(status) {
   if (status === "ready") {
-    return "Correcta";
+    return "Lista";
   }
   if (status === "adjusted") {
     return "Ajustada";
   }
-  return statusLabels[status] || "Correcta";
+  return statusLabels[status] || "Lista";
 }
 
 function renderFilterButtons() {
@@ -3284,8 +3718,8 @@ function renderFilterButtons() {
   };
   const labels = {
     all: "Todas",
-    valid: "Correctas",
-    warnings: "Avisos",
+    valid: "Listas",
+    warnings: "Con aviso",
     omitted: "Omitidas",
   };
   $$(".batch-filter button").forEach((button) => {
@@ -3308,7 +3742,7 @@ function renderPreview() {
   $("#preview-name").textContent = image
     ? image.name
     : state.batch === "none"
-      ? "Elegir carpeta de imágenes"
+      ? "Seleccionar carpeta de imágenes"
       : state.batch === "empty"
         ? "No se encontraron imágenes compatibles"
         : state.batch === "scanning"
@@ -3373,10 +3807,10 @@ function renderPreview() {
       title: "No se encontraron imágenes compatibles",
       detail: state.scanDiagnostics.totalOmitted
         ? omittedSummaryText(state.scanDiagnostics)
-        : "Esta carpeta no contiene PNG ni JPG.",
+        : "Esta carpeta no contiene imágenes compatibles.",
       actionLabel: "Elegir otra carpeta",
       action: "pick-bridge-folder",
-      meta: state.scanStatus || "Revisa el diagnóstico del lote",
+      meta: state.scanStatus || "Revisa el detalle técnico del lote",
     });
     queueFitZoomRefresh();
     return;
@@ -3525,9 +3959,9 @@ function bridgePreviewMeta() {
 
 function previewSettingsLabel() {
   if (state.bridgeMode === "bridge" && activePresetItem()?.source === "bridge") {
-    return state.presetDirty ? "Ajustes modificados" : "Salida";
+    return state.presetDirty ? "Aspecto modificado" : "Salida";
   }
-  return state.presetDirty ? "Ajustes modificados" : "Ajustes";
+  return state.presetDirty ? "Aspecto modificado" : "Aspecto";
 }
 
 function previewStateHtml(title, detail) {
@@ -3554,9 +3988,9 @@ function initialStateHtml() {
   return `
     <div class="empty-state onboarding initial-onboarding">
       <span class="empty-icon" aria-hidden="true"></span>
-      <strong>Elegir carpeta de imágenes</strong>
+      <strong>Seleccionar carpeta de imágenes</strong>
       <span>PNG o JPG. Después podrás revisar y exportar el lote.</span>
-      <button type="button" class="primary" data-action="pick-bridge-folder">Elegir carpeta</button>
+      <button type="button" class="primary" data-action="pick-bridge-folder">Seleccionar carpeta</button>
       <details class="manual-path-inline">
         <summary>Usar ruta manual</summary>
         <label class="text-field">
@@ -3565,7 +3999,7 @@ function initialStateHtml() {
         </label>
         <button type="button" data-action="scan-bridge-folder">Escanear carpeta</button>
       </details>
-      <small>Salida por defecto: ${escapeHtml(outputPresetLabel())} · ${escapeHtml(state.format)} · ${escapeHtml(backgroundLabel(state.background))}</small>
+      <small>Ajuste por defecto: ${escapeHtml(outputPresetLabel())} · ${escapeHtml(state.format)} · ${escapeHtml(backgroundLabel(state.background))}</small>
     </div>
   `;
 }
@@ -3601,7 +4035,7 @@ function previewSubtitle(image) {
       return "Sin lote";
     }
     if (state.batch === "empty") {
-      return state.scanStatus || "No hay PNG válidos";
+      return state.scanStatus || "No hay imágenes válidas";
     }
     if (state.batch === "scanning") {
       return state.scanStatus || "Escaneando";
@@ -3651,11 +4085,11 @@ function renderSettings() {
       return `
       <button type="button" class="preset-chip${active ? " active" : ""}" data-preset="${escapeHtml(preset.name)}" aria-pressed="${active ? "true" : "false"}" title="${escapeHtml(active ? `${preset.name} activo` : `Cambiar a ${preset.name}`)}">
         <span class="preset-chip__name">${escapeHtml(preset.name)}</span>
-        <span class="preset-chip__meta">${escapeHtml(active ? "Activo" : preset.category || "Preset")}</span>
+        <span class="preset-chip__meta">${escapeHtml(active ? "Activo" : preset.category || "Ajuste")}</span>
       </button>
     `;
     }).join("")
-    : '<span class="preset-empty">No hay presets disponibles</span>';
+    : '<span class="preset-empty">No hay ajustes guardados</span>';
 
   Object.entries(state.settings).forEach(([key, value]) => {
     const input = $(`[data-setting="${key}"]`);
@@ -3689,13 +4123,13 @@ function renderSettings() {
     }
   });
   $("#save-preset").disabled = false;
-  $("#save-preset").title = "Guardar los ajustes del preset activo";
+  $("#save-preset").title = "Guardar el ajuste activo";
   $("#save-preset").textContent = state.presetDirty ? "Guardar cambios" : "Guardar";
   const deletePresetButton = $("#delete-preset");
   if (deletePresetButton) {
     const canDeletePreset = presetItems.length > 1;
     deletePresetButton.disabled = !canDeletePreset;
-    deletePresetButton.title = canDeletePreset ? "Eliminar el preset activo" : "Debe quedar al menos un preset";
+    deletePresetButton.title = canDeletePreset ? "Eliminar el ajuste activo" : "Debe quedar al menos un ajuste";
   }
   const advanced = $("#advanced-settings");
   const advancedSummaryTitle = advanced?.querySelector("summary strong");
@@ -3758,10 +4192,10 @@ function contextualInspectorHtml() {
           <strong>Escaneando carpeta</strong>
           <small>${escapeHtml(state.scanStatus || "Leyendo imágenes")}</small>
         </div>
-        ${progressPanelHtml("Preparando lote", state.progress || 0)}
+        ${progressPanelHtml("Preparando lote")}
         ${preflightListHtml([
           { state: "pending", title: "Carpeta seleccionada", detail: "Leyendo origen" },
-          { state: "pending", title: "Correctas", detail: "Contando archivos" },
+          { state: "pending", title: "Imágenes listas", detail: "Contando archivos" },
           { state: "pending", title: "Destino", detail: "Se configurará después" },
         ])}
       </div>
@@ -3773,20 +4207,20 @@ function contextualInspectorHtml() {
       <div class="context-panel">
         <div class="context-header">
           <span class="eyebrow">Preparación</span>
-          <strong>Elegir carpeta</strong>
-          <small>El preset y la salida se preparan automáticamente.</small>
+          <strong>Seleccionar carpeta</strong>
+          <small>El ajuste activo y la salida se preparan automáticamente.</small>
         </div>
         ${preflightListHtml([
           { state: "pending", title: "Carpeta seleccionada", detail: "Pendiente" },
-          { state: "pending", title: "Correctas", detail: "Pendiente" },
+          { state: "pending", title: "Imágenes listas", detail: "Pendiente" },
           { state: "pending", title: "Destino de salida", detail: "Origen / _SALIDA_PRO" },
         ])}
         <div class="default-stack">
           <span>Valores por defecto</span>
           <strong>${escapeHtml(state.format)} · ${escapeHtml(state.size)} · ${escapeHtml(backgroundLabel(state.background))}</strong>
-          <small>Preset ${escapeHtml(state.activePreset)}</small>
+          <small>Ajuste ${escapeHtml(state.activePreset)}</small>
         </div>
-        <button type="button" class="primary" data-action="pick-bridge-folder">Elegir carpeta</button>
+        <button type="button" class="primary" data-action="pick-bridge-folder">Seleccionar carpeta</button>
       </div>
     `;
   }
@@ -3801,7 +4235,7 @@ function contextualInspectorHtml() {
         </div>
         ${preflightListHtml([
           { state: "warning", title: "Carpeta revisada", detail: state.scanDiagnostics.totalFiles ? `${state.scanDiagnostics.totalFiles} archivos encontrados` : "Sin archivos compatibles" },
-          { state: "error", title: "Correctas", detail: "0 imágenes" },
+          { state: "error", title: "Imágenes exportables", detail: "0 imágenes" },
           { state: state.scanDiagnostics.totalOmitted ? "warning" : "pending", title: "Avisos", detail: omittedSummaryText(state.scanDiagnostics) },
           { state: "pending", title: "Destino", detail: "Pendiente hasta cargar un lote" },
         ])}
@@ -3827,11 +4261,12 @@ function contextualInspectorHtml() {
   `;
 }
 
-function progressPanelHtml(label, value) {
+function progressPanelHtml(label, value = null) {
+  const valueHtml = value === null ? "" : `<strong>${escapeHtml(Math.round(value))}%</strong>`;
   return `
-    <div class="context-progress">
+    <div class="context-progress${value === null ? " is-indeterminate" : ""}">
       <span>${escapeHtml(label)}</span>
-      <strong>${escapeHtml(Math.round(value))}%</strong>
+      ${valueHtml}
     </div>
   `;
 }
@@ -3854,6 +4289,7 @@ function presetSourceLabel() {
 }
 
 function renderExport() {
+  renderOutputProfileSelect();
   $("#format-select").value = state.format;
   $("#size-select").value = state.size;
   $("#background-select").value = state.background;
@@ -3867,7 +4303,7 @@ function renderExport() {
   const ready = isExportReady();
   const destinationText = destinationCompactLabel();
   const warningCount = visibleWarningCount();
-  $("#export-readiness").textContent = state.outputEditMode ? "Editar salida" : "Salida";
+  $("#export-readiness").textContent = state.outputEditMode ? "Editar salida" : outputProfileDisplayName();
   $("#export-count").textContent = outputCount ? `${outputCount} img` : "Pendiente";
   $("#export-count").classList.toggle("dirty", !ready);
   const warningsReadiness = $("#warnings-readiness");
@@ -3881,17 +4317,16 @@ function renderExport() {
 
   const warningSummary = outputWarningSummary(issues);
   const editActions = state.outputEditMode ? `
-    <div class="inspector-actions">
-      <button type="button" class="primary" data-action="apply-output-edit">Aplicar</button>
-      <button type="button" data-action="save-preset">Guardar como preset</button>
+    <div class="inspector-actionbar">
+      <button type="button" class="primary" data-action="apply-output-edit">Aplicar salida</button>
       <button type="button" data-action="cancel-output-edit">Cancelar</button>
-      <button type="button" data-action="reset-settings">Restaurar preset</button>
+      <button type="button" class="btn-linklike" data-action="open-app-settings">Formatos</button>
     </div>
   ` : "";
   const presetActions = !state.outputEditMode ? `
-    <div class="inspector-actions">
-      <button type="button" data-action="open-preset-editor">Cambiar preset</button>
-      <button type="button" data-action="edit-output">Editar</button>
+    <div class="inspector-actionbar">
+      <button type="button" class="primary" data-action="edit-output">Editar salida</button>
+      <button type="button" class="btn-linklike" data-action="open-app-settings">Gestionar formatos</button>
     </div>
   ` : "";
 
@@ -3899,7 +4334,7 @@ function renderExport() {
     <div class="compact-panel">
       <div>
         <span>Salida</span>
-        <strong>${escapeHtml(state.activePreset)}</strong>
+        <strong>${escapeHtml(outputProfileDisplayName())}</strong>
       </div>
       <small>${escapeHtml(presetSummaryLine())}</small>
     </div>
@@ -3908,7 +4343,7 @@ function renderExport() {
     <div class="preset-summary-card">
       <div class="preset-summary-main">
         <span>Salida</span>
-        <strong>${escapeHtml(state.activePreset)}</strong>
+        <strong>${escapeHtml(outputProfileDisplayName())}</strong>
       </div>
       <div class="preset-summary-row">
         <span>Formato</span>
@@ -3940,6 +4375,279 @@ function renderExport() {
   $("#issue-list").innerHTML = issueListHtml();
 }
 
+function renderOutputProfileSelect() {
+  const select = $("#output-profile-select");
+  if (!select) {
+    return;
+  }
+  const customLabel = outputMatchesProfile() ? "" : '<option value="__custom">Personalizado sin guardar</option>';
+  select.innerHTML = `
+    ${state.outputProfiles.map((profile) => `
+      <option value="${escapeHtml(profile.id)}">${escapeHtml(profile.name)}</option>
+    `).join("")}
+    ${customLabel}
+  `;
+  select.value = outputMatchesProfile() ? state.activeOutputProfileId : "__custom";
+}
+
+function outputProfileDisplayName() {
+  const profile = activeOutputProfile();
+  if (!profile || !outputMatchesProfile(profile)) {
+    return "Salida personalizada";
+  }
+  return profile.name;
+}
+
+function outputProfileManagerRows() {
+  const draft = state.outputProfileDraft;
+  if (!draft || state.outputProfiles.some((profile) => profile.id === draft.id)) {
+    return state.outputProfiles;
+  }
+  return [...state.outputProfiles, draft];
+}
+
+function profileDestinationLabel(profile) {
+  if (!profile) {
+    return "Sin destino";
+  }
+  if (profile.destinationMode === "custom") {
+    return profile.destinationValue || "Carpeta personalizada";
+  }
+  return profile.destinationValue || "_SALIDA_PRO";
+}
+
+function ensureOutputProfileDraft() {
+  const current = state.outputProfiles.find((profile) => profile.id === state.outputProfileEditorId)
+    || state.outputProfileDraft
+    || activeOutputProfile()
+    || normalizeOutputProfile(defaultOutputProfiles[0]);
+  if (!state.outputProfileEditorId) {
+    state.outputProfileEditorId = current.id;
+  }
+  if (!state.outputProfileDraft || state.outputProfileDraft.id !== state.outputProfileEditorId) {
+    state.outputProfileDraft = { ...current };
+  }
+  return state.outputProfileDraft;
+}
+
+function setOutputProfileFormValues(profile) {
+  const pairs = [
+    ["profile-name-input", profile.name],
+    ["profile-format-input", profile.format],
+    ["profile-background-input", profile.background],
+    ["profile-width-input", profile.width],
+    ["profile-height-input", profile.height],
+    ["profile-destination-mode-input", profile.destinationMode],
+    ["profile-suffix-input", profile.suffix],
+    ["profile-destination-input", profile.destinationValue],
+    ["profile-naming-input", profile.naming],
+  ];
+  pairs.forEach(([id, value]) => {
+    const input = $(`#${id}`);
+    if (input && input.value !== String(value ?? "")) {
+      input.value = value ?? "";
+    }
+  });
+}
+
+function outputProfileDraftFromForm() {
+  const current = ensureOutputProfileDraft();
+  return normalizeOutputProfile({
+    id: current.id,
+    name: $("#profile-name-input")?.value || current.name,
+    format: $("#profile-format-input")?.value || current.format,
+    background: $("#profile-background-input")?.value || current.background,
+    width: $("#profile-width-input")?.value || current.width,
+    height: $("#profile-height-input")?.value || current.height,
+    destinationMode: $("#profile-destination-mode-input")?.value || current.destinationMode,
+    destinationValue: $("#profile-destination-input")?.value || current.destinationValue,
+    naming: $("#profile-naming-input")?.value || current.naming,
+    suffix: $("#profile-suffix-input") ? $("#profile-suffix-input").value : current.suffix,
+  });
+}
+
+function updateOutputProfileDraftFromForm() {
+  if (!state.appSettingsOpen) {
+    return;
+  }
+  state.outputProfileDraft = outputProfileDraftFromForm();
+}
+
+function selectOutputProfileDraft(profileId) {
+  const profile = outputProfileManagerRows().find((item) => item.id === profileId);
+  if (!profile) {
+    return;
+  }
+  state.outputProfileEditorId = profile.id;
+  state.outputProfileDraft = { ...profile };
+  state.statusText = `Editando formato: ${profile.name}`;
+  render();
+}
+
+function newOutputProfile() {
+  const source = currentOutputProfileData();
+  const id = uniqueOutputProfileId("formato", Date.now());
+  state.outputProfileEditorId = id;
+  state.outputProfileDraft = {
+    ...source,
+    id,
+    name: "Nuevo formato",
+  };
+  state.appSettingsOpen = true;
+  state.statusText = "Nuevo formato de salida";
+  render();
+}
+
+function duplicateOutputProfile() {
+  const source = state.outputProfileDraft || activeOutputProfile() || currentOutputProfileData();
+  const id = uniqueOutputProfileId(source.name || "formato", Date.now());
+  state.outputProfileEditorId = id;
+  state.outputProfileDraft = {
+    ...source,
+    id,
+    name: `${source.name || "Formato"} copia`,
+  };
+  state.appSettingsOpen = true;
+  state.statusText = "Formato duplicado";
+  render();
+}
+
+function commitOutputProfileDraft() {
+  const draft = outputProfileDraftFromForm();
+  const saved = normalizeOutputProfile({
+    ...draft,
+    name: draft.name.trim() || "Formato sin nombre",
+  });
+  const index = state.outputProfiles.findIndex((profile) => profile.id === saved.id);
+  if (index >= 0) {
+    state.outputProfiles[index] = saved;
+  } else {
+    state.outputProfiles.push(saved);
+  }
+  state.outputProfiles = dedupeOutputProfileIds(state.outputProfiles.map(normalizeOutputProfile));
+  state.outputProfileEditorId = saved.id;
+  state.outputProfileDraft = { ...saved };
+  persistOutputProfiles();
+  return state.outputProfiles.find((profile) => profile.id === saved.id) || saved;
+}
+
+function saveOutputProfile(options = {}) {
+  const saved = commitOutputProfileDraft();
+  state.statusText = `Formato guardado: ${saved.name}`;
+  if (options.render !== false) {
+    render();
+  }
+  return saved;
+}
+
+function applyManagedOutputProfile() {
+  const saved = saveOutputProfile({ render: false });
+  state.appSettingsOpen = false;
+  applyOutputProfile(saved.id, { statusText: `Salida: ${saved.name}` });
+}
+
+function deleteManagedOutputProfile() {
+  const draft = ensureOutputProfileDraft();
+  const exists = state.outputProfiles.some((profile) => profile.id === draft.id);
+  if (!exists) {
+    const fallback = activeOutputProfile() || state.outputProfiles[0];
+    state.outputProfileEditorId = fallback?.id || "";
+    state.outputProfileDraft = fallback ? { ...fallback } : null;
+    state.statusText = "Formato descartado";
+    render();
+    return;
+  }
+  if (state.outputProfiles.length <= 1) {
+    state.statusText = "Debe quedar al menos un formato";
+    render();
+    return;
+  }
+  const deletedName = draft.name;
+  state.outputProfiles = state.outputProfiles.filter((profile) => profile.id !== draft.id);
+  if (state.activeOutputProfileId === draft.id) {
+    const next = state.outputProfiles[0];
+    state.activeOutputProfileId = next.id;
+    state.format = next.format;
+    state.size = outputProfileSize(next);
+    state.background = next.background;
+    state.previewBg = next.background;
+    state.destinationMode = next.destinationMode;
+    state.destinationValue = next.destinationValue;
+    state.naming = next.naming;
+    state.suffix = next.suffix;
+  }
+  const nextDraft = state.outputProfiles.find((profile) => profile.id === state.activeOutputProfileId)
+    || state.outputProfiles[0];
+  state.outputProfileEditorId = nextDraft.id;
+  state.outputProfileDraft = { ...nextDraft };
+  persistOutputProfiles();
+  state.statusText = `Formato eliminado: ${deletedName}`;
+  render();
+}
+
+function openAppSettings() {
+  const activeProfile = activeOutputProfile();
+  const profile = outputMatchesProfile(activeProfile)
+    ? activeProfile
+    : {
+      ...currentOutputProfileData(),
+      id: uniqueOutputProfileId("salida-personalizada", Date.now()),
+      name: "Salida personalizada",
+    };
+  state.appSettingsOpen = true;
+  state.outputProfileEditorId = profile.id;
+  state.outputProfileDraft = { ...profile };
+  state.statusText = "Configuración de salida";
+  render();
+}
+
+function closeAppSettings() {
+  state.appSettingsOpen = false;
+  state.outputProfileDraft = null;
+  state.statusText = "Configuración cerrada";
+  render();
+}
+
+function renderAppSettings() {
+  const modal = $("#app-settings-modal");
+  if (!modal) {
+    return;
+  }
+  modal.classList.toggle("is-hidden", !state.appSettingsOpen);
+  modal.setAttribute("aria-hidden", state.appSettingsOpen ? "false" : "true");
+  if (!state.appSettingsOpen) {
+    return;
+  }
+
+  const draft = ensureOutputProfileDraft();
+  const rows = outputProfileManagerRows();
+  $("#output-profile-list").innerHTML = rows.map((profile) => {
+    const selected = profile.id === draft.id;
+    const active = profile.id === state.activeOutputProfileId;
+    const unsaved = !state.outputProfiles.some((item) => item.id === profile.id);
+    return `
+      <button type="button" class="output-profile-option${selected ? " selected" : ""}${active ? " active" : ""}" data-output-profile-id="${escapeHtml(profile.id)}">
+        <span>
+          <strong>${escapeHtml(profile.name)}</strong>
+          <small>${escapeHtml(`${profile.format} · ${outputProfileSize(profile)} · ${backgroundLabel(profile.background)}`)}</small>
+        </span>
+        <em>${escapeHtml(unsaved ? "Sin guardar" : active ? "En uso" : profileDestinationLabel(profile))}</em>
+      </button>
+    `;
+  }).join("");
+  setOutputProfileFormValues(draft);
+  const deleteButton = $("[data-action='delete-output-profile']");
+  if (deleteButton) {
+    const isPersisted = state.outputProfiles.some((profile) => profile.id === draft.id);
+    deleteButton.disabled = isPersisted && state.outputProfiles.length <= 1;
+    deleteButton.title = deleteButton.disabled ? "Debe quedar al menos un formato" : "Eliminar formato seleccionado";
+  }
+  const applyButton = $("[data-action='apply-output-profile']");
+  if (applyButton) {
+    applyButton.disabled = !String(draft.name || "").trim();
+  }
+}
+
 function presetSummaryLine() {
   return `${state.format} · ${state.size} · ${backgroundLabel(state.background)}`;
 }
@@ -3953,7 +4661,7 @@ function destinationCompactLabel() {
 
 function namingHumanLabel() {
   if (state.naming === "{original}{suffix}") {
-    return "original + _PRO";
+    return state.suffix ? `original + ${state.suffix}` : "original";
   }
   return state.naming || "Sin plantilla";
 }
@@ -4046,25 +4754,25 @@ function exportPreflightRows(issues, exportable, ready) {
   if (state.batch === "none") {
     return [
       { state: "error", title: "Carpeta de origen", detail: "Elige una carpeta para empezar" },
-      { state: "pending", title: "Correctas", detail: "Pendiente" },
-      { state: "pending", title: "Destino", detail: destinationFallbackLabel() },
+      { state: "pending", title: "Imágenes exportables", detail: "Pendiente" },
+      { state: "pending", title: "Carpeta de salida", detail: destinationFallbackLabel() },
     ];
   }
   if (state.batch === "empty") {
     return [
-      { state: "error", title: "Correctas", detail: "0 imágenes" },
+      { state: "error", title: "Imágenes exportables", detail: "0 imágenes" },
       { state: state.scanDiagnostics.totalOmitted ? "warning" : "pending", title: "Avisos", detail: omittedSummaryText(state.scanDiagnostics) },
-      { state: "pending", title: "Destino", detail: "Pendiente" },
+      { state: "pending", title: "Carpeta de salida", detail: "Pendiente" },
     ];
   }
   const rows = [
-    { state: exportable > 0 ? "ok" : "error", title: "Correctas", detail: `${exportable} imagen${exportable === 1 ? "" : "es"}` },
+    { state: exportable > 0 ? "ok" : "error", title: "Imágenes exportables", detail: `${exportable} imagen${exportable === 1 ? "" : "es"}` },
     { state: state.scanDiagnostics.totalOmitted ? "warning" : "ok", title: "Avisos", detail: state.scanDiagnostics.totalOmitted ? omittedSummaryText(state.scanDiagnostics) : "Sin avisos" },
-    { state: state.destinationMode === "custom" && !state.destinationValue.trim() ? "error" : "ok", title: "Destino", detail: destinationFallbackLabel() },
-    { state: state.naming.trim() ? "ok" : "error", title: "Naming", detail: state.naming.trim() ? namingExample() : "Plantilla vacía" },
+    { state: state.destinationMode === "custom" && !state.destinationValue.trim() ? "error" : "ok", title: "Carpeta de salida", detail: destinationFallbackLabel() },
+    { state: state.naming.trim() ? "ok" : "error", title: "Nombre de archivo", detail: state.naming.trim() ? namingExample() : "Plantilla vacía" },
   ];
   issues
-    .filter((issue) => !["Sin lote", "No hay PNG válidos", "Naming vacío", "Destino sin configurar", "Sin imágenes exportables"].includes(issue.title))
+    .filter((issue) => !["Sin lote", "No hay imágenes válidas", "Nombre de archivo vacío", "Carpeta de salida sin configurar", "Sin imágenes exportables"].includes(issue.title))
     .forEach((issue) => {
       rows.push({ state: issue.level === "error" ? "error" : "warning", title: issue.title, detail: issue.detail });
     });
@@ -4137,7 +4845,7 @@ function namingExample() {
   const folder = activeFolders()[0]?.name || "lote";
   let example = state.naming
     .replaceAll("{original}", original)
-    .replaceAll("{suffix}", "_PRO")
+    .replaceAll("{suffix}", state.suffix || "_PRO")
     .replaceAll("{folder}", folder);
   example = example.replace(/\{index(?::0?(\d+)d)?\}/g, (_match, width) => {
     const digits = Number(width) || 1;
@@ -4232,7 +4940,7 @@ function exportResultTitle() {
 
 function destinationFallbackLabel() {
   if (state.destinationMode === "custom") {
-    return state.destinationValue || "Destino sin configurar";
+    return state.destinationValue || "Carpeta de salida sin configurar";
   }
   return state.destinationValue || "_SALIDA_PRO";
 }
@@ -4245,6 +4953,7 @@ function beginOutputEdit() {
     destinationMode: state.destinationMode,
     destinationValue: state.destinationValue,
     naming: state.naming,
+    suffix: state.suffix,
   };
   state.outputEditMode = true;
   state.presetEditorOpen = false;
@@ -4282,11 +4991,12 @@ async function saveCurrentPreset() {
     destinationMode: state.destinationMode,
     destinationValue: state.destinationValue,
     naming: state.naming,
+    suffix: state.suffix,
   };
   state.presetOutputSettings[presetName] = outputSettings;
 
   if (state.bridgeMode === "bridge") {
-    state.statusText = "Guardando preset";
+    state.statusText = "Guardando ajuste";
     render();
     try {
       const payload = await bridgeRequest("/presets/save", {
@@ -4300,7 +5010,7 @@ async function saveCurrentPreset() {
       applyBridgePresets(payload);
     } catch (error) {
       state.presetDirty = true;
-      state.statusText = `No se pudo guardar el preset: ${bridgeErrorMessage(error)}`;
+      state.statusText = `No se pudo guardar el ajuste: ${bridgeErrorMessage(error)}`;
       render();
       return;
     }
@@ -4313,7 +5023,7 @@ async function saveCurrentPreset() {
   state.outputDraft = null;
   state.outputEditMode = false;
   state.exportStatus = isExportReady() ? "ready" : "blocked";
-  state.statusText = "Preset guardado";
+  state.statusText = "Ajuste guardado";
   render();
 }
 
@@ -4358,30 +5068,30 @@ function exportPresetCollection() {
   const link = document.createElement("a");
   const stamp = new Date().toISOString().slice(0, 10).replaceAll("-", "");
   link.href = url;
-  link.download = `flatshot-presets-${stamp}.json`;
+  link.download = `flatshot-ajustes-${stamp}.json`;
   document.body.appendChild(link);
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
-  state.statusText = `${payload.flatshot_export.preset_count} presets exportados`;
+  state.statusText = `${payload.flatshot_export.preset_count} ajustes exportados`;
   render();
 }
 
 async function deleteActivePreset() {
   const presets = activePresetItems();
   if (presets.length <= 1) {
-    state.statusText = "Debe quedar al menos un preset";
+    state.statusText = "Debe quedar al menos un ajuste";
     render();
     return;
   }
   const presetName = state.activePreset;
   const nextPreset = presets.find((preset) => preset.name !== presetName)?.name || presets[0]?.name;
-  if (!window.confirm(`Eliminar el preset "${presetName}"?`)) {
+  if (!window.confirm(`Eliminar el ajuste "${presetName}"?`)) {
     return;
   }
 
   if (state.bridgeMode === "bridge") {
-    state.statusText = "Eliminando preset";
+    state.statusText = "Eliminando ajuste";
     render();
     try {
       const payload = await bridgeRequest("/presets/delete", {
@@ -4392,17 +5102,17 @@ async function deleteActivePreset() {
       applyBridgePresets(payload);
       const preferred = payload.activePreset || nextPreset;
       if (preferred) {
-        applyPresetSettings(preferred, { refresh: false, statusText: `Preset eliminado: ${presetName}` });
+        applyPresetSettings(preferred, { refresh: false, statusText: `Ajuste eliminado: ${presetName}` });
       }
     } catch (error) {
-      state.statusText = `No se pudo eliminar el preset: ${bridgeErrorMessage(error)}`;
+      state.statusText = `No se pudo eliminar el ajuste: ${bridgeErrorMessage(error)}`;
       render();
       return;
     }
   } else {
     removePresetFromCache(presetName);
     if (nextPreset) {
-      applyPresetSettings(nextPreset, { refresh: false, statusText: `Preset eliminado: ${presetName}` });
+      applyPresetSettings(nextPreset, { refresh: false, statusText: `Ajuste eliminado: ${presetName}` });
     }
   }
 
@@ -4417,14 +5127,14 @@ function openPresetEditor() {
   state.presetEditorOpen = true;
   state.outputEditMode = false;
   state.inspectorTab = "adjustments";
-  state.statusText = "Cambia o ajusta el preset";
+  state.statusText = "Cambia o ajusta el ajuste activo";
   render();
 }
 
 function closePresetEditor() {
   state.presetEditorOpen = false;
   state.inspectorTab = "output";
-  state.statusText = "Preset aplicado";
+  state.statusText = "Ajuste aplicado";
   render();
 }
 
@@ -4441,7 +5151,7 @@ function exportStatusLabel(ready) {
   if (state.exportStatus === "failed") {
     return "Fallida";
   }
-  return ready ? "Lista" : "Configura exportación";
+  return ready ? "Lista" : "Configura salida";
 }
 
 function backgroundLabel(value) {
@@ -4451,13 +5161,13 @@ function backgroundLabel(value) {
   if (value === "white") {
     return "Blanco";
   }
-  return "RGB230";
+  return "Gris claro · RGB 230";
 }
 
 function renderFooter() {
-  const exportable = exportableImages().length;
   const issues = [...validationIssues(), ...state.errors];
-  const ready = isExportReady();
+  const visible = getVisibleAppState();
+  const counts = batchCounts();
   $("#footer-statusline").textContent = statusBarText();
   $("#bottom-status").textContent = state.statusText;
   $("#progress-fill").style.width = `${state.progress}%`;
@@ -4466,6 +5176,7 @@ function renderFooter() {
 
   const hasReviewIssues = (hasBatch() || state.batch === "empty") && (
     issues.some((issue) => issue.title !== "Sin lote")
+    || counts.omittedFiles > 0
     || activeImages().some((image) => image.status === "error" || image.status === "warning" || exportItemState(image)?.status === "error")
   );
   $("#review-errors").classList.toggle("is-hidden", !hasReviewIssues);
@@ -4479,33 +5190,17 @@ function renderFooter() {
   $("#primary-action").classList.add("is-hidden");
 
   const primaryButtons = [$("#primary-action"), $("#top-primary-action")].filter(Boolean);
-  const primaryDisabled = false;
-  let primaryText = "";
-  let primaryTitle = "";
-  if (state.exportStatus === "running") {
-    primaryText = state.paused ? "Detener pausa" : "Detener";
-    primaryTitle = "Detener exportación en curso";
-  } else if (!hasBatch()) {
-    primaryText = "Elegir carpeta";
-    primaryTitle = "Elegir una carpeta local con imágenes";
-  } else if (state.exportStatus === "completed" || state.exportStatus === "partial") {
-    primaryText = "Nuevo lote";
-  } else if (!ready) {
-    primaryText = "Revisar salida";
-    primaryTitle = firstBlockingIssue()?.detail || "Revisa el panel Salida";
-  } else {
-    primaryText = `Exportar ${exportable}`;
-    primaryTitle = `${exportable} imágenes preparadas`;
-  }
-  primaryButtons.forEach((primary) => {
-    primary.disabled = primaryDisabled;
-    primary.textContent = primaryText;
-    primary.title = primaryTitle;
+  const primaryActionState = visible.primaryAction || {};
+  primaryButtons.forEach((button) => {
+    button.disabled = primaryActionState.enabled === false;
+    button.textContent = primaryActionState.label || "Seleccionar carpeta";
+    button.title = visible.subtitle || primaryActionState.label || "";
   });
 }
 
 function statusBarText() {
   const images = activeImages();
+  const counts = batchCounts();
   const selectedIndex = images.findIndex((image) => image.id === state.selectedImageId);
   const selectedText = selectedIndex >= 0 ? `Imagen ${selectedIndex + 1}/${images.length}` : "Sin selección";
   const destination = state.destinationMode === "custom"
@@ -4538,7 +5233,8 @@ function statusBarText() {
   if (state.batch === "empty") {
     return `0 imágenes · ${state.scanStatus || "Cambia de carpeta"}`;
   }
-  return `${images.length} imágenes · ${selectedText} · Salida: ${destination}`;
+  const warningText = counts.nonBlockingWarnings ? ` · ${countText(counts.nonBlockingWarnings, "aviso", "avisos")}` : "";
+  return `${counts.exportableImages} exportables · ${selectedText}${warningText} · Salida: ${destination}`;
 }
 
 function previewFooterLabel() {
@@ -4618,6 +5314,20 @@ function handleAction(action) {
     applyOutputEdit();
   } else if (action === "cancel-output-edit") {
     cancelOutputEdit();
+  } else if (action === "open-app-settings") {
+    openAppSettings();
+  } else if (action === "close-app-settings") {
+    closeAppSettings();
+  } else if (action === "new-output-profile") {
+    newOutputProfile();
+  } else if (action === "duplicate-output-profile") {
+    duplicateOutputProfile();
+  } else if (action === "delete-output-profile") {
+    deleteManagedOutputProfile();
+  } else if (action === "save-output-profile") {
+    saveOutputProfile();
+  } else if (action === "apply-output-profile") {
+    applyManagedOutputProfile();
   } else if (action === "open-preset-editor") {
     openPresetEditor();
   } else if (action === "close-preset-editor") {
@@ -4653,12 +5363,13 @@ function handleAction(action) {
   } else if (action === "stop-export") {
     stopExport();
   } else if (action === "review-errors") {
-    reviewErrors();
+    reviewWarnings();
   } else if (action === "open-output") {
-    state.statusText = "Apertura no disponible";
-    render();
+    openOutputFolder();
   } else if (action === "primary") {
     primaryAction();
+  } else if (action === "secondary-primary") {
+    runVisibleAction(getVisibleAppState().secondaryAction?.action);
   }
 }
 
@@ -4741,9 +5452,20 @@ document.addEventListener("click", (event) => {
     }
   }
 
+  if (event.target.id === "app-settings-modal") {
+    closeAppSettings();
+    return;
+  }
+
   const actionTarget = event.target.closest("[data-action]");
   if (actionTarget) {
     handleAction(actionTarget.dataset.action);
+    return;
+  }
+
+  const outputProfileTarget = event.target.closest("[data-output-profile-id]");
+  if (outputProfileTarget) {
+    selectOutputProfileDraft(outputProfileTarget.dataset.outputProfileId);
     return;
   }
 
@@ -4866,6 +5588,23 @@ document.addEventListener("input", (event) => {
   if (localKey) {
     setCurrentImageOverrideValue(localKey, event.target.value);
   }
+  if (event.target.closest?.("#output-profile-form")) {
+    updateOutputProfileDraftFromForm();
+  }
+});
+
+document.addEventListener("change", (event) => {
+  if (event.target.closest?.("#output-profile-form")) {
+    updateOutputProfileDraftFromForm();
+    render();
+  }
+});
+
+document.addEventListener("submit", (event) => {
+  if (event.target.id === "output-profile-form") {
+    event.preventDefault();
+    saveOutputProfile();
+  }
 });
 
 $("#image-search").addEventListener("input", (event) => {
@@ -4898,13 +5637,24 @@ function settingInputValue(input) {
 }
 
 $("#format-select").addEventListener("change", (event) => {
-  state.format = event.target.value;
+  state.format = normalizeExportFormat(event.target.value);
   state.statusText = `Formato: ${state.format}`;
   render();
 });
 
-$("#size-select").addEventListener("change", (event) => {
+$("#output-profile-select").addEventListener("change", (event) => {
+  if (event.target.value === "__custom") {
+    return;
+  }
+  applyOutputProfile(event.target.value);
+});
+
+$("#size-select").addEventListener("input", (event) => {
   state.size = event.target.value;
+});
+
+$("#size-select").addEventListener("change", (event) => {
+  state.size = parseOutputSize(event.target.value).normalized;
   state.statusText = `Tamaño: ${state.size}`;
   const image = selectedImage();
   if (image?.source === "bridge") {
@@ -4930,21 +5680,21 @@ $("#destination-mode").addEventListener("change", (event) => {
   state.destinationMode = event.target.value;
   state.destinationValue = state.destinationMode === "custom" ? "" : "_SALIDA_PRO";
   state.exportStatus = isExportReady() ? "ready" : "blocked";
-  state.statusText = state.destinationMode === "custom" ? "Destino sin configurar" : "Destino: origen";
+  state.statusText = state.destinationMode === "custom" ? "Carpeta de salida sin configurar" : "Salida junto al origen";
   render();
 });
 
 $("#destination-input").addEventListener("input", (event) => {
   state.destinationValue = event.target.value;
   state.exportStatus = isExportReady() ? "ready" : "blocked";
-  state.statusText = state.destinationValue.trim() ? "Destino configurado" : "Destino sin configurar";
+  state.statusText = state.destinationValue.trim() ? "Carpeta de salida configurada" : "Carpeta de salida sin configurar";
   render();
 });
 
 $("#naming-input").addEventListener("input", (event) => {
   state.naming = event.target.value;
   state.exportStatus = isExportReady() ? "ready" : "blocked";
-  state.statusText = state.naming.trim() ? "Naming actualizado" : "Naming vacío";
+  state.statusText = state.naming.trim() ? "Nombre de archivo actualizado" : "Nombre de archivo vacío";
   render();
 });
 
@@ -4975,6 +5725,11 @@ document.addEventListener("keydown", (event) => {
   }
 
   if (event.key === "Escape") {
+    if (state.appSettingsOpen) {
+      closeAppSettings();
+      event.preventDefault();
+      return;
+    }
     const openDetails = Array.from(document.querySelectorAll("details[open]")).reverse()[0];
     if (openDetails) {
       openDetails.open = false;

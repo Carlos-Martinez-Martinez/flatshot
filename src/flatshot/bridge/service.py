@@ -129,6 +129,54 @@ class FlatShotBridgeService:
             payload["warning"] = warning
         return payload
 
+    def save_preset(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+        if not isinstance(payload, Mapping):
+            raise InvalidRequestError("Expected a JSON object.")
+
+        name = _required_string(payload.get("name"), "name")
+        raw_settings = payload.get("settings")
+        if not isinstance(raw_settings, Mapping):
+            raise InvalidRequestError("Field 'settings' must be an object.")
+
+        try:
+            settings = normalize_shadow_settings(
+                self._preview_settings(raw_settings),
+                missing_engine=SHADOW_ENGINE_DEFAULT,
+            ).model_dump()
+        except Exception as exc:
+            raise InvalidRequestError("Field 'settings' contains invalid preset values.") from exc
+
+        service = self._writable_preset_service()
+        flat_presets = service.load_flat_presets()
+        updated = PresetService.save_current_preset(flat_presets, name, settings)
+        service.save_flat_presets_preserving_categories(updated)
+
+        response = self.list_presets()
+        response["ok"] = True
+        response["activePreset"] = name
+        return response
+
+    def delete_preset(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+        if not isinstance(payload, Mapping):
+            raise InvalidRequestError("Expected a JSON object.")
+
+        name = _required_string(payload.get("name"), "name")
+        service = self._writable_preset_service()
+        flat_presets = service.load_flat_presets()
+        if len(flat_presets) <= 1:
+            raise InvalidRequestError("At least one preset must remain.")
+
+        try:
+            updated = PresetService.delete_preset(flat_presets, name)
+        except ValueError as exc:
+            raise InvalidRequestError(str(exc)) from exc
+
+        service.save_flat_presets_preserving_categories(updated)
+        response = self.list_presets()
+        response["ok"] = True
+        response["activePreset"] = response["items"][0]["name"] if response.get("items") else None
+        return response
+
     def scan_folders(self, payload: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(payload, Mapping):
             raise InvalidRequestError("Expected a JSON object.")
@@ -449,6 +497,12 @@ class FlatShotBridgeService:
             return path.parent
         return None
 
+    def _writable_preset_service(self) -> PresetService:
+        config_dir = self.config_resolver.config_dir(create=False)
+        if config_dir.exists() and not config_dir.is_dir():
+            raise BridgeError("config_path_invalid", "Config path is not a directory.", status=409)
+        return PresetService(config_dir)
+
 
 def pick_folder_with_tk(initial_path: Path | None = None) -> Path | None:
     try:
@@ -498,6 +552,13 @@ def _optional_string(value: Any) -> str | None:
         raise InvalidRequestError("Expected string value.")
     text = value.strip()
     return text or None
+
+
+def _required_string(value: Any, field_name: str) -> str:
+    text = _optional_string(value)
+    if text is None:
+        raise InvalidRequestError(f"Field '{field_name}' must be a non-empty string.")
+    return text
 
 
 def _export_size(raw_export: Mapping[str, Any]) -> tuple[int, int]:

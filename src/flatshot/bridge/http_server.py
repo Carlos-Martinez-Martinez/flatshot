@@ -94,6 +94,10 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(self.server.service.pick_folder(self._read_json_body()))
             elif path == "/preview/render":
                 self._send_json(self.server.service.render_preview(self._read_json_body()))
+            elif path == "/presets/save":
+                self._send_json(self.server.service.save_preset(self._read_json_body()))
+            elif path == "/presets/delete":
+                self._send_json(self.server.service.delete_preset(self._read_json_body()))
             elif path == "/exports/prepare":
                 self._send_json(self.server.service.prepare_export(self._read_json_body()))
             elif path == "/exports/run":

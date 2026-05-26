@@ -272,6 +272,8 @@ const MAX_THUMBNAIL_FALLBACKS = 3;
 let fitZoomFrame = 0;
 let viewerResizeObserver = null;
 let inspectorScrollTopBeforeToggle = 0;
+const inspectorDisclosureTimers = new WeakMap();
+const INSPECTOR_DISCLOSURE_MS = 220;
 const viewerPanState = {
   active: false,
   pointerId: null,
@@ -1066,6 +1068,35 @@ function normalizeSettings(settings = {}) {
 
 function presetItemByName(name) {
   return activePresetItems().find((preset) => preset.name === name) || null;
+}
+
+function updatePresetCache(name, settings) {
+  const normalized = normalizeSettings(settings);
+  const bridgeIndex = state.bridgePresets.findIndex((preset) => preset.name === name);
+  if (bridgeIndex >= 0) {
+    state.bridgePresets[bridgeIndex] = {
+      ...state.bridgePresets[bridgeIndex],
+      settings: normalized,
+    };
+  }
+  const preset = presetItemByName(name);
+  if (preset) {
+    preset.settings = normalized;
+  }
+  if (!mockPresets.includes(name) && state.bridgeMode !== "bridge") {
+    mockPresets.push(name);
+  }
+  mockPresetSettings[name] = normalized;
+}
+
+function removePresetFromCache(name) {
+  state.bridgePresets = state.bridgePresets.filter((preset) => preset.name !== name);
+  const mockIndex = mockPresets.indexOf(name);
+  if (mockIndex >= 0) {
+    mockPresets.splice(mockIndex, 1);
+  }
+  delete mockPresetSettings[name];
+  delete state.presetOutputSettings[name];
 }
 
 function applyPresetSettings(name, options = {}) {
@@ -2040,7 +2071,149 @@ function render() {
   renderExport();
   renderInspector();
   renderFooter();
+  syncOpenInspectorDisclosureHeights();
   keepActiveThumbnailVisible();
+}
+
+function syncOpenInspectorDisclosureHeights() {
+  window.requestAnimationFrame(() => {
+    $$(".settings-panel details.inspector-disclosure[open]").forEach((details) => {
+      if (!details.classList.contains("is-closing")) {
+        setInspectorDisclosureHeight(details);
+      }
+    });
+  });
+}
+
+function inspectorDisclosureBody(details) {
+  return details?.querySelector?.(".inspector-disclosure__body") || null;
+}
+
+function setInspectorDisclosureHeight(details, height = null) {
+  const body = inspectorDisclosureBody(details);
+  if (!body) {
+    return;
+  }
+  let nextHeight = height;
+  if (nextHeight === null) {
+    const wasOpening = details.classList.contains("is-opening");
+    const wasClosing = details.classList.contains("is-closing");
+    if (wasOpening || wasClosing) {
+      details.classList.remove("is-opening", "is-closing");
+    }
+    const previousHeight = body.style.getPropertyValue("--inspector-disclosure-height");
+    body.style.setProperty("--inspector-disclosure-height", "none");
+    const bodyRect = body.getBoundingClientRect();
+    const bodyStyle = getComputedStyle(body);
+    const paddingBottom = Number.parseFloat(bodyStyle.paddingBottom) || 0;
+    const childBottom = Array.from(body.children).reduce((max, child) => {
+      const rect = child.getBoundingClientRect();
+      return Math.max(max, rect.bottom - bodyRect.top);
+    }, 0);
+    nextHeight = Math.max(body.scrollHeight, Math.ceil(childBottom + paddingBottom));
+    if (previousHeight) {
+      body.style.setProperty("--inspector-disclosure-height", previousHeight);
+    } else {
+      body.style.removeProperty("--inspector-disclosure-height");
+    }
+    if (wasOpening) {
+      details.classList.add("is-opening");
+    }
+    if (wasClosing) {
+      details.classList.add("is-closing");
+    }
+  }
+  body.style.setProperty("--inspector-disclosure-height", `${Math.max(0, Math.round(nextHeight))}px`);
+}
+
+function restoreInspectorScroll(panel, scrollTop = inspectorScrollTopBeforeToggle) {
+  if (!panel) {
+    return;
+  }
+  const restore = () => {
+    panel.scrollTop = scrollTop;
+  };
+  restore();
+  window.requestAnimationFrame(() => {
+    restore();
+    window.requestAnimationFrame(restore);
+    window.setTimeout(restore, 0);
+    window.setTimeout(restore, INSPECTOR_DISCLOSURE_MS);
+  });
+}
+
+function closeInspectorDisclosure(details, panel = $(".settings-panel"), scrollTop = inspectorScrollTopBeforeToggle) {
+  if (!details?.open || details.classList.contains("is-closing")) {
+    return;
+  }
+  const previousTimer = inspectorDisclosureTimers.get(details);
+  if (previousTimer) {
+    window.clearTimeout(previousTimer);
+  }
+
+  setInspectorDisclosureHeight(details);
+  details.classList.remove("is-opening", "is-open");
+  details.classList.add("is-closing");
+  window.requestAnimationFrame(() => {
+    setInspectorDisclosureHeight(details, 0);
+    restoreInspectorScroll(panel, scrollTop);
+  });
+
+  const timer = window.setTimeout(() => {
+    details.open = false;
+    details.classList.remove("is-closing");
+    const body = inspectorDisclosureBody(details);
+    body?.style.removeProperty("--inspector-disclosure-height");
+    inspectorDisclosureTimers.delete(details);
+    restoreInspectorScroll(panel, scrollTop);
+  }, INSPECTOR_DISCLOSURE_MS);
+  inspectorDisclosureTimers.set(details, timer);
+}
+
+function openInspectorDisclosure(details, panel = $(".settings-panel"), scrollTop = inspectorScrollTopBeforeToggle) {
+  if (!details) {
+    return;
+  }
+  $$(".settings-panel details.inspector-disclosure").forEach((other) => {
+    if (other !== details && other.open) {
+      closeInspectorDisclosure(other, panel, scrollTop);
+    }
+  });
+
+  const previousTimer = inspectorDisclosureTimers.get(details);
+  if (previousTimer) {
+    window.clearTimeout(previousTimer);
+    inspectorDisclosureTimers.delete(details);
+  }
+  details.open = true;
+  details.classList.remove("is-closing", "is-open");
+  details.classList.add("is-opening");
+  setInspectorDisclosureHeight(details, 0);
+  restoreInspectorScroll(panel, scrollTop);
+  window.requestAnimationFrame(() => {
+    setInspectorDisclosureHeight(details);
+    restoreInspectorScroll(panel, scrollTop);
+  });
+  const timer = window.setTimeout(() => {
+    details.classList.remove("is-opening");
+    details.classList.add("is-open");
+    const body = inspectorDisclosureBody(details);
+    body?.style.setProperty("--inspector-disclosure-height", "none");
+    inspectorDisclosureTimers.delete(details);
+    restoreInspectorScroll(panel, scrollTop);
+  }, INSPECTOR_DISCLOSURE_MS);
+  inspectorDisclosureTimers.set(details, timer);
+}
+
+function toggleInspectorDisclosure(details) {
+  const panel = $(".settings-panel");
+  inspectorScrollTopBeforeToggle = panel?.scrollTop || 0;
+  const shouldOpen = !details.open || details.classList.contains("is-closing");
+  if (shouldOpen) {
+    openInspectorDisclosure(details, panel, inspectorScrollTopBeforeToggle);
+  } else {
+    closeInspectorDisclosure(details, panel, inspectorScrollTopBeforeToggle);
+  }
 }
 
 function renderShell() {
@@ -3467,14 +3640,22 @@ function renderSettings() {
   $("#preset-source").textContent = presetSourceLabel();
   $("#preset-dirty").textContent = state.presetDirty ? "Sin guardar" : "Sin cambios";
   $("#preset-dirty").classList.toggle("dirty", state.presetDirty);
-  const quickPresets = activePresetItems().filter((preset) => preset.name !== state.activePreset);
-  $("#preset-list").innerHTML = quickPresets.length
-    ? quickPresets.map((preset) => `
-      <button type="button" class="preset-chip" data-preset="${escapeHtml(preset.name)}" title="${escapeHtml(`Cambiar a ${preset.name}`)}">
+  const presetItems = activePresetItems();
+  const presetCount = $("#preset-count");
+  if (presetCount) {
+    presetCount.textContent = `${presetItems.length}`;
+  }
+  $("#preset-list").innerHTML = presetItems.length
+    ? presetItems.map((preset) => {
+      const active = preset.name === state.activePreset;
+      return `
+      <button type="button" class="preset-chip${active ? " active" : ""}" data-preset="${escapeHtml(preset.name)}" aria-pressed="${active ? "true" : "false"}" title="${escapeHtml(active ? `${preset.name} activo` : `Cambiar a ${preset.name}`)}">
         <span class="preset-chip__name">${escapeHtml(preset.name)}</span>
+        <span class="preset-chip__meta">${escapeHtml(active ? "Activo" : preset.category || "Preset")}</span>
       </button>
-    `).join("")
-    : '<span class="preset-empty">No hay presets alternativos</span>';
+    `;
+    }).join("")
+    : '<span class="preset-empty">No hay presets disponibles</span>';
 
   Object.entries(state.settings).forEach(([key, value]) => {
     const input = $(`[data-setting="${key}"]`);
@@ -3508,16 +3689,19 @@ function renderSettings() {
     }
   });
   $("#save-preset").disabled = false;
-  $("#save-preset").title = "Guardar cambios del preset";
-  $("#save-preset").textContent = "Guardar preset";
+  $("#save-preset").title = "Guardar los ajustes del preset activo";
+  $("#save-preset").textContent = state.presetDirty ? "Guardar cambios" : "Guardar";
+  const deletePresetButton = $("#delete-preset");
+  if (deletePresetButton) {
+    const canDeletePreset = presetItems.length > 1;
+    deletePresetButton.disabled = !canDeletePreset;
+    deletePresetButton.title = canDeletePreset ? "Eliminar el preset activo" : "Debe quedar al menos un preset";
+  }
   const advanced = $("#advanced-settings");
   const advancedSummaryTitle = advanced?.querySelector("summary strong");
   if (advancedSummaryTitle) {
     const dirtyCount = advancedDirtyCount();
     advancedSummaryTitle.textContent = dirtyCount ? `Avanzado · ${dirtyCount} cambio${dirtyCount === 1 ? "" : "s"}` : "Avanzado";
-  }
-  if (advanced && advancedSettingsDirty()) {
-    advanced.open = true;
   }
 }
 
@@ -4088,7 +4272,9 @@ function cancelOutputEdit() {
   render();
 }
 
-function saveCurrentPreset() {
+async function saveCurrentPreset() {
+  const presetName = state.activePreset;
+  const presetSettings = normalizeSettings(state.settings);
   const outputSettings = {
     format: state.format,
     size: state.size,
@@ -4097,15 +4283,30 @@ function saveCurrentPreset() {
     destinationValue: state.destinationValue,
     naming: state.naming,
   };
-  state.presetOutputSettings[state.activePreset] = outputSettings;
+  state.presetOutputSettings[presetName] = outputSettings;
 
-  const preset = presetItemByName(state.activePreset);
-  if (preset) {
-    preset.settings = normalizeSettings(state.settings);
+  if (state.bridgeMode === "bridge") {
+    state.statusText = "Guardando preset";
+    render();
+    try {
+      const payload = await bridgeRequest("/presets/save", {
+        method: "POST",
+        body: JSON.stringify({
+          name: presetName,
+          settings: presetSettings,
+        }),
+        timeoutMs: 8000,
+      });
+      applyBridgePresets(payload);
+    } catch (error) {
+      state.presetDirty = true;
+      state.statusText = `No se pudo guardar el preset: ${bridgeErrorMessage(error)}`;
+      render();
+      return;
+    }
   }
-  if (mockPresetSettings[state.activePreset]) {
-    mockPresetSettings[state.activePreset] = normalizeSettings(state.settings);
-  }
+
+  updatePresetCache(presetName, presetSettings);
 
   state.presetDirty = false;
   state.presetSource = "Salida";
@@ -4113,6 +4314,102 @@ function saveCurrentPreset() {
   state.outputEditMode = false;
   state.exportStatus = isExportReady() ? "ready" : "blocked";
   state.statusText = "Preset guardado";
+  render();
+}
+
+function presetsExportPayload() {
+  const categories = {};
+  const uncategorized = {};
+  activePresetItems().forEach((preset) => {
+    const settings = normalizeSettings(preset.settings);
+    const categoryId = preset.categoryId && preset.categoryId !== "uncategorized"
+      ? preset.categoryId
+      : "";
+    if (!categoryId) {
+      uncategorized[preset.name] = settings;
+      return;
+    }
+    if (!categories[categoryId]) {
+      categories[categoryId] = {
+        name: preset.category || categoryId,
+        presets: {},
+      };
+    }
+    categories[categoryId].presets[preset.name] = settings;
+  });
+  return {
+    flatshot_export: {
+      type: "presets",
+      version: 1,
+      exported_at: new Date().toISOString(),
+      preset_count: activePresetItems().length,
+    },
+    presets: {
+      categories,
+      uncategorized,
+    },
+  };
+}
+
+function exportPresetCollection() {
+  const payload = presetsExportPayload();
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const stamp = new Date().toISOString().slice(0, 10).replaceAll("-", "");
+  link.href = url;
+  link.download = `flatshot-presets-${stamp}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  state.statusText = `${payload.flatshot_export.preset_count} presets exportados`;
+  render();
+}
+
+async function deleteActivePreset() {
+  const presets = activePresetItems();
+  if (presets.length <= 1) {
+    state.statusText = "Debe quedar al menos un preset";
+    render();
+    return;
+  }
+  const presetName = state.activePreset;
+  const nextPreset = presets.find((preset) => preset.name !== presetName)?.name || presets[0]?.name;
+  if (!window.confirm(`Eliminar el preset "${presetName}"?`)) {
+    return;
+  }
+
+  if (state.bridgeMode === "bridge") {
+    state.statusText = "Eliminando preset";
+    render();
+    try {
+      const payload = await bridgeRequest("/presets/delete", {
+        method: "POST",
+        body: JSON.stringify({ name: presetName }),
+        timeoutMs: 8000,
+      });
+      applyBridgePresets(payload);
+      const preferred = payload.activePreset || nextPreset;
+      if (preferred) {
+        applyPresetSettings(preferred, { refresh: false, statusText: `Preset eliminado: ${presetName}` });
+      }
+    } catch (error) {
+      state.statusText = `No se pudo eliminar el preset: ${bridgeErrorMessage(error)}`;
+      render();
+      return;
+    }
+  } else {
+    removePresetFromCache(presetName);
+    if (nextPreset) {
+      applyPresetSettings(nextPreset, { refresh: false, statusText: `Preset eliminado: ${presetName}` });
+    }
+  }
+
+  state.presetDirty = false;
+  state.outputDraft = null;
+  state.outputEditMode = false;
+  state.exportStatus = isExportReady() ? "ready" : "blocked";
   render();
 }
 
@@ -4340,7 +4637,11 @@ function handleAction(action) {
   } else if (action === "reset-settings") {
     resetActivePresetSettings();
   } else if (action === "save-preset") {
-    saveCurrentPreset();
+    void saveCurrentPreset();
+  } else if (action === "export-presets") {
+    exportPresetCollection();
+  } else if (action === "delete-preset") {
+    void deleteActivePreset();
   } else if (action === "toggle-local-adjustment") {
     state.localOverride = !state.localOverride;
     state.statusText = state.localOverride ? "Ajuste local activo" : "Ajuste local quitado";
@@ -4425,38 +4726,17 @@ document.addEventListener("click", (event) => {
   inspectorScrollTopBeforeToggle = panel?.scrollTop || 0;
   event.preventDefault();
   event.stopImmediatePropagation();
-  details.open = !details.open;
+  toggleInspectorDisclosure(details);
   disclosureSummary.blur();
-  if (panel) {
-    const restoreScroll = () => {
-      panel.scrollTop = inspectorScrollTopBeforeToggle;
-    };
-    restoreScroll();
-    window.requestAnimationFrame(() => {
-      restoreScroll();
-      window.requestAnimationFrame(restoreScroll);
-      window.setTimeout(restoreScroll, 0);
-      window.setTimeout(restoreScroll, 80);
-      window.setTimeout(restoreScroll, 180);
-    });
-  }
 }, true);
 
 document.addEventListener("click", (event) => {
   const disclosureSummary = event.target.closest(".settings-panel details > summary");
   if (disclosureSummary) {
-    const panel = $(".settings-panel");
     const details = disclosureSummary.closest("details");
-    inspectorScrollTopBeforeToggle = panel?.scrollTop || 0;
     if (details?.classList.contains("inspector-disclosure")) {
       event.preventDefault();
-      details.open = !details.open;
-      if (panel) {
-        panel.scrollTop = inspectorScrollTopBeforeToggle;
-        window.requestAnimationFrame(() => {
-          panel.scrollTop = inspectorScrollTopBeforeToggle;
-        });
-      }
+      toggleInspectorDisclosure(details);
       return;
     }
   }

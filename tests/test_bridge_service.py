@@ -103,6 +103,7 @@ def test_bridge_health_app_info_and_capabilities(tmp_path):
     assert service.capabilities() == {
         "folderScan": True,
         "presetsRead": True,
+        "presetsWrite": True,
         "previewRender": True,
         "thumbnailRender": True,
         "exportRun": True,
@@ -142,6 +143,39 @@ def test_bridge_presets_read_existing_categorized_config(tmp_path):
     assert local["settings"]["angle"] == 90
     assert local["settings"]["distance"] == 10
     assert local["settings"]["shadow_engine"] == "legacy"
+
+
+def test_bridge_save_preset_creates_persisted_config(tmp_path):
+    config_dir = tmp_path / "config"
+    service = _service(config_dir)
+
+    response = service.save_preset(
+        {
+            "name": "Luz cenital",
+            "settings": {"opacity": 35, "blur": 12, "distance": 8, "shadow_engine": "realistic_v2"},
+        }
+    )
+
+    assert response["ok"] is True
+    assert response["source"] == "config"
+    saved = next(item for item in response["items"] if item["name"] == "Luz cenital")
+    assert saved["settings"]["opacity"] == 35
+    assert saved["settings"]["blur"] == 12
+    assert (config_dir / PresetService.CATEGORIZED_PRESETS_FILE).exists()
+
+
+def test_bridge_delete_preset_persists_remaining_presets(tmp_path):
+    preset_service = PresetService(tmp_path)
+    categorized = preset_service.get_default_categorized_presets()
+    categorized.categories["custom"].presets["Local"] = {"angle": 90, "distance": 10}
+    preset_service.save_all_presets(categorized)
+
+    response = _service(tmp_path).delete_preset({"name": "Local"})
+
+    assert response["ok"] is True
+    assert response["source"] == "config"
+    assert "Local" not in {item["name"] for item in response["items"]}
+    assert response["activePreset"] == "Luz cenital"
 
 
 def test_bridge_render_preview_accepts_preset_settings_from_presets(tmp_path):

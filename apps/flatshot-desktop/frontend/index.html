@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>FlatShot Desktop</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./styles.css?v=20260526-ui-system11" />
+    <link rel="stylesheet" href="./styles.css?v=20260526-ui-system14" />
   </head>
   <body>
     <main class="app-shell" aria-label="FlatShot nueva app">
@@ -244,11 +244,22 @@
               <span class="change-chip" id="preset-dirty">Sin cambios</span>
             </summary>
             <div class="inspector-disclosure__body">
+              <div class="preset-group-heading">
+                <span>Presets disponibles</span>
+                <strong id="preset-count">0</strong>
+              </div>
               <div class="preset-list" id="preset-list" aria-label="Cambiar preset"></div>
-              <div class="button-row preset-actions">
-                <button type="button" data-action="reset-settings">Restaurar</button>
-                <button type="button" data-action="close-preset-editor">Listo</button>
-                <button type="button" id="save-preset" data-action="save-preset">Guardar preset</button>
+              <div class="preset-action-panel">
+                <div class="preset-group-heading">
+                  <span>Acciones de preset</span>
+                </div>
+                <div class="button-row preset-actions">
+                  <button type="button" id="save-preset" data-action="save-preset">Guardar</button>
+                  <button type="button" id="export-presets" data-action="export-presets">Exportar presets</button>
+                  <button type="button" id="delete-preset" class="danger-subtle" data-action="delete-preset">Eliminar</button>
+                  <button type="button" data-action="reset-settings">Restaurar</button>
+                  <button type="button" data-action="close-preset-editor">Listo</button>
+                </div>
               </div>
             </div>
           </details>
@@ -310,40 +321,50 @@
                 <small>Motor y parámetros finos</small>
               </span>
             </summary>
-            <div class="inspector-disclosure__body advanced-grid">
-                <label>
+            <div class="inspector-disclosure__body control-stack advanced-controls">
+                <label class="control-row">
                   <span>Spread</span>
-                  <input type="number" min="0" max="20" value="0" data-setting="spread" />
+                  <input type="range" min="0" max="20" value="0" data-setting="spread" />
+                  <output id="spread-output">0</output>
                 </label>
-                <label>
+                <label class="control-row">
                   <span>Ruido</span>
-                  <input type="number" min="0" max="20" value="2" data-setting="noise" />
+                  <input type="range" min="0" max="20" value="2" data-setting="noise" />
+                  <output id="noise-output">2</output>
                 </label>
-                <label>
+                <label class="control-row">
                   <span>Contacto</span>
-                  <input type="number" min="0" max="40" value="10" data-setting="contact_blur" />
+                  <input type="range" min="0" max="40" value="10" data-setting="contact_blur" />
+                  <output id="contact_blur-output">10</output>
                 </label>
-                <label>
+                <label class="control-row">
                   <span>Escala</span>
-                  <input type="number" min="-30" max="30" value="0" data-setting="scale_adjustment" />
+                  <input type="range" min="-30" max="30" value="0" data-setting="scale_adjustment" />
+                  <output id="scale_adjustment-output">0</output>
                 </label>
-                <label>
+                <label class="control-row">
                   <span>Fusión</span>
-                  <input type="number" min="0" max="20" value="1" data-setting="fusion" />
+                  <input type="range" min="0" max="20" value="1" data-setting="fusion" />
+                  <output id="fusion-output">1</output>
                 </label>
-                <label>
+                <label class="control-row">
                   <span>Ángulo</span>
-                  <input type="number" min="0" max="360" value="180" data-setting="angle" />
+                  <input type="range" min="0" max="360" value="180" data-setting="angle" />
+                  <output id="angle-output">180</output>
                 </label>
-                <label>
+                <label class="control-row">
                   <span>Contracción</span>
-                  <input type="number" min="0" max="80" value="0" data-setting="contraction" />
+                  <input type="range" min="0" max="80" value="0" data-setting="contraction" />
+                  <output id="contraction-output">0</output>
                 </label>
-                <label>
+                <label class="control-row control-row--toggle">
                   <span>Zoom auto</span>
-                  <input type="checkbox" data-setting="adaptive_zoom" checked />
+                  <span class="toggle-field">
+                    <input type="checkbox" data-setting="adaptive_zoom" checked />
+                    <em>Activo</em>
+                  </span>
                 </label>
-                <label class="advanced-wide">
+                <label class="control-row control-row--select">
                   <span>Motor</span>
                   <select data-setting="shadow_engine">
                     <option value="realistic_v2">Realista V2</option>
@@ -472,6 +493,6 @@
       </footer>
     </main>
 
-    <script src="./app.js?v=20260526-ui-system11"></script>
+    <script src="./app.js?v=20260526-ui-system14"></script>
   </body>
 </html>

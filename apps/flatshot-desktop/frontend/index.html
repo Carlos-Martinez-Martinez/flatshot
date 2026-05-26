@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>FlatShot Desktop</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./styles.css?v=20260525-ui7" />
+    <link rel="stylesheet" href="./styles.css?v=20260525-ui8" />
   </head>
   <body>
     <main class="app-shell" aria-label="FlatShot nueva app">
@@ -21,13 +21,13 @@
 
           <div class="top-summary" aria-live="polite">
             <span class="status-dot" id="status-dot"></span>
-            <span id="top-status-text">Selecciona una carpeta</span>
+            <span id="top-status-text">Sin lote</span>
             <span class="bridge-chip idle" id="bridge-status">Bridge pendiente</span>
           </div>
 
           <div class="top-actions">
             <span class="preflight-chip" id="top-preflight-status">Exportación bloqueada</span>
-            <button type="button" class="primary top-export" id="top-primary-action" data-action="primary">Seleccionar carpeta</button>
+            <button type="button" class="primary top-export" id="top-primary-action" data-action="primary">Elegir carpeta</button>
             <button type="button" data-action="toggle-inspector">Diagnóstico</button>
             <details class="debug-panel" id="debug-panel">
               <summary>Debug</summary>
@@ -81,14 +81,14 @@
           <div class="source-panel" id="source-panel">
             <div class="source-panel-heading">
               <div>
-                <strong id="source-title">Selecciona una carpeta</strong>
-                <span id="scan-status">Selecciona una carpeta con PNG.</span>
+                <strong id="source-title">Carpeta</strong>
+                <span id="scan-status">Sin lote</span>
               </div>
               <span class="state-chip" id="scan-source-badge">Sin lote</span>
             </div>
             <div class="button-row">
-              <button type="button" class="primary" id="bridge-pick-folder" data-action="pick-bridge-folder">Seleccionar carpeta</button>
-              <button type="button" id="bridge-scan-folder" data-action="scan-bridge-folder">Escanear</button>
+              <button type="button" id="bridge-pick-folder" data-action="pick-bridge-folder">Elegir carpeta</button>
+              <button type="button" id="bridge-scan-folder" data-action="scan-bridge-folder">Escanear carpeta</button>
             </div>
             <details class="manual-path-panel">
               <summary>Ruta manual</summary>
@@ -97,7 +97,7 @@
                 <input id="bridge-scan-path" type="text" placeholder="C:/ruta/lote" />
               </label>
             </details>
-            <div class="bridge-message" id="bridge-message">Selecciona una carpeta local.</div>
+            <div class="bridge-message" id="bridge-message">Sin lote.</div>
             <ul class="import-requirements" aria-label="Requisitos de importación">
               <li>Carpeta local</li>
               <li>Imágenes PNG o JPG</li>
@@ -116,13 +116,10 @@
 
           <div class="segmented batch-filter" aria-label="Filtro de imágenes">
             <button type="button" data-filter="all">Todas</button>
-            <button type="button" data-filter="valid">Exportables</button>
+            <button type="button" data-filter="valid">Correctas</button>
             <button type="button" data-filter="warnings">Avisos</button>
-            <button type="button" data-filter="errors">Errores</button>
+            <button type="button" data-filter="omitted">Omitidas</button>
           </div>
-
-          <div class="image-list" id="image-list" aria-label="Imágenes del lote"></div>
-          <div class="empty-note" id="batch-empty-note"></div>
 
           <details class="review-panel">
             <summary>Revisión</summary>
@@ -168,7 +165,7 @@
             <div class="preview-title-block">
               <span class="eyebrow">Imagen</span>
               <h2 id="preview-name">Empieza con una carpeta</h2>
-              <span id="preview-subtitle">Selecciona una carpeta local con PNG o JPG</span>
+              <span id="preview-subtitle">Sin lote</span>
             </div>
 
             <div class="preview-toolbar" aria-label="Herramientas de preview">
@@ -181,7 +178,7 @@
                 <button type="button" data-action="previous-image" aria-label="Imagen anterior">‹</button>
                 <span id="viewer-position">Sin imagen</span>
                 <button type="button" data-action="next-image" aria-label="Imagen siguiente">›</button>
-                <button type="button" data-action="zoom-fit">Fit</button>
+                <button type="button" data-action="zoom-fit">Ajustar</button>
                 <button type="button" data-action="zoom-100">100%</button>
                 <button type="button" data-action="zoom-out" aria-label="Reducir zoom">-</button>
                 <span id="zoom-label">100%</span>
@@ -192,6 +189,15 @@
 
           <div class="canvas-area" id="canvas-area">
             <div class="preview-canvas" id="preview-canvas" aria-live="polite"></div>
+          </div>
+
+          <div class="filmstrip-panel" aria-label="Galería de imágenes">
+            <div class="filmstrip-header">
+              <strong>Galería</strong>
+              <span id="filmstrip-count">Sin lote</span>
+            </div>
+            <div class="image-list" id="image-list" aria-label="Imágenes del lote"></div>
+            <div class="empty-note" id="batch-empty-note"></div>
           </div>
 
           <div class="preview-footer">
@@ -217,7 +223,7 @@
               <div>
                 <span class="eyebrow">Preset</span>
                 <strong id="active-preset">Luz cenital</strong>
-                <small id="preset-source">Preset activo</small>
+                <small id="preset-source">Salida</small>
               </div>
               <span class="change-chip" id="preset-dirty">Sin cambios</span>
             </div>
@@ -374,10 +380,10 @@
       </section>
 
       <footer class="bottom-bar">
-        <div class="status-sentence" id="footer-statusline" aria-live="polite">Sin lote · Selecciona una carpeta para empezar</div>
+        <div class="status-sentence" id="footer-statusline" aria-live="polite">Sin lote · Elige una carpeta para empezar</div>
 
         <div class="progress-block">
-          <span id="bottom-status">Selecciona una carpeta</span>
+          <span id="bottom-status">Sin lote</span>
           <div class="progress-track" aria-hidden="true">
             <span id="progress-fill"></span>
           </div>
@@ -388,11 +394,11 @@
           <button type="button" id="pause-export" data-action="pause-export">Pausar</button>
           <button type="button" id="stop-export" data-action="stop-export">Detener</button>
           <button type="button" id="open-output" data-action="open-output">Abrir destino</button>
-          <button type="button" class="primary" id="primary-action" data-action="primary">Añadir carpeta</button>
+          <button type="button" class="primary" id="primary-action" data-action="primary">Elegir carpeta</button>
         </div>
       </footer>
     </main>
 
-    <script src="./app.js?v=20260525-ui7"></script>
+    <script src="./app.js?v=20260525-ui8"></script>
   </body>
 </html>

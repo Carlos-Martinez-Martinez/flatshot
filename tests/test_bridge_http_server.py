@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from time import sleep
 from types import SimpleNamespace
+from urllib.parse import quote
 
 from PIL import Image
 
@@ -84,6 +85,28 @@ def request_json(port: int, method: str, path: str, body: dict | str | None = No
         connection.close()
 
 
+def request_raw(port: int, method: str, path: str):
+    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+    try:
+        connection.request(method, path)
+        response = connection.getresponse()
+        raw = response.read()
+        return response.status, dict(response.getheaders()), raw
+    finally:
+        connection.close()
+
+
+def request_with_headers(port: int, method: str, path: str, headers: dict[str, str]):
+    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+    try:
+        connection.request(method, path, headers=headers)
+        response = connection.getresponse()
+        response.read()
+        return response.status, dict(response.getheaders())
+    finally:
+        connection.close()
+
+
 class _DisconnectedWriter:
     def write(self, body: bytes) -> None:
         raise ConnectionAbortedError("client disconnected")
@@ -128,8 +151,22 @@ def test_bridge_http_capabilities(tmp_path):
     assert status == 200
     assert data["folderScan"] is True
     assert data["previewRender"] is True
+    assert data["thumbnailRender"] is True
     assert data["exportRun"] is True
     assert data["exportProgress"] is True
+
+
+def test_bridge_http_allows_localhost_frontend_origin_on_custom_port(tmp_path):
+    with running_bridge(tmp_path / "config") as port:
+        status, headers = request_with_headers(
+            port,
+            "GET",
+            "/health",
+            {"Origin": "http://127.0.0.1:4174"},
+        )
+
+    assert status == 200
+    assert headers["Access-Control-Allow-Origin"] == "http://127.0.0.1:4174"
 
 
 def test_bridge_http_presets_include_settings(tmp_path):
@@ -211,6 +248,23 @@ def test_bridge_http_render_preview(tmp_path):
     assert data["image"]["width"] == 32
     assert data["image"]["height"] == 32
     assert base64.b64decode(data["image"]["dataBase64"]).startswith(b"\x89PNG")
+
+
+def test_bridge_http_render_thumbnail(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    png = _png(source / "item.png")
+
+    with running_bridge(tmp_path / "config") as port:
+        status, headers, body = request_raw(
+            port,
+            "GET",
+            f"/images/thumbnail?path={quote(str(png), safe='')}&size=24",
+        )
+
+    assert status == 200
+    assert headers["Content-Type"] == "image/png"
+    assert body.startswith(b"\x89PNG")
 
 
 def test_bridge_http_render_preview_rejects_unsupported_file(tmp_path):

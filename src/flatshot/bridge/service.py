@@ -1,11 +1,14 @@
 """Testable bridge service for the modern FlatShot desktop prototype."""
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 import threading
 from time import perf_counter
 from typing import Any, Callable, Mapping
 from uuid import uuid4
+
+from PIL import Image
 
 from flatshot.application.config_paths import ConfigPathResolver
 from flatshot.application.contracts import ExportJobRequest, PreviewRequest
@@ -33,6 +36,8 @@ from flatshot.core.models import ExportConfig, SHADOW_ENGINE_DEFAULT, normalize_
 
 MAX_PREVIEW_SIDE = 1200
 DEFAULT_PREVIEW_SIDE = 900
+MAX_THUMBNAIL_SIDE = 320
+DEFAULT_THUMBNAIL_SIDE = 160
 SUPPORTED_PREVIEW_SUFFIXES = {".png"}
 PREVIEW_SETTING_ALIASES = {
     "transparentBg": "transparent_bg",
@@ -189,6 +194,26 @@ class FlatShotBridgeService:
 
         elapsed_ms = int(round((perf_counter() - started) * 1000))
         return preview_result_to_dict(result, source_path=image_path, render_time_ms=elapsed_ms)
+
+    def render_thumbnail(self, payload: Mapping[str, Any]) -> tuple[str, bytes]:
+        if not isinstance(payload, Mapping):
+            raise InvalidRequestError("Expected a JSON object.")
+
+        image_path = self._preview_image_path(payload)
+        size = min(_positive_int(payload.get("size"), "size", default=DEFAULT_THUMBNAIL_SIDE), MAX_THUMBNAIL_SIDE)
+
+        try:
+            with Image.open(image_path) as opened:
+                thumbnail = opened.convert("RGBA")
+                thumbnail.thumbnail((size, size), Image.Resampling.LANCZOS)
+        except BridgeError:
+            raise
+        except Exception as exc:
+            raise BridgeError("thumbnail_failed", "No se pudo generar la miniatura.", status=422) from exc
+
+        buffer = BytesIO()
+        thumbnail.save(buffer, format="PNG")
+        return "image/png", buffer.getvalue()
 
     def prepare_export(self, payload: Mapping[str, Any]) -> dict[str, Any]:
         requests, config = self._export_requests(payload)

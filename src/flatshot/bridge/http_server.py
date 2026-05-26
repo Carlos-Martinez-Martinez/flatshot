@@ -5,7 +5,7 @@ import argparse
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from flatshot.bridge.errors import (
     BridgeError,
@@ -49,7 +49,8 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         try:
-            path = urlparse(self.path).path
+            parsed = urlparse(self.path)
+            path = parsed.path
             if path == "/health":
                 self._send_json(self.server.service.health())
             elif path == "/app-info":
@@ -58,6 +59,15 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(self.server.service.capabilities())
             elif path == "/presets":
                 self._send_json(self.server.service.list_presets())
+            elif path == "/images/thumbnail":
+                query = parse_qs(parsed.query)
+                mime_type, body = self.server.service.render_thumbnail(
+                    {
+                        "imagePath": _single_query_value(query, "path"),
+                        "size": _single_query_value(query, "size", required=False),
+                    }
+                )
+                self._send_binary(body, content_type=mime_type)
             elif _is_export_job_status_path(path):
                 self._send_json(self.server.service.export_status(_export_job_id(path)))
             elif path == "/folders/scan":
@@ -158,9 +168,21 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
         except CLIENT_DISCONNECT_ERRORS:
             return
 
+    def _send_binary(self, body: bytes, *, content_type: str, status: int = 200) -> None:
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Cache-Control", "no-store")
+            self._send_cors_headers()
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except CLIENT_DISCONNECT_ERRORS:
+            return
+
     def _send_cors_headers(self) -> None:
         origin = self.headers.get("Origin")
-        if origin and origin in self.server.allowed_origins:
+        if origin and (origin in self.server.allowed_origins or _is_local_http_origin(origin)):
             self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
@@ -184,6 +206,19 @@ def create_server(
 
 def _path_parts(path: str) -> list[str]:
     return [part for part in path.strip("/").split("/") if part]
+
+
+def _single_query_value(query: dict[str, list[str]], name: str, *, required: bool = True) -> str | None:
+    values = query.get(name) or []
+    value = values[0] if values else None
+    if required and (value is None or not value.strip()):
+        raise BridgeError("invalid_request", f"Query parameter '{name}' is required.", status=400)
+    return value
+
+
+def _is_local_http_origin(origin: str) -> bool:
+    parsed = urlparse(origin)
+    return parsed.scheme == "http" and parsed.hostname in {"127.0.0.1", "localhost"}
 
 
 def _is_export_job_status_path(path: str) -> bool:

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>FlatShot Desktop</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./styles.css?v=20260525-ui8" />
+    <link rel="stylesheet" href="./styles.css?v=20260526-columns2" />
   </head>
   <body>
     <main class="app-shell" aria-label="FlatShot nueva app">
@@ -62,6 +62,19 @@
                     <strong id="bridge-capabilities">Sin comprobar</strong>
                   </div>
                 </div>
+                <div class="preview-debug" aria-label="Debug de previews">
+                  <strong>Debug de previews</strong>
+                  <div class="debug-meta">
+                    <div><span>originalUrl</span><strong id="debug-original-url">-</strong></div>
+                    <div><span>previewUrl</span><strong id="debug-preview-url">-</strong></div>
+                    <div><span>thumbnailUrl</span><strong id="debug-thumbnail-url">-</strong></div>
+                    <div><span>naturalSize</span><strong id="debug-natural-size">-</strong></div>
+                    <div><span>renderedSize</span><strong id="debug-rendered-size">-</strong></div>
+                    <div><span>loadStatus</span><strong id="debug-load-status">-</strong></div>
+                    <div><span>error</span><strong id="debug-preview-error">-</strong></div>
+                    <div><span>miniaturas</span><strong id="debug-thumbnail-stats">-</strong></div>
+                  </div>
+                </div>
               </div>
             </details>
           </div>
@@ -69,26 +82,27 @@
       </header>
 
       <section class="workspace">
-        <aside class="batch-panel" aria-label="Lote">
-          <div class="panel-heading">
-            <div>
-              <span class="eyebrow">Lote</span>
+        <aside class="batch-panel batch-rail" aria-label="Lote">
+          <section class="batch-rail__header">
+            <span class="batch-rail__eyebrow">Lote</span>
+            <div class="batch-rail__title-row">
               <h1 id="batch-count">0 imágenes</h1>
+              <span class="batch-rail__badge" id="batch-pill">Sin carpeta</span>
             </div>
-            <span class="pill" id="batch-pill">Sin carpeta</span>
-          </div>
+          </section>
 
-          <div class="source-panel" id="source-panel">
-            <div class="source-panel-heading">
-              <div>
-                <strong id="source-title">Carpeta</strong>
-                <span id="scan-status">Sin lote</span>
+          <section class="source-panel batch-rail__source" id="source-panel" aria-label="Carpeta del lote">
+            <div class="source-panel-heading batch-source__row">
+              <div class="batch-source__copy">
+                <span id="source-title">Carpeta</span>
+                <strong id="source-folder-name">Carpeta actual</strong>
+                <small id="scan-status">Sin lote</small>
+              </div>
+              <div class="batch-source__toolbar">
+                <button type="button" id="bridge-pick-folder" data-action="pick-bridge-folder">Elegir carpeta</button>
+                <button type="button" class="batch-source__refresh" id="bridge-scan-folder" data-action="scan-bridge-folder" aria-label="Actualizar lote" title="Actualizar lote">↻</button>
               </div>
               <span class="state-chip" id="scan-source-badge">Sin lote</span>
-            </div>
-            <div class="button-row">
-              <button type="button" id="bridge-pick-folder" data-action="pick-bridge-folder">Elegir carpeta</button>
-              <button type="button" id="bridge-scan-folder" data-action="scan-bridge-folder">Escanear carpeta</button>
             </div>
             <details class="manual-path-panel">
               <summary>Ruta manual</summary>
@@ -103,23 +117,30 @@
               <li>Imágenes PNG o JPG</li>
               <li>Salida configurable después</li>
             </ul>
-          </div>
+          </section>
 
-          <div class="batch-summary" id="batch-summary" aria-live="polite"></div>
+          <section class="batch-summary batch-rail__summary" id="batch-summary" aria-live="polite"></section>
 
-          <label class="search-field">
-            <span>Buscar</span>
-            <input id="image-search" type="search" placeholder="Nombre de imagen" autocomplete="off" />
-          </label>
+          <section class="batch-rail__controls" aria-label="Búsqueda y filtros del lote">
+            <div class="batch-rail__section-title">Filtro</div>
+            <label class="search-field batch-search">
+              <span>Buscar en lote</span>
+              <div class="batch-search__box">
+                <span aria-hidden="true">⌕</span>
+                <input id="image-search" type="search" placeholder="Buscar..." autocomplete="off" />
+                <button type="button" id="image-search-clear" data-action="clear-search" aria-label="Limpiar búsqueda">×</button>
+              </div>
+            </label>
 
-          <div class="folder-list" id="folder-list" aria-label="Carpetas del lote"></div>
+            <div class="folder-list batch-format" id="folder-list" aria-label="Formato del lote" hidden></div>
 
-          <div class="segmented batch-filter" aria-label="Filtro de imágenes">
-            <button type="button" data-filter="all">Todas</button>
-            <button type="button" data-filter="valid">Correctas</button>
-            <button type="button" data-filter="warnings">Avisos</button>
-            <button type="button" data-filter="omitted">Omitidas</button>
-          </div>
+            <div class="segmented batch-filter" aria-label="Filtro de imágenes">
+              <button type="button" data-filter="all">Todas</button>
+              <button type="button" data-filter="valid">Correctas</button>
+              <button type="button" data-filter="warnings">Avisos</button>
+              <button type="button" data-filter="omitted">Omitidas</button>
+            </div>
+          </section>
 
           <details class="review-panel">
             <summary>Revisión</summary>
@@ -160,7 +181,19 @@
           </details>
         </aside>
 
-        <section class="preview-panel" aria-label="Vista principal">
+        <aside class="gallery-column" aria-label="Galería de imágenes">
+          <div class="gallery-header">
+            <div>
+              <span class="gallery-eyebrow">Galería</span>
+              <strong>Navegación visual</strong>
+            </div>
+            <span id="batch-visible-count">0</span>
+          </div>
+          <div class="image-list gallery-grid" id="image-list" aria-label="Imágenes del lote"></div>
+          <div class="empty-note gallery-empty" id="batch-empty-note"></div>
+        </aside>
+
+        <section class="preview-panel" id="preview-panel" aria-label="Vista principal">
           <div class="preview-header">
             <div class="preview-title-block">
               <span class="eyebrow">Imagen</span>
@@ -189,15 +222,6 @@
 
           <div class="canvas-area" id="canvas-area">
             <div class="preview-canvas" id="preview-canvas" aria-live="polite"></div>
-          </div>
-
-          <div class="filmstrip-panel" aria-label="Galería de imágenes">
-            <div class="filmstrip-header">
-              <strong>Galería</strong>
-              <span id="filmstrip-count">Sin lote</span>
-            </div>
-            <div class="image-list" id="image-list" aria-label="Imágenes del lote"></div>
-            <div class="empty-note" id="batch-empty-note"></div>
           </div>
 
           <div class="preview-footer">
@@ -399,6 +423,6 @@
       </footer>
     </main>
 
-    <script src="./app.js?v=20260525-ui8"></script>
+    <script src="./app.js?v=20260526-columns2"></script>
   </body>
 </html>

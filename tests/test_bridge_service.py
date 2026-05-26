@@ -1,6 +1,7 @@
 from pathlib import Path
 import base64
 from concurrent.futures import Future
+from io import BytesIO
 from time import sleep
 
 import pytest
@@ -103,6 +104,7 @@ def test_bridge_health_app_info_and_capabilities(tmp_path):
         "folderScan": True,
         "presetsRead": True,
         "previewRender": True,
+        "thumbnailRender": True,
         "exportRun": True,
         "exportProgress": True,
         "nativeFolderPicker": False,
@@ -325,6 +327,18 @@ def test_bridge_render_preview_returns_png_payload(tmp_path):
     assert response["source"]["name"] == "source.png"
     assert response["renderTimeMs"] >= 0
     assert base64.b64decode(response["image"]["dataBase64"]).startswith(b"\x89PNG")
+
+
+def test_bridge_render_thumbnail_returns_png_bytes(tmp_path):
+    image = _png(tmp_path / "source.png")
+
+    mime_type, payload = _service(tmp_path / "config").render_thumbnail({"imagePath": str(image), "size": 24})
+
+    assert mime_type == "image/png"
+    assert payload.startswith(b"\x89PNG")
+    with Image.open(BytesIO(payload)) as opened:
+        assert opened.width <= 24
+        assert opened.height <= 24
 
 
 def test_bridge_render_preview_clamps_target_size(tmp_path):

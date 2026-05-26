@@ -13,7 +13,7 @@ from flatshot.application.preset_service import PresetService
 from flatshot.bridge.errors import BridgeError, InvalidRequestError, error_response
 from flatshot.bridge.serialization import image_file_info_to_dict
 from flatshot.bridge.service import FlatShotBridgeService
-from flatshot.application.contracts import ExportJobResult, ImageFileInfo
+from flatshot.application.contracts import ExportJobResult, ImageFileInfo, PreviewResult
 
 
 def _png(path: Path) -> Path:
@@ -161,6 +161,36 @@ def test_bridge_render_preview_accepts_preset_settings_from_presets(tmp_path):
     assert response["ok"] is True
     assert response["image"]["width"] == 32
     assert response["image"]["height"] == 32
+
+
+def test_bridge_render_preview_applies_local_override(tmp_path):
+    image = _png(tmp_path / "source.png")
+    captured = {}
+
+    class CapturingPreviewService:
+        def render_preview(self, request):
+            captured["settings"] = request.settings
+            return PreviewResult(width=1, height=1, bytes_rgb=b"\x00\x00\x00")
+
+    service = FlatShotBridgeService(
+        config_resolver=ConfigPathResolver(tmp_path / "config"),
+        preview_service=CapturingPreviewService(),
+    )
+
+    response = service.render_preview(
+        {
+            "imagePath": str(image),
+            "targetWidth": 1,
+            "targetHeight": 1,
+            "settings": {"opacity": 20, "blur": 30, "scale_adjustment": 0},
+            "localOverride": {"size_delta": 5, "shadow_delta": -10, "blur_delta": 8},
+        }
+    )
+
+    assert response["ok"] is True
+    assert captured["settings"].scale_adjustment == 5
+    assert captured["settings"].opacity == 10
+    assert captured["settings"].blur == 38
 
 
 def test_bridge_serializes_image_info_with_stable_keys(tmp_path):
@@ -556,6 +586,46 @@ def test_bridge_export_allows_valid_common_destination_without_collisions(tmp_pa
     assert final["status"] == "completed"
     assert (output / "one_PRO.png").exists()
     assert (output / "two_PRO.png").exists()
+
+
+def test_bridge_export_preserves_image_overrides(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    png = _png(source / "item.png")
+    captured = []
+
+    def capture_runner_factory(**kwargs):
+        class CaptureRunner:
+            def run(self, request):
+                captured.append(request)
+                return ExportJobResult(
+                    success=True,
+                    processed=len(request.input_files or []),
+                    total=len(request.input_files or []),
+                    errors=0,
+                    duration=0.0,
+                    destinations=[],
+                )
+
+        return CaptureRunner()
+
+    service = FlatShotBridgeService(
+        config_resolver=ConfigPathResolver(tmp_path / "config"),
+        export_runner_factory=capture_runner_factory,
+    )
+
+    started = service.start_export(
+        {
+            "imagePaths": [str(png)],
+            "settings": {"opacity": 0, "blur": 0, "noise": 0},
+            "imageOverrides": {str(png): {"size_delta": 6, "shadow_delta": 0}},
+            "export": {"format": "PNG", "size": "8x8", "destinationValue": "_OUT"},
+        }
+    )
+    final = _wait_for_export(service, started["jobId"])
+
+    assert final["status"] == "completed"
+    assert captured[0].image_overrides == {str(png): {"size_delta": 6}}
 
 
 def test_bridge_start_export_reports_structured_item_errors(tmp_path):

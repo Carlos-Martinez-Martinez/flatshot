@@ -32,6 +32,7 @@ from flatshot.bridge.serialization import (
     serialize_path,
 )
 from flatshot.core.models import ExportConfig, SHADOW_ENGINE_DEFAULT, normalize_shadow_settings
+from flatshot.core.overrides import apply_image_override, normalize_image_override
 
 
 MAX_PREVIEW_SIDE = 1200
@@ -174,14 +175,19 @@ class FlatShotBridgeService:
 
         image_path = self._preview_image_path(payload)
         target_size = self._preview_target_size(payload)
-        settings = self._preview_settings(payload.get("settings", {}))
+        settings = normalize_shadow_settings(
+            self._preview_settings(payload.get("settings", {})),
+            missing_engine=SHADOW_ENGINE_DEFAULT,
+        )
+        local_override = normalize_image_override(payload.get("localOverride", {}))
+        preview_settings = apply_image_override(settings, local_override)
 
         started = perf_counter()
         try:
             result = self.preview_service.render_preview(
                 PreviewRequest(
                     image_path=image_path,
-                    settings=settings,
+                    settings=preview_settings,
                     target_size=target_size,
                     scale_factor=1.0,
                     is_preview=True,
@@ -326,6 +332,16 @@ class FlatShotBridgeService:
             self._preview_settings(payload.get("settings", {})),
             missing_engine=SHADOW_ENGINE_DEFAULT,
         )
+        raw_image_overrides = payload.get("imageOverrides", {})
+        if raw_image_overrides is None:
+            raw_image_overrides = {}
+        if not isinstance(raw_image_overrides, Mapping):
+            raise InvalidRequestError("Field 'imageOverrides' must be an object when provided.")
+        image_overrides = {
+            str(key): normalized
+            for key, value in raw_image_overrides.items()
+            if (normalized := normalize_image_override(value))
+        }
         export_config = self._export_config(payload.get("export", {}))
         errors = self.export_config_service.validate(export_config)
         if errors:
@@ -344,7 +360,7 @@ class FlatShotBridgeService:
                     export_config=export_config,
                     curve_data=None,
                     preset_name=_optional_string(payload.get("presetName")),
-                    image_overrides={},
+                    image_overrides=image_overrides,
                 )
                 for folder, paths in sorted(grouped.items(), key=lambda item: str(item[0]))
             ],

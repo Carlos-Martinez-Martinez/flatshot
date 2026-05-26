@@ -132,6 +132,13 @@ const advancedSettingKeys = [
   "shadow_engine",
 ];
 
+const localOverrideKeys = ["size_delta", "shadow_delta", "blur_delta"];
+const localOverrideLimits = {
+  size_delta: [-30, 30],
+  shadow_delta: [-40, 40],
+  blur_delta: [-40, 40],
+};
+
 const defaultSettings = {
   angle: 180,
   opacity: 20,
@@ -198,6 +205,8 @@ const state = {
   zoom: 100,
   fitZoom: 100,
   fitMode: "fit",
+  panX: 0,
+  panY: 0,
   filter: "all",
   search: "",
   inspectorTab: "output",
@@ -252,6 +261,7 @@ const state = {
   },
   realFolders: [],
   realImages: [],
+  imageOverrides: {},
 };
 
 const timers = new Set();
@@ -261,6 +271,15 @@ const thumbnailFallbackInFlight = new Set();
 const MAX_THUMBNAIL_FALLBACKS = 3;
 let fitZoomFrame = 0;
 let viewerResizeObserver = null;
+let inspectorScrollTopBeforeToggle = 0;
+const viewerPanState = {
+  active: false,
+  pointerId: null,
+  startX: 0,
+  startY: 0,
+  originX: 0,
+  originY: 0,
+};
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
@@ -526,6 +545,23 @@ function imageCountLabel(count) {
   return `${count} ${count === 1 ? "imagen" : "imágenes"}`;
 }
 
+function detectedFormatLabel(images = activeImages()) {
+  if (!images.length) {
+    return "PNG";
+  }
+  const suffixes = Array.from(new Set(images.map((image) =>
+    String(image.name || image.suffix || "")
+      .split(".")
+      .pop()
+      ?.toUpperCase()
+      || "PNG"
+  )));
+  if (suffixes.length === 1) {
+    return suffixes[0];
+  }
+  return "PNG/JPG";
+}
+
 function outputPresetLabel() {
   return state.activePreset || "Salida";
 }
@@ -626,6 +662,8 @@ function setScenario(scenario) {
     fitMode: "fit",
     fitZoom: 100,
     zoom: 100,
+    panX: 0,
+    panY: 0,
     inspectorTab: "output",
     outputEditMode: false,
     presetEditorOpen: false,
@@ -852,10 +890,11 @@ function selectImage(imageId) {
   rememberSelectedImage(image);
   clearTimers();
   state.selectedImageId = image.id;
-  state.localOverride = image.status === "adjusted";
+  state.localOverride = hasCurrentImageOverride(image) || image.status === "adjusted";
   state.fitMode = "fit";
   state.zoom = 100;
   state.fitZoom = 100;
+  resetViewerPan();
   if (image.source === "bridge") {
     void requestBridgePreview(image);
     return;
@@ -887,6 +926,116 @@ function selectAdjacentImage(delta) {
   const startIndex = currentIndex >= 0 ? currentIndex : 0;
   const nextIndex = Math.max(0, Math.min(images.length - 1, startIndex + delta));
   selectImage(images[nextIndex].id);
+}
+
+function imageOverrideKey(image = selectedImage()) {
+  return image?.path || image?.id || "";
+}
+
+function clampLocalOverrideValue(key, value) {
+  const [minimum, maximum] = localOverrideLimits[key] || [-100, 100];
+  const parsed = Number(value);
+  const numeric = Number.isFinite(parsed) ? Math.round(parsed) : 0;
+  return Math.max(minimum, Math.min(maximum, numeric));
+}
+
+function normalizeLocalOverride(override = {}) {
+  const normalized = {};
+  localOverrideKeys.forEach((key) => {
+    const value = clampLocalOverrideValue(key, override?.[key]);
+    if (value) {
+      normalized[key] = value;
+    }
+  });
+  return normalized;
+}
+
+function currentImageOverride(image = selectedImage()) {
+  const key = imageOverrideKey(image);
+  return key ? normalizeLocalOverride(state.imageOverrides[key]) : {};
+}
+
+function hasCurrentImageOverride(image = selectedImage()) {
+  return Object.keys(currentImageOverride(image)).length > 0;
+}
+
+function setCurrentImageOverrideValue(key, value) {
+  const image = selectedImage();
+  const overrideKey = imageOverrideKey(image);
+  if (!image || !overrideKey || !localOverrideKeys.includes(key)) {
+    return;
+  }
+  const next = {
+    ...currentImageOverride(image),
+    [key]: clampLocalOverrideValue(key, value),
+  };
+  const normalized = normalizeLocalOverride(next);
+  if (Object.keys(normalized).length) {
+    state.imageOverrides[overrideKey] = normalized;
+  } else {
+    delete state.imageOverrides[overrideKey];
+  }
+  state.localOverride = Object.keys(normalized).length > 0;
+  state.statusText = state.localOverride ? "Ajuste local activo" : "Ajuste local quitado";
+  refreshPreviewAfterSettingChange();
+}
+
+function resetCurrentImageOverride() {
+  const key = imageOverrideKey();
+  if (!key) {
+    return;
+  }
+  delete state.imageOverrides[key];
+  state.localOverride = false;
+  state.statusText = "Ajuste local quitado";
+  refreshPreviewAfterSettingChange();
+}
+
+function isViewerNavigationAvailable() {
+  return Boolean(selectedImage()) && !["empty", "error", "loading"].includes(state.previewStatus);
+}
+
+function applyViewerPanDom() {
+  const canvas = $("#preview-canvas");
+  if (!canvas) {
+    return;
+  }
+  canvas.style.setProperty("--canvas-pan-x", `${Math.round(state.panX)}px`);
+  canvas.style.setProperty("--canvas-pan-y", `${Math.round(state.panY)}px`);
+}
+
+function resetViewerPan() {
+  state.panX = 0;
+  state.panY = 0;
+  applyViewerPanDom();
+}
+
+function currentViewerZoom() {
+  return state.fitMode === "fit" ? state.fitZoom : state.zoom;
+}
+
+function clampViewerZoom(value) {
+  return Math.max(25, Math.min(320, Math.round(value)));
+}
+
+function setViewerZoom(nextZoom, anchorEvent = null) {
+  const zoom = clampViewerZoom(nextZoom);
+  const previousZoom = Math.max(1, currentViewerZoom());
+  if (anchorEvent) {
+    const canvas = $("#preview-canvas");
+    const rect = canvas?.getBoundingClientRect();
+    if (rect?.width && rect?.height) {
+      const originX = anchorEvent.clientX - (rect.left + rect.width / 2);
+      const originY = anchorEvent.clientY - (rect.top + rect.height / 2);
+      const ratio = zoom / previousZoom;
+      state.panX = originX - (originX - state.panX) * ratio;
+      state.panY = originY - (originY - state.panY) * ratio;
+    }
+  }
+  state.fitMode = "manual";
+  state.zoom = zoom;
+  state.statusText = zoom === 100 ? "Zoom 1:1" : `Zoom ${zoom}%`;
+  render();
 }
 
 function normalizeSettings(settings = {}) {
@@ -1086,6 +1235,7 @@ function bridgeExportPayload() {
       .map((image) => image.path),
     presetName: state.activePreset,
     settings: bridgePreviewSettings(),
+    imageOverrides: state.imageOverrides,
     export: {
       format: state.format,
       size: state.size,
@@ -1294,6 +1444,7 @@ function reviewErrors() {
   const hasWarnings = activeImages().some((image) => image.status === "warning");
   const hasOmitted = Number(state.scanDiagnostics?.totalOmitted || 0) > 0;
   state.filter = hasErrors || hasWarnings ? "warnings" : hasOmitted ? "omitted" : "all";
+  state.inspectorTab = "warnings";
   state.statusText = "Mostrando avisos";
   render();
 }
@@ -1357,6 +1508,7 @@ async function requestBridgePreview(image) {
         imagePath: image.path,
         ...previewTargetSize(),
         settings: bridgePreviewSettings(),
+        localOverride: currentImageOverride(image),
       }),
       timeoutMs: 20000,
     });
@@ -1587,6 +1739,8 @@ async function scanBridgeFolder() {
     fitMode: "fit",
     fitZoom: 100,
     zoom: 100,
+    panX: 0,
+    panY: 0,
     scanIssues: [],
     scanDiagnostics: emptyScanDiagnostics(),
     scanStatus: folders.length === 1 ? "Escaneando ruta" : `Escaneando ${folders.length} rutas`,
@@ -1602,7 +1756,7 @@ async function scanBridgeFolder() {
     }
     const response = await bridgeRequest("/folders/scan", {
       method: "POST",
-      body: JSON.stringify({ folders }),
+      body: JSON.stringify({ folders, imageOverrides: state.imageOverrides }),
     });
     applyBridgeScanResult(response);
   } catch (error) {
@@ -1670,6 +1824,7 @@ function applyBridgeScanResult(response) {
     const selectedImage = rememberedImage || state.realImages[0];
     state.batch = "ready";
     state.selectedImageId = selectedImage.id;
+    state.localOverride = hasCurrentImageOverride(selectedImage) || selectedImage.status === "adjusted";
     rememberSelectedImage(selectedImage);
     state.previewStatus = "loading";
     state.previewData = null;
@@ -1677,6 +1832,8 @@ function applyBridgeScanResult(response) {
     state.fitMode = "fit";
     state.fitZoom = 100;
     state.zoom = 100;
+    state.panX = 0;
+    state.panY = 0;
     state.exportStatus = "blocked";
     state.scanStatus = state.scanIssues.length
       ? `Escaneo completado con ${state.scanIssues.length} aviso${state.scanIssues.length === 1 ? "" : "s"}`
@@ -1889,6 +2046,11 @@ function render() {
 function renderShell() {
   const shell = $(".app-shell");
   const derived = uiState();
+  const hasStatusFooter = state.batch === "scanning"
+    || state.exportStatus === "running"
+    || state.exportStatus === "completed"
+    || state.exportStatus === "partial"
+    || state.exportStatus === "failed";
   shell.classList.toggle("dev-mode", devMode);
   shell.classList.toggle("no-batch", state.batch === "none");
   shell.classList.toggle("empty-batch", state.batch === "empty");
@@ -1898,6 +2060,8 @@ function renderShell() {
   shell.classList.toggle("can-export", derived.canExport);
   shell.classList.toggle("is-exporting", derived.isExporting);
   shell.classList.toggle("is-scanning", state.batch === "scanning");
+  shell.classList.toggle("has-status-footer", hasStatusFooter);
+  shell.classList.toggle("export-completed", ["completed", "partial", "failed"].includes(state.exportStatus));
   shell.classList.toggle("inspector-collapsed", state.inspectorCollapsed);
 }
 
@@ -1981,9 +2145,7 @@ function renderTop() {
   $("#demo-scenario").value = scenarioLabels[state.scenario] ? state.scenario : "batch-ready";
   $("#app-mode").value = state.bridgeMode;
   $("#bridge-url").value = state.bridgeUrl;
-  $("#active-batch-label").textContent = state.batch === "ready"
-    ? imageCountLabel(activeImages().length)
-    : batchSummaryLabel();
+  $("#active-batch-label").textContent = "Producción visual";
   $("#top-status-text").textContent = topStatusText();
   $("#status-dot").className = `status-dot ${statusMode()}`;
   const preflight = $("#top-preflight-status");
@@ -1994,7 +2156,8 @@ function renderTop() {
 }
 
 function topStatusText() {
-  const image = selectedImage();
+  const images = activeImages();
+  const warnings = visibleWarningCount();
   if (state.batch === "scanning") {
     return "Escaneando carpeta";
   }
@@ -2002,24 +2165,14 @@ function topStatusText() {
     return "Sin lote";
   }
   if (state.batch === "empty") {
-    return "No hay imágenes compatibles";
+    return "No hay PNG válidos";
   }
   if (state.exportStatus === "running") {
     const total = exportableImages().length;
-    return state.paused ? "Pausado" : `Exportando ${state.processed}/${total}`;
+    return state.paused ? `Pausado · ${state.processed}/${total}` : `Exportando ${state.processed}/${total}`;
   }
-  if (state.previewStatus === "loading") {
-    return "Generando vista";
-  }
-  if (state.previewStatus === "error") {
-    return "Vista no disponible";
-  }
-  if (state.previewStatus === "warning") {
-    return "Revisa avisos";
-  }
-  if (image && state.previewStatus === "ready") {
-    const warnings = visibleWarningCount();
-    return `${warnings ? `${warningCountLabel(warnings)} · ` : ""}Salida: ${outputPresetLabel()}`;
+  if (state.batch === "ready") {
+    return `${detectedFormatLabel(images)}${warnings ? ` · ${warningCountLabel(warnings)}` : ""}`;
   }
   if (state.bridgeMode === "bridge" && state.bridgeStatus === "disconnected") {
     return "Conexión local no disponible";
@@ -2083,7 +2236,7 @@ function renderBridge() {
   sourcePanel.className = `source-panel batch-rail__source ${sourcePanelClass()}`;
   sourceBadge.className = `state-chip ${isBridgeBatch() ? "bridge" : isMockBatch() ? "ready" : ""}`;
   sourceBadge.textContent = sourceLabel();
-  $("#source-title").textContent = hasBatch() || state.batch === "empty" ? "Origen" : "Elegir carpeta";
+  $("#source-title").textContent = hasBatch() || state.batch === "empty" ? "Entrada" : "Elegir carpeta";
   const sourceName = $("#source-folder-name");
   if (sourceName) {
     sourceName.textContent = sourceFolderName();
@@ -2106,13 +2259,18 @@ function renderBridge() {
 
 function compactScanStatus() {
   if (state.batch === "ready") {
-    return "Escaneo completado";
+    const exportable = exportableImages().length;
+    const omitted = Number(state.scanDiagnostics?.totalOmitted || 0);
+    return omitted
+      ? `${pluralizeCount(exportable, "lista")} · ${pluralizeCount(omitted, "omitida")}`
+      : `${pluralizeCount(exportable, "lista")} para procesar`;
   }
   if (state.batch === "empty") {
-    return state.scanDiagnostics?.totalOmitted ? "Sin imágenes compatibles" : "Carpeta vacía";
+    const omitted = Number(state.scanDiagnostics?.totalOmitted || 0);
+    return omitted ? `0 listas · ${pluralizeCount(omitted, "omitida")}` : "Sin imágenes compatibles";
   }
   if (state.batch === "scanning") {
-    return "Escaneando";
+    return "Leyendo imágenes";
   }
   return state.scanStatus || "Sin lote";
 }
@@ -2224,30 +2382,181 @@ function renderBatchSummary() {
       : state.batch === "empty" && isMockBatch()
         ? [{ status: "empty" }]
         : [];
-  const issueCount = state.scanIssues.length + images.filter((image) => image.status === "warning" || image.status === "error").length;
-  const note = batchSummaryNote(images.length, folders.length, issueCount);
   const diagnostics = state.scanDiagnostics || emptyScanDiagnostics();
-  const filesLabel = state.batch === "scanning" ? "..." : diagnostics.totalFiles;
-  const readyLabel = state.batch === "scanning" ? "..." : images.length;
-  const totalIssues = state.batch === "scanning" ? "..." : visibleWarningCount();
-  const issueLine = state.batch === "scanning"
-    ? "Calculando incidencias"
-    : totalIssues
-      ? `${pluralizeCount(diagnostics.totalOmitted, "omitida")}`
-      : "Sin incidencias";
-  const readyLine = state.batch === "scanning"
-    ? "Leyendo archivos"
-    : `${pluralizeCount(filesLabel, "archivo")} · ${pluralizeCount(readyLabel, "correcta")}`;
+  const issueCount = state.scanIssues.length + images.filter((image) => image.status === "warning" || image.status === "error").length;
+  const totalIssues = state.batch === "scanning" ? 0 : visibleWarningCount();
+  const exportable = state.batch === "scanning" ? "..." : exportableImages().length;
+  const filesLabel = state.batch === "scanning" ? "..." : diagnostics.totalFiles || images.length;
+  const omittedLabel = state.batch === "scanning" ? "..." : Number(diagnostics.totalOmitted || 0);
+  const tone = batchSummaryTone(totalIssues);
+  const statusTitle = batchStatusTitle(totalIssues);
+  const statusDetail = batchStatusDetail(exportable, totalIssues, diagnostics, issueCount);
+  const nextStep = batchNextStep(exportable, totalIssues);
+  const outputLine = batchOutputLine();
+  const destinationLine = batchDestinationLine();
 
   summary.innerHTML = `
-    <div class="batch-summary-card">
-      <span class="batch-rail__section-title">Resumen</span>
-      <strong>${escapeHtml(readyLine)}</strong>
-      <small>${escapeHtml(issueLine)}</small>
-      <em title="${escapeHtml(note)}">${escapeHtml(note)}</em>
-      ${diagnostics.totalOmitted ? diagnosticsHtml(diagnostics) : `<div class="diagnostic-ok">Sin incidencias</div>`}
+    <div class="batch-summary-card ${tone}">
+      <div class="batch-summary__top">
+        <span class="batch-rail__section-title">Estado del lote</span>
+        <strong>${escapeHtml(statusTitle)}</strong>
+        <small title="${escapeHtml(statusDetail)}">${escapeHtml(statusDetail)}</small>
+      </div>
+
+      <div class="batch-metric-grid" aria-label="Datos del lote">
+        ${batchMetricHtml("Listas", exportable)}
+        ${batchMetricHtml("Archivos", filesLabel)}
+        ${batchMetricHtml("Omitidas", omittedLabel)}
+        ${batchMetricHtml("Tipo", batchInputFormatLabel(images))}
+      </div>
+
+      <div class="batch-summary-lines">
+        <div class="batch-summary__line">
+          <span>Salida</span>
+          <strong title="${escapeHtml(outputLine)}">${escapeHtml(outputLine)}</strong>
+        </div>
+        <div class="batch-summary__line">
+          <span>Destino</span>
+          <strong title="${escapeHtml(destinationLine)}">${escapeHtml(destinationLine)}</strong>
+        </div>
+      </div>
+
+      <div class="batch-next">
+        <span>Siguiente</span>
+        <strong>${escapeHtml(nextStep)}</strong>
+      </div>
+      ${diagnostics.totalOmitted ? diagnosticsHtml(diagnostics) : `<div class="diagnostic-ok">${totalIssues ? "Avisos en la galería" : "Sin avisos"}</div>`}
     </div>
   `;
+}
+
+function batchMetricHtml(label, value) {
+  return `
+    <div class="batch-metric">
+      <span>${escapeHtml(label)}</span>
+      <strong title="${escapeHtml(value)}">${escapeHtml(value)}</strong>
+    </div>
+  `;
+}
+
+function batchSummaryTone(totalIssues) {
+  if (state.batch === "scanning") {
+    return "is-busy";
+  }
+  if (state.batch === "empty") {
+    return "is-warning";
+  }
+  if (state.batch === "none") {
+    return "is-idle";
+  }
+  return totalIssues ? "is-warning" : "is-ready";
+}
+
+function batchStatusTitle(totalIssues) {
+  if (state.batch === "scanning") {
+    return "Leyendo carpeta";
+  }
+  if (state.batch === "none") {
+    return "Empieza el lote";
+  }
+  if (state.batch === "empty") {
+    return "Sin imágenes compatibles";
+  }
+  const blocking = validationIssues().find((issue) => issue.level === "error" && issue.title !== "Sin lote");
+  if (blocking) {
+    return "Falta preparar salida";
+  }
+  if (totalIssues) {
+    return `${warningCountLabel(totalIssues)} para revisar`;
+  }
+  return "Listo para procesar";
+}
+
+function batchStatusDetail(exportable, totalIssues, diagnostics, issueCount) {
+  if (state.batch === "scanning") {
+    return "La información del lote aparecerá al terminar la lectura.";
+  }
+  if (state.batch === "none") {
+    return "Elige una carpeta local con imágenes PNG o JPG.";
+  }
+  if (state.batch === "empty") {
+    return diagnostics.totalOmitted
+      ? omittedSummaryText(diagnostics)
+      : state.scanIssues[0]?.detail || "Elige otra carpeta para continuar.";
+  }
+  const blocking = validationIssues().find((issue) => issue.level === "error" && issue.title !== "Sin lote");
+  if (blocking) {
+    return blocking.detail;
+  }
+  if (totalIssues) {
+    return issueCount
+      ? `${pluralizeCount(exportable, "imagen")} preparada${Number(exportable) === 1 ? "" : "s"}; revisa la galería antes de procesar.`
+      : `${pluralizeCount(exportable, "imagen")} preparada${Number(exportable) === 1 ? "" : "s"}; las omisiones no bloquean la salida.`;
+  }
+  return `${pluralizeCount(exportable, "imagen")} preparada${Number(exportable) === 1 ? "" : "s"} con el preset ${state.activePreset}.`;
+}
+
+function batchNextStep(exportable, totalIssues) {
+  if (state.batch === "scanning") {
+    return "Esperar a que termine la lectura";
+  }
+  if (state.batch === "none") {
+    return "Elegir carpeta";
+  }
+  if (state.batch === "empty") {
+    return "Elegir otra carpeta";
+  }
+  const blocking = validationIssues().find((issue) => issue.level === "error" && issue.title !== "Sin lote");
+  if (blocking) {
+    return "Revisar salida";
+  }
+  if (totalIssues) {
+    return `Revisar avisos o procesar ${exportable}`;
+  }
+  return `Procesar ${exportable} imágenes`;
+}
+
+function batchInputFormatLabel(images) {
+  if (state.batch === "scanning") {
+    return "...";
+  }
+  if (!images.length) {
+    return "Pendiente";
+  }
+  const counts = images.reduce((acc, image) => {
+    const suffix = String(image.name || image.suffix || "")
+      .split(".")
+      .pop()
+      ?.toUpperCase() || "PNG";
+    acc[suffix] = (acc[suffix] || 0) + 1;
+    return acc;
+  }, {});
+  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  if (entries.length === 1) {
+    return entries[0][0];
+  }
+  return entries.map(([suffix, count]) => `${suffix} ${count}`).join(" · ");
+}
+
+function batchOutputLine() {
+  return `${state.format} · ${state.size.replace("x", " × ")} · ${batchBackgroundLabel(state.background)}`;
+}
+
+function batchBackgroundLabel(value) {
+  if (value === "transparent") {
+    return "Transparente";
+  }
+  if (value === "white") {
+    return "Blanco";
+  }
+  return "Fondo gris";
+}
+
+function batchDestinationLine() {
+  if (state.destinationMode === "custom") {
+    return state.destinationValue || "Sin destino";
+  }
+  return state.destinationValue ? `Junto al origen · ${state.destinationValue}` : "Junto al origen";
 }
 
 function diagnosticsHtml(diagnostics) {
@@ -2278,34 +2587,10 @@ function pluralizeCount(count, singular) {
   const irregular = {
     imagen: "imágenes",
     correcta: "correctas",
+    lista: "listas",
   };
   const plural = irregular[singular] || (singular.endsWith("s") ? singular : `${singular}s`);
   return `${value} ${value === 1 ? singular : plural}`;
-}
-
-function batchSummaryNote(imageCount, folderCount, issueCount) {
-  if (state.batch === "scanning") {
-    return "Leyendo imágenes.";
-  }
-  if (isBridgeBatch()) {
-    if (state.batch === "empty") {
-      return state.scanDiagnostics.totalOmitted
-        ? `0 exportables · ${state.scanDiagnostics.totalOmitted} aviso${state.scanDiagnostics.totalOmitted === 1 ? "" : "s"}`
-        : state.scanIssues[0]?.detail || "Carpeta real sin PNG válidos.";
-    }
-    if (state.scanDiagnostics.totalOmitted) {
-      return `${imageCount} exportables · ${state.scanDiagnostics.totalOmitted} aviso${state.scanDiagnostics.totalOmitted === 1 ? "" : "s"}`;
-    }
-    return issueCount
-      ? `${imageCount} imágenes reales · ${issueCount} aviso${issueCount === 1 ? "" : "s"}`
-      : `${imageCount} imágenes reales desde ${folderCount} carpeta${folderCount === 1 ? "" : "s"}`;
-  }
-  if (isMockBatch()) {
-    return devMode
-      ? (state.batch === "empty" ? "Carpeta vacía." : "Revisión visual.")
-      : "Elige una carpeta local.";
-  }
-  return "Sin lote cargado.";
 }
 
 function bridgeStatusClass() {
@@ -2346,7 +2631,8 @@ function renderBatch() {
   if (state.batch === "none") {
     $("#batch-count").textContent = "Sin lote";
     setBatchPill("Sin carpeta", "muted");
-    $("#batch-visible-count").textContent = "0";
+    setGalleryTitle(0);
+    $("#batch-visible-count").textContent = "";
     $("#folder-list").innerHTML = "";
     $("#image-list").innerHTML = "";
     $("#batch-empty-note").innerHTML = "";
@@ -2360,7 +2646,8 @@ function renderBatch() {
   if (state.batch === "scanning") {
     $("#batch-count").textContent = "Escaneando";
     setBatchPill("Escaneando", "active");
-    $("#batch-visible-count").textContent = "0";
+    setGalleryTitle(0);
+    $("#batch-visible-count").textContent = "";
     $("#folder-list").innerHTML = folderItemHtml({
       id: "scan",
       name: isBridgeBatch() || !devMode ? basename(parseFolderInput(state.bridgeScanPath)[0]) || "Ruta" : "Camisetas Mayo",
@@ -2395,7 +2682,8 @@ function renderBatch() {
         : "Sin imágenes",
       state.scanDiagnostics.totalOmitted ? "warning" : "muted"
     );
-    $("#batch-visible-count").textContent = "0";
+    setGalleryTitle(0);
+    $("#batch-visible-count").textContent = "";
     $("#folder-list").innerHTML = emptyFolders.map(folderItemHtml).join("");
     $("#image-list").innerHTML = "";
     $("#batch-empty-note").innerHTML = emptyBatchNoteHtml();
@@ -2406,18 +2694,20 @@ function renderBatch() {
     return;
   }
 
-  $("#batch-count").textContent = "Lote activo";
+  const exportable = exportableImages().length;
+  $("#batch-count").textContent = exportable ? `${pluralizeCount(exportable, "lista")}` : "Sin exportables";
   setBatchPill(
     warningCount
-      ? `${warningCount} aviso${warningCount === 1 ? "" : "s"}`
-      : adjusted ? `${adjusted} ajustada${adjusted === 1 ? "" : "s"}` : "Listo",
+      ? warningCountLabel(warningCount)
+      : adjusted ? `${pluralizeCount(adjusted, "ajustada")}` : "Listo",
     warningCount ? "warning" : adjusted ? "active" : "ready"
   );
   $("#folder-list").innerHTML = batchFormatHtml(images, omitted);
   renderFilterButtons();
 
   const visible = filteredImages();
-  $("#batch-visible-count").textContent = visible.length === images.length ? `${images.length}` : `${visible.length}/${images.length}`;
+  setGalleryTitle(images.length);
+  $("#batch-visible-count").textContent = visible.length === images.length ? "" : `${visible.length}/${images.length}`;
   $("#image-list").innerHTML = visible.map(imageItemHtml).join("");
   queueThumbnailPreload();
   $("#batch-empty-note").innerHTML = visible.length ? "" : filteredEmptyHtml(images.length, valid, warnings, errors);
@@ -2427,6 +2717,13 @@ function renderBatch() {
       : visible.length === images.length
       ? `${images.length} imágenes`
       : `${visible.length} de ${images.length}`;
+  }
+}
+
+function setGalleryTitle(count) {
+  const title = $("#gallery-title");
+  if (title) {
+    title.textContent = imageCountLabel(Number(count) || 0);
   }
 }
 
@@ -2508,29 +2805,7 @@ function omittedEmptyHtml() {
 }
 
 function batchFormatHtml(images, omittedCount = 0) {
-  if (!images.length) {
-    return "";
-  }
-  const counts = images.reduce((acc, image) => {
-    const suffix = String(image.name || image.suffix || "").split(".").pop()?.toUpperCase() || "PNG";
-    acc[suffix] = (acc[suffix] || 0) + 1;
-    return acc;
-  }, {});
-  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  const formatLabel = entries.length === 1
-    ? entries[0][0]
-    : entries.map(([suffix, count]) => `${suffix} ${count}`).join(" · ");
-  const omittedText = omittedCount ? ` · ${pluralizeCount(omittedCount, "omitida")}` : "";
-  return `
-    <div class="batch-format-row">
-      <div>
-        <span>Formato detectado</span>
-        <strong>${escapeHtml(formatLabel)}</strong>
-        <small>${escapeHtml(pluralizeCount(images.length, "imagen"))}${escapeHtml(omittedText)}</small>
-      </div>
-      <em>${escapeHtml(images.length)}</em>
-    </div>
-  `;
+  return "";
 }
 
 function folderItemHtml(folder) {
@@ -2750,6 +3025,7 @@ async function renderFallbackThumbnail({ imageId, sourceSrc }) {
       targetWidth: 160,
       targetHeight: 160,
       settings: bridgePreviewSettings(),
+      localOverride: currentImageOverride(image),
     }),
     timeoutMs: 20000,
   });
@@ -2782,11 +3058,13 @@ function applyThumbnailDomStatus(imageId, status, resolvedSrc = "") {
 function imageItemHtml(image) {
   const selected = image.id === state.selectedImageId ? "active" : "";
   const exportState = exportItemState(image);
-  const effectiveStatus = exportState?.status || image.status;
-  const chipClass = effectiveStatus === "warning" ? "warning" : effectiveStatus === "error" ? "error" : effectiveStatus === "exported" ? "exported" : "ready";
-  const chipLabel = exportState?.label || assetStatusLabel(image.status);
+  const imageStatus = hasCurrentImageOverride(image) ? "adjusted" : image.status;
+  const effectiveStatus = exportState?.status || imageStatus;
+  const chipClass = effectiveStatus === "warning" ? "warning" : effectiveStatus === "error" ? "error" : effectiveStatus === "exported" ? "exported" : imageStatus === "adjusted" ? "adjusted" : "ready";
+  const chipLabel = exportState?.label || assetStatusLabel(imageStatus);
   const title = image.path || image.name;
   const detail = image.detail === "Lista" ? "" : image.detail;
+  const compactDetail = compactImageDetail(detail || "PNG");
   const thumbState = thumbnailState(image, imageThumbnailSrc(image));
   const previewNote = thumbState.status === "error" ? " · sin preview" : "";
   const statusText = chipLabel ? ` · ${chipLabel}` : "";
@@ -2795,7 +3073,7 @@ function imageItemHtml(image) {
       ${thumbnailHtml(image)}
       <span class="image-copy">
         <strong>${escapeHtml(image.name)}</strong>
-        <small>${escapeHtml(`${detail || "PNG"}${previewNote}`)}</small>
+        <small>${escapeHtml(`${compactDetail}${previewNote}`)}</small>
       </span>
       <span class="asset-state ${chipClass}" title="${escapeHtml(chipLabel || "Correcta")}">
         <span aria-hidden="true"></span>
@@ -2803,6 +3081,14 @@ function imageItemHtml(image) {
       </span>
     </button>
   `;
+}
+
+function compactImageDetail(detail) {
+  return String(detail || "")
+    .replace(/^PNG\s*·\s*/i, "")
+    .replace(/^JPG\s*·\s*/i, "")
+    .replace(/^JPEG\s*·\s*/i, "")
+    || "Lista";
 }
 
 function assetStatusLabel(status) {
@@ -2832,8 +3118,7 @@ function renderFilterButtons() {
   $$(".batch-filter button").forEach((button) => {
     const filter = button.dataset.filter;
     const count = counts[filter] || 0;
-    const showCount = filter === "warnings" || filter === "omitted";
-    button.innerHTML = `${escapeHtml(labels[filter])}${showCount && count ? ` <span>${escapeHtml(count)}</span>` : ""}`;
+    button.innerHTML = `${escapeHtml(labels[filter])} <span>${escapeHtml(count)}</span>`;
     button.title = `${labels[filter]} ${count}`;
     button.classList.toggle("active", button.dataset.filter === state.filter);
     const empty = filter !== "all" && !count;
@@ -2895,6 +3180,7 @@ function renderPreview() {
   const canvas = $("#preview-canvas");
   canvas.className = `preview-canvas ${state.previewMode} bg-${state.previewBg} ${state.fitMode === "fit" ? "fit-mode" : "zoom-mode"}`;
   canvas.style.setProperty("--preview-scale", state.fitMode === "fit" ? "1" : String(state.zoom / 100));
+  applyViewerPanDom();
 
   if (state.batch === "none") {
     canvas.innerHTML = initialStateHtml();
@@ -3181,11 +3467,14 @@ function renderSettings() {
   $("#preset-source").textContent = presetSourceLabel();
   $("#preset-dirty").textContent = state.presetDirty ? "Sin guardar" : "Sin cambios";
   $("#preset-dirty").classList.toggle("dirty", state.presetDirty);
-  $("#preset-list").innerHTML = activePresetItems().map((preset) => `
-    <button type="button" class="preset-chip ${preset.name === state.activePreset ? "active" : ""}" data-preset="${escapeHtml(preset.name)}" title="${escapeHtml(preset.category)}">
-      ${escapeHtml(preset.name)}
-    </button>
-  `).join("");
+  const quickPresets = activePresetItems().filter((preset) => preset.name !== state.activePreset);
+  $("#preset-list").innerHTML = quickPresets.length
+    ? quickPresets.map((preset) => `
+      <button type="button" class="preset-chip" data-preset="${escapeHtml(preset.name)}" title="${escapeHtml(`Cambiar a ${preset.name}`)}">
+        <span class="preset-chip__name">${escapeHtml(preset.name)}</span>
+      </button>
+    `).join("")
+    : '<span class="preset-empty">No hay presets alternativos</span>';
 
   Object.entries(state.settings).forEach(([key, value]) => {
     const input = $(`[data-setting="${key}"]`);
@@ -3203,17 +3492,29 @@ function renderSettings() {
   });
 
   const image = selectedImage();
-  const localActive = state.localOverride || image?.status === "adjusted";
+  const localOverride = currentImageOverride(image);
+  const localActive = Object.keys(localOverride).length > 0 || image?.status === "adjusted";
   $("#local-adjustment").classList.toggle("active", localActive);
   $("#local-adjustment-text").textContent = localActive ? "Ajuste local activo" : "Sin ajuste local";
+  localOverrideKeys.forEach((key) => {
+    const value = Number(localOverride[key] || 0);
+    const input = $(`[data-local-setting="${key}"]`);
+    const output = $(`#local-${key}-output`);
+    if (input) {
+      input.value = value;
+    }
+    if (output) {
+      output.textContent = value > 0 ? `+${value}` : String(value);
+    }
+  });
   $("#save-preset").disabled = false;
   $("#save-preset").title = "Guardar cambios del preset";
   $("#save-preset").textContent = "Guardar preset";
   const advanced = $("#advanced-settings");
-  const advancedSummary = advanced?.querySelector("summary");
-  if (advancedSummary) {
+  const advancedSummaryTitle = advanced?.querySelector("summary strong");
+  if (advancedSummaryTitle) {
     const dirtyCount = advancedDirtyCount();
-    advancedSummary.textContent = dirtyCount ? `Avanzado · ${dirtyCount} cambio${dirtyCount === 1 ? "" : "s"}` : "Avanzado";
+    advancedSummaryTitle.textContent = dirtyCount ? `Avanzado · ${dirtyCount} cambio${dirtyCount === 1 ? "" : "s"}` : "Avanzado";
   }
   if (advanced && advancedSettingsDirty()) {
     advanced.open = true;
@@ -3252,12 +3553,14 @@ function renderInspector() {
   $$(".settings-panel [data-inspector-section]").forEach((section) => {
     const isOutput = section.dataset.inspectorSection === "output";
     const isAdjustments = section.dataset.inspectorSection === "adjustments";
+    const isWarnings = section.dataset.inspectorSection === "warnings";
     section.classList.toggle(
       "is-hidden",
       contextOnly
         || (isOutput && state.inspectorTab !== "output")
         || (isAdjustments && state.inspectorTab !== "adjustments")
-        || (!isOutput && !isAdjustments)
+        || (isWarnings && state.inspectorTab !== "warnings")
+        || (!isOutput && !isAdjustments && !isWarnings)
     );
   });
 }
@@ -3379,9 +3682,18 @@ function renderExport() {
   const outputCount = exportable;
   const ready = isExportReady();
   const destinationText = destinationCompactLabel();
+  const warningCount = visibleWarningCount();
   $("#export-readiness").textContent = state.outputEditMode ? "Editar salida" : "Salida";
   $("#export-count").textContent = outputCount ? `${outputCount} img` : "Pendiente";
   $("#export-count").classList.toggle("dirty", !ready);
+  const warningsReadiness = $("#warnings-readiness");
+  if (warningsReadiness) {
+    warningsReadiness.textContent = warningCount ? `${warningCount} aviso${warningCount === 1 ? "" : "s"} no bloqueante${warningCount === 1 ? "" : "s"}` : "Sin avisos";
+  }
+  const warningsTab = $("[data-inspector-tab='warnings']");
+  if (warningsTab) {
+    warningsTab.textContent = "Avisos";
+  }
 
   const warningSummary = outputWarningSummary(issues);
   const editActions = state.outputEditMode ? `
@@ -3465,15 +3777,11 @@ function namingHumanLabel() {
 function outputWarningSummary(issues) {
   const warnings = issues.filter((issue) => issue.title !== "Sin lote");
   if (!warnings.length) {
-    if (!hasBatch()) {
-      return "";
-    }
-    return `
-      <div class="warning-summary clear">
-        <strong>Avisos</strong>
-        <span>Sin avisos. Listo para exportar.</span>
-      </div>
-    `;
+    return "";
+  }
+  const hasBlocking = warnings.some((issue) => issue.level === "error");
+  if (!hasBlocking) {
+    return "";
   }
   const first = firstActionableIssue() || warnings[0];
   const count = Math.max(warnings.length, visibleWarningCount());
@@ -3522,7 +3830,12 @@ function issueListHtml() {
     });
   });
   if (!rows.length) {
-    return "";
+    return `
+      <div class="issue-item clear">
+        <strong>Sin avisos</strong>
+        <span>El lote no tiene incidencias pendientes.</span>
+      </div>
+    `;
   }
   return rows.slice(0, 5).map((row) => `
     <div class="issue-item ${row.level === "error" ? "error" : ""}" title="${escapeHtml(row.path || row.detail || row.title)}">
@@ -3906,6 +4219,19 @@ function statusBarText() {
     const total = exportableImages().length;
     return `${state.paused ? "Pausado" : "Exportando"} ${state.processed}/${total} · ${state.statusText}`;
   }
+  if (state.exportStatus === "completed") {
+    const total = Number(state.exportResult?.total ?? exportableImages().length ?? 0);
+    const processed = Number(state.exportResult?.processed ?? total);
+    return `Última exportación completada · ${processed}/${total} archivos`;
+  }
+  if (state.exportStatus === "partial") {
+    const total = Number(state.exportResult?.total ?? exportableImages().length ?? 0);
+    const processed = Number(state.exportResult?.processed ?? state.processed ?? 0);
+    return `Última exportación con avisos · ${processed}/${total} archivos`;
+  }
+  if (state.exportStatus === "failed") {
+    return `Exportación fallida · ${state.errors[0]?.detail || "Revisa avisos"}`;
+  }
   if (state.batch === "none") {
     return "Sin lote · Elige una carpeta para empezar";
   }
@@ -4001,36 +4327,26 @@ function handleAction(action) {
     closePresetEditor();
   } else if (action === "zoom-fit") {
     state.fitMode = "fit";
+    resetViewerPan();
     state.statusText = "Imagen ajustada";
     render();
   } else if (action === "zoom-100") {
-    state.fitMode = "manual";
-    state.zoom = 100;
-    state.statusText = "Zoom 100%";
-    render();
+    resetViewerPan();
+    setViewerZoom(100);
   } else if (action === "zoom-in") {
-    const baseZoom = state.fitMode === "fit" ? state.fitZoom : state.zoom;
-    state.fitMode = "manual";
-    state.zoom = Math.min(220, Math.max(25, Math.round(baseZoom / 10) * 10 + 10));
-    render();
+    setViewerZoom(Math.round(currentViewerZoom() / 10) * 10 + 10);
   } else if (action === "zoom-out") {
-    const baseZoom = state.fitMode === "fit" ? state.fitZoom : state.zoom;
-    state.fitMode = "manual";
-    state.zoom = Math.max(25, Math.round(baseZoom / 10) * 10 - 10);
-    render();
+    setViewerZoom(Math.round(currentViewerZoom() / 10) * 10 - 10);
   } else if (action === "reset-settings") {
     resetActivePresetSettings();
   } else if (action === "save-preset") {
     saveCurrentPreset();
   } else if (action === "toggle-local-adjustment") {
-    if (!devMode) {
-      state.statusText = "Ajuste por imagen no disponible";
-      render();
-      return;
-    }
     state.localOverride = !state.localOverride;
     state.statusText = state.localOverride ? "Ajuste local activo" : "Ajuste local quitado";
     render();
+  } else if (action === "reset-local-adjustment") {
+    resetCurrentImageOverride();
   } else if (action === "pause-export") {
     pauseExport();
   } else if (action === "stop-export") {
@@ -4093,7 +4409,58 @@ function recordThumbnailError(imageElement) {
   markThumbnailError(imageId, src);
 }
 
+document.addEventListener("pointerdown", (event) => {
+  if (event.target.closest?.(".settings-panel details > summary")) {
+    inspectorScrollTopBeforeToggle = $(".settings-panel")?.scrollTop || 0;
+  }
+}, true);
+
 document.addEventListener("click", (event) => {
+  const disclosureSummary = event.target.closest?.(".settings-panel details.inspector-disclosure > summary");
+  if (!disclosureSummary) {
+    return;
+  }
+  const panel = $(".settings-panel");
+  const details = disclosureSummary.closest("details");
+  inspectorScrollTopBeforeToggle = panel?.scrollTop || 0;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  details.open = !details.open;
+  disclosureSummary.blur();
+  if (panel) {
+    const restoreScroll = () => {
+      panel.scrollTop = inspectorScrollTopBeforeToggle;
+    };
+    restoreScroll();
+    window.requestAnimationFrame(() => {
+      restoreScroll();
+      window.requestAnimationFrame(restoreScroll);
+      window.setTimeout(restoreScroll, 0);
+      window.setTimeout(restoreScroll, 80);
+      window.setTimeout(restoreScroll, 180);
+    });
+  }
+}, true);
+
+document.addEventListener("click", (event) => {
+  const disclosureSummary = event.target.closest(".settings-panel details > summary");
+  if (disclosureSummary) {
+    const panel = $(".settings-panel");
+    const details = disclosureSummary.closest("details");
+    inspectorScrollTopBeforeToggle = panel?.scrollTop || 0;
+    if (details?.classList.contains("inspector-disclosure")) {
+      event.preventDefault();
+      details.open = !details.open;
+      if (panel) {
+        panel.scrollTop = inspectorScrollTopBeforeToggle;
+        window.requestAnimationFrame(() => {
+          panel.scrollTop = inspectorScrollTopBeforeToggle;
+        });
+      }
+      return;
+    }
+  }
+
   const actionTarget = event.target.closest("[data-action]");
   if (actionTarget) {
     handleAction(actionTarget.dataset.action);
@@ -4151,6 +4518,26 @@ document.addEventListener("click", (event) => {
   }
 });
 
+document.addEventListener("toggle", (event) => {
+  if (!event.target.matches?.(".settings-panel details.inspector-disclosure")) {
+    return;
+  }
+  const panel = $(".settings-panel");
+  if (!panel) {
+    return;
+  }
+  const restoreScroll = () => {
+    panel.scrollTop = inspectorScrollTopBeforeToggle;
+  };
+  window.requestAnimationFrame(() => {
+    restoreScroll();
+    window.requestAnimationFrame(restoreScroll);
+    window.setTimeout(restoreScroll, 0);
+    window.setTimeout(restoreScroll, 80);
+    window.setTimeout(restoreScroll, 180);
+  });
+}, true);
+
 $("#demo-scenario").addEventListener("change", (event) => {
   if (!devMode) {
     return;
@@ -4194,6 +4581,10 @@ document.addEventListener("input", (event) => {
     if (sidebarInput) {
       sidebarInput.value = state.bridgeScanPath;
     }
+  }
+  const localKey = event.target?.dataset?.localSetting;
+  if (localKey) {
+    setCurrentImageOverrideValue(localKey, event.target.value);
   }
 });
 
@@ -4325,6 +4716,78 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+function handleViewerWheel(event) {
+  if (!isViewerNavigationAvailable()) {
+    return;
+  }
+  event.preventDefault();
+  const baseZoom = currentViewerZoom();
+  const direction = event.deltaY < 0 ? 1 : -1;
+  const step = event.shiftKey ? 5 : 10;
+  setViewerZoom(baseZoom + direction * step, event);
+}
+
+function handleViewerPointerDown(event) {
+  if (
+    event.button !== 0
+    || !isViewerNavigationAvailable()
+    || event.target.closest("button, input, textarea, select, summary, a")
+  ) {
+    return;
+  }
+  const canvas = $("#preview-canvas");
+  viewerPanState.active = true;
+  viewerPanState.pointerId = event.pointerId;
+  viewerPanState.startX = event.clientX;
+  viewerPanState.startY = event.clientY;
+  viewerPanState.originX = state.panX;
+  viewerPanState.originY = state.panY;
+  canvas?.classList.add("is-panning");
+  try {
+    canvas?.setPointerCapture(event.pointerId);
+  } catch (error) {
+    // Pointer capture is optional; document-level listeners continue the drag.
+  }
+}
+
+function handleViewerPointerMove(event) {
+  if (!viewerPanState.active || event.pointerId !== viewerPanState.pointerId) {
+    return;
+  }
+  state.panX = viewerPanState.originX + event.clientX - viewerPanState.startX;
+  state.panY = viewerPanState.originY + event.clientY - viewerPanState.startY;
+  applyViewerPanDom();
+}
+
+function handleViewerPointerEnd(event) {
+  if (!viewerPanState.active || event.pointerId !== viewerPanState.pointerId) {
+    return;
+  }
+  const canvas = $("#preview-canvas");
+  viewerPanState.active = false;
+  canvas?.classList.remove("is-panning");
+  try {
+    if (viewerPanState.pointerId !== null) {
+      canvas?.releasePointerCapture(viewerPanState.pointerId);
+    }
+  } catch (error) {
+    // Release can fail if the pointer was already released by the browser.
+  }
+  viewerPanState.pointerId = null;
+}
+
+function initViewerCanvasNavigation() {
+  const canvas = $("#preview-canvas");
+  if (!canvas) {
+    return;
+  }
+  canvas.addEventListener("wheel", handleViewerWheel, { passive: false });
+  canvas.addEventListener("pointerdown", handleViewerPointerDown);
+  document.addEventListener("pointermove", handleViewerPointerMove);
+  document.addEventListener("pointerup", handleViewerPointerEnd);
+  document.addEventListener("pointercancel", handleViewerPointerEnd);
+}
+
 function initViewerResizeObserver() {
   const canvas = $("#preview-canvas");
   if (!canvas || !("ResizeObserver" in window)) {
@@ -4346,6 +4809,7 @@ function restorePersistentBridgeSession() {
   void scanBridgeFolder();
 }
 
+initViewerCanvasNavigation();
 initViewerResizeObserver();
 setScenario("initial");
 restorePersistentBridgeSession();

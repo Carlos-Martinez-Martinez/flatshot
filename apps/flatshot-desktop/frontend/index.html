@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>FlatShot Desktop</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./styles.css?v=20260526-persist1" />
+    <link rel="stylesheet" href="./styles.css?v=20260526-ui-system11" />
   </head>
   <body>
     <main class="app-shell" aria-label="FlatShot nueva app">
@@ -120,27 +120,7 @@
           </section>
 
           <section class="batch-summary batch-rail__summary" id="batch-summary" aria-live="polite"></section>
-
-          <section class="batch-rail__controls" aria-label="Búsqueda y filtros del lote">
-            <div class="batch-rail__section-title">Filtro</div>
-            <label class="search-field batch-search">
-              <span>Buscar en lote</span>
-              <div class="batch-search__box">
-                <span aria-hidden="true">⌕</span>
-                <input id="image-search" type="search" placeholder="Buscar..." autocomplete="off" />
-                <button type="button" id="image-search-clear" data-action="clear-search" aria-label="Limpiar búsqueda">×</button>
-              </div>
-            </label>
-
-            <div class="folder-list batch-format" id="folder-list" aria-label="Formato del lote" hidden></div>
-
-            <div class="segmented batch-filter" aria-label="Filtro de imágenes">
-              <button type="button" data-filter="all">Todas</button>
-              <button type="button" data-filter="valid">Correctas</button>
-              <button type="button" data-filter="warnings">Avisos</button>
-              <button type="button" data-filter="omitted">Omitidas</button>
-            </div>
-          </section>
+          <div class="folder-list batch-format" id="folder-list" aria-label="Formato del lote" hidden></div>
 
           <details class="review-panel">
             <summary>Revisión</summary>
@@ -182,12 +162,28 @@
         </aside>
 
         <aside class="gallery-column" aria-label="Galería de imágenes">
-          <div class="gallery-header">
-            <div>
-              <span class="gallery-eyebrow">Galería</span>
-              <strong>Navegación visual</strong>
+          <div class="gallery-header gallery-toolbar">
+            <div class="gallery-heading">
+              <span class="gallery-eyebrow">Imágenes</span>
+              <strong id="gallery-title">0 imágenes</strong>
             </div>
             <span id="batch-visible-count">0</span>
+
+            <label class="search-field gallery-search">
+              <span>Buscar imagen</span>
+              <div class="batch-search__box">
+                <span aria-hidden="true">⌕</span>
+                <input id="image-search" type="search" placeholder="Buscar imagen..." autocomplete="off" />
+                <button type="button" id="image-search-clear" data-action="clear-search" aria-label="Limpiar búsqueda">×</button>
+              </div>
+            </label>
+
+            <div class="segmented batch-filter gallery-filter" aria-label="Filtro de imágenes">
+              <button type="button" data-filter="all">Todas</button>
+              <button type="button" data-filter="valid">Correctas</button>
+              <button type="button" data-filter="warnings">Avisos</button>
+              <button type="button" data-filter="omitted">Omitidas</button>
+            </div>
           </div>
           <div class="image-list gallery-grid" id="image-list" aria-label="Imágenes del lote"></div>
           <div class="empty-note gallery-empty" id="batch-empty-note"></div>
@@ -208,28 +204,23 @@
                 <button type="button" data-preview-mode="compare">Comparar</button>
               </div>
               <div class="zoom-controls" aria-label="Zoom">
-                <button type="button" data-action="previous-image" aria-label="Imagen anterior">‹</button>
+                <button type="button" data-action="previous-image" aria-label="Imagen anterior" title="Imagen anterior">‹</button>
                 <span id="viewer-position">Sin imagen</span>
-                <button type="button" data-action="next-image" aria-label="Imagen siguiente">›</button>
-                <button type="button" data-action="zoom-fit">Ajustar</button>
-                <button type="button" data-action="zoom-100">100%</button>
-                <button type="button" data-action="zoom-out" aria-label="Reducir zoom">-</button>
+                <button type="button" data-action="next-image" aria-label="Imagen siguiente" title="Imagen siguiente">›</button>
+                <button type="button" data-action="zoom-fit" title="Ajustar al visor">Ajustar</button>
+                <button type="button" data-action="zoom-100" title="Ver al 100%">1:1</button>
+                <button type="button" data-action="zoom-out" aria-label="Reducir zoom" title="Reducir zoom">-</button>
                 <span id="zoom-label">100%</span>
-                <button type="button" data-action="zoom-in" aria-label="Aumentar zoom">+</button>
+                <button type="button" data-action="zoom-in" aria-label="Aumentar zoom" title="Aumentar zoom">+</button>
               </div>
             </div>
           </div>
 
           <div class="canvas-area" id="canvas-area">
-            <div class="preview-canvas" id="preview-canvas" aria-live="polite"></div>
+            <div class="preview-canvas" id="preview-canvas" aria-live="polite" aria-label="Canvas de revisión. Arrastra para mover la imagen y usa la rueda para cambiar el zoom."></div>
           </div>
 
-          <div class="preview-footer">
-            <div class="segmented compact background-switch" aria-label="Fondo de preview">
-              <button type="button" data-preview-bg="rgb230">RGB230</button>
-              <button type="button" data-preview-bg="white">Blanco</button>
-              <button type="button" data-preview-bg="transparent">Transparente</button>
-            </div>
+          <div class="preview-footer" aria-hidden="true">
             <span id="preview-meta">Sin imagen</span>
           </div>
         </section>
@@ -238,36 +229,39 @@
           <section class="inspector-start" id="inspector-start" aria-live="polite"></section>
 
           <div class="inspector-tabs segmented compact" aria-label="Panel derecho">
-            <button type="button" data-inspector-tab="adjustments">Ajustes</button>
             <button type="button" data-inspector-tab="output">Salida</button>
+            <button type="button" data-inspector-tab="adjustments">Ajustes</button>
+            <button type="button" data-inspector-tab="warnings">Avisos</button>
           </div>
 
-          <section class="settings-section" data-inspector-section="adjustments">
-            <div class="section-title">
-              <div>
-                <span class="eyebrow">Preset</span>
+          <details class="settings-section inspector-disclosure preset-section" data-inspector-section="adjustments">
+            <summary>
+              <span class="summary-copy">
+                <span class="eyebrow">Preset actual</span>
                 <strong id="active-preset">Luz cenital</strong>
                 <small id="preset-source">Salida</small>
-              </div>
+              </span>
               <span class="change-chip" id="preset-dirty">Sin cambios</span>
+            </summary>
+            <div class="inspector-disclosure__body">
+              <div class="preset-list" id="preset-list" aria-label="Cambiar preset"></div>
+              <div class="button-row preset-actions">
+                <button type="button" data-action="reset-settings">Restaurar</button>
+                <button type="button" data-action="close-preset-editor">Listo</button>
+                <button type="button" id="save-preset" data-action="save-preset">Guardar preset</button>
+              </div>
             </div>
-            <div class="preset-list" id="preset-list" aria-label="Presets disponibles"></div>
-            <div class="button-row">
-              <button type="button" class="primary" data-action="close-preset-editor">Aplicar preset</button>
-              <button type="button" data-action="reset-settings">Reset</button>
-              <button type="button" id="save-preset" data-action="save-preset">Guardar preset</button>
-            </div>
-          </section>
+          </details>
 
-          <section class="settings-section" data-inspector-section="adjustments">
-            <div class="section-title">
-              <div>
+          <details class="settings-section inspector-disclosure appearance-section" data-inspector-section="adjustments" open>
+            <summary>
+              <span class="summary-copy">
                 <span class="eyebrow">Aspecto</span>
                 <strong>Ajustes principales</strong>
-              </div>
-            </div>
-
-            <div class="control-stack">
+                <small>Preset completo del lote</small>
+              </span>
+            </summary>
+            <div class="inspector-disclosure__body control-stack">
               <label class="control-row">
                 <span>Opacidad</span>
                 <input id="opacity-input" type="range" min="0" max="100" value="20" data-setting="opacity" />
@@ -289,10 +283,34 @@
                 <output id="padding-output">10</output>
               </label>
             </div>
+          </details>
 
-            <details class="advanced-block" id="advanced-settings">
-              <summary>Avanzado</summary>
-              <div class="advanced-grid">
+          <details class="settings-section inspector-disclosure review-background-panel" data-inspector-section="adjustments">
+            <summary>
+              <span class="summary-copy">
+                <span class="eyebrow">Vista</span>
+                <strong>Fondo</strong>
+                <small>Revisión y salida</small>
+              </span>
+            </summary>
+            <div class="inspector-disclosure__body">
+              <div class="segmented compact background-switch inspector-background-switch" aria-label="Fondo de revisión">
+                <button type="button" data-preview-bg="rgb230">RGB230</button>
+                <button type="button" data-preview-bg="white">Blanco</button>
+                <button type="button" data-preview-bg="transparent">Transparente</button>
+              </div>
+            </div>
+          </details>
+
+          <details class="settings-section inspector-disclosure advanced-block" id="advanced-settings" data-inspector-section="adjustments">
+            <summary>
+              <span class="summary-copy">
+                <span class="eyebrow">Técnico</span>
+                <strong>Avanzado</strong>
+                <small>Motor y parámetros finos</small>
+              </span>
+            </summary>
+            <div class="inspector-disclosure__body advanced-grid">
                 <label>
                   <span>Spread</span>
                   <input type="number" min="0" max="20" value="0" data-setting="spread" />
@@ -333,16 +351,37 @@
                   </select>
                 </label>
               </div>
-            </details>
+          </details>
 
-            <div class="local-adjustment" id="local-adjustment">
-              <div>
+          <details class="settings-section inspector-disclosure local-adjustment" id="local-adjustment" data-inspector-section="adjustments">
+            <summary>
+              <span class="summary-copy">
+                <span class="eyebrow">Imagen seleccionada</span>
                 <strong>Ajuste por imagen</strong>
-                <span id="local-adjustment-text">Sin ajuste local</span>
+                <small id="local-adjustment-text">Sin ajuste local</small>
+              </span>
+            </summary>
+            <div class="inspector-disclosure__body local-adjustment__body">
+              <label class="local-control-row">
+                <span>Tamaño</span>
+                <input type="range" min="-30" max="30" value="0" data-local-setting="size_delta" />
+                <output id="local-size_delta-output">0</output>
+              </label>
+              <label class="local-control-row">
+                <span>Sombra</span>
+                <input type="range" min="-40" max="40" value="0" data-local-setting="shadow_delta" />
+                <output id="local-shadow_delta-output">0</output>
+              </label>
+              <label class="local-control-row">
+                <span>Blur</span>
+                <input type="range" min="-40" max="40" value="0" data-local-setting="blur_delta" />
+                <output id="local-blur_delta-output">0</output>
+              </label>
+              <div class="local-adjustment__actions">
+                <button type="button" data-action="reset-local-adjustment">Restablecer imagen</button>
               </div>
-              <button type="button" data-action="toggle-local-adjustment">Alternar</button>
             </div>
-          </section>
+          </details>
 
           <section class="settings-section export-section" data-inspector-section="output">
             <div class="section-title">
@@ -398,6 +437,16 @@
 
             <div class="export-summary" id="export-summary"></div>
             <div class="export-result" id="export-result" aria-live="polite"></div>
+          </section>
+
+          <section class="settings-section warning-section" data-inspector-section="warnings">
+            <div class="section-title">
+              <div>
+                <span class="eyebrow">Avisos</span>
+                <strong id="warnings-readiness">Sin avisos</strong>
+                <small>Diagnóstico contextual del lote</small>
+              </div>
+            </div>
             <div class="issue-list" id="issue-list" aria-live="polite"></div>
           </section>
         </aside>
@@ -423,6 +472,6 @@
       </footer>
     </main>
 
-    <script src="./app.js?v=20260526-persist1"></script>
+    <script src="./app.js?v=20260526-ui-system11"></script>
   </body>
 </html>

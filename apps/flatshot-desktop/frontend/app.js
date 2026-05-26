@@ -74,6 +74,10 @@ const mockPresets = [
 
 const defaultBridgeUrl = "http://127.0.0.1:8765";
 const devMode = new URLSearchParams(window.location.search).get("dev") === "1";
+const STORAGE_KEYS = {
+  bridgeScanPath: "flatshot.bridgeScanPath",
+  selectedImagePath: "flatshot.selectedImagePath",
+};
 document.documentElement.classList.toggle("dev-mode", devMode);
 
 const statusLabels = {
@@ -236,7 +240,7 @@ const state = {
   bridgePresets: [],
   bridgePresetSource: "unavailable",
   bridgePresetWarning: "",
-  bridgeScanPath: "",
+  bridgeScanPath: readPersistentValue(STORAGE_KEYS.bridgeScanPath),
   scanStatus: "Sin lote",
   scanIssues: [],
   scanDiagnostics: {
@@ -260,6 +264,27 @@ let viewerResizeObserver = null;
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+
+function readPersistentValue(key) {
+  try {
+    return window.localStorage.getItem(key) || "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function writePersistentValue(key, value) {
+  const normalized = String(value || "").trim();
+  try {
+    if (normalized) {
+      window.localStorage.setItem(key, normalized);
+    } else {
+      window.localStorage.removeItem(key);
+    }
+  } catch (error) {
+    // Persistence is a convenience; the app must still work if storage is blocked.
+  }
+}
 
 function escapeHtml(value) {
   return String(value)
@@ -824,6 +849,7 @@ function selectImage(imageId) {
   if (!image) {
     return;
   }
+  rememberSelectedImage(image);
   clearTimers();
   state.selectedImageId = image.id;
   state.localOverride = image.status === "adjusted";
@@ -844,6 +870,12 @@ function selectImage(imageId) {
     state.statusText = state.previewStatus === "error" ? "Vista no disponible" : "Vista lista";
     render();
   }, 380);
+}
+
+function rememberSelectedImage(image) {
+  if (image?.source === "bridge" && image.path) {
+    writePersistentValue(STORAGE_KEYS.selectedImagePath, image.path);
+  }
 }
 
 function selectAdjacentImage(delta) {
@@ -1459,6 +1491,7 @@ async function pickBridgeFolder() {
     }
 
     state.bridgeScanPath = selected.path;
+    persistBridgeScanPath();
     state.bridgeMessage = "Carpeta seleccionada";
     state.bridgeLastResponse = "folder pick OK";
     state.scanStatus = "Carpeta seleccionada";
@@ -1523,6 +1556,7 @@ async function scanBridgeFolder() {
     render();
     return;
   }
+  persistBridgeScanPath(folders[0]);
 
   clearTimers();
   thumbnailPreloads.clear();
@@ -1594,6 +1628,10 @@ async function scanBridgeFolder() {
   render();
 }
 
+function persistBridgeScanPath(path = parseFolderInput(state.bridgeScanPath)[0] || "") {
+  writePersistentValue(STORAGE_KEYS.bridgeScanPath, path);
+}
+
 function applyBridgeScanResult(response) {
   state.scanDiagnostics = scanDiagnosticsFromResponse(response);
   state.realFolders = (response.folders || []).map(bridgeFolderToItem);
@@ -1625,8 +1663,14 @@ function applyBridgeScanResult(response) {
   }
 
   if (state.realImages.length) {
+    const rememberedPath = readPersistentValue(STORAGE_KEYS.selectedImagePath);
+    const rememberedImage = rememberedPath
+      ? state.realImages.find((image) => image.path === rememberedPath)
+      : null;
+    const selectedImage = rememberedImage || state.realImages[0];
     state.batch = "ready";
-    state.selectedImageId = state.realImages[0].id;
+    state.selectedImageId = selectedImage.id;
+    rememberSelectedImage(selectedImage);
     state.previewStatus = "loading";
     state.previewData = null;
     state.previewError = "";
@@ -1638,7 +1682,7 @@ function applyBridgeScanResult(response) {
       ? `Escaneo completado con ${state.scanIssues.length} aviso${state.scanIssues.length === 1 ? "" : "s"}`
       : `${state.realImages.length} imágenes encontradas`;
     state.statusText = "Generando preview";
-    void requestBridgePreview(state.realImages[0]);
+    void requestBridgePreview(selectedImage);
     return;
   }
 
@@ -2087,6 +2131,10 @@ function sourceFolderName() {
   }
   if (folders.length > 1) {
     return `${folders.length} carpetas`;
+  }
+  const persistedPath = parseFolderInput(state.bridgeScanPath)[0];
+  if (persistedPath) {
+    return basename(persistedPath) || "Carpeta actual";
   }
   return hasBatch() || state.batch === "empty" ? "Carpeta actual" : "Pendiente";
 }
@@ -4286,5 +4334,18 @@ function initViewerResizeObserver() {
   viewerResizeObserver.observe(canvas);
 }
 
+function restorePersistentBridgeSession() {
+  const path = parseFolderInput(state.bridgeScanPath)[0];
+  if (!path || state.bridgeMode !== "bridge") {
+    return;
+  }
+  state.bridgeScanPath = path;
+  state.scanStatus = `Última carpeta: ${basename(path)}`;
+  state.statusText = "Restaurando último lote";
+  render();
+  void scanBridgeFolder();
+}
+
 initViewerResizeObserver();
 setScenario("initial");
+restorePersistentBridgeSession();

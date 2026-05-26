@@ -89,6 +89,14 @@ const statusLabels = {
   error: "Error",
 };
 
+const DEFAULT_VIEW_MODE = "height";
+const VIEW_MODE_LABELS = {
+  fit: "Encajar",
+  height: "Altura",
+  width: "Anchura",
+  manual: "Manual",
+};
+
 const scenarioLabels = {
   initial: "Sin lote",
   "batch-ready": "Lote listo",
@@ -250,11 +258,12 @@ const state = {
   previewBg: "rgb230",
   zoom: 100,
   fitZoom: 100,
-  fitMode: "fit",
+  fitMode: DEFAULT_VIEW_MODE,
   panX: 0,
   panY: 0,
   filter: "all",
   search: "",
+  galleryView: "thumbs",
   inspectorTab: "adjustments",
   inspectorCollapsed: false,
   outputEditMode: false,
@@ -690,7 +699,7 @@ function exportItemState(image) {
 function filteredImages() {
   const term = state.search.trim().toLowerCase();
   return activeImages().filter((image) => {
-    if (term && !image.name.toLowerCase().includes(term)) {
+    if (term && !imageSearchText(image).includes(term)) {
       return false;
     }
     if (state.filter === "valid") {
@@ -704,6 +713,14 @@ function filteredImages() {
     }
     return true;
   });
+}
+
+function imageSearchText(image) {
+  const name = String(image?.name || "");
+  const stem = imageFileStem(name);
+  const path = String(image?.path || "");
+  const tokens = stem.split(/[^a-z0-9]+/i).filter(Boolean);
+  return [name, stem, path, ...tokens].join(" ").toLowerCase();
 }
 
 function filterDisplayName(filter = state.filter) {
@@ -1087,7 +1104,7 @@ function setScenario(scenario) {
     errors: [],
     filter: "all",
     search: "",
-    fitMode: "fit",
+    fitMode: DEFAULT_VIEW_MODE,
     fitZoom: 100,
     zoom: 100,
     panX: 0,
@@ -1272,7 +1289,7 @@ function loadBatch() {
       previewStatus: "loading",
       exportStatus: "ready",
       scanDiagnostics: mockScanDiagnostics(),
-      statusText: "Generando preview",
+      statusText: "Generando vista",
     });
     render();
     setTimer(() => {
@@ -1319,8 +1336,6 @@ function selectImage(imageId) {
   clearTimers();
   state.selectedImageId = image.id;
   state.localOverride = hasCurrentImageOverride(image) || image.status === "adjusted";
-  state.fitMode = "fit";
-  state.zoom = 100;
   state.fitZoom = 100;
   resetViewerPan();
   if (image.source === "bridge") {
@@ -1438,8 +1453,26 @@ function resetViewerPan() {
   applyViewerPanDom();
 }
 
+function isAutoViewerMode(mode = state.fitMode) {
+  return ["fit", "height", "width"].includes(mode);
+}
+
+function viewerModeLabel(mode = state.fitMode) {
+  return VIEW_MODE_LABELS[mode] || VIEW_MODE_LABELS.manual;
+}
+
+function viewerModeClass(mode = state.fitMode) {
+  if (mode === "height") {
+    return "fit-height-mode";
+  }
+  if (mode === "width") {
+    return "fit-width-mode";
+  }
+  return mode === "fit" ? "fit-mode" : "zoom-mode";
+}
+
 function currentViewerZoom() {
-  return state.fitMode === "fit" ? state.fitZoom : state.zoom;
+  return isAutoViewerMode() ? state.fitZoom : state.zoom;
 }
 
 function clampViewerZoom(value) {
@@ -1462,8 +1495,30 @@ function setViewerZoom(nextZoom, anchorEvent = null) {
   }
   state.fitMode = "manual";
   state.zoom = zoom;
-  state.statusText = zoom === 100 ? "Zoom 1:1" : `Zoom ${zoom}%`;
+  state.statusText = zoom === 100 ? "Zoom 100%" : `Zoom ${zoom}%`;
   render();
+}
+
+function setViewerMode(mode) {
+  if (!["fit", "height", "width"].includes(mode)) {
+    return;
+  }
+  state.fitMode = mode;
+  resetViewerPan();
+  state.statusText = `Vista: ${viewerModeLabel(mode)}`;
+  render();
+}
+
+function toggleViewerZoomMode() {
+  if (!isViewerNavigationAvailable()) {
+    return;
+  }
+  if (state.fitMode === "manual" && state.zoom === 100) {
+    setViewerMode(DEFAULT_VIEW_MODE);
+    return;
+  }
+  resetViewerPan();
+  setViewerZoom(100);
 }
 
 function normalizeSettings(settings = {}) {
@@ -2184,7 +2239,7 @@ async function scanBridgeFolder() {
     errors: [],
     filter: "all",
     search: "",
-    fitMode: "fit",
+    fitMode: DEFAULT_VIEW_MODE,
     fitZoom: 100,
     zoom: 100,
     panX: 0,
@@ -2277,7 +2332,7 @@ function applyBridgeScanResult(response) {
     state.previewStatus = "loading";
     state.previewData = null;
     state.previewError = "";
-    state.fitMode = "fit";
+    state.fitMode = DEFAULT_VIEW_MODE;
     state.fitZoom = 100;
     state.zoom = 100;
     state.panX = 0;
@@ -2286,7 +2341,7 @@ function applyBridgeScanResult(response) {
     state.scanStatus = state.scanIssues.length
       ? `Escaneo completado con ${state.scanIssues.length} aviso${state.scanIssues.length === 1 ? "" : "s"}`
       : `${state.realImages.length} imágenes encontradas`;
-    state.statusText = "Generando preview";
+    state.statusText = "Generando vista";
     void requestBridgePreview(selectedImage);
     return;
   }
@@ -2387,6 +2442,19 @@ function bridgeImageToItem(image, folderIndex, imageIndex) {
 
 function basename(path) {
   return String(path || "").split(/[\\/]/).filter(Boolean).pop() || "";
+}
+
+function imageFileStem(name) {
+  return basename(name).replace(/\.[^.\\/]+$/, "") || basename(name) || "Imagen";
+}
+
+function imageFileType(image) {
+  const fromName = String(image?.name || "").split(".").pop();
+  if (fromName && fromName !== image?.name) {
+    return fromName.toUpperCase();
+  }
+  const fromDetail = String(image?.detail || "").split("·")[0]?.trim();
+  return fromDetail || state.format || "Imagen";
 }
 
 function formatBytes(bytes) {
@@ -2693,6 +2761,7 @@ function toggleInspectorDisclosure(details) {
 
 function renderShell() {
   const shell = $(".app-shell");
+  const gallery = $(".gallery-column");
   const derived = uiState();
   const visible = getVisibleAppState();
   const hasStatusFooter = state.batch === "scanning"
@@ -2713,6 +2782,9 @@ function renderShell() {
   shell.classList.toggle("export-completed", ["completed", "partial", "failed"].includes(state.exportStatus));
   shell.classList.toggle("inspector-collapsed", state.inspectorCollapsed);
   shell.dataset.uiState = visible.id;
+  if (gallery) {
+    gallery.dataset.galleryView = state.galleryView;
+  }
 }
 
 function keepActiveThumbnailVisible() {
@@ -3234,6 +3306,7 @@ function renderBatch() {
   const filmstripCount = $("#filmstrip-count");
   $("#image-search").value = state.search;
   updateBatchSearchClear();
+  renderGalleryViewButtons();
 
   if (state.batch === "none") {
     $("#batch-count").textContent = "Sin lote";
@@ -3360,11 +3433,12 @@ function filteredEmptyHtml(total, valid, warnings, errors) {
     omitted: "omitidas",
   };
   if (state.search.trim()) {
+    const term = state.search.trim();
     const searchDetail = state.filter === "all"
-      ? "No hay imágenes con ese nombre."
-      : "No hay imágenes con ese nombre en el filtro actual.";
+      ? `No hay imágenes que coincidan con "${term}".`
+      : `No hay imágenes que coincidan con "${term}" en el filtro actual.`;
     return `
-      <strong>No hay imágenes con ese nombre</strong>
+      <strong>No hay imágenes que coincidan</strong>
       <span>${escapeHtml(searchDetail)}</span>
       <button type="button" data-action="clear-filter">Limpiar búsqueda</button>
     `;
@@ -3671,19 +3745,25 @@ function imageItemHtml(image) {
   const chipLabel = exportState?.label || assetStatusLabel(imageStatus);
   const title = image.path || image.name;
   const detail = image.detail === "Lista" ? "" : image.detail;
-  const compactDetail = compactImageDetail(detail || "PNG");
+  const displayName = imageFileStem(image.name);
+  const fileType = imageFileType(image);
+  const compactDetail = compactImageDetail(detail || fileType);
+  const metadata = compactDetail.toUpperCase().startsWith(fileType)
+    ? compactDetail
+    : `${fileType} · ${compactDetail}`;
   const thumbState = thumbnailState(image, imageThumbnailSrc(image));
   const previewNote = thumbState.status === "error" ? " · sin preview" : "";
   const statusText = chipLabel ? ` · ${chipLabel}` : "";
+  const stateIcon = assetStatusIcon(effectiveStatus);
   return `
     <button type="button" class="image-item asset-row ${selected} ${chipClass}" data-image-id="${escapeHtml(image.id)}" title="${escapeHtml(title)}" aria-pressed="${selected ? "true" : "false"}" aria-label="${escapeHtml(`${image.name}${statusText}`)}">
       ${thumbnailHtml(image)}
       <span class="image-copy">
-        <strong>${escapeHtml(image.name)}</strong>
-        <small>${escapeHtml(`${compactDetail}${previewNote}`)}</small>
+        <strong>${escapeHtml(displayName)}</strong>
+        <small>${escapeHtml(`${metadata}${previewNote}`)}</small>
       </span>
       <span class="asset-state ${chipClass}" title="${escapeHtml(chipLabel || "Lista")}">
-        <span aria-hidden="true"></span>
+        <span aria-hidden="true">${escapeHtml(stateIcon)}</span>
         <em>${escapeHtml(chipLabel || "Lista")}</em>
       </span>
     </button>
@@ -3708,6 +3788,22 @@ function assetStatusLabel(status) {
   return statusLabels[status] || "Lista";
 }
 
+function assetStatusIcon(status) {
+  if (status === "warning") {
+    return "!";
+  }
+  if (status === "error") {
+    return "x";
+  }
+  if (status === "exported") {
+    return "OK";
+  }
+  if (status === "adjusted") {
+    return "*";
+  }
+  return "OK";
+}
+
 function renderFilterButtons() {
   const images = activeImages();
   const counts = {
@@ -3722,15 +3818,29 @@ function renderFilterButtons() {
     warnings: "Con aviso",
     omitted: "Omitidas",
   };
+  const hasWarnings = counts.warnings > 0;
+  const order = hasWarnings
+    ? { warnings: 1, valid: 2, all: 3, omitted: 4 }
+    : { all: 1, valid: 2, omitted: 3, warnings: 4 };
   $$(".batch-filter button").forEach((button) => {
     const filter = button.dataset.filter;
     const count = counts[filter] || 0;
     button.innerHTML = `${escapeHtml(labels[filter])} <span>${escapeHtml(count)}</span>`;
     button.title = `${labels[filter]} ${count}`;
+    button.style.order = String(order[filter] || 9);
     button.classList.toggle("active", button.dataset.filter === state.filter);
     const empty = filter !== "all" && !count;
     button.classList.toggle("is-empty", empty);
-    button.hidden = false;
+    button.hidden = (filter === "warnings" && !hasWarnings && state.filter !== "warnings")
+      || (filter === "omitted" && !count && state.filter !== "omitted");
+  });
+}
+
+function renderGalleryViewButtons() {
+  $$("[data-gallery-view]").forEach((button) => {
+    const active = button.dataset.galleryView === state.galleryView;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
   });
 }
 
@@ -3749,7 +3859,7 @@ function renderPreview() {
           ? "Escaneando carpeta"
           : "Selecciona una imagen";
   $("#preview-subtitle").textContent = previewSubtitle(image);
-  $("#zoom-label").textContent = state.fitMode === "fit" ? `${state.fitZoom}%` : `${state.zoom}%`;
+  $("#zoom-label").textContent = `${currentViewerZoom()}%`;
   const visibleImages = filteredImages();
   const visibleIndex = visibleImages.findIndex((item) => item.id === state.selectedImageId);
   $("#viewer-position").textContent = visibleIndex >= 0
@@ -3758,6 +3868,10 @@ function renderPreview() {
   $("#preview-meta").textContent = isBridgeImage
     ? bridgePreviewMeta()
     : image ? state.activePreset : "Sin lote";
+  const outputContext = $("#preview-output-context");
+  if (outputContext) {
+    outputContext.innerHTML = previewOutputContextHtml(image);
+  }
   $("#canvas-area").className = `canvas-area bg-${state.previewBg === "transparent" ? "transparent" : state.previewBg}`;
   $$(".preview-toolbar [data-preview-mode]").forEach((button) => {
     button.classList.toggle("active", button.dataset.previewMode === state.previewMode);
@@ -3769,11 +3883,21 @@ function renderPreview() {
     button.classList.toggle("active", button.dataset.previewBg === state.previewBg);
     button.disabled = previewControlsDisabled;
   });
-  $$("[data-action='zoom-fit'], [data-action='zoom-100'], [data-action='zoom-out'], [data-action='zoom-in'], [data-action='force-preview-error']").forEach((button) => {
+  $$("[data-action='zoom-fit'], [data-action='zoom-height'], [data-action='zoom-width'], [data-action='zoom-100'], [data-action='zoom-out'], [data-action='zoom-in'], [data-action='force-preview-error']").forEach((button) => {
     button.disabled = previewControlsDisabled;
   });
-  $$("[data-action='zoom-fit'], [data-action='zoom-100']").forEach((button) => {
-    button.classList.toggle("active", button.dataset.action === "zoom-fit" ? state.fitMode === "fit" : state.fitMode !== "fit" && state.zoom === 100);
+  $$("[data-action='zoom-fit'], [data-action='zoom-height'], [data-action='zoom-width'], [data-action='zoom-100']").forEach((button) => {
+    const expectedMode = button.dataset.action === "zoom-fit"
+      ? "fit"
+      : button.dataset.action === "zoom-height"
+        ? "height"
+        : button.dataset.action === "zoom-width"
+          ? "width"
+          : "manual";
+    const active = expectedMode === "manual"
+      ? state.fitMode === "manual" && state.zoom === 100
+      : state.fitMode === expectedMode;
+    button.classList.toggle("active", active);
     button.setAttribute("aria-pressed", button.classList.contains("active") ? "true" : "false");
   });
   $$("[data-action='previous-image'], [data-action='next-image']").forEach((button) => {
@@ -3785,8 +3909,8 @@ function renderPreview() {
     previewPanel.className = `preview-panel preview-panel--${previewOrientation()}`;
   }
   const canvas = $("#preview-canvas");
-  canvas.className = `preview-canvas ${state.previewMode} bg-${state.previewBg} ${state.fitMode === "fit" ? "fit-mode" : "zoom-mode"}`;
-  canvas.style.setProperty("--preview-scale", state.fitMode === "fit" ? "1" : String(state.zoom / 100));
+  canvas.className = `preview-canvas ${state.previewMode} bg-${state.previewBg} ${viewerModeClass()}`;
+  canvas.style.setProperty("--preview-scale", isAutoViewerMode() ? "1" : String(state.zoom / 100));
   applyViewerPanDom();
 
   if (state.batch === "none") {
@@ -3878,7 +4002,7 @@ function updateFitZoomReadout() {
   if (!label) {
     return;
   }
-  if (state.fitMode !== "fit") {
+  if (!isAutoViewerMode()) {
     label.textContent = `${state.zoom}%`;
     return;
   }
@@ -3903,7 +4027,13 @@ function calculateFitZoom() {
   const availableHeight = Math.max(1, canvas.clientHeight - 48);
   canvas.style.setProperty("--fit-width", `${availableWidth}px`);
   canvas.style.setProperty("--fit-height", `${availableHeight}px`);
-  const fit = Math.min(availableWidth / naturalWidth, availableHeight / naturalHeight);
+  const widthFit = availableWidth / naturalWidth;
+  const heightFit = availableHeight / naturalHeight;
+  const fit = state.fitMode === "width"
+    ? widthFit
+    : state.fitMode === "height"
+      ? Math.min(heightFit, widthFit)
+      : Math.min(widthFit, heightFit);
   return Math.max(1, Math.min(100, Math.round(fit * 100)));
 }
 
@@ -3962,6 +4092,43 @@ function previewSettingsLabel() {
     return state.presetDirty ? "Aspecto modificado" : "Salida";
   }
   return state.presetDirty ? "Aspecto modificado" : "Aspecto";
+}
+
+function previewModeLabel() {
+  if (state.previewMode === "original") {
+    return "Original";
+  }
+  if (state.previewMode === "compare") {
+    return "Comparación";
+  }
+  return "Vista previa";
+}
+
+function previewOutputContextHtml(image) {
+  if (!image || state.batch !== "ready") {
+    return "";
+  }
+  const reviewBackground = backgroundLabel(state.previewBg);
+  const outputBackground = backgroundLabel(state.background);
+  const backgroundDetail = state.previewBg === state.background
+    ? `Fondo de salida: ${outputBackground}`
+    : `Fondo de revisión: ${reviewBackground} · salida: ${outputBackground}`;
+  const outputLine = `${state.format} · ${outputSizeDisplay()} · ${backgroundDetail}`;
+  const modeLine = state.previewMode === "original"
+    ? "Original sin salida aplicada"
+    : state.previewMode === "compare"
+      ? "Comparando original y vista previa"
+      : "Previsualización de salida";
+  return `
+    <span>${escapeHtml(previewModeLabel())}</span>
+    <strong>${escapeHtml(outputLine)}</strong>
+    <small>${escapeHtml(modeLine)}</small>
+  `;
+}
+
+function outputSizeDisplay() {
+  const size = parseOutputSize(state.size);
+  return `${size.width} x ${size.height}`;
 }
 
 function previewStateHtml(title, detail) {
@@ -4044,7 +4211,7 @@ function previewSubtitle(image) {
   }
   if (image.source === "bridge") {
     if (state.previewStatus === "loading") {
-      return "Generando preview";
+      return "Generando vista";
     }
     if (state.previewStatus === "warning") {
       return "Vista con aviso";
@@ -4058,7 +4225,7 @@ function previewSubtitle(image) {
     return "Vista pendiente";
   }
   if (state.previewStatus === "loading") {
-    return "Generando preview";
+    return "Generando vista";
   }
   if (state.previewStatus === "warning") {
     return "Vista con aviso";
@@ -5333,10 +5500,11 @@ function handleAction(action) {
   } else if (action === "close-preset-editor") {
     closePresetEditor();
   } else if (action === "zoom-fit") {
-    state.fitMode = "fit";
-    resetViewerPan();
-    state.statusText = "Imagen ajustada";
-    render();
+    setViewerMode("fit");
+  } else if (action === "zoom-height") {
+    setViewerMode("height");
+  } else if (action === "zoom-width") {
+    setViewerMode("width");
   } else if (action === "zoom-100") {
     resetViewerPan();
     setViewerZoom(100);
@@ -5485,6 +5653,14 @@ document.addEventListener("click", (event) => {
   if (filterTarget) {
     state.filter = filterTarget.dataset.filter;
     state.statusText = filterStatusText(state.filter);
+    render();
+    return;
+  }
+
+  const galleryViewTarget = event.target.closest("[data-gallery-view]");
+  if (galleryViewTarget) {
+    state.galleryView = galleryViewTarget.dataset.galleryView === "list" ? "list" : "thumbs";
+    state.statusText = state.galleryView === "list" ? "Galería en lista" : "Galería en miniaturas";
     render();
     return;
   }
@@ -5742,12 +5918,20 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
+  const key = event.key.toLowerCase();
   if (event.key === "ArrowLeft") {
     event.preventDefault();
     selectAdjacentImage(-1);
   } else if (event.key === "ArrowRight") {
     event.preventDefault();
     selectAdjacentImage(1);
+  } else if (key === "f" && isViewerNavigationAvailable()) {
+    event.preventDefault();
+    setViewerMode("fit");
+  } else if (key === "1" && isViewerNavigationAvailable()) {
+    event.preventDefault();
+    resetViewerPan();
+    setViewerZoom(100);
   }
 });
 
@@ -5817,6 +6001,13 @@ function initViewerCanvasNavigation() {
     return;
   }
   canvas.addEventListener("wheel", handleViewerWheel, { passive: false });
+  canvas.addEventListener("dblclick", (event) => {
+    if (event.target.closest("button, input, textarea, select, summary, a")) {
+      return;
+    }
+    event.preventDefault();
+    toggleViewerZoomMode();
+  });
   canvas.addEventListener("pointerdown", handleViewerPointerDown);
   document.addEventListener("pointermove", handleViewerPointerMove);
   document.addEventListener("pointerup", handleViewerPointerEnd);

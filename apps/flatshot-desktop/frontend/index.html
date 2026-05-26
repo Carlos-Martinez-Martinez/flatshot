@@ -172,11 +172,16 @@
             </div>
             <span id="batch-visible-count">0</span>
 
+            <div class="segmented compact gallery-view-switch" aria-label="Vista de galería">
+              <button type="button" data-gallery-view="thumbs">Miniaturas</button>
+              <button type="button" data-gallery-view="list">Lista</button>
+            </div>
+
             <label class="search-field gallery-search">
               <span>Buscar imagen</span>
               <div class="batch-search__box">
                 <span aria-hidden="true">⌕</span>
-                <input id="image-search" type="search" placeholder="Buscar imagen..." autocomplete="off" />
+                <input id="image-search" type="search" placeholder="Buscar por nombre o referencia..." autocomplete="off" />
                 <button type="button" id="image-search-clear" data-action="clear-search" aria-label="Limpiar búsqueda">×</button>
               </div>
             </label>
@@ -210,8 +215,10 @@
                 <button type="button" data-action="previous-image" aria-label="Imagen anterior" title="Imagen anterior">‹</button>
                 <span id="viewer-position">Sin imagen</span>
                 <button type="button" data-action="next-image" aria-label="Imagen siguiente" title="Imagen siguiente">›</button>
-                <button type="button" data-action="zoom-fit" title="Ajustar al visor">Ajustar</button>
-                <button type="button" data-action="zoom-100" title="Ver al 100%">1:1</button>
+                <button type="button" data-action="zoom-fit" title="Encajar imagen en el visor (F)">Encajar</button>
+                <button type="button" data-action="zoom-height" title="Aprovechar la altura del visor">Altura</button>
+                <button type="button" data-action="zoom-width" title="Aprovechar la anchura del visor">Anchura</button>
+                <button type="button" data-action="zoom-100" title="Ver al 100% (1)">100 %</button>
                 <button type="button" data-action="zoom-out" aria-label="Reducir zoom" title="Reducir zoom">-</button>
                 <span id="zoom-label">100%</span>
                 <button type="button" data-action="zoom-in" aria-label="Aumentar zoom" title="Aumentar zoom">+</button>
@@ -220,6 +227,7 @@
           </div>
 
           <div class="canvas-area" id="canvas-area">
+            <div class="preview-output-context" id="preview-output-context" aria-live="polite"></div>
             <div class="preview-canvas" id="preview-canvas" aria-live="polite" aria-label="Canvas de revisión. Arrastra para mover la imagen y usa la rueda para cambiar el zoom."></div>
           </div>
 

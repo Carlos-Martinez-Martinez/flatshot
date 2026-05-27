@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>FlatShot Desktop</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./styles.css?v=20260526-prune1" />
-    <link rel="stylesheet" href="./ux-foundation.css?v=20260526-prune1" />
+    <link rel="stylesheet" href="./styles.css?v=20260527-export1" />
+    <link rel="stylesheet" href="./ux-foundation.css?v=20260527-export1" />
   </head>
   <body>
     <main class="app-shell" aria-label="FlatShot nueva app">
@@ -512,6 +512,24 @@
         </section>
       </div>
 
+      <div class="app-settings-backdrop export-confirm-backdrop is-hidden" id="export-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="export-confirm-title">
+        <section class="app-settings-dialog export-confirm-dialog">
+          <header class="app-settings-header">
+            <div>
+              <span class="eyebrow">Exportación</span>
+              <h2 id="export-confirm-title">Exportar lote</h2>
+              <small id="export-confirm-subtitle">Revisa los puntos que pueden afectar a la salida.</small>
+            </div>
+            <button type="button" class="icon-button" data-action="cancel-export-confirm" aria-label="Cerrar confirmación">×</button>
+          </header>
+          <div class="export-confirm-content" id="export-confirm-body"></div>
+          <footer class="app-settings-footer">
+            <button type="button" data-action="cancel-export-confirm">Cancelar</button>
+            <button type="button" class="primary" id="export-confirm-action" data-action="confirm-export">Exportar</button>
+          </footer>
+        </section>
+      </div>
+
       <div class="app-settings-backdrop is-hidden" id="app-settings-modal" role="dialog" aria-modal="true" aria-labelledby="app-settings-title">
         <section class="app-settings-dialog">
           <header class="app-settings-header">
@@ -646,6 +664,6 @@
       </footer>
     </main>
 
-    <script src="./app.js?v=20260526-ux-foundation1"></script>
+    <script src="./app.js?v=20260527-export1"></script>
   </body>
 </html>

@@ -285,6 +285,9 @@ const state = {
   outputDraft: null,
   appSettingsOpen: false,
   batchDetailOpen: false,
+  exportConfirmOpen: false,
+  exportConfirmRisks: [],
+  exportConfirmOptions: null,
   outputProfiles: initialOutputProfiles,
   activeOutputProfileId: initialOutputProfile.id,
   outputProfileEditorId: initialOutputProfile.id,
@@ -800,6 +803,157 @@ function preflightCounts() {
   };
 }
 
+function exportConfirmationRisks() {
+  const counts = batchCounts();
+  const risks = [];
+  const exportableWarningImages = exportableImages().filter((image) => image.status === "warning").length;
+
+  validationIssues()
+    .filter((issue) => issue.level === "error" && issue.title !== "Sin lote")
+    .forEach((issue) => {
+      risks.push({
+        id: `blocker-${issue.title}`,
+        level: "error",
+        blocking: true,
+        title: issue.title,
+        detail: issue.detail || "Resuelve este punto antes de exportar.",
+      });
+    });
+
+  if (counts.omittedFiles > 0) {
+    risks.push({
+      id: "omitted-files",
+      level: "warning",
+      title: `${counts.omittedFiles} archivo${counts.omittedFiles === 1 ? "" : "s"} omitido${counts.omittedFiles === 1 ? "" : "s"}`,
+      detail: omittedSummaryText(state.scanDiagnostics),
+    });
+  }
+
+  if (exportableWarningImages > 0) {
+    risks.push({
+      id: "image-warnings",
+      level: "warning",
+      title: `${exportableWarningImages} imagen${exportableWarningImages === 1 ? "" : "es"} con aviso`,
+      detail: "Se exportarán, pero conviene revisarlas si el lote es de producción.",
+    });
+  }
+
+  if (counts.nonExportableImages > 0) {
+    risks.push({
+      id: "non-exportable-images",
+      level: "warning",
+      title: `${counts.nonExportableImages} imagen${counts.nonExportableImages === 1 ? "" : "es"} fuera de la salida`,
+      detail: "No se incluirán en la exportación.",
+    });
+  }
+
+  const existingOutputIssue = [...state.errors, ...state.exportIssues].find(issueMentionsExistingOutput);
+  if (existingOutputIssue) {
+    risks.push({
+      id: "existing-output-blocker",
+      level: "error",
+      blocking: true,
+      title: "Archivos ya existentes",
+      detail: "Cambia el destino o el nombre de archivo antes de exportar de nuevo.",
+    });
+  } else if (hasPreviousExportDestination()) {
+    risks.push({
+      id: "previous-export-destination",
+      level: "warning",
+      title: "Destino usado en la exportación anterior",
+      detail: "Si ya existen archivos con el mismo nombre, el motor local no debe sobrescribirlos sin validación.",
+    });
+  }
+
+  const lowResolutionCount = lowResolutionImageCount();
+  if (lowResolutionCount > 0) {
+    risks.push({
+      id: "low-resolution",
+      level: "warning",
+      title: `${lowResolutionCount} imagen${lowResolutionCount === 1 ? "" : "es"} por debajo del tamaño de salida`,
+      detail: "La imagen puede ampliarse para llegar al tamaño configurado.",
+    });
+  }
+
+  if (advancedSettingsDirty()) {
+    risks.push({
+      id: "advanced-settings",
+      level: "warning",
+      title: "Ajustes avanzados modificados",
+      detail: "La exportación usará esos valores.",
+    });
+  }
+
+  if (state.exportStatus === "failed" && state.errors.some((issue) => issue.level === "error" && !issueMentionsExistingOutput(issue))) {
+    risks.push({
+      id: "previous-export-errors",
+      level: "warning",
+      title: "Errores en la última exportación",
+      detail: "Puedes reintentar, pero revisa el resultado si vuelve a fallar.",
+    });
+  }
+
+  state.errors
+    .filter((issue) => issue.level !== "error" && !issueMentionsExistingOutput(issue))
+    .slice(0, 2)
+    .forEach((issue, index) => {
+      risks.push({
+        id: `state-warning-${index}-${issue.title}`,
+        level: "warning",
+        title: issue.title || "Aviso",
+        detail: issue.detail || "Revisa este punto antes de exportar.",
+      });
+    });
+
+  return dedupeExportRisks(risks);
+}
+
+function dedupeExportRisks(risks) {
+  const seen = new Set();
+  return risks.filter((risk) => {
+    const key = risk.id || `${risk.title}-${risk.detail}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+function issueMentionsExistingOutput(issue) {
+  const text = `${issue?.title || ""} ${issue?.detail || ""}`.toLowerCase();
+  return /ya existe|existente|existentes|sobrescri|overwrite|already exists|collision|colisi/.test(text);
+}
+
+function hasPreviousExportDestination() {
+  return ["completed", "partial"].includes(state.exportStatus) && Boolean(outputDestinationToOpen());
+}
+
+function imageDimensions(image) {
+  const width = Number(image?.width || image?.naturalWidth || image?.sourceWidth || 0);
+  const height = Number(image?.height || image?.naturalHeight || image?.sourceHeight || 0);
+  if (width > 0 && height > 0) {
+    return { width, height };
+  }
+  const detail = String(image?.detail || "");
+  const match = /(\d{2,5})\s*[x×]\s*(\d{2,5})/i.exec(detail);
+  if (!match) {
+    return null;
+  }
+  return {
+    width: Number.parseInt(match[1], 10),
+    height: Number.parseInt(match[2], 10),
+  };
+}
+
+function lowResolutionImageCount() {
+  const target = parseOutputSize(state.size);
+  return exportableImages().filter((image) => {
+    const dimensions = imageDimensions(image);
+    return dimensions && (dimensions.width < target.width || dimensions.height < target.height);
+  }).length;
+}
+
 function isExportReady() {
   return validationIssues().filter((issue) => issue.level === "error" || issue.title !== "Sin lote").length === 0
     && hasBatch()
@@ -966,9 +1120,9 @@ function getVisibleAppState() {
       title: "Exportación con errores",
       subtitle: issue?.detail || "Revisa el detalle antes de continuar.",
       topSummary: compactHeaderStatusText(),
-      primaryAction: { label: "Ver detalle técnico", action: "review-warnings", enabled: true },
+      primaryAction: { label: "Ver error", action: "review-warnings", enabled: true },
       secondaryAction: isExportReady() ? { label: "Exportar de nuevo", action: "start-export", enabled: true } : null,
-      nextStep: "Revisar errores",
+      nextStep: "Revisar error",
       counts,
     };
   }
@@ -1109,6 +1263,9 @@ function setScenario(scenario) {
     inspectorTab: "review",
     outputEditMode: false,
     presetEditorOpen: false,
+    exportConfirmOpen: false,
+    exportConfirmRisks: [],
+    exportConfirmOptions: null,
     scanIssues: [],
     scanDiagnostics: mockScanDiagnostics(),
     paused: false,
@@ -1649,6 +1806,9 @@ function refreshPreviewAfterSettingChange() {
 }
 
 function startExport(options = {}) {
+  if (state.appSettingsOpen && outputProfileHasUnsavedChanges() && !confirmDiscardOutputDraft("exportar sin aplicar esos cambios")) {
+    return;
+  }
   clearTimers();
   if (!isExportReady()) {
     state.exportStatus = "blocked";
@@ -1656,6 +1816,17 @@ function startExport(options = {}) {
     render();
     return;
   }
+
+  const risks = exportConfirmationRisks();
+  if (!options.confirmed && risks.length) {
+    openExportConfirm(risks, options);
+    return;
+  }
+  if (risks.some((risk) => risk.blocking)) {
+    openExportConfirm(risks, options);
+    return;
+  }
+  closeExportConfirm({ renderAfter: false });
 
   if (isBridgeBatch()) {
     void startBridgeExport();
@@ -1687,6 +1858,9 @@ function startExport(options = {}) {
     exportCompletedItems: [],
     exportIssues: [],
     exportResult: null,
+    exportConfirmOpen: false,
+    exportConfirmRisks: [],
+    exportConfirmOptions: null,
     errors: [],
     paused: false,
     statusText: "Preparando exportación",
@@ -2119,6 +2293,7 @@ async function checkBridge() {
 
 async function pickBridgeFolder() {
   state.batchDetailOpen = false;
+  state.exportConfirmOpen = false;
   state.bridgeMode = "bridge";
   state.bridgeStatus = "checking";
   state.bridgeMessage = "Abriendo selector";
@@ -2610,6 +2785,7 @@ function render() {
   renderSettings();
   renderExport();
   renderBatchDetail();
+  renderExportConfirm();
   renderAppSettings();
   renderInspector();
   renderFooter();
@@ -3314,6 +3490,101 @@ function renderBatchDetail() {
   if (body) {
     body.innerHTML = batchDetailHtml();
   }
+}
+
+function renderExportConfirm() {
+  const modal = $("#export-confirm-modal");
+  if (!modal) {
+    return;
+  }
+  modal.classList.toggle("is-hidden", !state.exportConfirmOpen);
+  modal.setAttribute("aria-hidden", state.exportConfirmOpen ? "false" : "true");
+  if (!state.exportConfirmOpen) {
+    return;
+  }
+
+  const risks = state.exportConfirmRisks.length ? state.exportConfirmRisks : exportConfirmationRisks();
+  const body = $("#export-confirm-body");
+  if (body) {
+    body.innerHTML = exportConfirmHtml(risks);
+  }
+  const action = $("#export-confirm-action");
+  if (action) {
+    const blocking = risks.some((risk) => risk.blocking);
+    const count = batchCounts().exportableImages;
+    action.textContent = blocking
+      ? "Revisar problemas"
+      : `Exportar ${count} imagen${count === 1 ? "" : "es"}`;
+    action.classList.toggle("danger", blocking);
+  }
+  const subtitle = $("#export-confirm-subtitle");
+  if (subtitle) {
+    const blocking = risks.some((risk) => risk.blocking);
+    subtitle.textContent = blocking
+      ? "Hay puntos que impiden exportar."
+      : "Confirma solo los puntos que requieren atención.";
+  }
+}
+
+function exportConfirmHtml(risks) {
+  const counts = batchCounts();
+  const blocking = risks.some((risk) => risk.blocking);
+  const exportable = counts.exportableImages;
+  const summaryRows = [
+    ["Imágenes", `${exportable} exportable${exportable === 1 ? "" : "s"}`],
+    ["Formato", `${state.format} · ${outputSizeDisplay()} · ${backgroundLabel(state.background)}`],
+    ["Destino", destinationFallbackLabel()],
+    ["Nombre", namingExample()],
+  ];
+  const riskTitle = blocking ? "Bloqueos" : "Avisos";
+  const riskRows = risks.length
+    ? risks.map(exportConfirmRiskHtml).join("")
+    : `
+      <div class="export-confirm-risk ready">
+        <span aria-hidden="true">✓</span>
+        <div>
+          <strong>Sin avisos</strong>
+          <small>El lote se exportará con el formato activo.</small>
+        </div>
+      </div>
+    `;
+  const overwriteNote = risks.some((risk) => risk.id === "previous-export-destination" || risk.id === "existing-output-blocker")
+    ? `
+      <div class="export-confirm-note">
+        <strong>Archivos existentes</strong>
+        <span>FlatShot mantiene la validación segura: no sobrescribe archivos existentes sin soporte explícito del motor local.</span>
+      </div>
+    `
+    : "";
+
+  return `
+    <div class="export-confirm-summary">
+      ${summaryRows.map(([label, value]) => `
+        <div>
+          <span>${escapeHtml(label)}</span>
+          <strong title="${escapeHtml(value)}">${escapeHtml(value)}</strong>
+        </div>
+      `).join("")}
+    </div>
+    <section class="export-confirm-section">
+      <h3>${escapeHtml(riskTitle)}</h3>
+      <div class="export-confirm-risks">${riskRows}</div>
+    </section>
+    ${overwriteNote}
+  `;
+}
+
+function exportConfirmRiskHtml(risk) {
+  const icon = risk.blocking ? "!" : "⚠";
+  return `
+    <div class="export-confirm-risk ${risk.blocking ? "error" : "warning"}">
+      <span aria-hidden="true">${escapeHtml(icon)}</span>
+      <div>
+        <strong>${escapeHtml(risk.title)}</strong>
+        <small>${escapeHtml(risk.detail || "Revisar antes de exportar.")}</small>
+      </div>
+    </div>
+  `;
 }
 
 function batchDetailHtml() {
@@ -5135,6 +5406,7 @@ function resetOutputProfileDraft() {
 
 function openAppSettings() {
   state.batchDetailOpen = false;
+  state.exportConfirmOpen = false;
   const activeProfile = activeOutputProfile();
   const profile = outputMatchesProfile(activeProfile)
     ? activeProfile
@@ -5161,6 +5433,7 @@ function closeAppSettings() {
 }
 
 function openBatchDetail() {
+  state.exportConfirmOpen = false;
   state.batchDetailOpen = true;
   state.statusText = "Detalle del lote";
   render();
@@ -5170,6 +5443,40 @@ function closeBatchDetail() {
   state.batchDetailOpen = false;
   state.statusText = hasBatch() ? "Lote cargado" : "Sin lote";
   render();
+}
+
+function openExportConfirm(risks, options = {}) {
+  state.appSettingsOpen = false;
+  state.outputProfileDraft = null;
+  state.batchDetailOpen = false;
+  state.exportConfirmOpen = true;
+  state.exportConfirmRisks = dedupeExportRisks(risks);
+  state.exportConfirmOptions = { ...options };
+  state.statusText = state.exportConfirmRisks.some((risk) => risk.blocking)
+    ? "Resuelve problemas antes de exportar"
+    : "Confirmar exportación";
+  render();
+}
+
+function closeExportConfirm({ renderAfter = true } = {}) {
+  state.exportConfirmOpen = false;
+  state.exportConfirmRisks = [];
+  state.exportConfirmOptions = null;
+  if (renderAfter) {
+    render();
+  }
+}
+
+function confirmExportFromModal() {
+  const risks = state.exportConfirmRisks || [];
+  if (risks.some((risk) => risk.blocking)) {
+    closeExportConfirm({ renderAfter: false });
+    reviewWarnings();
+    return;
+  }
+  const options = { ...(state.exportConfirmOptions || {}), confirmed: true };
+  closeExportConfirm({ renderAfter: false });
+  startExport(options);
 }
 
 function confirmDiscardOutputDraft(actionLabel) {
@@ -5755,20 +6062,28 @@ function renderExportResult() {
       : state.exportStatus === "completed"
         ? "ready"
         : "running";
+  const meta = exportResultMeta(processed, total, errors);
 
   const destinationHtml = destinations.length
     ? destinations.slice(0, 3).map((path) => `
       <div class="result-path" title="${escapeHtml(path)}">
-        <span>Destino</span>
+        <span>Carpeta</span>
         <strong>${escapeHtml(path)}</strong>
       </div>
     `).join("")
-    : `<div class="result-path muted"><span>Destino</span><strong>${escapeHtml(destinationFallbackLabel())}</strong></div>`;
+    : `<div class="result-path muted"><span>Carpeta</span><strong>${escapeHtml(destinationFallbackLabel())}</strong></div>`;
+
+  const currentItemHtml = state.exportStatus === "running" ? `
+    <div class="result-path muted">
+      <span>Actual</span>
+      <strong title="${escapeHtml(currentExportFileLabel())}">${escapeHtml(currentExportFileLabel())}</strong>
+    </div>
+  ` : "";
 
   const issuesHtml = issues.length ? `
     <div class="result-issues">
       <strong>${errors ? `${errors} error${errors === 1 ? "" : "es"}` : `${issues.length} aviso${issues.length === 1 ? "" : "s"}`}</strong>
-      <span>${escapeHtml(issues[0].title)} · ${escapeHtml(issues[0].detail)}</span>
+      <span>${escapeHtml(exportIssueActionText(issues[0]))}</span>
     </div>
   ` : "";
 
@@ -5781,15 +6096,18 @@ function renderExportResult() {
       `).join("")}
     </div>
   ` : "";
+  const actionsHtml = exportResultActionsHtml(issues, destinations);
 
   target.innerHTML = `
     <div class="result-header ${resultClass}">
       <strong>${escapeHtml(title)}</strong>
-      <span>${escapeHtml(processed)}/${escapeHtml(total)} archivos</span>
+      <span>${escapeHtml(meta)}</span>
     </div>
     ${destinationHtml}
+    ${currentItemHtml}
     ${issuesHtml}
     ${itemsHtml}
+    ${actionsHtml}
   `;
 }
 
@@ -5807,6 +6125,62 @@ function exportResultTitle() {
     return "Exportación fallida";
   }
   return "Resultado";
+}
+
+function exportResultMeta(processed, total, errors) {
+  if (state.exportStatus === "running") {
+    return `${processed}/${total} imágenes`;
+  }
+  if (state.exportStatus === "completed") {
+    return `${processed}/${total} exportadas`;
+  }
+  if (state.exportStatus === "partial") {
+    return `${processed}/${total} exportadas · ${errors} error${errors === 1 ? "" : "es"}`;
+  }
+  if (state.exportStatus === "failed") {
+    return errors ? `${errors} error${errors === 1 ? "" : "es"}` : "No completada";
+  }
+  return `${processed}/${total}`;
+}
+
+function currentExportFileLabel() {
+  const images = exportableImages();
+  if (!images.length) {
+    return state.statusText || "Preparando";
+  }
+  const index = Math.min(Math.max(Number(state.processed) || 0, 0), images.length - 1);
+  return images[index]?.name || state.statusText || "Preparando";
+}
+
+function exportIssueActionText(issue) {
+  if (!issue) {
+    return "Revisa el resultado.";
+  }
+  if (issueMentionsExistingOutput(issue)) {
+    return "Ya hay archivos en destino. Cambia la carpeta o el nombre final.";
+  }
+  const title = issue.title || "Exportación";
+  const detail = issue.detail || "Revisa el resultado.";
+  return `${title} · ${detail}`;
+}
+
+function exportResultActionsHtml(issues, destinations) {
+  const actions = [];
+  if ((state.exportStatus === "completed" || state.exportStatus === "partial") && outputDestinationToOpen()) {
+    actions.push('<button type="button" data-action="open-output">Abrir carpeta</button>');
+  }
+  if (issues.length || state.exportStatus === "failed" || state.exportStatus === "partial") {
+    actions.push('<button type="button" data-action="review-errors">Ver avisos</button>');
+  }
+  if (state.exportStatus === "failed" && isExportReady()) {
+    actions.push('<button type="button" class="primary" data-action="start-export">Reintentar</button>');
+  }
+  if (!actions.length || destinations.length > 3) {
+    return destinations.length > 3
+      ? `<div class="result-actions"><span>${escapeHtml(destinations.length - 3)} carpetas más</span>${actions.join("")}</div>`
+      : "";
+  }
+  return `<div class="result-actions">${actions.join("")}</div>`;
 }
 
 function destinationFallbackLabel() {
@@ -6203,6 +6577,10 @@ function handleAction(action, target = null) {
     openBatchDetail();
   } else if (action === "close-batch-detail") {
     closeBatchDetail();
+  } else if (action === "cancel-export-confirm") {
+    closeExportConfirm();
+  } else if (action === "confirm-export") {
+    confirmExportFromModal();
   } else if (action === "new-output-profile") {
     newOutputProfile();
   } else if (action === "duplicate-output-profile") {
@@ -6349,6 +6727,11 @@ document.addEventListener("click", (event) => {
 
   if (event.target.id === "batch-detail-modal") {
     closeBatchDetail();
+    return;
+  }
+
+  if (event.target.id === "export-confirm-modal") {
+    closeExportConfirm();
     return;
   }
 
@@ -6629,6 +7012,11 @@ document.addEventListener("keydown", (event) => {
   }
 
   if (event.key === "Escape") {
+    if (state.exportConfirmOpen) {
+      closeExportConfirm();
+      event.preventDefault();
+      return;
+    }
     if (state.batchDetailOpen) {
       closeBatchDetail();
       event.preventDefault();

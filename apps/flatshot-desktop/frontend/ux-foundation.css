@@ -906,6 +906,21 @@
   display: block;
 }
 
+.preview-canvas:focus-visible,
+.output-profile-option:focus-visible,
+.preset-chip:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+.batch-detail-row strong,
+.result-path strong,
+.format-preview-card strong,
+.export-confirm-summary strong {
+  user-select: text;
+}
+
 .review-card--compact,
 .review-output-card--compact {
   padding: var(--space-3);

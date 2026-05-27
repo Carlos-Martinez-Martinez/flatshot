@@ -337,6 +337,7 @@ const MAX_THUMBNAIL_FALLBACKS = 3;
 let fitZoomFrame = 0;
 let viewerResizeObserver = null;
 let inspectorScrollTopBeforeToggle = 0;
+let modalFocusReturnTarget = null;
 const inspectorDisclosureTimers = new WeakMap();
 const INSPECTOR_DISCLOSURE_MS = 220;
 const viewerPanState = {
@@ -833,7 +834,7 @@ function exportConfirmationRisks() {
     risks.push({
       id: "image-warnings",
       level: "warning",
-      title: `${exportableWarningImages} imagen${exportableWarningImages === 1 ? "" : "es"} con aviso`,
+      title: `${countText(exportableWarningImages, "imagen", "imágenes")} con aviso`,
       detail: "Se exportarán, pero conviene revisarlas si el lote es de producción.",
     });
   }
@@ -842,7 +843,7 @@ function exportConfirmationRisks() {
     risks.push({
       id: "non-exportable-images",
       level: "warning",
-      title: `${counts.nonExportableImages} imagen${counts.nonExportableImages === 1 ? "" : "es"} fuera de la salida`,
+      title: `${countText(counts.nonExportableImages, "imagen", "imágenes")} fuera de la salida`,
       detail: "No se incluirán en la exportación.",
     });
   }
@@ -870,7 +871,7 @@ function exportConfirmationRisks() {
     risks.push({
       id: "low-resolution",
       level: "warning",
-      title: `${lowResolutionCount} imagen${lowResolutionCount === 1 ? "" : "es"} por debajo del tamaño de salida`,
+      title: `${countText(lowResolutionCount, "imagen", "imágenes")} por debajo del tamaño de salida`,
       detail: "La imagen puede ampliarse para llegar al tamaño configurado.",
     });
   }
@@ -1514,7 +1515,7 @@ function rememberSelectedImage(image) {
   }
 }
 
-function selectAdjacentImage(delta) {
+function selectAdjacentImage(delta, options = {}) {
   const images = filteredImages();
   if (!images.length) {
     return;
@@ -1523,6 +1524,31 @@ function selectAdjacentImage(delta) {
   const startIndex = currentIndex >= 0 ? currentIndex : 0;
   const nextIndex = Math.max(0, Math.min(images.length - 1, startIndex + delta));
   selectImage(images[nextIndex].id);
+  if (options.focus) {
+    queueImageFocus(images[nextIndex].id);
+  }
+}
+
+function selectEdgeImage(edge, options = {}) {
+  const images = filteredImages();
+  if (!images.length) {
+    return;
+  }
+  const image = edge === "last" ? images[images.length - 1] : images[0];
+  selectImage(image.id);
+  if (options.focus) {
+    queueImageFocus(image.id);
+  }
+}
+
+function queueImageFocus(imageId = state.selectedImageId) {
+  if (!imageId) {
+    return;
+  }
+  window.requestAnimationFrame(() => {
+    const button = $$("#image-list [data-image-id]").find((item) => item.dataset.imageId === imageId);
+    button?.focus({ preventScroll: true });
+  });
 }
 
 function imageOverrideKey(image = selectedImage()) {
@@ -2789,6 +2815,7 @@ function render() {
   renderAppSettings();
   renderInspector();
   renderFooter();
+  renderAccessibilityHints();
   syncOpenInspectorDisclosureHeights();
   keepActiveThumbnailVisible();
 }
@@ -3514,7 +3541,7 @@ function renderExportConfirm() {
     const count = batchCounts().exportableImages;
     action.textContent = blocking
       ? "Revisar problemas"
-      : `Exportar ${count} imagen${count === 1 ? "" : "es"}`;
+      : `Exportar ${imageCountLabel(count)}`;
     action.classList.toggle("danger", blocking);
   }
   const subtitle = $("#export-confirm-subtitle");
@@ -4163,7 +4190,7 @@ function imageItemHtml(image) {
         <strong>${escapeHtml(displayName)}</strong>
         <small>${escapeHtml(`${metadata}${previewNote}`)}</small>
       </span>
-      <span class="asset-state ${chipClass}" title="${escapeHtml(chipLabel || "Lista")}">
+      <span class="asset-state ${chipClass}" role="img" title="${escapeHtml(chipLabel || "Lista")}" aria-label="${escapeHtml(chipLabel || "Lista")}">
         <span aria-hidden="true">${escapeHtml(stateIcon)}</span>
         <em>${escapeHtml(chipLabel || "Lista")}</em>
       </span>
@@ -4919,7 +4946,9 @@ function renderInspector() {
   }
   $(".inspector-tabs").classList.toggle("is-hidden", contextOnly);
   $$(".settings-panel [data-inspector-tab]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.inspectorTab === state.inspectorTab);
+    const active = button.dataset.inspectorTab === state.inspectorTab;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
   });
   $$(".settings-panel [data-inspector-section]").forEach((section) => {
     const sectionName = section.dataset.inspectorSection;
@@ -5405,6 +5434,7 @@ function resetOutputProfileDraft() {
 }
 
 function openAppSettings() {
+  rememberModalFocusReturn();
   state.batchDetailOpen = false;
   state.exportConfirmOpen = false;
   const activeProfile = activeOutputProfile();
@@ -5420,6 +5450,7 @@ function openAppSettings() {
   state.outputProfileDraft = { ...profile };
   state.statusText = "Configuración de salida";
   render();
+  queueModalFocus("#app-settings-modal", "[data-action='apply-output-profile']");
 }
 
 function closeAppSettings() {
@@ -5430,22 +5461,27 @@ function closeAppSettings() {
   state.outputProfileDraft = null;
   state.statusText = "Configuración cerrada";
   render();
+  restoreModalFocusReturn();
 }
 
 function openBatchDetail() {
+  rememberModalFocusReturn();
   state.exportConfirmOpen = false;
   state.batchDetailOpen = true;
   state.statusText = "Detalle del lote";
   render();
+  queueModalFocus("#batch-detail-modal", "[data-action='close-batch-detail']");
 }
 
 function closeBatchDetail() {
   state.batchDetailOpen = false;
   state.statusText = hasBatch() ? "Lote cargado" : "Sin lote";
   render();
+  restoreModalFocusReturn();
 }
 
 function openExportConfirm(risks, options = {}) {
+  rememberModalFocusReturn();
   state.appSettingsOpen = false;
   state.outputProfileDraft = null;
   state.batchDetailOpen = false;
@@ -5456,6 +5492,7 @@ function openExportConfirm(risks, options = {}) {
     ? "Resuelve problemas antes de exportar"
     : "Confirmar exportación";
   render();
+  queueModalFocus("#export-confirm-modal", "#export-confirm-action");
 }
 
 function closeExportConfirm({ renderAfter = true } = {}) {
@@ -5464,6 +5501,7 @@ function closeExportConfirm({ renderAfter = true } = {}) {
   state.exportConfirmOptions = null;
   if (renderAfter) {
     render();
+    restoreModalFocusReturn();
   }
 }
 
@@ -5477,6 +5515,89 @@ function confirmExportFromModal() {
   const options = { ...(state.exportConfirmOptions || {}), confirmed: true };
   closeExportConfirm({ renderAfter: false });
   startExport(options);
+}
+
+function rememberModalFocusReturn() {
+  const active = document.activeElement;
+  if (
+    active instanceof HTMLElement
+    && active !== document.body
+    && !active.closest(".app-settings-backdrop")
+  ) {
+    modalFocusReturnTarget = active;
+  }
+}
+
+function restoreModalFocusReturn() {
+  const target = modalFocusReturnTarget;
+  modalFocusReturnTarget = null;
+  if (target instanceof HTMLElement && document.contains(target)) {
+    window.requestAnimationFrame(() => target.focus({ preventScroll: true }));
+  }
+}
+
+function queueModalFocus(modalSelector, preferredSelector = "") {
+  window.requestAnimationFrame(() => {
+    const modal = $(modalSelector);
+    if (!modal || modal.classList.contains("is-hidden")) {
+      return;
+    }
+    const preferred = preferredSelector ? modal.querySelector(preferredSelector) : null;
+    const fallback = firstFocusableElement(modal);
+    (preferred || fallback)?.focus({ preventScroll: true });
+  });
+}
+
+function firstFocusableElement(container) {
+  return Array.from(container.querySelectorAll(
+    "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex='-1'])"
+  )).find((element) => element.offsetParent !== null);
+}
+
+function currentOpenModal() {
+  if (state.exportConfirmOpen) {
+    return $("#export-confirm-modal");
+  }
+  if (state.appSettingsOpen) {
+    return $("#app-settings-modal");
+  }
+  if (state.batchDetailOpen) {
+    return $("#batch-detail-modal");
+  }
+  return null;
+}
+
+function trapOpenModalFocus(event) {
+  const modal = currentOpenModal();
+  if (!modal || modal.classList.contains("is-hidden")) {
+    return false;
+  }
+  const focusable = Array.from(modal.querySelectorAll(
+    "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex='-1'])"
+  )).filter((element) => element.offsetParent !== null);
+  if (!focusable.length) {
+    event.preventDefault();
+    return true;
+  }
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const active = document.activeElement;
+  if (event.shiftKey && active === first) {
+    event.preventDefault();
+    last.focus({ preventScroll: true });
+    return true;
+  }
+  if (!event.shiftKey && active === last) {
+    event.preventDefault();
+    first.focus({ preventScroll: true });
+    return true;
+  }
+  if (!modal.contains(active)) {
+    event.preventDefault();
+    first.focus({ preventScroll: true });
+    return true;
+  }
+  return false;
 }
 
 function confirmDiscardOutputDraft(actionLabel) {
@@ -6443,6 +6564,110 @@ function renderFooter() {
   });
 }
 
+function renderAccessibilityHints() {
+  const visible = getVisibleAppState();
+  const counts = batchCounts();
+  setControlHint($("#top-primary-action"), topPrimaryHint(visible));
+  setControlHint($("#top-secondary-action"), visible.secondaryAction ? `${visible.secondaryAction.label}. Atajo: Ctrl+E si exporta.` : "");
+  setControlHint($("[data-action='open-batch-detail']"), "Abrir detalle del lote");
+  setControlHint($("[data-action='open-app-settings']"), "Abrir formatos y salida");
+  setControlHint($("[data-action='toggle-inspector']"), "Mostrar u ocultar detalle técnico");
+  setControlHint($("#image-search"), "Buscar por nombre, referencia o ruta");
+  setControlHint($("#image-search-clear"), "Limpiar búsqueda");
+
+  const galleryViewHints = {
+    thumbs: "Ver galería como miniaturas",
+    list: "Ver galería como lista compacta",
+  };
+  $$("[data-gallery-view]").forEach((button) => {
+    setControlHint(button, galleryViewHints[button.dataset.galleryView] || button.textContent.trim());
+  });
+
+  const filterCounts = {
+    all: activeImages().length,
+    valid: counts.readyImages,
+    warnings: counts.warningImages + counts.nonExportableImages,
+    omitted: counts.omittedFiles,
+  };
+  const filterHints = {
+    all: "Mostrar todas las imágenes",
+    valid: "Mostrar imágenes listas",
+    warnings: "Mostrar imágenes con aviso o error",
+    omitted: "Mostrar archivos omitidos",
+  };
+  $$("[data-filter]").forEach((button) => {
+    const filter = button.dataset.filter;
+    setControlHint(button, `${filterHints[filter] || button.textContent.trim()} · ${filterCounts[filter] || 0}`);
+  });
+
+  const previewModeHints = {
+    processed: "Ver previsualización con el formato activo",
+    original: "Ver imagen original",
+    compare: "Comparar original y previsualización",
+  };
+  $$("[data-preview-mode]").forEach((button) => {
+    setControlHint(button, previewModeHints[button.dataset.previewMode] || button.textContent.trim());
+    button.setAttribute("aria-pressed", button.classList.contains("active") ? "true" : "false");
+  });
+
+  const backgroundHints = {
+    rgb230: "Fondo gris claro RGB 230",
+    white: "Fondo blanco",
+    transparent: "Fondo transparente",
+  };
+  $$("[data-preview-bg]").forEach((button) => {
+    setControlHint(button, backgroundHints[button.dataset.previewBg] || button.textContent.trim());
+    button.setAttribute("aria-pressed", button.classList.contains("active") ? "true" : "false");
+  });
+
+  const zoomHints = {
+    "previous-image": "Imagen anterior. Atajo: flecha izquierda",
+    "next-image": "Imagen siguiente. Atajo: flecha derecha",
+    "zoom-fit": "Encajar imagen en el visor. Atajo: F",
+    "zoom-height": "Ajustar a la altura del visor",
+    "zoom-width": "Ajustar a la anchura del visor",
+    "zoom-100": "Ver al 100 %. Atajo: 1",
+    "zoom-out": "Reducir zoom",
+    "zoom-in": "Aumentar zoom",
+  };
+  Object.entries(zoomHints).forEach(([action, hint]) => {
+    setControlHint($(`[data-action='${action}']`), hint);
+  });
+
+  $$(".settings-panel [data-inspector-tab]").forEach((button) => {
+    const active = button.dataset.inspectorTab === state.inspectorTab;
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+    setControlHint(button, `${button.textContent.trim()} del inspector`);
+  });
+}
+
+function topPrimaryHint(visible) {
+  const action = visible.primaryAction?.action || "";
+  if (action === "start-export") {
+    return `${visible.primaryAction.label}. Atajo: Ctrl+E`;
+  }
+  if (action === "pick-bridge-folder") {
+    return "Seleccionar carpeta de entrada";
+  }
+  if (action === "review-warnings") {
+    return "Revisar avisos del lote";
+  }
+  if (action === "open-output") {
+    return "Abrir carpeta de salida";
+  }
+  return visible.primaryAction?.label || visible.title;
+}
+
+function setControlHint(target, hint) {
+  if (!target || !hint) {
+    return;
+  }
+  target.title = hint;
+  if (!target.getAttribute("aria-label") && target.textContent.trim().length <= 2) {
+    target.setAttribute("aria-label", hint.replace(/\s*\. Atajo:.*$/, ""));
+  }
+}
+
 function statusBarText() {
   const images = activeImages();
   const counts = batchCounts();
@@ -6993,6 +7218,10 @@ document.addEventListener("keydown", (event) => {
     || target?.isContentEditable;
   const command = event.ctrlKey || event.metaKey;
 
+  if (event.key === "Tab" && trapOpenModalFocus(event)) {
+    return;
+  }
+
   if (command && event.key.toLowerCase() === "f") {
     event.preventDefault();
     const search = $("#image-search");
@@ -7035,6 +7264,12 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
+  if (event.key === "Enter" && state.exportConfirmOpen && !isTyping) {
+    event.preventDefault();
+    confirmExportFromModal();
+    return;
+  }
+
   if (isTyping) {
     return;
   }
@@ -7042,10 +7277,16 @@ document.addEventListener("keydown", (event) => {
   const key = event.key.toLowerCase();
   if (event.key === "ArrowLeft") {
     event.preventDefault();
-    selectAdjacentImage(-1);
+    selectAdjacentImage(-1, { focus: true });
   } else if (event.key === "ArrowRight") {
     event.preventDefault();
-    selectAdjacentImage(1);
+    selectAdjacentImage(1, { focus: true });
+  } else if (event.key === "Home") {
+    event.preventDefault();
+    selectEdgeImage("first", { focus: true });
+  } else if (event.key === "End") {
+    event.preventDefault();
+    selectEdgeImage("last", { focus: true });
   } else if (key === "f" && isViewerNavigationAvailable()) {
     event.preventDefault();
     setViewerMode("fit");

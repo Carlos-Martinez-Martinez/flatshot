@@ -10,6 +10,16 @@ from flatshot.application.contracts import BatchScanResult, FolderScanResult, Im
 from flatshot.core.overrides import has_image_override, override_key
 
 SUPPORTED_IMAGE_SUFFIXES = {".png"}
+IGNORED_SYSTEM_NAMES = {
+    ".ds_store",
+    "desktop.ini",
+    "thumbs.db",
+}
+IGNORED_SYSTEM_SUFFIXES = {
+    ".ini",
+    ".tmp",
+    ".temp",
+}
 
 
 class FolderScanner:
@@ -27,8 +37,10 @@ class FolderScanner:
         total_files = sum(result.files_found for result in folder_results)
         omitted_items = [item for result in folder_results for item in result.omitted]
         omitted_by_reason: dict[str, int] = {}
+        omitted_by_category: dict[str, int] = {}
         for item in omitted_items:
             omitted_by_reason[item.reason] = omitted_by_reason.get(item.reason, 0) + 1
+            omitted_by_category[item.category] = omitted_by_category.get(item.category, 0) + 1
         adjusted_images = sum(
             1
             for result in folder_results
@@ -45,6 +57,7 @@ class FolderScanner:
             total_files=total_files,
             total_omitted=len(omitted_items),
             omitted_by_reason=omitted_by_reason,
+            omitted_by_category=omitted_by_category,
         )
 
     def _scan_folder(self, folder: Path, image_overrides: dict) -> FolderScanResult:
@@ -90,6 +103,8 @@ class FolderScanner:
                         name=entry.name,
                         reason="subfolder_not_scanned",
                         detail="Subcarpeta no escaneada",
+                        category="ignored",
+                        severity="ignored",
                     )
                 )
                 continue
@@ -100,13 +115,16 @@ class FolderScanner:
             files_found += 1
             suffix = entry.suffix.lower()
             if suffix not in SUPPORTED_IMAGE_SUFFIXES:
+                reason, detail = self._unsupported_file_reason(entry)
                 omitted.append(
                     OmittedScanItem(
                         path=entry,
                         name=entry.name,
                         suffix=entry.suffix,
-                        reason="unsupported_extension",
-                        detail=f"Extensión no admitida: {entry.suffix or 'sin extensión'}",
+                        reason=reason,
+                        detail=detail,
+                        category="ignored",
+                        severity="ignored",
                     )
                 )
                 continue
@@ -119,6 +137,8 @@ class FolderScanner:
                         suffix=entry.suffix,
                         reason="read_error",
                         detail="No se pudo leer como PNG válido",
+                        category="warning",
+                        severity="warning",
                     )
                 )
                 continue
@@ -161,3 +181,13 @@ class FolderScanner:
             return True
         except (OSError, UnidentifiedImageError):
             return False
+
+    @staticmethod
+    def _unsupported_file_reason(path: Path) -> tuple[str, str]:
+        name = path.name.lower()
+        suffix = path.suffix.lower()
+        if name in IGNORED_SYSTEM_NAMES:
+            return "system_file", "Archivo del sistema ignorado"
+        if suffix in IGNORED_SYSTEM_SUFFIXES:
+            return "temporary_or_config_file", "Archivo temporal o de configuración ignorado"
+        return "unsupported_extension", f"Extensión no admitida: {path.suffix or 'sin extensión'}"

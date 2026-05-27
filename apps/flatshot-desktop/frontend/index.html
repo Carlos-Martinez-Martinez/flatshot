@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>FlatShot Desktop</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./styles.css?v=20260527-export1" />
-    <link rel="stylesheet" href="./ux-foundation.css?v=20260527-export1" />
+    <link rel="stylesheet" href="./styles.css?v=20260527-review1" />
+    <link rel="stylesheet" href="./ux-foundation.css?v=20260527-review1" />
   </head>
   <body>
     <main class="app-shell" aria-label="FlatShot nueva app">
@@ -30,8 +30,8 @@
             <span class="preflight-chip" id="top-preflight-status">Exportación bloqueada</span>
             <button type="button" class="primary top-export" id="top-primary-action" data-action="primary">Elegir carpeta</button>
             <button type="button" class="top-secondary-action" id="top-secondary-action" data-action="secondary-primary" hidden></button>
-            <button type="button" class="top-detail-action" data-action="open-batch-detail" title="Ver detalle del lote">Detalle</button>
-            <button type="button" data-action="open-app-settings">Configuración</button>
+            <button type="button" class="top-detail-action" data-action="open-batch-detail" title="Ver detalle del lote">Detalle lote</button>
+            <button type="button" data-action="open-app-settings">Configurar salida</button>
             <button type="button" data-action="toggle-inspector">Detalle técnico</button>
             <details class="debug-panel" id="debug-panel">
               <summary>Debug</summary>
@@ -118,7 +118,7 @@
             <div class="bridge-message" id="bridge-message">Sin lote.</div>
             <ul class="import-requirements" aria-label="Requisitos de importación">
               <li>Carpeta local</li>
-              <li>Imágenes PNG o JPG</li>
+              <li>Imágenes PNG</li>
               <li>Salida configurable después</li>
             </ul>
           </section>
@@ -191,7 +191,7 @@
               <button type="button" data-filter="all">Todas</button>
               <button type="button" data-filter="valid">Listas</button>
               <button type="button" data-filter="warnings">Avisos</button>
-              <button type="button" data-filter="omitted">Omitidas</button>
+              <button type="button" data-filter="excluded">Excluidas</button>
             </div>
           </div>
           <div class="image-list gallery-grid" id="image-list" aria-label="Imágenes del lote"></div>
@@ -213,16 +213,22 @@
                 <button type="button" data-preview-mode="compare">Comparar</button>
               </div>
               <div class="zoom-controls" aria-label="Zoom">
-                <button type="button" data-action="previous-image" aria-label="Imagen anterior" title="Imagen anterior">‹</button>
-                <span id="viewer-position">Sin imagen</span>
-                <button type="button" data-action="next-image" aria-label="Imagen siguiente" title="Imagen siguiente">›</button>
-                <button type="button" data-action="zoom-fit" title="Encajar imagen en el visor (F)">Encajar</button>
-                <button type="button" data-action="zoom-height" title="Aprovechar la altura del visor">Altura</button>
-                <button type="button" data-action="zoom-width" title="Aprovechar la anchura del visor">Anchura</button>
-                <button type="button" data-action="zoom-100" title="Ver al 100% (1)">100 %</button>
-                <button type="button" data-action="zoom-out" aria-label="Reducir zoom" title="Reducir zoom">-</button>
-                <span id="zoom-label">100%</span>
-                <button type="button" data-action="zoom-in" aria-label="Aumentar zoom" title="Aumentar zoom">+</button>
+                <div class="viewer-control-group viewer-nav" aria-label="Navegación">
+                  <button type="button" data-action="previous-image" aria-label="Imagen anterior" title="Imagen anterior">‹</button>
+                  <span id="viewer-position">Sin imagen</span>
+                  <button type="button" data-action="next-image" aria-label="Imagen siguiente" title="Imagen siguiente">›</button>
+                </div>
+                <div class="viewer-control-group viewer-fit" aria-label="Ajuste de vista">
+                  <button type="button" data-action="zoom-fit" title="Encajar imagen en el visor (F)">Encajar</button>
+                  <button type="button" data-action="zoom-height" title="Aprovechar la altura del visor">Alto</button>
+                  <button type="button" data-action="zoom-width" title="Aprovechar la anchura del visor">Ancho</button>
+                  <button type="button" data-action="zoom-100" title="Ver al 100% (1)">1:1</button>
+                </div>
+                <div class="viewer-control-group viewer-zoom" aria-label="Zoom real">
+                  <button type="button" data-action="zoom-out" aria-label="Reducir zoom" title="Reducir zoom">-</button>
+                  <span id="zoom-label">100%</span>
+                  <button type="button" data-action="zoom-in" aria-label="Aumentar zoom" title="Aumentar zoom">+</button>
+                </div>
               </div>
             </div>
           </div>
@@ -237,13 +243,13 @@
           </div>
         </section>
 
-        <aside class="settings-panel" aria-label="Revisión, salida, avisos y avanzado">
+        <aside class="settings-panel" aria-label="Resumen, exportación, incidencias y avanzado">
           <section class="inspector-start" id="inspector-start" aria-live="polite"></section>
 
           <div class="inspector-tabs segmented compact" aria-label="Panel derecho">
-            <button type="button" data-inspector-tab="review">Revisión</button>
-            <button type="button" data-inspector-tab="output">Salida</button>
-            <button type="button" data-inspector-tab="warnings">Avisos</button>
+            <button type="button" data-inspector-tab="review">Resumen</button>
+            <button type="button" data-inspector-tab="output">Exportación</button>
+            <button type="button" data-inspector-tab="warnings">Incidencias</button>
             <button type="button" data-inspector-tab="advanced">Avanzado</button>
           </div>
 
@@ -484,9 +490,9 @@
           <section class="settings-section warning-section" data-inspector-section="warnings">
             <div class="section-title">
               <div>
-                <span class="eyebrow">Avisos</span>
-                <strong id="warnings-readiness">Sin avisos</strong>
-                <small>Problemas y archivos omitidos</small>
+                <span class="eyebrow">Incidencias</span>
+                <strong id="warnings-readiness">Sin incidencias</strong>
+                <small>Avisos, errores e ignorados</small>
               </div>
             </div>
             <div class="issue-list" id="issue-list" aria-live="polite"></div>
@@ -664,6 +670,6 @@
       </footer>
     </main>
 
-    <script src="./app.js?v=20260527-export1"></script>
+    <script src="./app.js?v=20260527-review1"></script>
   </body>
 </html>

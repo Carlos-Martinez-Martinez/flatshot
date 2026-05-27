@@ -1,5 +1,37 @@
 /* Tanda 1 UX foundation: loaded after legacy stylesheet on purpose. */
 :root {
+  /* Tanda 7 design-system aliases. Keep these role-based names for future UI. */
+  --surface-app: var(--color-bg-app);
+  --surface-panel: var(--color-bg-panel);
+  --surface-muted: var(--color-bg-soft);
+  --surface-stage: var(--color-bg-stage);
+  --border-subtle: var(--color-border);
+  --border-default: var(--color-border);
+  --border-emphasis: var(--color-border-strong);
+  --text-primary: var(--color-text-strong);
+  --text-secondary: var(--color-text);
+  --text-muted: var(--color-text-muted);
+  --text-subtle: var(--color-text-subtle);
+  --semantic-primary: var(--color-accent);
+  --semantic-primary-hover: var(--color-accent-hover);
+  --semantic-primary-soft: var(--color-accent-soft);
+  --semantic-primary-border: var(--color-accent-border);
+  --semantic-selection: #2563eb;
+  --semantic-selection-soft: rgba(37, 99, 235, 0.1);
+  --semantic-selection-border: rgba(37, 99, 235, 0.28);
+  --semantic-success: var(--color-success);
+  --semantic-success-soft: var(--color-success-soft);
+  --semantic-warning: var(--color-warning);
+  --semantic-warning-soft: var(--color-warning-soft);
+  --semantic-warning-border: var(--color-warning-border);
+  --semantic-danger: var(--color-error);
+  --semantic-danger-soft: var(--color-error-soft);
+  --semantic-danger-border: var(--color-error-border);
+  --semantic-info: #2563eb;
+  --semantic-info-soft: rgba(37, 99, 235, 0.1);
+  --semantic-info-border: rgba(37, 99, 235, 0.28);
+  --z-modal: 60;
+  --z-popover: 70;
   --ui-panel-gap: var(--space-4);
   --ui-card-padding: var(--space-4);
   --ui-border: var(--color-border);
@@ -11,6 +43,115 @@
   --ui-state-warning: var(--color-warning);
   --ui-state-error: var(--color-error);
   --ui-state-info: #256b8f;
+}
+
+/* Component primitives. Existing local classes are mapped to these in app.js. */
+.ui-button {
+  min-height: var(--control-height);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.ui-button--secondary {
+  border-color: var(--border-default);
+  background: var(--surface-panel);
+  color: var(--text-secondary);
+}
+
+.ui-button--primary {
+  border-color: var(--semantic-primary);
+  background: var(--semantic-primary);
+  color: var(--color-text-inverse);
+}
+
+.ui-button--ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--semantic-primary);
+}
+
+.ui-button--danger {
+  border-color: var(--semantic-danger-border);
+  background: var(--semantic-danger-soft);
+  color: var(--semantic-danger);
+}
+
+.ui-button--icon {
+  min-width: var(--control-height);
+  padding-inline: var(--space-2);
+}
+
+.ui-status-badge {
+  min-height: 22px;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ui-summary-card,
+.ui-inspector-section,
+.ui-problem-card {
+  border-radius: var(--radius-sm);
+}
+
+.ui-summary-card,
+.ui-modal-shell {
+  box-shadow: var(--shadow-xs);
+}
+
+.ui-thumbnail-card {
+  border-radius: var(--radius-md);
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.ui-segmented-control {
+  border-color: var(--border-default);
+  background: var(--surface-muted);
+}
+
+.ui-segmented-control button.active,
+.ui-tabs button.active {
+  border-color: var(--semantic-selection-border);
+  background: var(--semantic-selection-soft);
+  color: var(--semantic-selection);
+}
+
+.ui-modal-backdrop {
+  z-index: var(--z-modal);
+}
+
+.ui-modal-shell {
+  border-radius: var(--radius-lg);
+}
+
+.ui-empty-state {
+  border-radius: var(--radius-md);
+}
+
+.ui-progress-state {
+  border-radius: var(--radius-pill);
+}
+
+.gallery-column .image-item.active {
+  border-color: var(--semantic-selection-border);
+  background: var(--semantic-selection-soft);
+  box-shadow: inset 0 0 0 1px var(--semantic-selection-border);
+}
+
+.status-badge.active,
+.state-chip.active {
+  border-color: var(--semantic-selection-border);
+  background: var(--semantic-selection-soft);
+  color: var(--semantic-selection);
 }
 
 .top-secondary-action {
@@ -1106,5 +1247,225 @@
 @media (max-width: 720px) {
   .export-confirm-summary {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Tanda 8: review/export screen hierarchy and mature state taxonomy. */
+.workspace,
+.app-shell.empty-batch .workspace,
+.app-shell.is-scanning .workspace {
+  grid-template-columns:
+    minmax(300px, var(--column-gallery))
+    minmax(var(--viewer-min), 1fr)
+    minmax(320px, var(--column-inspector)) !important;
+  background: var(--border-subtle);
+}
+
+.batch-panel {
+  display: none !important;
+}
+
+.app-shell.inspector-collapsed .workspace {
+  grid-template-columns:
+    minmax(300px, var(--column-gallery))
+    minmax(var(--viewer-min), 1fr)
+    0 !important;
+}
+
+.app-shell[data-ui-state="ready_with_warnings"] .top-export,
+.app-shell[data-ui-state="ready_with_omitted"] .top-export {
+  border-color: var(--semantic-primary);
+  background: var(--semantic-primary);
+  color: var(--color-text-inverse);
+}
+
+.app-shell[data-ui-state="ready_with_warnings"] .top-export:hover:not(:disabled),
+.app-shell[data-ui-state="ready_with_omitted"] .top-export:hover:not(:disabled) {
+  border-color: var(--semantic-primary-hover);
+  background: var(--semantic-primary-hover);
+}
+
+.top-actions {
+  align-items: center;
+}
+
+.top-detail-action[hidden],
+#top-secondary-action[hidden] {
+  display: none !important;
+}
+
+.gallery-column {
+  border-right: 1px solid var(--border-subtle);
+}
+
+.gallery-header.gallery-toolbar {
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.gallery-view-switch {
+  justify-self: end;
+}
+
+.gallery-filter button[data-filter="excluded"]:not(.is-empty) {
+  border-color: var(--semantic-danger-border);
+  color: var(--semantic-danger);
+}
+
+.preview-header {
+  min-height: 62px;
+  align-content: center;
+}
+
+.preview-toolbar {
+  align-items: center;
+}
+
+.zoom-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.viewer-control-group {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+  padding: var(--space-1);
+}
+
+.viewer-control-group button {
+  min-height: 28px;
+  border-radius: var(--radius-xs);
+}
+
+.viewer-fit button {
+  min-width: 56px;
+}
+
+#viewer-position,
+#zoom-label {
+  color: var(--text-secondary);
+}
+
+#viewer-position {
+  min-width: 58px;
+}
+
+#zoom-label {
+  min-width: 46px;
+}
+
+.settings-panel {
+  border-left: 0;
+  background: var(--surface-panel);
+}
+
+.settings-panel .inspector-tabs {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  grid-auto-flow: row;
+  grid-auto-columns: auto;
+}
+
+.issue-list-summary.clear,
+.issue-item.clear {
+  border-color: var(--border-default);
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+}
+
+.issue-item.clear strong {
+  color: var(--text-primary);
+}
+
+.issue-item.clear span {
+  color: var(--text-secondary);
+}
+
+.warning-summary button,
+.issue-item button {
+  cursor: pointer;
+}
+
+.empty-note,
+.empty-state {
+  color: var(--text-secondary);
+}
+
+.gallery-column .empty-note:empty {
+  display: none !important;
+}
+
+.lot-summary-card {
+  display: grid;
+  gap: var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+  padding: var(--space-3);
+}
+
+.lot-summary-card__head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.lot-summary-card__head span,
+.lot-summary-card__grid em {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  font-style: normal;
+  font-weight: var(--font-weight-semibold);
+}
+
+.lot-summary-card__head strong,
+.lot-summary-card__grid strong {
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.lot-summary-card__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.lot-summary-card__grid span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+@media (max-width: 1240px) {
+  .workspace,
+  .app-shell.empty-batch .workspace,
+  .app-shell.is-scanning .workspace {
+    grid-template-columns:
+      minmax(270px, 0.42fr)
+      minmax(360px, 1fr)
+      minmax(300px, 0.5fr) !important;
+  }
+}
+
+@media (max-width: 1080px) {
+  .workspace,
+  .app-shell.empty-batch .workspace,
+  .app-shell.is-scanning .workspace {
+    grid-template-columns:
+      minmax(260px, 0.42fr)
+      minmax(340px, 1fr) !important;
+  }
+
+  .settings-panel {
+    display: none !important;
   }
 }

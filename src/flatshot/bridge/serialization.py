@@ -39,6 +39,8 @@ def omitted_scan_item_to_dict(item: OmittedScanItem) -> dict[str, Any]:
         "suffix": item.suffix,
         "reason": item.reason,
         "detail": item.detail,
+        "category": item.category,
+        "severity": item.severity,
     }
 
 
@@ -65,6 +67,7 @@ def batch_scan_result_to_dict(result: BatchScanResult) -> dict[str, Any]:
         "totalFiles": result.total_files,
         "totalOmitted": result.total_omitted,
         "omittedByReason": dict(result.omitted_by_reason),
+        "omittedByCategory": dict(result.omitted_by_category),
         "errors": list(result.errors),
     }
 

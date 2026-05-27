@@ -89,6 +89,22 @@ const statusLabels = {
   error: "Error",
 };
 
+const BATCH_FILTERS = {
+  all: "all",
+  valid: "valid",
+  warnings: "warnings",
+  excluded: "excluded",
+};
+const IGNORED_OMISSION_REASONS = new Set([
+  "system_file",
+  "temporary_or_config_file",
+  "unsupported_extension",
+  "subfolder_not_scanned",
+]);
+const ACTIONABLE_OMISSION_REASONS = new Set([
+  "read_error",
+]);
+
 const DEFAULT_VIEW_MODE = "height";
 const VIEW_MODE_LABELS = {
   fit: "Encajar",
@@ -633,10 +649,55 @@ function blockingValidationIssues() {
   return validationIssues().filter((issue) => issue.level === "error" && issue.title !== "Sin lote");
 }
 
+function scanOmissions() {
+  const omitted = state.scanDiagnostics?.omitted;
+  return Array.isArray(omitted) ? omitted : [];
+}
+
+function omissionSeverity(item) {
+  const severity = String(item?.severity || "").toLowerCase();
+  if (["ignored", "warning", "error"].includes(severity)) {
+    return severity;
+  }
+  const category = String(item?.category || "").toLowerCase();
+  if (["ignored", "warning", "error"].includes(category)) {
+    return category;
+  }
+  const reason = String(item?.reason || "");
+  if (ACTIONABLE_OMISSION_REASONS.has(reason)) {
+    return "warning";
+  }
+  if (IGNORED_OMISSION_REASONS.has(reason)) {
+    return "ignored";
+  }
+  return "ignored";
+}
+
+function ignoredOmissions() {
+  return scanOmissions().filter((item) => omissionSeverity(item) === "ignored");
+}
+
+function actionableOmissions() {
+  return scanOmissions().filter((item) => omissionSeverity(item) !== "ignored");
+}
+
+function imageWarningCount(images = activeImages()) {
+  return images.filter((image) => image.status === "warning").length;
+}
+
+function excludedImageCount(images = activeImages()) {
+  return images.filter((image) =>
+    !image.exportable || image.status === "error" || exportItemState(image)?.status === "error"
+  ).length;
+}
+
 function batchCounts() {
   const images = activeImages();
   const diagnostics = state.scanDiagnostics || emptyScanDiagnostics();
   const omittedFiles = Number(diagnostics.totalOmitted || 0);
+  const ignoredFiles = ignoredOmissions().length;
+  const warningFiles = actionableOmissions().filter((item) => omissionSeverity(item) === "warning").length;
+  const errorFiles = actionableOmissions().filter((item) => omissionSeverity(item) === "error").length;
   const filesFound = state.batch === "scanning"
     ? null
     : Math.max(
@@ -653,17 +714,18 @@ function batchCounts() {
       .filter((image) => exportItemState(image)?.status === "error")
       .map((image) => image.id)
   );
-  const exportableWarningImages = exportables.filter((image) => image.status === "warning").length;
+  const exportableWarningImages = imageWarningCount(exportables);
   const nonExportableImages = images.filter((image) =>
     !image.exportable || image.status === "error" || exportedErrors.has(image.id)
   ).length;
-  const warningImages = exportableWarningImages + nonExportableImages;
+  const warningImages = exportableWarningImages;
   const readyImages = exportables.filter((image) =>
     !["warning", "error"].includes(image.status) && !exportedErrors.has(image.id)
   ).length;
   const stateErrors = state.errors.filter((issue) => issue.level === "error").length;
   const stateWarnings = state.errors.length - stateErrors;
-  const blockingErrors = blockingValidationIssues().length + (state.exportStatus === "failed" ? 1 : 0);
+  const blockingErrors = blockingValidationIssues().length + stateErrors + errorFiles + (state.exportStatus === "failed" ? 1 : 0);
+  const reviewIssues = warningImages + nonExportableImages + warningFiles + stateWarnings;
 
   return {
     filesFound,
@@ -672,9 +734,13 @@ function batchCounts() {
     readyImages,
     warningImages,
     omittedFiles,
+    ignoredFiles,
+    warningFiles,
+    errorFiles,
     nonExportableImages,
     blockingErrors,
-    nonBlockingWarnings: omittedFiles + warningImages + stateWarnings,
+    nonBlockingWarnings: reviewIssues,
+    reviewIssues,
   };
 }
 
@@ -707,14 +773,14 @@ function filteredImages() {
     if (term && !imageSearchText(image).includes(term)) {
       return false;
     }
-    if (state.filter === "valid") {
+    if (state.filter === BATCH_FILTERS.valid) {
       return image.status === "ready" || image.status === "adjusted";
     }
-    if (state.filter === "warnings") {
-      return image.status === "warning" || image.status === "error" || exportItemState(image)?.status === "error";
+    if (state.filter === BATCH_FILTERS.warnings) {
+      return image.status === "warning";
     }
-    if (state.filter === "omitted") {
-      return false;
+    if (state.filter === BATCH_FILTERS.excluded) {
+      return !image.exportable || image.status === "error" || exportItemState(image)?.status === "error";
     }
     return true;
   });
@@ -733,7 +799,7 @@ function filterDisplayName(filter = state.filter) {
     all: "todas",
     valid: "listas",
     warnings: "con aviso",
-    omitted: "omitidas",
+    excluded: "excluidas",
   };
   return labels[filter] || "imágenes";
 }
@@ -751,7 +817,7 @@ function validationIssues() {
     issues.push({ level: "error", title: "Sin lote", detail: "Elige una carpeta con imágenes para iniciar el lote." });
   }
   if (state.batch === "empty") {
-    issues.push({ level: "warning", title: "No hay imágenes válidas", detail: "Elige otra carpeta o revisa el detalle técnico." });
+    issues.push({ level: "warning", title: "No hay PNG válidos", detail: "Elige otra carpeta o revisa el detalle técnico." });
   }
   if (exportableImages().length === 0 && state.batch === "ready") {
     issues.push({ level: "error", title: "Sin imágenes exportables", detail: "Revisa los errores." });
@@ -767,15 +833,16 @@ function validationIssues() {
 
 function preflightIssues() {
   const issues = [...validationIssues(), ...state.errors];
-  const omitted = Number(state.scanDiagnostics?.totalOmitted || 0);
-  const warningImages = activeImages().filter((image) => image.status === "warning").length;
-  const errorImages = activeImages().filter((image) => image.status === "error" || exportItemState(image)?.status === "error").length;
+  const counts = batchCounts();
+  const actionableOmitted = actionableOmissions();
+  const warningImages = imageWarningCount();
+  const errorImages = excludedImageCount();
 
-  if (omitted > 0 && hasBatch()) {
+  if (actionableOmitted.length > 0 && hasBatch()) {
     issues.push({
       level: "warning",
-      title: `${omitted} omitida${omitted === 1 ? "" : "s"}`,
-      detail: omittedSummaryText(state.scanDiagnostics),
+      title: `${actionableOmitted.length} archivo${actionableOmitted.length === 1 ? "" : "s"} con incidencia`,
+      detail: actionableOmissionSummaryText(),
     });
   }
   if (warningImages > 0) {
@@ -788,8 +855,15 @@ function preflightIssues() {
   if (errorImages > 0 && exportableImages().length > 0) {
     issues.push({
       level: "warning",
-      title: "Imágenes no exportables",
+      title: "Imágenes excluidas",
       detail: `${errorImages} imagen${errorImages === 1 ? "" : "es"} quedará${errorImages === 1 ? "" : "n"} fuera de la salida.`,
+    });
+  }
+  if (counts.errorFiles > 0) {
+    issues.push({
+      level: "error",
+      title: "Errores de lectura",
+      detail: actionableOmissionSummaryText(),
     });
   }
 
@@ -808,6 +882,7 @@ function exportConfirmationRisks() {
   const counts = batchCounts();
   const risks = [];
   const exportableWarningImages = exportableImages().filter((image) => image.status === "warning").length;
+  const actionableOmitted = actionableOmissions();
 
   validationIssues()
     .filter((issue) => issue.level === "error" && issue.title !== "Sin lote")
@@ -821,12 +896,12 @@ function exportConfirmationRisks() {
       });
     });
 
-  if (counts.omittedFiles > 0) {
+  if (actionableOmitted.length > 0) {
     risks.push({
-      id: "omitted-files",
+      id: "omitted-file-incidents",
       level: "warning",
-      title: `${counts.omittedFiles} archivo${counts.omittedFiles === 1 ? "" : "s"} omitido${counts.omittedFiles === 1 ? "" : "s"}`,
-      detail: omittedSummaryText(state.scanDiagnostics),
+      title: `${actionableOmitted.length} archivo${actionableOmitted.length === 1 ? "" : "s"} con incidencia`,
+      detail: actionableOmissionSummaryText(),
     });
   }
 
@@ -843,7 +918,7 @@ function exportConfirmationRisks() {
     risks.push({
       id: "non-exportable-images",
       level: "warning",
-      title: `${countText(counts.nonExportableImages, "imagen", "imágenes")} fuera de la salida`,
+      title: `${countText(counts.nonExportableImages, "imagen", "imágenes")} excluida${counts.nonExportableImages === 1 ? "" : "s"}`,
       detail: "No se incluirán en la exportación.",
     });
   }
@@ -983,7 +1058,7 @@ function visibleWarningCount() {
 }
 
 function warningCountLabel(count = visibleWarningCount()) {
-  return `${count} aviso${count === 1 ? "" : "s"}`;
+  return `${count} incidencia${count === 1 ? "" : "s"}`;
 }
 
 function imageCountLabel(count) {
@@ -1012,8 +1087,8 @@ function outputPresetLabel() {
 }
 
 function firstOmittedItem() {
-  const omitted = state.scanDiagnostics?.omitted;
-  return Array.isArray(omitted) && omitted.length ? omitted[0] : null;
+  const omitted = actionableOmissions();
+  return omitted.length ? omitted[0] : null;
 }
 
 function firstActionableIssue() {
@@ -1021,7 +1096,7 @@ function firstActionableIssue() {
   if (omitted) {
     return {
       level: "warning",
-      title: "Archivo omitido",
+      title: "Archivo con incidencia",
       file: omitted.name || "Archivo",
       detail: omissionReasonLabel(omitted.reason),
       path: omitted.path || omitted.folder || "",
@@ -1103,7 +1178,7 @@ function getVisibleAppState() {
     return {
       id: "export_done",
       tone: state.exportStatus === "partial" ? "warning" : "ready",
-      title: state.exportStatus === "partial" ? "Exportación finalizada con avisos" : "Exportación finalizada",
+      title: state.exportStatus === "partial" ? "Exportación finalizada con incidencias" : "Exportación finalizada",
       subtitle: `${processed}/${total} imágenes exportadas · ${destination}`,
       topSummary: compactHeaderStatusText(),
       primaryAction: { label: "Abrir carpeta de salida", action: "open-output", enabled: Boolean(outputDestinationToOpen()) },
@@ -1147,7 +1222,7 @@ function getVisibleAppState() {
       id: "no_folder",
       tone: "idle",
       title: "Sin carpeta seleccionada",
-      subtitle: "Selecciona una carpeta local con imágenes PNG o JPG.",
+      subtitle: "Selecciona una carpeta local con imágenes PNG.",
       topSummary: compactHeaderStatusText(),
       primaryAction: { label: "Seleccionar carpeta", action: "pick-bridge-folder", enabled: state.bridgeStatus !== "checking" },
       secondaryAction: null,
@@ -1161,13 +1236,13 @@ function getVisibleAppState() {
     return {
       id: hasFoundFiles ? "scan_empty" : "batch_empty",
       tone: "warning",
-      title: hasFoundFiles ? "Carpeta sin imágenes válidas" : "Lote vacío",
+      title: hasFoundFiles ? "Carpeta sin PNG válidos" : "Lote vacío",
       subtitle: hasFoundFiles
-        ? `${countText(counts.filesFound, "archivo encontrado", "archivos encontrados")} · ${countText(counts.omittedFiles, "omitido", "omitidos")}`
+        ? `${countText(counts.filesFound, "archivo encontrado", "archivos encontrados")} · ${countText(counts.ignoredFiles, "ignorado", "ignorados")}`
         : "No hay archivos compatibles en esta carpeta.",
       topSummary: compactHeaderStatusText(),
       primaryAction: { label: "Elegir otra carpeta", action: "pick-bridge-folder", enabled: state.bridgeStatus !== "checking" },
-      secondaryAction: counts.omittedFiles ? { label: "Ver detalle técnico", action: "review-warnings", enabled: true } : null,
+      secondaryAction: counts.reviewIssues ? { label: "Ver incidencias", action: "review-warnings", enabled: true } : null,
       nextStep: "Elegir otra carpeta",
       counts,
     };
@@ -1190,14 +1265,14 @@ function getVisibleAppState() {
 
   if (hasWarnings) {
     return {
-      id: counts.omittedFiles ? "ready_with_omitted" : "ready_with_warnings",
+      id: "ready_with_warnings",
       tone: "warning",
-      title: counts.omittedFiles ? "Lote preparado con archivos omitidos" : "Lote preparado con avisos",
-      subtitle: `${summary} · ${countText(counts.nonBlockingWarnings, "aviso", "avisos")} no bloqueante${counts.nonBlockingWarnings === 1 ? "" : "s"}`,
+      title: "Listo para exportar con incidencias",
+      subtitle: `${summary} · ${countText(counts.nonBlockingWarnings, "incidencia", "incidencias")} no bloqueante${counts.nonBlockingWarnings === 1 ? "" : "s"}`,
       topSummary: compactHeaderStatusText(),
-      primaryAction: { label: "Revisar avisos", action: "review-warnings", enabled: true },
-      secondaryAction: isExportReady() ? { label: "Exportar igualmente", action: "start-export", enabled: true } : null,
-      nextStep: "Revisar avisos",
+      primaryAction: { label: `Exportar ${counts.exportableImages} imágenes`, action: "start-export", enabled: isExportReady() },
+      secondaryAction: { label: "Revisar incidencias", action: "review-warnings", enabled: true },
+      nextStep: `Exportar ${counts.exportableImages} imágenes`,
       counts,
     };
   }
@@ -1206,7 +1281,7 @@ function getVisibleAppState() {
     id: "ready_clean",
     tone: "ready",
     title: "Listo para exportar",
-    subtitle: `${summary} · ${output} · ${destination}`,
+    subtitle: `${summary}${counts.ignoredFiles ? ` · ${countText(counts.ignoredFiles, "ignorado", "ignorados")}` : ""} · ${output} · ${destination}`,
     topSummary: compactHeaderStatusText(),
     primaryAction: { label: `Exportar ${counts.exportableImages} imágenes`, action: "start-export", enabled: isExportReady() },
     secondaryAction: null,
@@ -1292,7 +1367,7 @@ function setScenario(scenario) {
       selectedImageId: null,
       previewStatus: "empty",
       exportStatus: "blocked",
-      statusText: "No hay imágenes válidas",
+      statusText: "No hay PNG válidos",
       scanStatus: "Carpeta mock vacía",
       scanDiagnostics: emptyScanDiagnostics(),
     });
@@ -1539,6 +1614,42 @@ function selectEdgeImage(edge, options = {}) {
   if (options.focus) {
     queueImageFocus(image.id);
   }
+}
+
+function clearPreviewSelection() {
+  state.previewRequestId += 1;
+  clearTimers();
+  state.selectedImageId = null;
+  state.localOverride = false;
+  state.previewStatus = "empty";
+  state.previewData = null;
+  state.previewError = "";
+  state.fitZoom = 100;
+  resetViewerPan();
+}
+
+function ensureGallerySelectionForFilter() {
+  const visible = filteredImages();
+  if (visible.some((image) => image.id === state.selectedImageId)) {
+    return false;
+  }
+  if (visible.length) {
+    selectImage(visible[0].id);
+    return true;
+  }
+  if (state.filter !== BATCH_FILTERS.all || state.search.trim()) {
+    clearPreviewSelection();
+  }
+  return false;
+}
+
+function applyGalleryFilter(filter) {
+  state.filter = filter || BATCH_FILTERS.all;
+  state.statusText = filterStatusText(state.filter);
+  if (ensureGallerySelectionForFilter()) {
+    return;
+  }
+  render();
 }
 
 function queueImageFocus(imageId = state.selectedImageId) {
@@ -2011,7 +2122,7 @@ function applyBridgeExportStatus(payload) {
   } else if (payload.status === "partial") {
     state.exportStatus = "partial";
     state.progress = 0;
-    state.statusText = "Exportación con avisos";
+    state.statusText = "Exportación con incidencias";
   } else if (payload.status === "failed" || payload.status === "cancelled") {
     state.exportStatus = "failed";
     state.progress = 0;
@@ -2150,9 +2261,12 @@ function reviewErrors() {
 }
 
 function clearFilter() {
-  state.filter = "all";
+  state.filter = BATCH_FILTERS.all;
   state.search = "";
   state.statusText = "Mostrando todo";
+  if (ensureGallerySelectionForFilter()) {
+    return;
+  }
   render();
 }
 
@@ -2510,11 +2624,11 @@ function applyBridgeScanResult(response) {
       })),
     ...responseErrors.map((detail) => ({ level: "error", title: "Escaneo", detail })),
   ];
-  if (state.scanDiagnostics.totalOmitted > 0) {
+  if (actionableOmissions().length > 0) {
     state.scanIssues.push({
       level: "warning",
-      title: "Archivos omitidos",
-      detail: omittedSummaryText(state.scanDiagnostics),
+      title: "Archivos con incidencia",
+      detail: actionableOmissionSummaryText(),
     });
   }
 
@@ -2538,7 +2652,7 @@ function applyBridgeScanResult(response) {
     state.panY = 0;
     state.exportStatus = "blocked";
     state.scanStatus = state.scanIssues.length
-      ? `Escaneo completado con ${state.scanIssues.length} aviso${state.scanIssues.length === 1 ? "" : "s"}`
+      ? `Escaneo completado con ${state.scanIssues.length} incidencia${state.scanIssues.length === 1 ? "" : "s"}`
       : `${state.realImages.length} imágenes encontradas`;
     state.statusText = "Generando vista";
     void requestBridgePreview(selectedImage);
@@ -2551,7 +2665,7 @@ function applyBridgeScanResult(response) {
   state.previewData = null;
   state.previewError = "";
   state.exportStatus = "blocked";
-  state.scanStatus = state.scanIssues.length ? state.scanIssues[0].detail : "No se encontraron PNG ni JPG";
+  state.scanStatus = state.scanIssues.length ? state.scanIssues[0].detail : "No se encontraron PNG válidos";
   state.statusText = state.scanIssues.length ? "Revisa carpeta" : "No hay imágenes compatibles";
 }
 
@@ -2564,24 +2678,30 @@ function parseFolderInput(value) {
 
 function bridgeScanMessage(totalImages, warningCount) {
   if (warningCount) {
-    return `Escaneo completado con ${warningCount} aviso${warningCount === 1 ? "" : "s"}`;
+    return `Escaneo completado con ${warningCount} incidencia${warningCount === 1 ? "" : "s"}`;
   }
   if (totalImages === 0) {
-    return "No se encontraron PNG ni JPG";
+    return "No se encontraron PNG válidos";
   }
   return `${totalImages} imágenes encontradas`;
 }
 
 function omittedSummaryText(diagnostics = state.scanDiagnostics) {
   if (!diagnostics.totalOmitted) {
-    return "Sin omisiones";
+    return "Sin ignorados";
   }
   return Object.entries(diagnostics.omittedByReason || {})
     .map(([reason, count]) => `${count} ${omissionReasonLabel(reason).toLowerCase()}`)
-    .join(" · ") || `${diagnostics.totalOmitted} omitidas`;
+    .join(" · ") || `${diagnostics.totalOmitted} ignorados`;
 }
 
 function omissionReasonLabel(reason) {
+  if (reason === "system_file") {
+    return "Archivo del sistema";
+  }
+  if (reason === "temporary_or_config_file") {
+    return "Archivo temporal o de configuración";
+  }
   if (reason === "unsupported_extension") {
     return "Extensión no admitida";
   }
@@ -2591,18 +2711,53 @@ function omissionReasonLabel(reason) {
   if (reason === "subfolder_not_scanned") {
     return "Subcarpeta no escaneada";
   }
-  return "Omitida";
+  return "Ignorado";
+}
+
+function actionableOmissionSummaryText() {
+  const actionable = actionableOmissions();
+  if (!actionable.length) {
+    return "Sin incidencias de archivos";
+  }
+  const counts = actionable.reduce((acc, item) => {
+    const label = omissionReasonLabel(item.reason).toLowerCase();
+    acc[label] = (acc[label] || 0) + 1;
+    return acc;
+  }, {});
+  return Object.entries(counts)
+    .map(([label, count]) => `${count} ${label}`)
+    .join(" · ");
+}
+
+function ignoredSummaryText() {
+  const ignored = ignoredOmissions();
+  if (!ignored.length) {
+    return "Sin archivos ignorados";
+  }
+  const counts = ignored.reduce((acc, item) => {
+    const label = omissionReasonLabel(item.reason).toLowerCase();
+    acc[label] = (acc[label] || 0) + 1;
+    return acc;
+  }, {});
+  return Object.entries(counts)
+    .map(([label, count]) => `${count} ${label}`)
+    .join(" · ");
+}
+
+function folderActionableOmissionCount(folder) {
+  return (folder.omitted || []).filter((item) => omissionSeverity(item) !== "ignored").length;
 }
 
 function bridgeFolderToItem(folder, index) {
   const hasErrors = Array.isArray(folder.errors) && folder.errors.length > 0;
   const count = Array.isArray(folder.images) ? folder.images.length : 0;
   const omittedCount = Number(folder.omittedCount) || 0;
+  const actionableOmitted = folderActionableOmissionCount(folder);
   const exists = folder.exists !== false;
   const isDir = folder.isDir !== false;
   const status = hasErrors
     ? count ? "warning" : "error"
-    : omittedCount ? "warning" : count ? "ready" : exists && isDir ? "empty" : "error";
+    : actionableOmitted ? "warning" : count ? "ready" : exists && isDir ? "empty" : "error";
   return {
     id: `bridge-folder-${index}`,
     name: basename(folder.path) || `Carpeta ${index + 1}`,
@@ -2614,8 +2769,10 @@ function bridgeFolderToItem(folder, index) {
     status,
     detail: hasErrors
       ? folder.errors[0]
-      : omittedCount
-        ? `${count} imágenes · ${omittedCount} omitidas`
+      : actionableOmitted
+        ? `${count} imágenes · ${actionableOmitted} incidencias`
+        : omittedCount
+          ? `${count} imágenes · ${omittedCount} ignorados`
         : count ? `${count} imágenes` : "No se encontraron imágenes",
     filesFound: Number(folder.filesFound) || count,
     omittedCount,
@@ -2731,15 +2888,16 @@ function reviewWarnings() {
   const counts = batchCounts();
   const blockingCount = preflightCounts().errors;
   state.inspectorTab = "warnings";
-  if (counts.warningImages || counts.nonExportableImages) {
+  if (counts.warningImages) {
     state.filter = "warnings";
-  } else if (counts.omittedFiles) {
-    state.filter = "omitted";
+  } else if (counts.nonExportableImages) {
+    state.filter = "excluded";
   }
-  const issueCount = counts.nonBlockingWarnings + blockingCount;
+  ensureGallerySelectionForFilter();
+  const issueCount = counts.reviewIssues + blockingCount;
   state.statusText = issueCount
-    ? `${countText(issueCount, "aviso", "avisos")} para revisar`
-    : "Sin avisos";
+    ? `${countText(issueCount, "incidencia", "incidencias")} para revisar`
+    : "Sin incidencias";
   render();
 }
 
@@ -2816,6 +2974,7 @@ function render() {
   renderInspector();
   renderFooter();
   renderAccessibilityHints();
+  renderDesignSystemComponents();
   syncOpenInspectorDisclosureHeights();
   keepActiveThumbnailVisible();
 }
@@ -3067,6 +3226,7 @@ function thumbnailStats() {
 
 function renderTop() {
   const visible = getVisibleAppState();
+  const counts = batchCounts();
   $("#demo-scenario").value = scenarioLabels[state.scenario] ? state.scenario : "batch-ready";
   $("#app-mode").value = state.bridgeMode;
   $("#bridge-url").value = state.bridgeUrl;
@@ -3076,6 +3236,12 @@ function renderTop() {
   $("#status-dot").className = `status-dot ${statusMode()}`;
   const detailButton = $("[data-action='open-batch-detail']");
   if (detailButton) {
+    const hasBatchDetail = hasBatch() || state.batch === "empty"
+      || counts.reviewIssues > 0
+      || counts.ignoredFiles > 0
+      || counts.blockingErrors > 0
+      || ["partial", "failed"].includes(state.exportStatus);
+    detailButton.hidden = !hasBatchDetail;
     detailButton.title = state.batch === "none" ? "Ver configuración inicial" : "Ver detalle del lote";
   }
   const preflight = $("#top-preflight-status");
@@ -3103,7 +3269,7 @@ function compactHeaderStatusText() {
   if (state.exportStatus === "completed" || state.exportStatus === "partial") {
     const processed = Number(state.exportResult?.processed ?? state.processed ?? counts.exportableImages);
     const total = Number(state.exportResult?.total ?? counts.exportableImages);
-    return state.exportStatus === "partial" ? `Exportado con avisos · ${processed}/${total}` : `Exportado · ${processed}/${total}`;
+    return state.exportStatus === "partial" ? `Exportado con incidencias · ${processed}/${total}` : `Exportado · ${processed}/${total}`;
   }
   if (state.exportStatus === "failed") {
     return "Exportación fallida";
@@ -3116,8 +3282,8 @@ function compactHeaderStatusText() {
   }
   if (state.batch === "empty") {
     const files = counts.filesFound || 0;
-    const omitted = counts.omittedFiles || 0;
-    return omitted ? `${files} archivos · 0 exportables · ${omitted} omitidos` : "0 exportables";
+    const ignored = counts.ignoredFiles || 0;
+    return ignored ? `${files} archivos · 0 exportables · ${ignored} ignorados` : "0 exportables";
   }
   const parts = [
     detectedFormatLabel(activeImages()),
@@ -3125,7 +3291,10 @@ function compactHeaderStatusText() {
     `${counts.exportableImages} exportables`,
   ];
   if (counts.nonBlockingWarnings) {
-    parts.push(`${counts.nonBlockingWarnings} aviso${counts.nonBlockingWarnings === 1 ? "" : "s"}`);
+    parts.push(`${counts.nonBlockingWarnings} incidencia${counts.nonBlockingWarnings === 1 ? "" : "s"}`);
+  }
+  if (counts.ignoredFiles) {
+    parts.push(`${counts.ignoredFiles} ignorado${counts.ignoredFiles === 1 ? "" : "s"}`);
   }
   return parts.join(" · ");
 }
@@ -3140,7 +3309,7 @@ function topStatusText() {
     return "Sin lote";
   }
   if (state.batch === "empty") {
-    return "No hay imágenes válidas";
+    return "No hay PNG válidos";
   }
   if (state.exportStatus === "running") {
     const total = exportableImages().length;
@@ -3163,7 +3332,7 @@ function preflightStatusLabel() {
     return "Salida completada";
   }
   if (state.exportStatus === "partial") {
-    return "Avisos";
+    return "Incidencias";
   }
   if (state.exportStatus === "failed") {
     return "Revisar";
@@ -3177,7 +3346,7 @@ function preflightStatusLabel() {
     return "Pendiente";
   }
   if (counts.warnings > 0) {
-    return `${counts.warnings} aviso${counts.warnings === 1 ? "" : "s"}`;
+    return `${counts.warnings} incidencia${counts.warnings === 1 ? "" : "s"}`;
   }
   return "Listo";
 }
@@ -3235,12 +3404,12 @@ function renderBridge() {
 function compactScanStatus() {
   const counts = batchCounts();
   if (state.batch === "ready") {
-    return counts.omittedFiles
-      ? `${counts.exportableImages} exportables · ${countText(counts.omittedFiles, "omitido", "omitidos")}`
+    return counts.ignoredFiles
+      ? `${counts.exportableImages} exportables · ${countText(counts.ignoredFiles, "ignorado", "ignorados")}`
       : `${counts.exportableImages} exportables`;
   }
   if (state.batch === "empty") {
-    return counts.omittedFiles ? `0 exportables · ${countText(counts.omittedFiles, "omitido", "omitidos")}` : "Sin imágenes compatibles";
+    return counts.ignoredFiles ? `0 exportables · ${countText(counts.ignoredFiles, "ignorado", "ignorados")}` : "Sin imágenes compatibles";
   }
   if (state.batch === "scanning") {
     return "Leyendo imágenes";
@@ -3315,6 +3484,7 @@ function emptyScanDiagnostics() {
     totalImages: 0,
     totalOmitted: 0,
     omittedByReason: {},
+    omittedByCategory: {},
     omitted: [],
   };
 }
@@ -3325,6 +3495,7 @@ function mockScanDiagnostics() {
     totalImages: mockImages.length,
     totalOmitted: 0,
     omittedByReason: {},
+    omittedByCategory: {},
     omitted: [],
   };
 }
@@ -3341,6 +3512,7 @@ function scanDiagnosticsFromResponse(response) {
     totalImages: Number(response.totalImages) || 0,
     totalOmitted: Number(response.totalOmitted) || omitted.length,
     omittedByReason: response.omittedByReason || {},
+    omittedByCategory: response.omittedByCategory || {},
     omitted,
   };
 }
@@ -3360,7 +3532,8 @@ function renderBatchSummary() {
   const validLabel = counts.validImages === null ? "Leyendo" : counts.validImages;
   const outputLine = batchOutputLine();
   const destinationLine = batchDestinationLine();
-  const warningsLabel = counts.nonBlockingWarnings ? countText(counts.nonBlockingWarnings, "aviso", "avisos") : "Sin avisos";
+  const warningsLabel = counts.nonBlockingWarnings ? countText(counts.nonBlockingWarnings, "incidencia", "incidencias") : "Sin incidencias";
+  const ignoredLabel = counts.ignoredFiles ? countText(counts.ignoredFiles, "ignorado", "ignorados") : "Sin ignorados";
 
   summary.innerHTML = `
     <div class="batch-summary-card ${tone}">
@@ -3372,9 +3545,9 @@ function renderBatchSummary() {
 
       <div class="batch-metric-grid" aria-label="Datos del lote">
         ${batchMetricHtml("Archivos encontrados", filesLabel)}
-        ${batchMetricHtml("Imágenes válidas", validLabel)}
-        ${batchMetricHtml("Imágenes exportables", counts.exportableImages)}
-        ${batchMetricHtml("Archivos omitidos", counts.omittedFiles)}
+        ${batchMetricHtml("Imágenes listas", counts.readyImages)}
+        ${batchMetricHtml("Excluidas", counts.nonExportableImages)}
+        ${batchMetricHtml("Ignorados", counts.ignoredFiles)}
       </div>
 
       <div class="batch-summary-section">
@@ -3389,8 +3562,8 @@ function renderBatchSummary() {
           <strong>${escapeHtml(counts.readyImages)}</strong>
         </div>
         <div class="batch-summary__line">
-          <span>Con aviso</span>
-          <strong>${escapeHtml(counts.warningImages)}</strong>
+          <span>Incidencias</span>
+          <strong>${escapeHtml(counts.reviewIssues)}</strong>
         </div>
         <div class="batch-summary__line">
           <span>Bloqueos</span>
@@ -3410,8 +3583,12 @@ function renderBatchSummary() {
           <strong title="${escapeHtml(namingExample())}">${escapeHtml(namingHumanLabel())}</strong>
         </div>
         <div class="batch-summary__line">
-          <span>Avisos</span>
+          <span>Incidencias</span>
           <strong>${escapeHtml(warningsLabel)}</strong>
+        </div>
+        <div class="batch-summary__line">
+          <span>Ignorados</span>
+          <strong>${escapeHtml(ignoredLabel)}</strong>
         </div>
       </div>
 
@@ -3419,7 +3596,7 @@ function renderBatchSummary() {
         <span>Siguiente</span>
         <strong>${escapeHtml(visible.nextStep)}</strong>
       </div>
-      ${diagnostics.totalOmitted || counts.blockingErrors ? diagnosticsHtml(diagnostics) : `<div class="diagnostic-ok">${counts.nonBlockingWarnings ? "Avisos en la galería" : "Sin avisos"}</div>`}
+      ${diagnostics.totalOmitted || counts.blockingErrors ? diagnosticsHtml(diagnostics) : `<div class="diagnostic-ok">${counts.nonBlockingWarnings ? "Incidencias en la galería" : "Sin incidencias"}</div>`}
     </div>
   `;
 }
@@ -3431,7 +3608,7 @@ function sourceInputDetail(filesLabel, validLabel) {
   if (state.batch === "scanning") {
     return "Leyendo imágenes";
   }
-  return `${filesLabel} archivos encontrados · ${validLabel} imágenes válidas`;
+  return `${filesLabel} archivos encontrados · ${validLabel} imágenes listas`;
 }
 
 function batchSummaryToneFromVisible(visible) {
@@ -3563,14 +3740,14 @@ function exportConfirmHtml(risks) {
     ["Destino", destinationFallbackLabel()],
     ["Nombre", namingExample()],
   ];
-  const riskTitle = blocking ? "Bloqueos" : "Avisos";
+  const riskTitle = blocking ? "Bloqueos" : "Incidencias";
   const riskRows = risks.length
     ? risks.map(exportConfirmRiskHtml).join("")
     : `
       <div class="export-confirm-risk ready">
         <span aria-hidden="true">✓</span>
         <div>
-          <strong>Sin avisos</strong>
+          <strong>Sin incidencias</strong>
           <small>El lote se exportará con el formato activo.</small>
         </div>
       </div>
@@ -3649,11 +3826,12 @@ function batchDetailHtml() {
       <section class="batch-detail-section">
         <h3>Conteo</h3>
         ${batchDetailRowHtml("Archivos encontrados", files)}
-        ${batchDetailRowHtml("Imágenes válidas", valid)}
+        ${batchDetailRowHtml("Imágenes listas", counts.readyImages)}
         ${batchDetailRowHtml("Exportables", counts.exportableImages)}
         ${batchDetailRowHtml("Listas", counts.readyImages)}
         ${batchDetailRowHtml("Avisos", counts.warningImages)}
-        ${batchDetailRowHtml("Omitidas", counts.omittedFiles)}
+        ${batchDetailRowHtml("Excluidas", counts.nonExportableImages)}
+        ${batchDetailRowHtml("Ignorados", counts.ignoredFiles)}
         ${batchDetailRowHtml("Bloqueos", counts.blockingErrors)}
       </section>
 
@@ -3668,8 +3846,8 @@ function batchDetailHtml() {
       </section>
 
       <section class="batch-detail-section">
-        <h3>Avisos</h3>
-        ${issueRowsHtml || '<span class="batch-detail-muted">Sin avisos.</span>'}
+        <h3>Incidencias</h3>
+        ${issueRowsHtml || '<span class="batch-detail-muted">Sin incidencias.</span>'}
         ${reasonRows ? `<div class="batch-detail-reasons">${reasonRows}</div>` : ""}
       </section>
     </div>
@@ -3722,12 +3900,13 @@ function bridgeStatusLabel() {
 
 function renderBatch() {
   const images = activeImages();
+  const counts = batchCounts();
   const adjusted = images.filter((image) => image.status === "adjusted").length;
   const valid = images.filter((image) => image.status === "ready" || image.status === "adjusted").length;
   const warnings = images.filter((image) => image.status === "warning").length;
   const errors = images.filter((image) => image.status === "error" || exportItemState(image)?.status === "error").length;
-  const omitted = Number(state.scanDiagnostics?.totalOmitted || 0);
-  const warningCount = omitted + warnings + errors;
+  const ignored = counts.ignoredFiles;
+  const issueCount = counts.reviewIssues;
   const filmstripCount = $("#filmstrip-count");
   $("#image-search").value = state.search;
   updateBatchSearchClear();
@@ -3776,16 +3955,16 @@ function renderBatch() {
       : [{
           id: "empty",
           name: "Carpeta vacía",
-          detail: "No hay imágenes válidas",
+          detail: "No hay PNG válidos",
           count: "0",
           status: "empty",
         }];
     $("#batch-count").textContent = "Sin imágenes";
     setBatchPill(
-      state.scanDiagnostics.totalOmitted
-        ? `${state.scanDiagnostics.totalOmitted} omitida${state.scanDiagnostics.totalOmitted === 1 ? "" : "s"}`
+      ignored
+        ? `${ignored} ignorado${ignored === 1 ? "" : "s"}`
         : "Sin imágenes",
-      state.scanDiagnostics.totalOmitted ? "warning" : "muted"
+      ignored ? "muted" : "muted"
     );
     setGalleryTitle(0);
     $("#batch-visible-count").textContent = "";
@@ -3802,12 +3981,12 @@ function renderBatch() {
   const exportable = exportableImages().length;
   $("#batch-count").textContent = exportable ? `${exportable} exportables` : "Sin exportables";
   setBatchPill(
-    warningCount
-      ? warningCountLabel(warningCount)
+    issueCount
+      ? warningCountLabel(issueCount)
       : adjusted ? `${pluralizeCount(adjusted, "ajustada")}` : "Listo",
-    warningCount ? "warning" : adjusted ? "active" : "ready"
+    issueCount ? "warning" : adjusted ? "active" : "ready"
   );
-  $("#folder-list").innerHTML = batchFormatHtml(images, omitted);
+  $("#folder-list").innerHTML = batchFormatHtml(images, ignored);
   ensureGalleryFilterAvailable(images);
   renderFilterButtons();
 
@@ -3818,9 +3997,7 @@ function renderBatch() {
   queueThumbnailPreload();
   $("#batch-empty-note").innerHTML = visible.length ? "" : filteredEmptyHtml(images.length, valid, warnings, errors);
   if (filmstripCount) {
-    filmstripCount.textContent = state.filter === "omitted"
-      ? `${Number(state.scanDiagnostics?.totalOmitted || 0)} omitida${Number(state.scanDiagnostics?.totalOmitted || 0) === 1 ? "" : "s"}`
-      : visible.length === images.length
+    filmstripCount.textContent = visible.length === images.length
       ? `${images.length} imágenes`
       : `${visible.length} de ${images.length}`;
   }
@@ -3856,7 +4033,7 @@ function filteredEmptyHtml(total, valid, warnings, errors) {
   const labels = {
     valid: "listas",
     warnings: "con avisos",
-    omitted: "omitidas",
+    excluded: "excluidas",
   };
   if (state.search.trim()) {
     const term = state.search.trim();
@@ -3869,12 +4046,9 @@ function filteredEmptyHtml(total, valid, warnings, errors) {
       <button type="button" data-action="clear-filter">Limpiar búsqueda</button>
     `;
   }
-  const counts = { valid, warnings, omitted: Number(state.scanDiagnostics?.totalOmitted || 0) };
+  const counts = { valid, warnings, excluded: errors };
   const label = labels[state.filter] || "con este filtro";
   const count = counts[state.filter] || 0;
-  if (state.filter === "omitted") {
-    return omittedEmptyHtml();
-  }
   return `
     <strong>No hay imágenes ${escapeHtml(label)}.</strong>
     <small>${escapeHtml(total)} imágenes en el lote · ${escapeHtml(count)} en este filtro</small>
@@ -3882,32 +4056,31 @@ function filteredEmptyHtml(total, valid, warnings, errors) {
   `;
 }
 
+function filterEmptyDetail() {
+  if (state.search.trim()) {
+    return `No hay coincidencias para "${state.search.trim()}".`;
+  }
+  if (state.filter === BATCH_FILTERS.warnings) {
+    return "El lote no contiene imágenes con avisos.";
+  }
+  if (state.filter === BATCH_FILTERS.excluded) {
+    return "No hay imágenes excluidas de la exportación.";
+  }
+  if (state.filter === BATCH_FILTERS.valid) {
+    return "No hay imágenes listas en este filtro.";
+  }
+  return "No hay imágenes visibles con el filtro activo.";
+}
+
 function emptyBatchNoteHtml() {
-  const detail = state.scanDiagnostics.totalOmitted
-    ? `Esta carpeta no contiene imágenes compatibles. ${omittedSummaryText(state.scanDiagnostics)}.`
+  const ignored = ignoredOmissions().length;
+  const detail = ignored
+    ? `Esta carpeta no contiene PNG válidos. ${ignoredSummaryText()}.`
     : state.scanStatus || "Esta carpeta no contiene imágenes compatibles.";
   return `
     <strong>No se encontraron imágenes compatibles</strong>
     <span>${escapeHtml(detail)}</span>
     <button type="button" class="primary" data-action="pick-bridge-folder">Elegir otra carpeta</button>
-  `;
-}
-
-function omittedEmptyHtml() {
-  const omitted = state.scanDiagnostics?.omitted || [];
-  if (!omitted.length) {
-    return `
-      <strong>No hay archivos omitidos</strong>
-      <small>${escapeHtml(activeImages().length)} imágenes en el lote</small>
-      <button type="button" data-action="clear-filter">Ver todas</button>
-    `;
-  }
-  const first = omitted[0];
-  return `
-    <strong>${escapeHtml(omitted.length)} archivo${omitted.length === 1 ? "" : "s"} omitido${omitted.length === 1 ? "" : "s"}</strong>
-    <span title="${escapeHtml(first.path || first.name)}">${escapeHtml(first.name || "Archivo")}</span>
-    <small>Motivo: ${escapeHtml(first.detail || omissionReasonLabel(first.reason))}</small>
-    <button type="button" data-action="clear-filter">Ver todas</button>
   `;
 }
 
@@ -4237,8 +4410,8 @@ function galleryFilterCounts(images = activeImages()) {
   return {
     all: images.length,
     valid: images.filter((image) => image.status === "ready" || image.status === "adjusted").length,
-    warnings: images.filter((image) => image.status === "warning" || image.status === "error" || exportItemState(image)?.status === "error").length,
-    omitted: Number(state.scanDiagnostics?.totalOmitted || 0),
+    warnings: images.filter((image) => image.status === "warning").length,
+    excluded: images.filter((image) => !image.exportable || image.status === "error" || exportItemState(image)?.status === "error").length,
   };
 }
 
@@ -4252,8 +4425,8 @@ function galleryFilterVisible(filter, counts = galleryFilterCounts()) {
   if (filter === "warnings") {
     return counts.warnings > 0;
   }
-  if (filter === "omitted") {
-    return counts.omitted > 0;
+  if (filter === "excluded") {
+    return counts.excluded > 0;
   }
   return false;
 }
@@ -4272,12 +4445,12 @@ function renderFilterButtons() {
     all: "Todas",
     valid: "Listas",
     warnings: "Avisos",
-    omitted: "Omitidas",
+    excluded: "Excluidas",
   };
-  const hasWarnings = counts.warnings > 0;
+  const hasWarnings = counts.warnings > 0 || counts.excluded > 0;
   const order = hasWarnings
-    ? { warnings: 1, all: 2, omitted: 3, valid: 4 }
-    : { all: 1, omitted: 2, valid: 3, warnings: 4 };
+    ? { all: 1, warnings: 2, excluded: 3, valid: 4 }
+    : { all: 1, valid: 2, warnings: 3, excluded: 4 };
   $$(".batch-filter button").forEach((button) => {
     const filter = button.dataset.filter;
     const count = counts[filter] || 0;
@@ -4301,11 +4474,15 @@ function renderGalleryViewButtons() {
 
 function renderPreview() {
   const image = selectedImage();
+  const visibleImages = filteredImages();
+  const filterIsEmpty = hasBatch() && activeImages().length > 0 && visibleImages.length === 0;
   const isBridgeImage = image?.source === "bridge";
   const previewControlsDisabled = !image || state.previewStatus === "empty" || state.previewStatus === "error";
   const compareControlsDisabled = !image || isBridgeImage || state.previewStatus === "empty" || state.previewStatus === "error";
   $("#preview-name").textContent = image
     ? image.name
+    : filterIsEmpty
+      ? "Sin imágenes en este filtro"
     : state.batch === "none"
       ? "Seleccionar carpeta de imágenes"
       : state.batch === "empty"
@@ -4315,11 +4492,10 @@ function renderPreview() {
           : "Selecciona una imagen";
   $("#preview-subtitle").textContent = previewSubtitle(image);
   $("#zoom-label").textContent = `${currentViewerZoom()}%`;
-  const visibleImages = filteredImages();
   const visibleIndex = visibleImages.findIndex((item) => item.id === state.selectedImageId);
   $("#viewer-position").textContent = visibleIndex >= 0
     ? `${visibleIndex + 1} / ${visibleImages.length}`
-    : activeImages().length ? "Fuera del filtro" : "Sin imagen";
+    : activeImages().length ? "Sin selección" : "Sin imagen";
   $("#preview-meta").textContent = isBridgeImage
     ? bridgePreviewMeta()
     : image ? state.activePreset : "Sin lote";
@@ -4385,11 +4561,24 @@ function renderPreview() {
       variant: "warning",
       title: "No se encontraron imágenes compatibles",
       detail: state.scanDiagnostics.totalOmitted
-        ? omittedSummaryText(state.scanDiagnostics)
+        ? ignoredSummaryText()
         : "Esta carpeta no contiene imágenes compatibles.",
       actionLabel: "Elegir otra carpeta",
       action: "pick-bridge-folder",
       meta: state.scanStatus || "Revisa el detalle técnico del lote",
+    });
+    queueFitZoomRefresh();
+    return;
+  }
+
+  if (filterIsEmpty) {
+    canvas.innerHTML = emptyStateHtml({
+      variant: "inline",
+      title: "No hay imágenes en este filtro",
+      detail: filterEmptyDetail(),
+      actionLabel: "Ver todas",
+      action: "clear-filter",
+      meta: `${activeImages().length} imágenes en el lote`,
     });
     queueFitZoomRefresh();
     return;
@@ -4650,11 +4839,14 @@ function previewOrientation() {
 
 function previewSubtitle(image) {
   if (!image) {
+    if (hasBatch() && activeImages().length && !filteredImages().length) {
+      return filterEmptyDetail();
+    }
     if (state.batch === "none") {
       return "Sin lote";
     }
     if (state.batch === "empty") {
-      return state.scanStatus || "No hay imágenes válidas";
+      return state.scanStatus || "No hay PNG válidos";
     }
     if (state.batch === "scanning") {
       return state.scanStatus || "Escaneando";
@@ -4770,13 +4962,16 @@ function renderReviewPanel() {
 function reviewPanelHtml() {
   const image = selectedImage();
   if (!image) {
-    return emptyStateHtml({
+    return `
+      ${lotInspectorSummaryHtml()}
+      ${emptyStateHtml({
       variant: "inline",
       title: "Selecciona una imagen",
       detail: "Elige una miniatura para revisar la salida.",
       actionLabel: activeImages().length ? "Seleccionar primera imagen" : "",
       action: activeImages().length ? "select-first-image" : "",
-    });
+    })}
+    `;
   }
 
   const reviewState = imageReviewState(image);
@@ -4799,11 +4994,13 @@ function reviewPanelHtml() {
   ` : "";
 
   return `
+    ${lotInspectorSummaryHtml()}
+
     <div class="review-card review-card--compact ${escapeHtml(reviewState.tone)}">
       <div class="review-card__header">
         <div>
           <strong title="${escapeHtml(image.path || image.name)}">${escapeHtml(image.name)}</strong>
-          <small>${escapeHtml(selectedIndex >= 0 ? `${selectedIndex + 1} de ${images.length}` : "Fuera del filtro")}</small>
+          <small>${escapeHtml(selectedIndex >= 0 ? `${selectedIndex + 1} de ${images.length}` : "Sin selección")}</small>
         </div>
         <span class="status-badge ${escapeHtml(reviewState.tone)}">${escapeHtml(reviewState.label)}</span>
       </div>
@@ -4819,9 +5016,32 @@ function reviewPanelHtml() {
     <div class="inspector-actionbar review-actions">
       <button type="button" data-action="previous-image"${canNavigate ? "" : " disabled"}>Anterior</button>
       <button type="button" data-action="next-image"${canNavigate ? "" : " disabled"}>Siguiente</button>
-      ${issues.length ? '<button type="button" class="primary" data-action="review-errors">Ver avisos</button>' : ""}
+      ${issues.length ? '<button type="button" data-action="review-errors">Ver incidencias</button>' : ""}
       <button type="button" data-action="open-app-settings">Cambiar formato</button>
       ${hasLocal ? '<button type="button" data-action="reset-local-adjustment">Quitar ajuste local</button>' : '<button type="button" data-action="open-advanced">Ajustar imagen</button>'}
+    </div>
+  `;
+}
+
+function lotInspectorSummaryHtml() {
+  const counts = batchCounts();
+  const stateLabel = counts.blockingErrors
+    ? `${counts.blockingErrors} bloqueo${counts.blockingErrors === 1 ? "" : "s"}`
+    : counts.reviewIssues
+      ? `${counts.reviewIssues} incidencia${counts.reviewIssues === 1 ? "" : "s"}`
+      : "Listo";
+  return `
+    <div class="lot-summary-card">
+      <div class="lot-summary-card__head">
+        <span>Lote</span>
+        <strong>${escapeHtml(stateLabel)}</strong>
+      </div>
+      <div class="lot-summary-card__grid">
+        <span><em>Listas</em><strong>${escapeHtml(counts.readyImages)}</strong></span>
+        <span><em>Exportables</em><strong>${escapeHtml(counts.exportableImages)}</strong></span>
+        <span><em>Excluidas</em><strong>${escapeHtml(counts.nonExportableImages)}</strong></span>
+        <span><em>Ignorados</em><strong>${escapeHtml(counts.ignoredFiles)}</strong></span>
+      </div>
     </div>
   `;
 }
@@ -5013,7 +5233,7 @@ function contextualInspectorHtml() {
         ${preflightListHtml([
           { state: "warning", title: "Carpeta revisada", detail: state.scanDiagnostics.totalFiles ? `${state.scanDiagnostics.totalFiles} archivos encontrados` : "Sin archivos compatibles" },
           { state: "error", title: "Imágenes exportables", detail: "0 imágenes" },
-          { state: state.scanDiagnostics.totalOmitted ? "warning" : "pending", title: "Avisos", detail: omittedSummaryText(state.scanDiagnostics) },
+          { state: ignoredOmissions().length ? "pending" : "pending", title: "Ignorados", detail: ignoredSummaryText() },
           { state: "pending", title: "Destino", detail: "Pendiente hasta cargar un lote" },
         ])}
         <button type="button" class="primary" data-action="pick-bridge-folder">Elegir otra carpeta</button>
@@ -5079,11 +5299,11 @@ function renderExport() {
   $("#export-count").classList.toggle("dirty", !ready);
   const warningsReadiness = $("#warnings-readiness");
   if (warningsReadiness) {
-    warningsReadiness.textContent = warningCount ? `${warningCount} aviso${warningCount === 1 ? "" : "s"} del lote` : "Sin avisos";
+    warningsReadiness.textContent = warningCount ? `${warningCount} incidencia${warningCount === 1 ? "" : "s"} del lote` : "Sin incidencias";
   }
   const warningsTab = $("[data-inspector-tab='warnings']");
   if (warningsTab) {
-    warningsTab.textContent = warningCount ? `Avisos ${warningCount}` : "Avisos";
+    warningsTab.textContent = warningCount ? `Incidencias ${warningCount}` : "Incidencias";
   }
 
   const warningSummary = outputWarningSummary(issues);
@@ -5948,10 +6168,10 @@ function outputWarningSummary(issues) {
   const detail = first.file ? `Motivo: ${first.detail}` : `${first.title}${first.detail ? `: ${first.detail}` : ""}`;
   return `
     <div class="warning-summary ${warnings.some((issue) => issue.level === "error") ? "error" : ""}">
-      <strong>${count} aviso${count === 1 ? "" : "s"}</strong>
+      <strong>${count} incidencia${count === 1 ? "" : "s"}</strong>
       ${fileLine}
       <span>${escapeHtml(detail)}</span>
-      <button type="button" data-action="review-errors">Revisar aviso</button>
+      <button type="button" data-action="review-errors">Revisar incidencia</button>
     </div>
   `;
 }
@@ -5963,23 +6183,21 @@ function issueListHtml() {
   const rows = issueRows();
   const counts = preflightCounts();
   const warningCount = visibleWarningCount();
-  const canExportWithWarnings = isExportReady() && warningCount > 0 && counts.errors === 0 && state.exportStatus !== "running";
-  const footerAction = canExportWithWarnings
-    ? '<button type="button" class="primary" data-action="start-export">Exportar igualmente</button>'
-    : counts.errors
+  const onlyIgnored = rows.length > 0 && warningCount === 0 && counts.errors === 0;
+  const footerAction = counts.errors
       ? '<button type="button" class="primary" data-action="edit-output">Revisar salida</button>'
       : "";
   if (!rows.length) {
     return `
       <div class="issue-list-summary ready issue-list-summary--compact">
-        <strong>Sin avisos</strong>
+        <strong>Sin incidencias</strong>
       </div>
     `;
   }
   return `
-    <div class="issue-list-summary ${counts.errors ? "error" : "warning"}">
-      <strong>${escapeHtml(counts.errors ? `${counts.errors} bloqueo${counts.errors === 1 ? "" : "s"}` : `${warningCount || rows.length} aviso${(warningCount || rows.length) === 1 ? "" : "s"}`)}</strong>
-      <span>${escapeHtml(counts.errors ? "Resuelve los bloqueos antes de exportar." : "Puedes revisar las imágenes o exportar igualmente.")}</span>
+    <div class="issue-list-summary ${counts.errors ? "error" : onlyIgnored ? "clear" : "warning"}">
+      <strong>${escapeHtml(counts.errors ? `${counts.errors} bloqueo${counts.errors === 1 ? "" : "s"}` : onlyIgnored ? `${rows.length} ignorado${rows.length === 1 ? "" : "s"}` : `${warningCount || rows.length} incidencia${(warningCount || rows.length) === 1 ? "" : "s"}`)}</strong>
+      <span>${escapeHtml(counts.errors ? "Resuelve los bloqueos antes de exportar." : onlyIgnored ? "No afectan a la exportación." : "Puedes revisar el detalle sin bloquear la exportación.")}</span>
     </div>
     ${rows.slice(0, 8).map(issueItemHtml).join("")}
     ${footerAction ? `<div class="inspector-actionbar warning-actions">${footerAction}</div>` : ""}
@@ -5988,10 +6206,11 @@ function issueListHtml() {
 
 function issueRows() {
   const rows = [];
-  (state.scanDiagnostics?.omitted || []).slice(0, 4).forEach((item) => {
+  scanOmissions().slice(0, 4).forEach((item) => {
+    const severity = omissionSeverity(item);
     rows.push({
-      level: "warning",
-      title: item.name || "Archivo omitido",
+      level: severity === "ignored" ? "info" : severity,
+      title: item.name || (severity === "ignored" ? "Archivo ignorado" : "Archivo con incidencia"),
       detail: `Motivo: ${item.detail || omissionReasonLabel(item.reason)}`,
       path: item.path || item.folder || "",
       actionLabel: "",
@@ -6026,7 +6245,7 @@ function issueItemHtml(row) {
     ? `<button type="button" data-action="select-image-id" data-image-id="${escapeHtml(row.imageId)}">${escapeHtml(row.actionLabel || "Ir a imagen")}</button>`
     : "";
   return `
-    <div class="issue-item ${row.level === "error" ? "error" : "warning"}" title="${escapeHtml(row.path || row.detail || row.title)}">
+    <div class="issue-item ${row.level === "error" ? "error" : row.level === "info" || row.level === "ignored" ? "clear" : "warning"}" title="${escapeHtml(row.path || row.detail || row.title)}">
       <div>
         <strong>${escapeHtml(row.title)}</strong>
         <span>${escapeHtml(row.detail || "Revisar")}</span>
@@ -6060,23 +6279,24 @@ function exportPreflightRows(issues, exportable, ready) {
   if (state.batch === "empty") {
     return [
       { state: "error", title: "Imágenes exportables", detail: "0 imágenes" },
-      { state: state.scanDiagnostics.totalOmitted ? "warning" : "pending", title: "Avisos", detail: omittedSummaryText(state.scanDiagnostics) },
+      { state: ignoredOmissions().length ? "pending" : "pending", title: "Ignorados", detail: ignoredSummaryText() },
       { state: "pending", title: "Carpeta de salida", detail: "Pendiente" },
     ];
   }
   const rows = [
     { state: exportable > 0 ? "ok" : "error", title: "Imágenes exportables", detail: `${exportable} imagen${exportable === 1 ? "" : "es"}` },
-    { state: state.scanDiagnostics.totalOmitted ? "warning" : "ok", title: "Avisos", detail: state.scanDiagnostics.totalOmitted ? omittedSummaryText(state.scanDiagnostics) : "Sin avisos" },
+    { state: visibleWarningCount() ? "warning" : "ok", title: "Incidencias", detail: visibleWarningCount() ? `${visibleWarningCount()} incidencia${visibleWarningCount() === 1 ? "" : "s"}` : "Sin incidencias" },
+    { state: ignoredOmissions().length ? "pending" : "ok", title: "Ignorados", detail: ignoredSummaryText() },
     { state: state.destinationMode === "custom" && !state.destinationValue.trim() ? "error" : "ok", title: "Carpeta de salida", detail: destinationFallbackLabel() },
     { state: state.naming.trim() ? "ok" : "error", title: "Nombre de archivo", detail: state.naming.trim() ? namingExample() : "Plantilla vacía" },
   ];
   issues
-    .filter((issue) => !["Sin lote", "No hay imágenes válidas", "Nombre de archivo vacío", "Carpeta de salida sin configurar", "Sin imágenes exportables"].includes(issue.title))
+    .filter((issue) => !["Sin lote", "No hay PNG válidos", "Nombre de archivo vacío", "Carpeta de salida sin configurar", "Sin imágenes exportables"].includes(issue.title))
     .forEach((issue) => {
       rows.push({ state: issue.level === "error" ? "error" : "warning", title: issue.title, detail: issue.detail });
     });
   if (ready && !issues.length) {
-    rows.push({ state: "ok", title: "Preflight", detail: "Sin bloqueos ni avisos" });
+    rows.push({ state: "ok", title: "Preflight", detail: "Sin bloqueos ni incidencias" });
   }
   return rows;
 }
@@ -6105,7 +6325,7 @@ function exportPanelStatusLabel(ready, issues = preflightIssues()) {
     return "Exportado";
   }
   if (state.exportStatus === "partial") {
-    return "Exportado con avisos";
+    return "Exportado con incidencias";
   }
   if (state.exportStatus === "failed") {
     return "Revisar antes de exportar";
@@ -6117,7 +6337,7 @@ function exportPanelStatusLabel(ready, issues = preflightIssues()) {
     return "Pendiente";
   }
   if (ready && issues.length) {
-    return `${issues.length} aviso${issues.length === 1 ? "" : "s"} antes de exportar`;
+    return `${issues.length} incidencia${issues.length === 1 ? "" : "s"} antes de exportar`;
   }
   return ready ? "Listo para exportar" : "Configura salida";
 }
@@ -6129,7 +6349,7 @@ function exportPreflightSummary(issues, exportable, ready) {
     return `${errors} bloqueo${errors === 1 ? "" : "s"} · ${exportable} exportables`;
   }
   if (warnings) {
-    return `${warnings} aviso${warnings === 1 ? "" : "s"} · ${exportable} exportables`;
+    return `${warnings} incidencia${warnings === 1 ? "" : "s"} · ${exportable} exportables`;
   }
   return ready ? `${exportable} imágenes listas` : "Pendiente";
 }
@@ -6203,7 +6423,7 @@ function renderExportResult() {
 
   const issuesHtml = issues.length ? `
     <div class="result-issues">
-      <strong>${errors ? `${errors} error${errors === 1 ? "" : "es"}` : `${issues.length} aviso${issues.length === 1 ? "" : "s"}`}</strong>
+      <strong>${errors ? `${errors} error${errors === 1 ? "" : "es"}` : `${issues.length} incidencia${issues.length === 1 ? "" : "s"}`}</strong>
       <span>${escapeHtml(exportIssueActionText(issues[0]))}</span>
     </div>
   ` : "";
@@ -6291,7 +6511,7 @@ function exportResultActionsHtml(issues, destinations) {
     actions.push('<button type="button" data-action="open-output">Abrir carpeta</button>');
   }
   if (issues.length || state.exportStatus === "failed" || state.exportStatus === "partial") {
-    actions.push('<button type="button" data-action="review-errors">Ver avisos</button>');
+    actions.push('<button type="button" data-action="review-errors">Ver incidencias</button>');
   }
   if (state.exportStatus === "failed" && isExportReady()) {
     actions.push('<button type="button" class="primary" data-action="start-export">Reintentar</button>');
@@ -6542,12 +6762,12 @@ function renderFooter() {
 
   const hasReviewIssues = (hasBatch() || state.batch === "empty") && (
     issues.some((issue) => issue.title !== "Sin lote")
-    || counts.omittedFiles > 0
+    || counts.reviewIssues > 0
     || activeImages().some((image) => image.status === "error" || image.status === "warning" || exportItemState(image)?.status === "error")
   );
   $("#review-errors").classList.toggle("is-hidden", !hasReviewIssues);
   $("#review-errors").disabled = !hasReviewIssues;
-  $("#review-errors").textContent = "Ver avisos";
+  $("#review-errors").textContent = "Ver incidencias";
   $("#pause-export").classList.toggle("is-hidden", state.exportStatus !== "running");
   $("#pause-export").textContent = state.paused ? "Reanudar" : "Pausar";
   $("#stop-export").classList.toggle("is-hidden", state.exportStatus !== "running");
@@ -6586,14 +6806,14 @@ function renderAccessibilityHints() {
   const filterCounts = {
     all: activeImages().length,
     valid: counts.readyImages,
-    warnings: counts.warningImages + counts.nonExportableImages,
-    omitted: counts.omittedFiles,
+    warnings: counts.warningImages,
+    excluded: counts.nonExportableImages,
   };
   const filterHints = {
     all: "Mostrar todas las imágenes",
     valid: "Mostrar imágenes listas",
-    warnings: "Mostrar imágenes con aviso o error",
-    omitted: "Mostrar archivos omitidos",
+    warnings: "Mostrar imágenes con aviso",
+    excluded: "Mostrar imágenes excluidas de exportación",
   };
   $$("[data-filter]").forEach((button) => {
     const filter = button.dataset.filter;
@@ -6650,7 +6870,7 @@ function topPrimaryHint(visible) {
     return "Seleccionar carpeta de entrada";
   }
   if (action === "review-warnings") {
-    return "Revisar avisos del lote";
+    return "Revisar incidencias del lote";
   }
   if (action === "open-output") {
     return "Abrir carpeta de salida";
@@ -6666,6 +6886,45 @@ function setControlHint(target, hint) {
   if (!target.getAttribute("aria-label") && target.textContent.trim().length <= 2) {
     target.setAttribute("aria-label", hint.replace(/\s*\. Atajo:.*$/, ""));
   }
+}
+
+function renderDesignSystemComponents() {
+  $$("button").forEach((button) => {
+    button.classList.add("ui-button");
+    const isIcon = button.classList.contains("icon-button")
+      || (button.textContent.trim().length <= 2 && Boolean(button.getAttribute("aria-label")));
+    const isPrimary = button.classList.contains("primary");
+    const isDanger = button.classList.contains("danger-subtle") || button.classList.contains("danger");
+    const isGhost = button.classList.contains("btn-linklike");
+    button.classList.toggle("ui-button--icon", isIcon);
+    button.classList.toggle("ui-button--primary", isPrimary);
+    button.classList.toggle("ui-button--danger", isDanger);
+    button.classList.toggle("ui-button--ghost", isGhost);
+    button.classList.toggle("ui-button--secondary", !isPrimary && !isDanger && !isGhost && !isIcon);
+  });
+
+  addComponentClass(".top-bar", "ui-top-bar");
+  addComponentClass(".workspace", "ui-app-workspace");
+  addComponentClass(".gallery-column", "ui-gallery-panel");
+  addComponentClass(".preview-panel", "ui-viewer-panel");
+  addComponentClass(".settings-panel", "ui-inspector-panel");
+  addComponentClass(".bottom-bar", "ui-status-bar");
+  addComponentClass(".preview-toolbar, .gallery-toolbar, .settings-toolbar, .top-actions, .inspector-actionbar, .warning-actions, .result-actions", "ui-toolbar");
+  addComponentClass(".segmented", "ui-segmented-control");
+  addComponentClass(".inspector-tabs", "ui-tabs");
+  addComponentClass(".state-chip, .status-badge, .preflight-chip, .batch-rail__badge, .asset-state", "ui-status-badge");
+  addComponentClass(".batch-summary-card, .preset-summary-card, .compact-panel, .review-card, .format-preview-card, .format-validation-card, .export-confirm-summary", "ui-summary-card");
+  addComponentClass(".image-item", "ui-thumbnail-card");
+  addComponentClass(".settings-section, .batch-detail-section, .export-confirm-section, .context-panel", "ui-inspector-section");
+  addComponentClass(".app-settings-dialog", "ui-modal-shell");
+  addComponentClass(".app-settings-backdrop", "ui-modal-backdrop");
+  addComponentClass(".empty-state", "ui-empty-state");
+  addComponentClass(".progress-track, .context-progress", "ui-progress-state");
+  addComponentClass(".issue-item, .export-confirm-risk, .batch-detail-problem", "ui-problem-card");
+}
+
+function addComponentClass(selector, className) {
+  $$(selector).forEach((element) => element.classList.add(className));
 }
 
 function statusBarText() {
@@ -6703,7 +6962,7 @@ function statusBarText() {
   if (state.batch === "empty") {
     return `0 imágenes · ${state.scanStatus || "Cambia de carpeta"}`;
   }
-  const warningText = counts.nonBlockingWarnings ? ` · ${countText(counts.nonBlockingWarnings, "aviso", "avisos")}` : "";
+  const warningText = counts.nonBlockingWarnings ? ` · ${countText(counts.nonBlockingWarnings, "incidencia", "incidencias")}` : "";
   return `${counts.exportableImages} exportables · ${selectedText}${warningText} · Salida: ${destination}`;
 }
 
@@ -6772,6 +7031,9 @@ function handleAction(action, target = null) {
   } else if (action === "clear-search") {
     state.search = "";
     state.statusText = filterStatusText(state.filter);
+    if (ensureGallerySelectionForFilter()) {
+      return;
+    }
     render();
   } else if (action === "select-first-image") {
     const image = filteredImages()[0] || activeImages()[0];
@@ -6986,9 +7248,7 @@ document.addEventListener("click", (event) => {
 
   const filterTarget = event.target.closest("[data-filter]");
   if (filterTarget) {
-    state.filter = filterTarget.dataset.filter;
-    state.statusText = filterStatusText(state.filter);
-    render();
+    applyGalleryFilter(filterTarget.dataset.filter);
     return;
   }
 
@@ -7121,6 +7381,9 @@ document.addEventListener("submit", (event) => {
 
 $("#image-search").addEventListener("input", (event) => {
   state.search = event.target.value;
+  if (ensureGallerySelectionForFilter()) {
+    return;
+  }
   render();
 });
 

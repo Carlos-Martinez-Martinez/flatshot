@@ -26,6 +26,8 @@ class OmittedScanItem:
     reason: str
     detail: str
     suffix: str = ""
+    category: str = "ignored"
+    severity: str = "ignored"
 
 
 @dataclass(frozen=True)
@@ -49,6 +51,7 @@ class BatchScanResult:
     total_files: int = 0
     total_omitted: int = 0
     omitted_by_reason: dict[str, int] = field(default_factory=dict)
+    omitted_by_category: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

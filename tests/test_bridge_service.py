@@ -286,10 +286,12 @@ def test_bridge_scan_folder_with_png(tmp_path):
     assert response["totalImages"] == 2
     assert response["totalOmitted"] == 1
     assert response["omittedByReason"] == {"unsupported_extension": 1}
+    assert response["omittedByCategory"] == {"ignored": 1}
     assert [image["name"] for image in response["folders"][0]["images"]] == ["a.png", "b.png"]
     assert response["folders"][0]["images"][1]["path"] == png.as_posix()
     assert response["folders"][0]["images"][1]["sizeBytes"] > 0
     assert response["folders"][0]["omitted"][0]["name"] == "notes.txt"
+    assert response["folders"][0]["omitted"][0]["severity"] == "ignored"
 
 
 def test_bridge_scan_reports_omitted_items(tmp_path):
@@ -309,11 +311,21 @@ def test_bridge_scan_reports_omitted_items(tmp_path):
         "subfolder_not_scanned": 1,
         "unsupported_extension": 1,
     }
+    assert response["omittedByCategory"] == {
+        "ignored": 2,
+        "warning": 1,
+    }
     reasons = {item["name"]: item["reason"] for item in response["folders"][0]["omitted"]}
     assert reasons == {
         "broken.png": "read_error",
         "nested": "subfolder_not_scanned",
         "photo.jpg": "unsupported_extension",
+    }
+    severities = {item["name"]: item["severity"] for item in response["folders"][0]["omitted"]}
+    assert severities == {
+        "broken.png": "warning",
+        "nested": "ignored",
+        "photo.jpg": "ignored",
     }
 
 

@@ -47,10 +47,12 @@ def test_scan_folder_counts_png_and_ignores_non_png(tmp_path):
     assert result.total_images == 3
     assert result.total_omitted == 2
     assert result.omitted_by_reason == {"unsupported_extension": 2}
+    assert result.omitted_by_category == {"ignored": 2}
     assert [image.path for image in result.folders[0].images] == [second, first, upper]
     assert [image.name for image in result.folders[0].images] == ["a.png", "b.png", "c.PNG"]
     assert all(image.size_bytes > 0 for image in result.folders[0].images)
     assert [item.name for item in result.folders[0].omitted] == ["notes.txt", "photo.jpg"]
+    assert {item.severity for item in result.folders[0].omitted} == {"ignored"}
 
 
 def test_scan_reports_subfolders_and_corrupt_png(tmp_path):
@@ -69,9 +71,37 @@ def test_scan_reports_subfolders_and_corrupt_png(tmp_path):
         "read_error": 1,
         "subfolder_not_scanned": 1,
     }
+    assert result.omitted_by_category == {
+        "ignored": 1,
+        "warning": 1,
+    }
     omitted = {item.name: item for item in result.folders[0].omitted}
     assert omitted["broken.png"].detail == "No se pudo leer como PNG válido"
+    assert omitted["broken.png"].severity == "warning"
     assert omitted["nested"].detail == "Subcarpeta no escaneada"
+    assert omitted["nested"].severity == "ignored"
+
+
+def test_scan_classifies_system_and_temp_files_as_ignored(tmp_path):
+    _png(tmp_path / "valid.png")
+    (tmp_path / "Thumbs.db").write_bytes(b"cache")
+    (tmp_path / "desktop.ini").write_text("[.ShellClassInfo]", encoding="utf-8")
+    (tmp_path / "export.tmp").write_text("temp", encoding="utf-8")
+
+    result = FolderScanner().scan_folders([tmp_path])
+
+    assert result.total_images == 1
+    assert result.total_omitted == 3
+    assert result.omitted_by_reason == {
+        "system_file": 2,
+        "temporary_or_config_file": 1,
+    }
+    assert result.omitted_by_category == {"ignored": 3}
+    assert {item.name: item.severity for item in result.folders[0].omitted} == {
+        "desktop.ini": "ignored",
+        "export.tmp": "ignored",
+        "Thumbs.db": "ignored",
+    }
 
 
 def test_scan_multiple_folders_accumulates_totals(tmp_path):

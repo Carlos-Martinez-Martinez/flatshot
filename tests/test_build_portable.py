@@ -41,6 +41,7 @@ def test_build_portable_sync_stamp_separates_runtime_and_dependencies(tmp_path):
     assert stamp["manifest_hash"] == build_portable.source_manifest_hash(PROJECT_ROOT)
     assert stamp["runtime_hash"] == build_portable.runtime_manifest_hash(PROJECT_ROOT)
     assert stamp["dependency_hash"] == build_portable.dependency_manifest_hash(PROJECT_ROOT)
+    assert stamp["portable_dependencies"] == list(build_portable.PORTABLE_DEPENDENCIES)
     assert stamp["dependency_status"] == "current"
 
 
@@ -63,3 +64,7 @@ def test_runtime_manifest_excludes_dependency_files():
     assert "apps/flatshot-desktop/frontend/index.html" in files
     assert "requirements.txt" not in files
     assert "pyproject.toml" not in files
+
+
+def test_portable_window_dependency_is_recorded():
+    assert any(dependency.startswith("pywebview") for dependency in build_portable.PORTABLE_DEPENDENCIES)

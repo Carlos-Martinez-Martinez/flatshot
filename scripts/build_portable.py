@@ -20,6 +20,7 @@ RUNTIME_SOURCE_DIRS = (
     Path("apps") / "flatshot-desktop" / "frontend",
 )
 DEPENDENCY_FILES = ("pyproject.toml", "requirements.txt")
+PORTABLE_DEPENDENCIES = ("pywebview>=6.0",)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -89,6 +90,7 @@ def ensure_portable_venv(source_root: Path, venv_dir: Path) -> None:
 
     run_command([str(python_exe), "-m", "pip", "install", "--upgrade", "pip"], source_root, timeout=300)
     run_command([str(python_exe), "-m", "pip", "install", "-r", str(source_root / "requirements.txt")], source_root, timeout=300)
+    run_command([str(python_exe), "-m", "pip", "install", *PORTABLE_DEPENDENCIES], source_root, timeout=300)
 
 
 def portable_python(venv_dir: Path) -> Path:
@@ -131,7 +133,11 @@ def runtime_manifest_hash(source_root: Path) -> str:
 
 
 def dependency_manifest_hash(source_root: Path) -> str:
-    return files_manifest_hash(iter_dependency_files(source_root), source_root)
+    digest = hashlib.sha256()
+    digest.update(files_manifest_hash(iter_dependency_files(source_root), source_root).encode("utf-8"))
+    for dependency in PORTABLE_DEPENDENCIES:
+        digest.update(f"\0portable:{dependency}\n".encode("utf-8"))
+    return digest.hexdigest()
 
 
 def files_manifest_hash(files, source_root: Path) -> str:
@@ -180,6 +186,7 @@ def write_sync_stamp(source_root: Path, target: Path) -> None:
                 "manifest_hash": source_manifest_hash(source_root),
                 "runtime_hash": runtime_manifest_hash(source_root),
                 "dependency_hash": dependency_manifest_hash(source_root),
+                "portable_dependencies": list(PORTABLE_DEPENDENCIES),
                 "dependency_status": "current",
                 "synced_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             },
@@ -237,6 +244,10 @@ Diagnostico con consola:
 
 Datos locales del portable:
   data\\
+
+Ventana:
+  FlatShot se abre en una ventana propia con WebView2/pywebview. Si la ventana
+  nativa no puede iniciarse, se abre en el navegador como fallback.
 
 Actualizacion:
   Si este portable esta dentro de release\\FlatShotPortable, al arrancar se

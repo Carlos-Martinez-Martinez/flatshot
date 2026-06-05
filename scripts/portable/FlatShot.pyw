@@ -35,6 +35,7 @@ RUNTIME_SOURCE_DIRS = (
     Path("apps") / "flatshot-desktop" / "frontend",
 )
 DEPENDENCY_FILES = ("pyproject.toml", "requirements.txt")
+PORTABLE_DEPENDENCIES = ("pywebview>=6.0",)
 
 
 def configure_portable_environment() -> None:
@@ -108,7 +109,11 @@ def runtime_manifest_hash(source_root: Path) -> str:
 
 
 def dependency_manifest_hash(source_root: Path) -> str:
-    return files_manifest_hash(iter_dependency_files(source_root), source_root)
+    digest = hashlib.sha256()
+    digest.update(files_manifest_hash(iter_dependency_files(source_root), source_root).encode("utf-8"))
+    for dependency in PORTABLE_DEPENDENCIES:
+        digest.update(f"\0portable:{dependency}\n".encode("utf-8"))
+    return digest.hexdigest()
 
 
 def files_manifest_hash(files, source_root: Path) -> str:
@@ -181,6 +186,7 @@ def write_sync_stamp(source_root: Path, runtime_hash: str, dependency_hash: str,
                 "manifest_hash": source_manifest_hash(source_root),
                 "runtime_hash": runtime_hash,
                 "dependency_hash": dependency_hash,
+                "portable_dependencies": list(PORTABLE_DEPENDENCIES),
                 "dependency_status": dependency_status,
                 "synced_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             },
@@ -258,7 +264,7 @@ def main() -> int:
         bridge = start_bridge_server()
         frontend = start_frontend_server()
         app_url = frontend.url + "?" + urlencode({"bridge": bridge.url})
-        open_control_window(app_url)
+        open_desktop_window(app_url)
         return 0
     except Exception as error:
         details = "".join(traceback.format_exception(type(error), error, error.__traceback__))
@@ -342,14 +348,26 @@ def wait_until_ready(url: str, timeout_seconds: float = 20.0) -> None:
     raise RuntimeError(f"El servidor local no respondio a tiempo: {last_error}")
 
 
-def open_control_window(url: str) -> None:
-    webbrowser.open(url)
+def open_desktop_window(url: str) -> None:
+    try:
+        import webview
+
+        webview.create_window(APP_NAME, url, width=1360, height=900, min_size=(1100, 720), confirm_close=False)
+        webview.start(gui="edgechromium", debug=False)
+    except Exception:
+        write_launcher_log("Native desktop window", traceback.format_exc())
+        open_fallback_browser_window(url)
+
+
+def open_fallback_browser_window(url: str) -> None:
     try:
         from tkinter import Tk, ttk
     except Exception:
+        webbrowser.open(url)
         show_info_dialog("FlatShot se abrio en el navegador.\n\nPulsa Aceptar para detenerlo.")
         return
 
+    webbrowser.open(url)
     root = Tk()
     root.title(APP_NAME)
     root.geometry("460x170")

@@ -83,7 +83,9 @@ release\FlatShotPortable\Abrir FlatShot.vbs
 ```
 
 The portable starts the bridge and frontend on `127.0.0.1`, choosing the next
-free ports if `8765` or `4173` are already busy. It stores portable data under
+free ports if `8765` or `4173` are already busy. It opens FlatShot in its own
+desktop window through WebView2/pywebview, and falls back to the browser only if
+the native window cannot start. It stores portable data under
 `release\FlatShotPortable\data`, including settings, logs and render cache.
 
 When the portable remains inside `release\FlatShotPortable`, every launch checks

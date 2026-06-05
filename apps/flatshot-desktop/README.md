@@ -51,9 +51,11 @@ release\FlatShotPortable\Abrir FlatShot.vbs
 ```
 
 The portable keeps its settings, logs and render cache in
-`release\FlatShotPortable\data`. On launch it auto-syncs backend and frontend
-code changes from the source repo recorded in `source_path.txt`. Rebuild it with
-`python scripts\build_portable.py` when Python dependencies change.
+`release\FlatShotPortable\data`. It opens in a native desktop window through
+WebView2/pywebview, with browser fallback only when that native window cannot
+start. On launch it auto-syncs backend and frontend code changes from the source
+repo recorded in `source_path.txt`. Rebuild it with `python scripts\build_portable.py`
+when Python dependencies change.
 
 ## Options
 

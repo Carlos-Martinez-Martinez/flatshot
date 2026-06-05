@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 from pathlib import Path
 import tempfile
 import shutil
@@ -11,9 +12,15 @@ class RenderCache:
     """Manages cached full-resolution renders to speed up export."""
 
     CACHE_VERSION = 3
+    CACHE_DIR_ENV_VAR = "FLATSHOT_RENDER_CACHE_DIR"
     
     def __init__(self):
-        self.cache_dir = Path(tempfile.gettempdir()) / "flatshot_render_cache"
+        configured_cache = os.environ.get(self.CACHE_DIR_ENV_VAR, "").strip()
+        self.cache_dir = (
+            Path(configured_cache).expanduser()
+            if configured_cache
+            else Path(tempfile.gettempdir()) / "flatshot_render_cache"
+        )
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         
     def _file_fingerprint(self, image_path: str) -> dict:

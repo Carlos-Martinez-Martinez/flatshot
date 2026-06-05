@@ -16,6 +16,7 @@ env/
 # =========================
 build/
 dist/
+release/
 *.egg-info/
 *.egg
 MANIFEST

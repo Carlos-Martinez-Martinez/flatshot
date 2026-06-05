@@ -1,0 +1,383 @@
+from __future__ import annotations
+
+import ctypes
+import hashlib
+import json
+import os
+import shutil
+import socket
+import sys
+import threading
+import time
+import traceback
+import urllib.error
+import urllib.request
+import webbrowser
+from dataclasses import dataclass
+from functools import partial
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import urlencode
+
+
+APP_NAME = "FlatShot"
+ROOT = Path(__file__).resolve().parent
+APP_PARENT = ROOT / "app"
+APP_PACKAGE = APP_PARENT / "flatshot"
+FRONTEND_DIR = APP_PARENT / "frontend"
+AUTOSYNC_STAMP = ROOT / ".autosync.json"
+SOURCE_POINTER = ROOT / "source_path.txt"
+HOST = "127.0.0.1"
+DEFAULT_BRIDGE_PORT = 8765
+DEFAULT_FRONTEND_PORT = 4173
+RUNTIME_SOURCE_DIRS = (
+    Path("src") / "flatshot",
+    Path("apps") / "flatshot-desktop" / "frontend",
+)
+DEPENDENCY_FILES = ("pyproject.toml", "requirements.txt")
+
+
+def configure_portable_environment() -> None:
+    os.environ["FLATSHOT_PORTABLE"] = "1"
+    os.environ["FLATSHOT_CONFIG_DIR"] = str(ROOT / "data" / "config")
+    os.environ["FLATSHOT_RENDER_CACHE_DIR"] = str(ROOT / "data" / "render_cache")
+    (ROOT / "data").mkdir(parents=True, exist_ok=True)
+
+
+def auto_sync_from_source() -> None:
+    source_root = find_source_root()
+    if source_root is None:
+        return
+    try:
+        stamp = read_sync_stamp()
+        runtime_hash = runtime_manifest_hash(source_root)
+        dependency_hash = dependency_manifest_hash(source_root)
+        dependency_status = dependency_sync_status(stamp, dependency_hash)
+        if dependency_status == "needs_rebuild":
+            write_launcher_log(
+                "Dependencias portable",
+                "requirements.txt o pyproject.toml han cambiado. "
+                "Ejecuta python scripts\\build_portable.py para actualizar el venv portable.",
+            )
+        if not should_sync(source_root, runtime_hash, stamp):
+            return
+        sync_package(source_root)
+        recorded_dependency_hash = dependency_hash
+        if dependency_status == "needs_rebuild":
+            recorded_dependency_hash = str(stamp.get("dependency_hash") or dependency_hash)
+        write_sync_stamp(source_root, runtime_hash, recorded_dependency_hash, dependency_status)
+    except Exception:
+        write_launcher_log("Auto-sync portable", traceback.format_exc())
+
+
+def find_source_root() -> Path | None:
+    candidates: list[Path] = []
+    env_source = os.environ.get("FLATSHOT_SOURCE_ROOT")
+    if env_source:
+        candidates.append(Path(env_source))
+    if SOURCE_POINTER.exists():
+        try:
+            candidates.append(Path(SOURCE_POINTER.read_text(encoding="utf-8").strip()))
+        except OSError:
+            pass
+    candidates.append(ROOT.parent.parent)
+
+    for candidate in candidates:
+        resolved = candidate.expanduser().resolve()
+        if is_valid_source_root(resolved):
+            return resolved
+    return None
+
+
+def is_valid_source_root(path: Path) -> bool:
+    if path == APP_PACKAGE or str(path).lower().startswith(str(APP_PACKAGE).lower()):
+        return False
+    return (
+        (path / "pyproject.toml").exists()
+        and (path / "src" / "flatshot" / "bridge" / "service.py").exists()
+        and (path / "apps" / "flatshot-desktop" / "frontend" / "index.html").exists()
+    )
+
+
+def source_manifest_hash(source_root: Path) -> str:
+    return files_manifest_hash(iter_source_files(source_root), source_root)
+
+
+def runtime_manifest_hash(source_root: Path) -> str:
+    return files_manifest_hash(iter_runtime_source_files(source_root), source_root)
+
+
+def dependency_manifest_hash(source_root: Path) -> str:
+    return files_manifest_hash(iter_dependency_files(source_root), source_root)
+
+
+def files_manifest_hash(files, source_root: Path) -> str:
+    digest = hashlib.sha256()
+    for file in files:
+        stat = file.stat()
+        rel = file.relative_to(source_root).as_posix()
+        digest.update(f"{rel}\0{stat.st_size}\0{stat.st_mtime_ns}\n".encode("utf-8"))
+    return digest.hexdigest()
+
+
+def iter_source_files(source_root: Path):
+    yield from iter_runtime_source_files(source_root)
+    yield from iter_dependency_files(source_root)
+
+
+def iter_runtime_source_files(source_root: Path):
+    for source_dir in RUNTIME_SOURCE_DIRS:
+        root = source_root / source_dir
+        if not root.exists():
+            continue
+        for file in root.rglob("*"):
+            if should_skip_source_file(file):
+                continue
+            if file.is_file():
+                yield file
+
+
+def iter_dependency_files(source_root: Path):
+    for file_name in DEPENDENCY_FILES:
+        file = source_root / file_name
+        if file.exists() and file.is_file():
+            yield file
+
+
+def should_skip_source_file(file: Path) -> bool:
+    parts = set(file.parts)
+    if {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "release", "venv", ".venv"} & parts:
+        return True
+    return file.suffix in {".pyc", ".pyo"} or file.name.endswith(".tsbuildinfo")
+
+
+def dependency_sync_status(stamp: dict[str, object], dependency_hash: str) -> str:
+    previous_hash = stamp.get("dependency_hash")
+    if previous_hash and previous_hash != dependency_hash:
+        return "needs_rebuild"
+    return "current"
+
+
+def should_sync(source_root: Path, runtime_hash: str, stamp: dict[str, object] | None = None) -> bool:
+    if not APP_PACKAGE.exists() or not FRONTEND_DIR.exists():
+        return True
+    stamp = stamp or read_sync_stamp()
+    previous_runtime_hash = stamp.get("runtime_hash") or stamp.get("manifest_hash")
+    return stamp.get("source_root") != str(source_root) or previous_runtime_hash != runtime_hash
+
+
+def read_sync_stamp() -> dict[str, object]:
+    try:
+        return json.loads(AUTOSYNC_STAMP.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def write_sync_stamp(source_root: Path, runtime_hash: str, dependency_hash: str, dependency_status: str) -> None:
+    AUTOSYNC_STAMP.write_text(
+        json.dumps(
+            {
+                "source_root": str(source_root),
+                "manifest_hash": source_manifest_hash(source_root),
+                "runtime_hash": runtime_hash,
+                "dependency_hash": dependency_hash,
+                "dependency_status": dependency_status,
+                "synced_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+
+def sync_package(source_root: Path) -> None:
+    APP_PARENT.mkdir(parents=True, exist_ok=True)
+    copy_tree(source_root / "src" / "flatshot", APP_PACKAGE)
+    copy_tree(source_root / "apps" / "flatshot-desktop" / "frontend", FRONTEND_DIR)
+
+
+def copy_tree(source: Path, destination: Path) -> None:
+    if destination.exists():
+        shutil.rmtree(destination)
+    shutil.copytree(source, destination, ignore=ignore_generated)
+
+
+def ignore_generated(_directory: str, names: list[str]) -> set[str]:
+    ignored = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "node_modules", "build", "dist"}
+    return {name for name in names if name in ignored or name.endswith((".pyc", ".pyo", ".tsbuildinfo"))}
+
+
+def write_launcher_log(context: str, details: str) -> None:
+    log_dir = ROOT / "data" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    with (log_dir / "runtime.log").open("a", encoding="utf-8") as handle:
+        handle.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {context}\n{details}\n\n")
+
+
+@dataclass
+class LocalServer:
+    label: str
+    host: str
+    port: int
+    server: ThreadingHTTPServer
+    thread: threading.Thread
+
+    @property
+    def url(self) -> str:
+        return f"http://{self.host}:{self.port}"
+
+    def stop(self) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=5)
+
+
+class LocalStaticServer(ThreadingHTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+
+class QuietStaticHandler(SimpleHTTPRequestHandler):
+    def log_message(self, format: str, *args) -> None:  # noqa: A002
+        return
+
+    def copyfile(self, source, outputfile) -> None:
+        try:
+            super().copyfile(source, outputfile)
+        except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
+            return
+
+
+def main() -> int:
+    bridge = None
+    frontend = None
+    try:
+        configure_portable_environment()
+        auto_sync_from_source()
+        ensure_runtime_paths()
+        bridge = start_bridge_server()
+        frontend = start_frontend_server()
+        app_url = frontend.url + "?" + urlencode({"bridge": bridge.url})
+        open_control_window(app_url)
+        return 0
+    except Exception as error:
+        details = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+        write_launcher_log("Portable launcher", details)
+        show_error_dialog(
+            "No se pudo arrancar FlatShot.\n\n"
+            f"Detalle: {error}\n\n"
+            f"Log: {ROOT / 'data' / 'logs' / 'runtime.log'}"
+        )
+        return 1
+    finally:
+        for server in [frontend, bridge]:
+            if server is not None:
+                try:
+                    server.stop()
+                except Exception:
+                    pass
+
+
+def ensure_runtime_paths() -> None:
+    if not APP_PACKAGE.exists():
+        raise RuntimeError(f"No existe el paquete portable: {APP_PACKAGE}")
+    if not FRONTEND_DIR.exists():
+        raise RuntimeError(f"No existe el frontend portable: {FRONTEND_DIR}")
+    if str(APP_PARENT) not in sys.path:
+        sys.path.insert(0, str(APP_PARENT))
+
+
+def start_bridge_server() -> LocalServer:
+    from flatshot.bridge.http_server import create_server
+
+    port = find_available_port(DEFAULT_BRIDGE_PORT)
+    server = create_server(HOST, port)
+    local = LocalServer("bridge", HOST, server.server_port, server, threading.Thread(target=server.serve_forever, daemon=True))
+    local.thread.start()
+    wait_until_ready(local.url + "/health")
+    return local
+
+
+def start_frontend_server() -> LocalServer:
+    port = find_available_port(DEFAULT_FRONTEND_PORT)
+    handler = partial(QuietStaticHandler, directory=str(FRONTEND_DIR))
+    server = LocalStaticServer((HOST, port), handler)
+    local = LocalServer("frontend", HOST, server.server_port, server, threading.Thread(target=server.serve_forever, daemon=True))
+    local.thread.start()
+    wait_until_ready(local.url)
+    return local
+
+
+def find_available_port(preferred: int, attempts: int = 100) -> int:
+    for port in range(preferred, min(preferred + attempts, 65536)):
+        if is_port_available(port):
+            return port
+    raise RuntimeError("No hay puertos locales libres para arrancar FlatShot.")
+
+
+def is_port_available(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.settimeout(0.2)
+        if probe.connect_ex((HOST, port)) == 0:
+            return False
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        try:
+            sock.bind((HOST, port))
+        except OSError:
+            return False
+    return True
+
+
+def wait_until_ready(url: str, timeout_seconds: float = 20.0) -> None:
+    deadline = time.monotonic() + timeout_seconds
+    last_error = None
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=0.5) as response:
+                if 200 <= response.status < 500:
+                    return
+        except (OSError, urllib.error.URLError) as error:
+            last_error = error
+            time.sleep(0.15)
+    raise RuntimeError(f"El servidor local no respondio a tiempo: {last_error}")
+
+
+def open_control_window(url: str) -> None:
+    webbrowser.open(url)
+    try:
+        from tkinter import Tk, ttk
+    except Exception:
+        show_info_dialog("FlatShot se abrio en el navegador.\n\nPulsa Aceptar para detenerlo.")
+        return
+
+    root = Tk()
+    root.title(APP_NAME)
+    root.geometry("460x170")
+    root.resizable(False, False)
+    root.columnconfigure(0, weight=1)
+    ttk.Label(
+        root,
+        text="FlatShot esta abierto en el navegador.\nCierra esta ventana para detener el servidor local.",
+        justify="center",
+    ).grid(row=0, column=0, padx=24, pady=(24, 12), sticky="ew")
+    ttk.Button(root, text="Abrir navegador", command=lambda: webbrowser.open(url)).grid(row=1, column=0, pady=(0, 8))
+    ttk.Button(root, text="Cerrar FlatShot", command=root.destroy).grid(row=2, column=0, pady=(0, 20))
+    root.mainloop()
+
+
+def show_error_dialog(message: str) -> None:
+    try:
+        ctypes.windll.user32.MessageBoxW(None, message, APP_NAME, 0x10)
+    except Exception:
+        pass
+
+
+def show_info_dialog(message: str) -> None:
+    try:
+        ctypes.windll.user32.MessageBoxW(None, message, APP_NAME, 0x40)
+    except Exception:
+        time.sleep(3600)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

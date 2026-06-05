@@ -36,6 +36,25 @@ apps\flatshot-desktop\run_dev.bat
 
 Stop the environment with `Ctrl+C`.
 
+## Portable Run
+
+From the repository root, build or refresh the portable:
+
+```powershell
+python scripts\build_portable.py
+```
+
+Open:
+
+```text
+release\FlatShotPortable\Abrir FlatShot.vbs
+```
+
+The portable keeps its settings, logs and render cache in
+`release\FlatShotPortable\data`. On launch it auto-syncs backend and frontend
+code changes from the source repo recorded in `source_path.txt`. Rebuild it with
+`python scripts\build_portable.py` when Python dependencies change.
+
 ## Options
 
 ```bash

@@ -3,6 +3,16 @@ from PIL import Image
 from flatshot.utils.render_cache import RenderCache
 
 
+def test_render_cache_uses_configured_portable_cache_dir(tmp_path, monkeypatch):
+    cache_dir = tmp_path / "portable" / "render_cache"
+    monkeypatch.setenv(RenderCache.CACHE_DIR_ENV_VAR, str(cache_dir))
+
+    cache = RenderCache()
+
+    assert cache.cache_dir == cache_dir
+    assert cache.cache_dir.exists()
+
+
 def test_render_cache_key_changes_with_local_override(tmp_path):
     source = tmp_path / "source.png"
     Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(source)

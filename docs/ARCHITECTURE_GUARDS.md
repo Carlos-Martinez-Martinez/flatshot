@@ -20,6 +20,8 @@ apps/flatshot-desktop/frontend
 - `src/flatshot/bridge/` exposes those services through the local HTTP bridge used by the desktop frontend.
 - `apps/flatshot-desktop/frontend/` is the only product UI.
 - `src/flatshot/utils/render_cache.py` remains as a shared cache utility for export and pre-render services.
+- `scripts/build_portable.py` and `scripts/portable/` build the Windows portable launcher around the same bridge/frontend runtime; they must not become a separate product surface.
+- `release/` is generated output and must stay out of version control.
 
 ## Removed Legacy Surface
 

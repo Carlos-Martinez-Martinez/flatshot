@@ -62,6 +62,40 @@ The runner starts:
 If either default port is busy, the runner automatically chooses the next free
 port and prints the final URL to open.
 
+## Portable
+
+Build or refresh the Windows portable folder:
+
+```powershell
+python scripts\build_portable.py
+```
+
+The generated portable lives in:
+
+```text
+release\FlatShotPortable
+```
+
+Run it with:
+
+```text
+release\FlatShotPortable\Abrir FlatShot.vbs
+```
+
+The portable starts the bridge and frontend on `127.0.0.1`, choosing the next
+free ports if `8765` or `4173` are already busy. It stores portable data under
+`release\FlatShotPortable\data`, including settings, logs and render cache.
+
+When the portable remains inside `release\FlatShotPortable`, every launch checks
+the source repo in `source_path.txt` and auto-syncs changes from:
+
+- `src\flatshot`
+- `apps\flatshot-desktop\frontend`
+
+If `requirements.txt` or `pyproject.toml` changes, run
+`python scripts\build_portable.py` again so the portable virtual environment is
+updated.
+
 ## Development URLs
 
 Typical full run:

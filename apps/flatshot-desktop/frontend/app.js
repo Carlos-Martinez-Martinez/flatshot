@@ -72,8 +72,10 @@ const mockPresets = [
   "Sin sombra",
 ];
 
+const urlParams = new URLSearchParams(window.location.search);
 const defaultBridgeUrl = "http://127.0.0.1:8765";
-const devMode = new URLSearchParams(window.location.search).get("dev") === "1";
+const initialBridgeUrl = urlParams.get("bridge") || defaultBridgeUrl;
+const devMode = urlParams.get("dev") === "1";
 const STORAGE_KEYS = {
   bridgeScanPath: "flatshot.bridgeScanPath",
   selectedImagePath: "flatshot.selectedImagePath",
@@ -321,7 +323,7 @@ const state = {
   paused: false,
   statusText: "Sin lote",
   bridgeMode: "bridge",
-  bridgeUrl: defaultBridgeUrl,
+  bridgeUrl: initialBridgeUrl,
   bridgeStatus: "idle",
   bridgeMessage: "Sin lote",
   bridgeLastResponse: "Bridge pendiente",
@@ -5267,7 +5269,7 @@ function presetSourceLabel() {
     const source = state.bridgePresetSource === "config"
       ? "Config"
       : state.bridgePresetSource === "legacy-config"
-        ? "Config legacy"
+        ? "Config anterior"
         : state.bridgePresetSource === "defaults"
           ? "Defaults"
           : "Salida";

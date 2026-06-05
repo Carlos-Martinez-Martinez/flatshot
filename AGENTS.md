@@ -11,8 +11,8 @@ Primary invariant: **do not change exported image appearance or file-output beha
 ## Stable project context
 
 - Language: Python 3.10+.
-- Current UI: PyQt6.
-- Core dependencies: Pillow, numpy, pydantic, qtawesome.
+- Current UI: local web/bridge desktop app in `apps/flatshot-desktop`.
+- Core dependencies: Pillow, numpy, pydantic.
 - Main domains:
   - image/shadow processing;
   - presets and settings;
@@ -63,7 +63,7 @@ Allowed:
 - reusable algorithms.
 
 Forbidden:
-- PyQt imports;
+- UI toolkit imports;
 - widget references;
 - dialogs;
 - UI state;
@@ -85,10 +85,8 @@ Services must not depend on widgets.
 ### UI layer
 
 Allowed:
-- widgets;
-- layouts;
-- dialogs;
-- signals/callback wiring;
+- HTML/CSS/JS frontend code;
+- bridge request wiring;
 - displaying state;
 - calling services.
 
@@ -237,7 +235,7 @@ Rules:
 - worker errors must be logged and surfaced briefly;
 - UI must not freeze while previews or exports run.
 
-If extracting worker logic, keep Qt-specific signal/thread code as an adapter, not as the core job engine.
+Keep long-running work in application/bridge runners, not in frontend code.
 
 ---
 
@@ -275,7 +273,7 @@ Good refactors:
 
 Risky refactors:
 - changing processing output while doing UI work;
-- changing workers and UI layout in the same pass;
+- changing export runners and UI layout in the same pass;
 - replacing the GUI toolkit directly;
 - changing config schema without migration;
 - adding dependencies for visual polish;
@@ -288,14 +286,13 @@ Prefer small, reviewable commits.
 ## Future-interface rule
 
 Design new non-UI logic so it can be reused by:
-- current PyQt UI;
+- current local web/bridge UI;
 - CLI;
-- future local web UI;
 - future Electron/Tauri shell;
 - automation scripts.
 
 Therefore:
-- no PyQt in core/services;
+- no UI toolkit imports in core/services;
 - no widget objects in service APIs;
 - prefer serializable inputs/outputs;
 - keep paths explicit;

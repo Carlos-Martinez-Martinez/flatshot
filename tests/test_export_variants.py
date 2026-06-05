@@ -1,14 +1,38 @@
 from pathlib import Path
+from concurrent.futures import Future
 
 import pytest
 from PIL import Image, ImageDraw
 
-from flatshot.core.models import CurveData, ExportConfig, ShadowSettings, WEB_RGB230, WHITE_RGB255
-from flatshot.workers.export_worker import (
-    ExportWorker,
+from flatshot.application.contracts import ExportJobRequest
+from flatshot.application.export_runner import (
+    ExportRunner,
     build_variant_output_path,
     validate_output_path_collisions,
 )
+from flatshot.core.models import CurveData, ExportConfig, ShadowSettings, WEB_RGB230, WHITE_RGB255
+
+
+class InlineExecutor:
+    def __init__(self, max_workers=1):
+        self.max_workers = max_workers
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.shutdown()
+
+    def submit(self, fn, arg):
+        future = Future()
+        try:
+            future.set_result(fn(arg))
+        except Exception as exc:
+            future.set_exception(exc)
+        return future
+
+    def shutdown(self, wait=True, cancel_futures=False):
+        return None
 
 
 def _curve():
@@ -85,7 +109,7 @@ def test_two_enabled_variants_with_same_suffix_detect_collision(tmp_path):
         )
 
 
-def test_export_worker_exports_two_variant_files_with_expected_backgrounds(tmp_path):
+def test_export_runner_exports_two_variant_files_with_expected_backgrounds(tmp_path):
     _source(tmp_path)
     config = ExportConfig(
         format="PNG",
@@ -105,8 +129,15 @@ def test_export_worker_exports_two_variant_files_with_expected_backgrounds(tmp_p
         shadow_engine="legacy",
     )
 
-    worker = ExportWorker(str(tmp_path), settings, config, _curve())
-    worker.run()
+    runner = ExportRunner(executor_factory=InlineExecutor)
+    runner.run(
+        ExportJobRequest(
+            input_folder=tmp_path,
+            settings=settings,
+            export_config=config,
+            curve_data=_curve(),
+        )
+    )
 
     web_output = tmp_path / "_SALIDA_PRO" / "camiseta_001_PRO.png"
     white_output = tmp_path / "_SALIDA_PRO" / "camiseta_001_BLANCO.png"
@@ -121,13 +152,20 @@ def test_export_worker_exports_two_variant_files_with_expected_backgrounds(tmp_p
     assert _has_grayscale_shadow(white_output, (255, 255, 255))
 
 
-def test_single_variant_export_keeps_legacy_default_behavior(tmp_path):
+def test_single_variant_export_keeps_default_behavior(tmp_path):
     _source(tmp_path)
     config = ExportConfig(format="PNG", output_width=40, output_height=40)
     settings = ShadowSettings(opacity=0, blur=0, noise=0)
 
-    worker = ExportWorker(str(tmp_path), settings, config, _curve())
-    worker.run()
+    runner = ExportRunner(executor_factory=InlineExecutor)
+    runner.run(
+        ExportJobRequest(
+            input_folder=tmp_path,
+            settings=settings,
+            export_config=config,
+            curve_data=_curve(),
+        )
+    )
 
     output = tmp_path / "_SALIDA_PRO" / "camiseta_001_PRO.png"
     assert output.exists()

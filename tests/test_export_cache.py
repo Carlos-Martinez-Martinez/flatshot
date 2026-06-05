@@ -1,9 +1,33 @@
+from concurrent.futures import Future
+
 from PIL import Image
 
+from flatshot.application.contracts import ExportJobRequest
+from flatshot.application.export_runner import ExportRunner
 from flatshot.core.models import CurveData, ExportConfig, ShadowSettings
 from flatshot.utils.render_cache import RenderCache
-from flatshot.workers import export_worker
-from flatshot.workers.export_worker import ExportWorker
+
+
+class InlineExecutor:
+    def __init__(self, max_workers=1):
+        self.max_workers = max_workers
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.shutdown()
+
+    def submit(self, fn, arg):
+        future = Future()
+        try:
+            future.set_result(fn(arg))
+        except Exception as exc:
+            future.set_exception(exc)
+        return future
+
+    def shutdown(self, wait=True, cancel_futures=False):
+        return None
 
 
 def _use_isolated_cache(monkeypatch, cache_dir):
@@ -50,10 +74,15 @@ def test_export_uses_valid_export_ready_cache(monkeypatch, tmp_path):
     def fail_process(_args):
         raise AssertionError("normal render should not run for valid cache")
 
-    monkeypatch.setattr(export_worker, "process_single_image", fail_process)
-
-    worker = ExportWorker(str(tmp_path), settings, config, curve)
-    worker.run()
+    runner = ExportRunner(executor_factory=InlineExecutor, image_processor=fail_process)
+    runner.run(
+        ExportJobRequest(
+            input_folder=tmp_path,
+            settings=settings,
+            export_config=config,
+            curve_data=curve,
+        )
+    )
 
     output = tmp_path / "_SALIDA_PRO" / "source_PRO.png"
     assert output.exists()
@@ -79,11 +108,15 @@ def test_export_falls_back_to_normal_render_when_cache_copy_fails(monkeypatch, t
         Image.new("RGBA", (8, 8), (4, 5, 6, 255)).save(save_path)
         return True, img_path.name, None
 
-    monkeypatch.setattr(export_worker.shutil, "copy2", fail_copy)
-    monkeypatch.setattr(export_worker, "process_single_image", fake_process)
-
-    worker = ExportWorker(str(tmp_path), settings, config, curve)
-    worker.run()
+    runner = ExportRunner(executor_factory=InlineExecutor, image_processor=fake_process, copy_file=fail_copy)
+    runner.run(
+        ExportJobRequest(
+            input_folder=tmp_path,
+            settings=settings,
+            export_config=config,
+            curve_data=curve,
+        )
+    )
 
     output = tmp_path / "_SALIDA_PRO" / "source_PRO.png"
     assert output.exists()

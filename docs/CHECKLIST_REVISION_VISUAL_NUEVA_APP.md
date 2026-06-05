@@ -88,7 +88,7 @@ Usar antes de cerrar cada tanda visual de la nueva app.
 ## APP.6 — Presets y ajustes reales
 
 - [ ] `Comprobar bridge` carga presets reales.
-- [ ] El panel de preset indica `Defaults`, `Config` o `Config legacy`.
+- [ ] El panel de preset indica `Defaults`, `Config` o `Config anterior`.
 - [ ] Cambiar preset actualiza sliders principales.
 - [ ] Cambiar preset regenera preview real.
 - [ ] Opacidad, blur, distancia y padding afectan la preview real.

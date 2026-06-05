@@ -1,6 +1,6 @@
 #!/bin/bash
 echo "========================================"
-echo "  FlatShot - Instalador Mac/Linux"
+echo "  FlatShot Desktop - Instalador Mac/Linux"
 echo "========================================"
 echo
 

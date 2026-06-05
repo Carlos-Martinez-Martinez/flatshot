@@ -7,7 +7,7 @@ from flatshot.core.overrides import (
     has_image_override,
     normalize_image_override,
 )
-from flatshot.workers.export_worker import process_single_image
+from flatshot.application.export_runner import process_single_image
 
 
 def test_normalize_image_override_keeps_only_non_zero_clamped_deltas():

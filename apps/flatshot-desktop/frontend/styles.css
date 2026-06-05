@@ -1356,7 +1356,7 @@ small {
   grid-column: 1 / -1;
 }
 
-/* Final preset and advanced-control polish. Keep after legacy inspector rules. */
+/* Final preset and advanced-control polish. Keep after earlier inspector rules. */
 .preset-group-heading {
   min-width: 0;
   display: flex;
@@ -1570,7 +1570,7 @@ small {
   transform: translateY(2px) rotate(225deg);
 }
 
-/* Final Tanda 1 guards must stay after legacy overrides. */
+/* Final Tanda 1 guards must stay after earlier overrides. */
 .app-shell[data-ui-state="scanning"] .gallery-search,
 .app-shell[data-ui-state="scanning"] .gallery-filter,
 .app-shell[data-ui-state="no_folder"] .gallery-search,
@@ -2425,7 +2425,7 @@ small {
   font-size: var(--font-size-sm);
 }
 
-/* Final inspector disclosure normalization. Keep this after legacy adjustment rules. */
+/* Final inspector disclosure normalization. Keep this after earlier adjustment rules. */
 .settings-panel details.inspector-disclosure:not(.is-hidden) {
   min-width: 0;
   flex: 0 0 auto;
@@ -6586,7 +6586,7 @@ summary:focus-visible,
   --canvas-grid-size: 28px;
   --transition-fast: 120ms ease;
 
-  /* Compatibility aliases used by the legacy selectors above. */
+  /* Compatibility aliases used by earlier selectors above. */
   --app-bg: var(--color-bg-app);
   --surface: var(--color-bg-panel);
   --surface-muted: var(--color-bg-soft);
@@ -7040,7 +7040,7 @@ html:not(.dev-mode) .bridge-chip {
   min-height: var(--control-height-sm);
 }
 
-/* Final rail alignment guard: legacy source-panel rules used to pull this block to the edge. */
+/* Final rail alignment guard: earlier source-panel rules used to pull this block to the edge. */
 .batch-rail > .batch-rail__header,
 .batch-rail > .source-panel.batch-rail__source,
 .batch-rail > .batch-rail__summary {
@@ -8764,7 +8764,7 @@ html.dev-mode .top-actions [data-action="toggle-inspector"] {
   grid-column: 1 / -1;
 }
 
-/* Final preset and advanced-control polish. Keep after legacy inspector rules. */
+/* Final preset and advanced-control polish. Keep after earlier inspector rules. */
 .preset-group-heading {
   min-width: 0;
   display: flex;

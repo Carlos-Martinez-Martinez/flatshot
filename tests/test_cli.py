@@ -80,7 +80,7 @@ class TestNamingTemplate:
     
     def test_apply_naming_template_basic(self):
         """Test basic naming template application."""
-        from flatshot.workers.export_worker import apply_naming_template
+        from flatshot.application.export_runner import apply_naming_template
         
         result = apply_naming_template(
             "{original}{suffix}",
@@ -94,7 +94,7 @@ class TestNamingTemplate:
     
     def test_apply_naming_template_with_folder(self):
         """Test naming template with folder placeholder."""
-        from flatshot.workers.export_worker import apply_naming_template
+        from flatshot.application.export_runner import apply_naming_template
         
         result = apply_naming_template(
             "{folder}_{original}",
@@ -108,7 +108,7 @@ class TestNamingTemplate:
     
     def test_apply_naming_template_with_index(self):
         """Test naming template with index placeholder."""
-        from flatshot.workers.export_worker import apply_naming_template
+        from flatshot.application.export_runner import apply_naming_template
         
         result = apply_naming_template(
             "producto_{index}",
@@ -122,7 +122,7 @@ class TestNamingTemplate:
     
     def test_apply_naming_template_custom_padding(self):
         """Test naming template with custom index padding."""
-        from flatshot.workers.export_worker import apply_naming_template
+        from flatshot.application.export_runner import apply_naming_template
         
         result = apply_naming_template(
             "item_{index:05d}",
@@ -136,7 +136,7 @@ class TestNamingTemplate:
 
     def test_apply_naming_template_variant_tokens(self):
         """Test naming template with output variant placeholders."""
-        from flatshot.workers.export_worker import apply_naming_template
+        from flatshot.application.export_runner import apply_naming_template
 
         result = apply_naming_template(
             "{original}_{variant_id}_{bg}{suffix}",
@@ -153,7 +153,7 @@ class TestNamingTemplate:
 
     def test_apply_naming_template_variant_suffix_example(self):
         """Test the main variant suffix example keeps the expected filename."""
-        from flatshot.workers.export_worker import apply_naming_template
+        from flatshot.application.export_runner import apply_naming_template
 
         result = apply_naming_template(
             "{original}{suffix}",

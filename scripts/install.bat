@@ -1,6 +1,6 @@
 @echo off
 echo ========================================
-echo   FlatShot - Instalador
+echo   FlatShot Desktop - Instalador
 echo ========================================
 echo.
 
@@ -26,6 +26,6 @@ echo ========================================
 echo   Instalacion completada!
 echo ========================================
 echo.
-echo Para ejecutar: run.bat
+echo Para ejecutar: scripts\run.bat
 echo.
 pause

@@ -1,4 +1,4 @@
-/* Tanda 1 UX foundation: loaded after legacy stylesheet on purpose. */
+/* Tanda 1 UX foundation: loaded after the base stylesheet on purpose. */
 :root {
   /* Tanda 7 design-system aliases. Keep these role-based names for future UI. */
   --surface-app: var(--color-bg-app);

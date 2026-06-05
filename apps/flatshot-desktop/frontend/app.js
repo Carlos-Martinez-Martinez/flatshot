@@ -5552,13 +5552,13 @@ function lotInspectorCardHtml() {
     : `${readyImagesText(counts.exportableImages)}${ignored ? ` · ${ignored}` : ""}`;
   const tone = counts.blockingErrors ? "error" : counts.nonBlockingWarnings ? "warning" : "";
   return `
-    <section class="inspector-card ${escapeHtml(tone)}">
-      <div class="inspector-card__head">
+    <section class="inspector-summary ${escapeHtml(tone)}">
+      <div class="inspector-summary__main">
         <span>Lote</span>
         <strong>${escapeHtml(visible.title)}</strong>
+        <small>${escapeHtml(meta)}</small>
       </div>
-      <small>${escapeHtml(meta)}</small>
-      <div class="inspector-card__actions">
+      <div class="inspector-summary__action">
         <button type="button" data-action="open-batch-detail">Ver detalle</button>
       </div>
     </section>
@@ -5568,14 +5568,32 @@ function lotInspectorCardHtml() {
 function outputInspectorCardHtml() {
   const destination = destinationCompactLabel();
   const example = namingExample();
+  const output = viewerOutputCompactLabel();
   return `
-    <section class="inspector-card">
-      <div class="inspector-card__head">
+    <section class="inspector-output-card">
+      <div class="inspector-output-card__head">
         <span>Salida</span>
-        <strong title="${escapeHtml(viewerOutputCompactLabel())}">${escapeHtml(viewerOutputCompactLabel())}</strong>
+        <strong title="${escapeHtml(output)}">${escapeHtml(output)}</strong>
       </div>
-      <small title="${escapeHtml(`${destination} · ${example}`)}">${escapeHtml(`${destination} · ${example}`)}</small>
-      <div class="inspector-card__actions">
+      <div class="inspector-output-card__grid" aria-label="Resumen de salida">
+        <span>
+          <em>Formato</em>
+          <strong>${escapeHtml(state.format)}</strong>
+        </span>
+        <span>
+          <em>Tamaño</em>
+          <strong>${escapeHtml(outputSizeDisplay())}</strong>
+        </span>
+        <span>
+          <em>Fondo</em>
+          <strong>${escapeHtml(backgroundLabel(state.background))}</strong>
+        </span>
+      </div>
+      <div class="inspector-output-card__details">
+        <span title="${escapeHtml(destination)}">${escapeHtml(destination)}</span>
+        <strong title="${escapeHtml(example)}">${escapeHtml(example)}</strong>
+      </div>
+      <div class="inspector-output-card__actions">
         <button type="button" data-action="open-app-settings">Editar salida</button>
       </div>
     </section>
@@ -5589,30 +5607,26 @@ function selectedImageInspectorCardHtml() {
   }
   if (!image) {
     return `
-      <section class="inspector-card">
-        <div class="inspector-card__head">
+      <section class="inspector-compact-row">
+        <div>
           <span>Imagen</span>
           <strong>Sin selección</strong>
         </div>
-        <div class="inspector-card__actions">
-          <button type="button" data-action="select-first-image">Seleccionar primera</button>
-        </div>
+        <button type="button" data-action="select-first-image">Seleccionar primera</button>
       </section>
     `;
   }
   const hasLocal = hasCurrentImageOverride(image) || image.status === "adjusted";
   return `
-    <section class="inspector-card">
-      <div class="inspector-card__head">
+    <section class="inspector-compact-row">
+      <div>
         <span>Imagen</span>
         <strong title="${escapeHtml(image.path || image.name)}">${escapeHtml(image.name)}</strong>
+        <small>${escapeHtml(image.detail || imageFileType(image))}</small>
       </div>
-      <small>${escapeHtml(image.detail || imageFileType(image))}</small>
-      <div class="inspector-card__actions">
-        ${hasLocal
-          ? '<button type="button" data-action="reset-local-adjustment">Quitar ajuste</button>'
-          : '<button type="button" data-action="open-advanced">Ajustar imagen</button>'}
-      </div>
+      ${hasLocal
+        ? '<button type="button" data-action="reset-local-adjustment">Quitar ajuste</button>'
+        : '<button type="button" data-action="open-advanced">Ajustar imagen</button>'}
     </section>
   `;
 }
@@ -5632,17 +5646,17 @@ function issuesInspectorCardHtml() {
       ? `${errors} error${errors === 1 ? "" : "es"}`
     : `${rows.length} aviso${rows.length === 1 ? "" : "s"}`;
   return `
-    <section class="inspector-card ${tone}">
-      <div class="inspector-card__head">
+    <section class="inspector-alert ${tone}">
+      <div class="inspector-alert__head">
         <span>${escapeHtml(title)}</span>
         <strong>${escapeHtml(count)}</strong>
       </div>
-      <div class="inspector-card__list">
+      <div class="inspector-alert__list">
         ${rows.slice(0, 3).map((row) => `
           <span title="${escapeHtml(row.path || row.detail || row.title)}">${escapeHtml(row.title)}</span>
         `).join("")}
       </div>
-      <div class="inspector-card__actions">
+      <div class="inspector-alert__actions">
         <button type="button" data-action="review-errors">Revisar avisos</button>
       </div>
     </section>
@@ -5654,15 +5668,13 @@ function aspectInspectorCardHtml() {
     return "";
   }
   return `
-    <section class="inspector-card inspector-card--quiet">
-      <div class="inspector-card__head">
+    <section class="inspector-compact-row inspector-compact-row--quiet">
+      <div>
         <span>Ajuste activo</span>
         <strong>${escapeHtml(state.activePreset)}</strong>
+        <small>${escapeHtml(state.presetDirty ? "Modificado" : "Activo")}</small>
       </div>
-      <small>${escapeHtml(state.presetDirty ? "Modificado" : "Activo")}</small>
-      <div class="inspector-card__actions">
-        <button type="button" data-action="open-advanced">Editar ajuste</button>
-      </div>
+      <button type="button" data-action="open-advanced">Editar ajuste</button>
     </section>
   `;
 }

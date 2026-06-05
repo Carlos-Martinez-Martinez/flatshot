@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 
 APP_NAME = "FlatShot"
@@ -30,6 +30,9 @@ SOURCE_POINTER = ROOT / "source_path.txt"
 HOST = "127.0.0.1"
 DEFAULT_BRIDGE_PORT = 8765
 DEFAULT_FRONTEND_PORT = 4173
+LIVE_RELOAD_ENV_VAR = "FLATSHOT_LIVE_RELOAD"
+LIVE_RELOAD_ENDPOINT = "/__flatshot_live_reload"
+LIVE_RELOAD_INTERVAL_MS = 700
 RUNTIME_SOURCE_DIRS = (
     Path("src") / "flatshot",
     Path("apps") / "flatshot-desktop" / "frontend",
@@ -45,8 +48,8 @@ def configure_portable_environment() -> None:
     (ROOT / "data").mkdir(parents=True, exist_ok=True)
 
 
-def auto_sync_from_source() -> None:
-    source_root = find_source_root()
+def auto_sync_from_source(source_root: Path | None = None) -> None:
+    source_root = source_root or find_source_root()
     if source_root is None:
         return
     try:
@@ -108,6 +111,10 @@ def runtime_manifest_hash(source_root: Path) -> str:
     return files_manifest_hash(iter_runtime_source_files(source_root), source_root)
 
 
+def frontend_manifest_hash(frontend_dir: Path) -> str:
+    return files_manifest_hash(iter_frontend_files(frontend_dir), frontend_dir)
+
+
 def dependency_manifest_hash(source_root: Path) -> str:
     digest = hashlib.sha256()
     digest.update(files_manifest_hash(iter_dependency_files(source_root), source_root).encode("utf-8"))
@@ -140,6 +147,16 @@ def iter_runtime_source_files(source_root: Path):
                 continue
             if file.is_file():
                 yield file
+
+
+def iter_frontend_files(frontend_dir: Path):
+    if not frontend_dir.exists():
+        return
+    for file in frontend_dir.rglob("*"):
+        if should_skip_source_file(file):
+            continue
+        if file.is_file():
+            yield file
 
 
 def iter_dependency_files(source_root: Path):
@@ -220,6 +237,23 @@ def write_launcher_log(context: str, details: str) -> None:
         handle.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {context}\n{details}\n\n")
 
 
+def source_frontend_dir(source_root: Path) -> Path:
+    return source_root / "apps" / "flatshot-desktop" / "frontend"
+
+
+def live_reload_enabled() -> bool:
+    configured = os.environ.get(LIVE_RELOAD_ENV_VAR, "").strip().lower()
+    return configured not in {"0", "false", "no", "off"}
+
+
+def resolve_frontend_runtime(source_root: Path | None) -> tuple[Path, bool]:
+    if source_root is not None and live_reload_enabled():
+        candidate = source_frontend_dir(source_root)
+        if (candidate / "index.html").exists():
+            return candidate, True
+    return FRONTEND_DIR, False
+
+
 @dataclass
 class LocalServer:
     label: str
@@ -244,6 +278,24 @@ class LocalStaticServer(ThreadingHTTPServer):
 
 
 class QuietStaticHandler(SimpleHTTPRequestHandler):
+    live_reload_dir: Path | None = None
+
+    def do_GET(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path == LIVE_RELOAD_ENDPOINT:
+            self.serve_live_reload_status()
+            return
+        if self.live_reload_dir is not None and parsed.path in {"", "/", "/index.html"}:
+            self.serve_live_reload_index()
+            return
+        super().do_GET()
+
+    def end_headers(self) -> None:
+        if self.live_reload_dir is not None:
+            self.send_header("Cache-Control", "no-store, max-age=0")
+            self.send_header("Pragma", "no-cache")
+        super().end_headers()
+
     def log_message(self, format: str, *args) -> None:  # noqa: A002
         return
 
@@ -253,16 +305,80 @@ class QuietStaticHandler(SimpleHTTPRequestHandler):
         except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
             return
 
+    def serve_live_reload_status(self) -> None:
+        version = frontend_manifest_hash(self.live_reload_dir) if self.live_reload_dir is not None else ""
+        payload = json.dumps({"liveReload": self.live_reload_dir is not None, "version": version}).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def serve_live_reload_index(self) -> None:
+        index_path = Path(self.directory) / "index.html"
+        try:
+            html = index_path.read_text(encoding="utf-8")
+        except OSError:
+            self.send_error(404, "index.html no disponible")
+            return
+        payload = inject_live_reload_script(html).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+
+def inject_live_reload_script(html: str) -> str:
+    script = live_reload_script()
+    marker = "</body>"
+    marker_index = html.lower().rfind(marker)
+    if marker_index < 0:
+        return html + script
+    return html[:marker_index] + script + html[marker_index:]
+
+
+def live_reload_script() -> str:
+    return f"""
+<script>
+(() => {{
+  const endpoint = "{LIVE_RELOAD_ENDPOINT}";
+  let currentVersion = null;
+  let reloading = false;
+
+  async function checkFlatShotLiveReload() {{
+    try {{
+      const response = await fetch(endpoint, {{ cache: "no-store" }});
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!currentVersion) {{
+        currentVersion = data.version || "";
+        return;
+      }}
+      if (data.version && data.version !== currentVersion && !reloading) {{
+        reloading = true;
+        window.location.reload();
+      }}
+    }} catch (_error) {{}}
+  }}
+
+  window.setInterval(checkFlatShotLiveReload, {LIVE_RELOAD_INTERVAL_MS});
+  checkFlatShotLiveReload();
+}})();
+</script>
+"""
+
 
 def main() -> int:
     bridge = None
     frontend = None
     try:
         configure_portable_environment()
-        auto_sync_from_source()
+        source_root = find_source_root()
+        auto_sync_from_source(source_root)
         ensure_runtime_paths()
         bridge = start_bridge_server()
-        frontend = start_frontend_server()
+        frontend = start_frontend_server(source_root)
         app_url = frontend.url + "?" + urlencode({"bridge": bridge.url})
         open_desktop_window(app_url)
         return 0
@@ -304,9 +420,12 @@ def start_bridge_server() -> LocalServer:
     return local
 
 
-def start_frontend_server() -> LocalServer:
+def start_frontend_server(source_root: Path | None = None) -> LocalServer:
     port = find_available_port(DEFAULT_FRONTEND_PORT)
-    handler = partial(QuietStaticHandler, directory=str(FRONTEND_DIR))
+    frontend_dir, live_reload = resolve_frontend_runtime(source_root)
+    handler_class = type("FlatShotStaticHandler", (QuietStaticHandler,), {})
+    handler_class.live_reload_dir = frontend_dir if live_reload else None
+    handler = partial(handler_class, directory=str(frontend_dir))
     server = LocalStaticServer((HOST, port), handler)
     local = LocalServer("frontend", HOST, server.server_port, server, threading.Thread(target=server.serve_forever, daemon=True))
     local.thread.start()

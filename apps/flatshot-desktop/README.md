@@ -57,6 +57,11 @@ start. On launch it auto-syncs backend and frontend code changes from the source
 repo recorded in `source_path.txt`. Rebuild it with `python scripts\build_portable.py`
 when Python dependencies change.
 
+When the source repo is available, the portable window serves this frontend
+directory directly and reloads automatically after HTML, CSS or JS edits. Set
+`FLATSHOT_LIVE_RELOAD=0` before launching to test the copied portable frontend
+instead. Python bridge/core edits still require restarting the app.
+
 ## Options
 
 ```bash

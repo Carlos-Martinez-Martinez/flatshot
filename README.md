@@ -94,6 +94,12 @@ the source repo in `source_path.txt` and auto-syncs changes from:
 - `src\flatshot`
 - `apps\flatshot-desktop\frontend`
 
+While the source repo is available, the portable window serves the frontend
+directly from `apps\flatshot-desktop\frontend` and reloads automatically when
+HTML, CSS or JS files change. Set `FLATSHOT_LIVE_RELOAD=0` before launching to
+force the copied portable frontend instead. Python bridge/core changes still
+need an app restart because modules are already loaded in the running process.
+
 If `requirements.txt` or `pyproject.toml` changes, run
 `python scripts\build_portable.py` again so the portable virtual environment is
 updated.

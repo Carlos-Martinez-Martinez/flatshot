@@ -249,6 +249,11 @@ Ventana:
   FlatShot se abre en una ventana propia con WebView2/pywebview. Si la ventana
   nativa no puede iniciarse, se abre en el navegador como fallback.
 
+Live reload:
+  Si source_path.txt apunta al repo, la ventana sirve la interfaz directamente
+  desde apps\\flatshot-desktop\\frontend y se recarga al cambiar HTML, CSS o JS.
+  Para desactivarlo, arranca con FLATSHOT_LIVE_RELOAD=0.
+
 Actualizacion:
   Si este portable esta dentro de release\\FlatShotPortable, al arrancar se
   sincroniza automaticamente desde el repo indicado en source_path.txt cuando

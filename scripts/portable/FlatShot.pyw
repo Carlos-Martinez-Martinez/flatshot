@@ -357,6 +357,7 @@ def live_reload_script() -> str:
       }}
       if (data.version && data.version !== currentVersion && !reloading) {{
         reloading = true;
+        window.dispatchEvent(new CustomEvent("flatshot:before-live-reload"));
         window.location.reload();
       }}
     }} catch (_error) {{}}

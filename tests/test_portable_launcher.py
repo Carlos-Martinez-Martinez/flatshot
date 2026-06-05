@@ -47,6 +47,7 @@ def test_live_reload_script_is_injected_before_body_close():
     injected = launcher.inject_live_reload_script(html)
 
     assert launcher.LIVE_RELOAD_ENDPOINT in injected
+    assert "flatshot:before-live-reload" in injected
     assert injected.index(launcher.LIVE_RELOAD_ENDPOINT) < injected.lower().index("</body>")
 
 

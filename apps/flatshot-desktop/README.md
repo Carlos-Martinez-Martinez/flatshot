@@ -58,7 +58,9 @@ repo recorded in `source_path.txt`. Rebuild it with `python scripts\build_portab
 when Python dependencies change.
 
 When the source repo is available, the portable window serves this frontend
-directory directly and reloads automatically after HTML, CSS or JS edits. Set
+directory directly and reloads automatically after HTML, CSS or JS edits. It
+keeps a session snapshot so the current batch, selected image, filters, view
+mode, inspector tab and output controls come back after the reload. Set
 `FLATSHOT_LIVE_RELOAD=0` before launching to test the copied portable frontend
 instead. Python bridge/core edits still require restarting the app.
 

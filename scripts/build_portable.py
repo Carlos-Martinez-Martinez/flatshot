@@ -252,6 +252,8 @@ Ventana:
 Live reload:
   Si source_path.txt apunta al repo, la ventana sirve la interfaz directamente
   desde apps\\flatshot-desktop\\frontend y se recarga al cambiar HTML, CSS o JS.
+  Antes de recargar guarda un snapshot de sesion para recuperar lote, imagen
+  seleccionada, filtros, vista, pestana activa y controles de salida.
   Para desactivarlo, arranca con FLATSHOT_LIVE_RELOAD=0.
 
 Actualizacion:

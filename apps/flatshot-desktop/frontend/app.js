@@ -81,6 +81,7 @@ const STORAGE_KEYS = {
   selectedImagePath: "flatshot.selectedImagePath",
   outputProfiles: "flatshot.outputProfiles",
   activeOutputProfile: "flatshot.activeOutputProfile",
+  sessionSnapshot: "flatshot.liveReloadSession.v1",
 };
 document.documentElement.classList.toggle("dev-mode", devMode);
 
@@ -356,6 +357,7 @@ let fitZoomFrame = 0;
 let viewerResizeObserver = null;
 let inspectorScrollTopBeforeToggle = 0;
 let modalFocusReturnTarget = null;
+let sessionSnapshotPersistenceEnabled = false;
 const inspectorDisclosureTimers = new WeakMap();
 const INSPECTOR_DISCLOSURE_MS = 220;
 const viewerPanState = {
@@ -409,6 +411,223 @@ function writePersistentJson(key, value) {
   } catch (error) {
     // Settings persistence is local convenience; runtime state remains usable.
   }
+}
+
+function readSessionSnapshot() {
+  let raw = "";
+  try {
+    raw = window.sessionStorage.getItem(STORAGE_KEYS.sessionSnapshot) || "";
+  } catch (error) {
+    return null;
+  }
+  if (!raw) {
+    return null;
+  }
+  try {
+    const snapshot = JSON.parse(raw);
+    return snapshot?.version === 1 && snapshot.state && typeof snapshot.state === "object"
+      ? snapshot
+      : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function writeSessionSnapshot() {
+  try {
+    window.sessionStorage.setItem(STORAGE_KEYS.sessionSnapshot, JSON.stringify(buildSessionSnapshot()));
+  } catch (error) {
+    // Live-reload state is best effort; the app still works without session storage.
+  }
+}
+
+function buildSessionSnapshot() {
+  const selected = selectedImage();
+  return {
+    version: 1,
+    savedAt: Date.now(),
+    state: {
+      batch: state.batch,
+      batchSource: state.batchSource,
+      selectedImageId: state.selectedImageId,
+      selectedImagePath: selected?.path || readPersistentValue(STORAGE_KEYS.selectedImagePath),
+      previewMode: state.previewMode,
+      previewBg: state.previewBg,
+      zoom: state.zoom,
+      fitZoom: state.fitZoom,
+      fitMode: state.fitMode,
+      panX: state.panX,
+      panY: state.panY,
+      filter: state.filter,
+      search: state.search,
+      galleryView: state.galleryView,
+      inspectorTab: state.inspectorTab,
+      inspectorCollapsed: state.inspectorCollapsed,
+      activePreset: state.activePreset,
+      presetOutputSettings: state.presetOutputSettings,
+      settings: state.settings,
+      presetDirty: state.presetDirty,
+      presetSource: state.presetSource,
+      localOverride: state.localOverride,
+      outputProfiles: state.outputProfiles,
+      activeOutputProfileId: state.activeOutputProfileId,
+      outputProfileEditorId: state.outputProfileEditorId,
+      outputProfileDraft: state.outputProfileDraft,
+      destinationMode: state.destinationMode,
+      destinationValue: state.destinationValue,
+      format: state.format,
+      size: state.size,
+      background: state.background,
+      naming: state.naming,
+      suffix: state.suffix,
+      appSettingsOpen: state.appSettingsOpen,
+      batchDetailOpen: state.batchDetailOpen,
+      bridgeMode: state.bridgeMode,
+      bridgeUrl: state.bridgeUrl,
+      bridgeStatus: state.bridgeStatus,
+      bridgeMessage: state.bridgeMessage,
+      bridgeLastResponse: state.bridgeLastResponse,
+      bridgeCapabilitiesSummary: state.bridgeCapabilitiesSummary,
+      bridgeCapabilities: state.bridgeCapabilities,
+      bridgePresets: state.bridgePresets,
+      bridgePresetSource: state.bridgePresetSource,
+      bridgePresetWarning: state.bridgePresetWarning,
+      bridgeScanPath: state.bridgeScanPath,
+      scanStatus: state.scanStatus,
+      scanIssues: state.scanIssues,
+      scanDiagnostics: state.scanDiagnostics,
+      realFolders: state.realFolders,
+      realImages: state.realImages,
+      imageOverrides: state.imageOverrides,
+    },
+  };
+}
+
+function restoreSessionSnapshot() {
+  const snapshot = readSessionSnapshot();
+  if (!snapshot) {
+    return false;
+  }
+
+  const restored = snapshot.state;
+  const outputProfiles = Array.isArray(restored.outputProfiles)
+    ? dedupeOutputProfileIds(restored.outputProfiles.map(normalizeOutputProfile))
+    : state.outputProfiles;
+  const selectedPath = String(restored.selectedImagePath || "");
+  const realFolders = Array.isArray(restored.realFolders) ? restored.realFolders : [];
+  const realImages = Array.isArray(restored.realImages) ? restored.realImages : [];
+
+  Object.assign(state, {
+    batch: restored.batch === "empty" ? "empty" : realImages.length ? "ready" : "none",
+    batchSource: realImages.length || restored.batch === "empty" ? "bridge" : "none",
+    scenario: "initial",
+    selectedImageId: null,
+    previewStatus: "empty",
+    previewData: null,
+    previewError: "",
+    previewMode: ["processed", "original", "compare"].includes(restored.previewMode) ? restored.previewMode : "processed",
+    previewBg: restored.previewBg || state.previewBg,
+    zoom: clampNumber(restored.zoom, 25, 400, 100),
+    fitZoom: clampNumber(restored.fitZoom, 25, 400, 100),
+    fitMode: VIEW_MODE_LABELS[restored.fitMode] ? restored.fitMode : DEFAULT_VIEW_MODE,
+    panX: clampNumber(restored.panX, -10000, 10000, 0),
+    panY: clampNumber(restored.panY, -10000, 10000, 0),
+    filter: Object.values(BATCH_FILTERS).includes(restored.filter) ? restored.filter : BATCH_FILTERS.all,
+    search: String(restored.search || ""),
+    galleryView: restored.galleryView === "list" ? "list" : "thumbs",
+    inspectorTab: ["review", "output", "warnings", "advanced"].includes(restored.inspectorTab) ? restored.inspectorTab : "review",
+    inspectorCollapsed: Boolean(restored.inspectorCollapsed),
+    activePreset: String(restored.activePreset || state.activePreset),
+    presetOutputSettings: safeObject(restored.presetOutputSettings),
+    settings: normalizeSettings(restored.settings),
+    presetDirty: Boolean(restored.presetDirty),
+    presetSource: String(restored.presetSource || "Salida"),
+    localOverride: Boolean(restored.localOverride),
+    outputProfiles,
+    activeOutputProfileId: outputProfiles.some((profile) => profile.id === restored.activeOutputProfileId)
+      ? restored.activeOutputProfileId
+      : outputProfiles[0]?.id || state.activeOutputProfileId,
+    outputProfileEditorId: restored.outputProfileEditorId || restored.activeOutputProfileId || outputProfiles[0]?.id,
+    outputProfileDraft: restored.outputProfileDraft && typeof restored.outputProfileDraft === "object"
+      ? restored.outputProfileDraft
+      : null,
+    destinationMode: restored.destinationMode === "custom" ? "custom" : "source",
+    destinationValue: String(restored.destinationValue || "_SALIDA_PRO"),
+    format: normalizeExportFormat(restored.format),
+    size: parseOutputSize(restored.size).normalized,
+    background: ["rgb230", "white", "transparent"].includes(restored.background) ? restored.background : "rgb230",
+    naming: String(restored.naming || "{original}{suffix}"),
+    suffix: restored.suffix === undefined || restored.suffix === null ? "_PRO" : String(restored.suffix),
+    appSettingsOpen: Boolean(restored.appSettingsOpen),
+    batchDetailOpen: Boolean(restored.batchDetailOpen),
+    exportConfirmOpen: false,
+    exportStatus: "blocked",
+    exportJobId: null,
+    exportDestinations: [],
+    exportMessages: [],
+    exportCompletedItems: [],
+    exportIssues: [],
+    exportResult: null,
+    progress: 0,
+    processed: 0,
+    errors: [],
+    paused: false,
+    bridgeMode: "bridge",
+    bridgeUrl: String(restored.bridgeUrl || initialBridgeUrl || defaultBridgeUrl),
+    bridgeStatus: restored.bridgeStatus === "connected" ? "connected" : "idle",
+    bridgeMessage: String(restored.bridgeMessage || "Estado restaurado"),
+    bridgeLastResponse: String(restored.bridgeLastResponse || "Estado restaurado tras recarga"),
+    bridgeCapabilitiesSummary: String(restored.bridgeCapabilitiesSummary || "Restaurado"),
+    bridgeCapabilities: restored.bridgeCapabilities || null,
+    bridgePresets: Array.isArray(restored.bridgePresets) ? restored.bridgePresets.map(normalizePresetItem).filter(Boolean) : [],
+    bridgePresetSource: String(restored.bridgePresetSource || "unavailable"),
+    bridgePresetWarning: String(restored.bridgePresetWarning || ""),
+    bridgeScanPath: String(restored.bridgeScanPath || ""),
+    scanStatus: String(restored.scanStatus || "Estado restaurado"),
+    scanIssues: Array.isArray(restored.scanIssues) ? restored.scanIssues.map(normalizeBridgeIssue) : [],
+    scanDiagnostics: restored.scanDiagnostics && typeof restored.scanDiagnostics === "object"
+      ? restored.scanDiagnostics
+      : emptyScanDiagnostics(),
+    realFolders,
+    realImages,
+    imageOverrides: safeObject(restored.imageOverrides),
+    thumbnailStatus: {},
+    thumbnailErrors: [],
+    statusText: "Estado restaurado",
+  });
+
+  if (state.batch === "ready") {
+    const selected = selectedPath
+      ? state.realImages.find((image) => image.path === selectedPath)
+      : state.realImages.find((image) => image.id === restored.selectedImageId);
+    const nextImage = selected || state.realImages[0];
+    state.selectedImageId = nextImage?.id || null;
+    state.localOverride = hasCurrentImageOverride(nextImage) || nextImage?.status === "adjusted";
+    state.exportStatus = isExportReady() ? "ready" : "blocked";
+    if (nextImage?.path) {
+      writePersistentValue(STORAGE_KEYS.selectedImagePath, nextImage.path);
+      state.previewStatus = "loading";
+      state.statusText = "Restaurando vista";
+      setTimer(() => requestBridgePreview(nextImage), 0);
+    }
+  } else if (state.batch === "empty") {
+    state.exportStatus = "blocked";
+    state.statusText = state.scanStatus || "No hay imágenes compatibles";
+  }
+
+  return true;
+}
+
+function safeObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function clampNumber(value, min, max, fallback) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+  return Math.min(max, Math.max(min, numeric));
 }
 
 function escapeHtml(value) {
@@ -2979,6 +3198,9 @@ function render() {
   renderDesignSystemComponents();
   syncOpenInspectorDisclosureHeights();
   keepActiveThumbnailVisible();
+  if (sessionSnapshotPersistenceEnabled) {
+    writeSessionSnapshot();
+  }
 }
 
 function syncOpenInspectorDisclosureHeights() {
@@ -7664,5 +7886,13 @@ function restorePersistentBridgeSession() {
 
 initViewerCanvasNavigation();
 initViewerResizeObserver();
-setScenario("initial");
-restorePersistentBridgeSession();
+const restoredSessionSnapshot = restoreSessionSnapshot();
+sessionSnapshotPersistenceEnabled = true;
+if (restoredSessionSnapshot) {
+  render();
+} else {
+  setScenario("initial");
+  restorePersistentBridgeSession();
+}
+window.addEventListener("flatshot:before-live-reload", writeSessionSnapshot);
+window.addEventListener("beforeunload", writeSessionSnapshot);

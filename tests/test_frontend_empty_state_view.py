@@ -51,6 +51,25 @@ assert.equal(withAction.includes('class="empty-state onboarding &quot;x&quot;"')
 assert.equal(withAction.includes('data-action="pick-&quot;folder&quot;"'), true);
 assert.equal(withAction.includes('>Elegir &amp; abrir</button>'), true);
 assert.equal(withAction.includes('<small>PNG &amp; JPG</small>'), true);
+
+const initial = helpers.initialStateHtml({{ devMode: false }});
+assert.equal(initial.includes('class="empty-state onboarding initial-onboarding"'), true);
+assert.equal(initial.includes("<strong>Selecciona una carpeta</strong>"), true);
+assert.equal(initial.includes("Carga un lote de imágenes PNG o JPG"), true);
+assert.equal(initial.includes('data-action="pick-bridge-folder"'), true);
+assert.equal(initial.includes('data-action="open-app-settings"'), true);
+assert.equal(initial.includes("manual-path-inline"), false);
+assert.equal(initial.includes("<svg"), true);
+
+const devInitial = helpers.initialStateHtml({{
+  devMode: true,
+  bridgeScanPath: 'C:/Entrada/"uno"&<dos>',
+}});
+assert.equal(devInitial.includes('class="manual-path-inline"'), true);
+assert.equal(devInitial.includes("Ruta manual"), true);
+assert.equal(devInitial.includes('id="onboarding-scan-path"'), true);
+assert.equal(devInitial.includes('value="C:/Entrada/&quot;uno&quot;&amp;&lt;dos&gt;"'), true);
+assert.equal(devInitial.includes('data-action="scan-bridge-folder"'), true);
 """
     result = subprocess.run(
         ["node", "-e", script],

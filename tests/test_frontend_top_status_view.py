@@ -135,6 +135,87 @@ assert.equal(helpers.topPrimaryHint({{
   title: "Fallback",
 }}), "Fallback");
 
+assert.equal(helpers.statusMode({{
+  batch: "none",
+  bridgeStatus: "idle",
+}}), "");
+assert.equal(helpers.statusMode({{
+  batch: "ready",
+  bridgeMode: "bridge",
+  bridgeStatus: "connected",
+  exportStatus: "failed",
+  previewStatus: "ready",
+}}), "error");
+assert.equal(helpers.statusMode({{
+  batch: "ready",
+  bridgeMode: "bridge",
+  bridgeStatus: "connected",
+  exportStatus: "idle",
+  previewStatus: "error",
+}}), "error");
+assert.equal(helpers.statusMode({{
+  batch: "ready",
+  bridgeMode: "bridge",
+  bridgeStatus: "connected",
+  hasScanError: true,
+}}), "error");
+assert.equal(helpers.statusMode({{
+  batch: "ready",
+  bridgeMode: "bridge",
+  bridgeStatus: "connected",
+  exportStatus: "running",
+  previewStatus: "ready",
+}}), "busy");
+assert.equal(helpers.statusMode({{
+  batch: "ready",
+  bridgeMode: "bridge",
+  bridgeStatus: "connected",
+  exportStatus: "idle",
+  previewStatus: "loading",
+}}), "busy");
+assert.equal(helpers.statusMode({{
+  batch: "scanning",
+  bridgeMode: "bridge",
+  bridgeStatus: "checking",
+}}), "busy");
+assert.equal(helpers.statusMode({{
+  batch: "ready",
+  bridgeMode: "bridge",
+  bridgeStatus: "disconnected",
+  exportStatus: "idle",
+  previewStatus: "ready",
+}}), "busy");
+assert.equal(helpers.statusMode({{
+  batch: "ready",
+  bridgeMode: "bridge",
+  bridgeStatus: "connected",
+  exportStatus: "partial",
+  previewStatus: "ready",
+}}), "busy");
+assert.equal(helpers.statusMode({{
+  batch: "ready",
+  bridgeMode: "bridge",
+  bridgeStatus: "connected",
+  exportStatus: "idle",
+  previewStatus: "warning",
+}}), "busy");
+assert.equal(helpers.statusMode({{
+  batch: "ready",
+  bridgeMode: "bridge",
+  bridgeStatus: "connected",
+  exportStatus: "idle",
+  previewStatus: "ready",
+  hasValidationIssues: true,
+}}), "busy");
+assert.equal(helpers.statusMode({{
+  batch: "ready",
+  bridgeMode: "bridge",
+  bridgeStatus: "connected",
+  exportStatus: "idle",
+  previewStatus: "ready",
+  hasValidationIssues: false,
+}}), "ready");
+
 assert.equal(helpers.statusBarText({{
   batch: "none",
 }}), "Sin lote · Elige una carpeta para empezar");

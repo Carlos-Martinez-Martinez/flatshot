@@ -2874,22 +2874,15 @@ function pathToFileUrl(path) {
 }
 
 function statusMode() {
-  if (state.batch === "none" && state.bridgeStatus === "idle") {
-    return "";
-  }
-  if (state.exportStatus === "failed" || state.previewStatus === "error" || state.scanIssues.some((issue) => issue.level === "error")) {
-    return "error";
-  }
-  if (state.exportStatus === "running" || state.previewStatus === "loading" || state.batch === "scanning") {
-    return "busy";
-  }
-  if (state.bridgeMode === "bridge" && state.bridgeStatus !== "connected") {
-    return "busy";
-  }
-  if (state.exportStatus === "partial" || state.previewStatus === "warning" || validationIssues().length) {
-    return "busy";
-  }
-  return "ready";
+  return topStatusViewHelpers.statusMode({
+    batch: state.batch,
+    bridgeMode: state.bridgeMode,
+    bridgeStatus: state.bridgeStatus,
+    exportStatus: state.exportStatus,
+    hasScanError: state.scanIssues.some((issue) => issue.level === "error"),
+    hasValidationIssues: Boolean(validationIssues().length),
+    previewStatus: state.previewStatus,
+  });
 }
 
 function render() {

@@ -165,6 +165,25 @@
     return primaryAction.label || options.title;
   }
 
+  function statusMode(options = {}) {
+    if (options.batch === "none" && options.bridgeStatus === "idle") {
+      return "";
+    }
+    if (options.exportStatus === "failed" || options.previewStatus === "error" || options.hasScanError) {
+      return "error";
+    }
+    if (options.exportStatus === "running" || options.previewStatus === "loading" || options.batch === "scanning") {
+      return "busy";
+    }
+    if (options.bridgeMode === "bridge" && options.bridgeStatus !== "connected") {
+      return "busy";
+    }
+    if (options.exportStatus === "partial" || options.previewStatus === "warning" || options.hasValidationIssues) {
+      return "busy";
+    }
+    return "ready";
+  }
+
   function statusBarText(options = {}) {
     const exportStatus = options.exportStatus || "idle";
     const batch = options.batch || "none";
@@ -215,6 +234,7 @@
     escapeHtml,
     preflightStatusClass,
     preflightStatusLabel,
+    statusMode,
     statusBarText,
     topPrimaryHint,
     topStatusSummaryHtml,

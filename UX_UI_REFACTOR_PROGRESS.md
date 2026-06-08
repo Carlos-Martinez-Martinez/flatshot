@@ -951,6 +951,35 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 39 - Extraccion de modo del punto de estado
+
+Estado: completada.
+
+Cambios realizados:
+- `top-status-view.js` ahora expone `statusMode()` para decidir la clase visual del punto superior:
+  - estado inicial sin lote;
+  - error por exportacion, preview o escaneo;
+  - ocupado por exportacion, preview, escaneo, bridge o validaciones;
+  - listo.
+- `app.js` conserva las fuentes de verdad (`batch`, `bridgeStatus`, `exportStatus`, `previewStatus`, errores de escaneo y validaciones) y solo delega la decision.
+- Se amplio `tests/test_frontend_top_status_view.py` para cubrir todas las ramas del modo visual.
+
+Impacto medido:
+- `app.js`: 7.171 -> 7.164 lineas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: sin cambios, 22.
+
+Validaciones ejecutadas:
+- `node --check apps/flatshot-desktop/frontend/top-status-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_top_status_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 282 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- HTTP local: `index.html`, `top-status-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

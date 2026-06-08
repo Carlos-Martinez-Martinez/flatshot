@@ -261,6 +261,66 @@ assert.equal(helpers.sourceScanButtonTitle({{ hasBatch: false, batch: "none" }})
 assert.equal(helpers.bridgeMessageClass("connected"), "bridge-message ready");
 assert.equal(helpers.bridgeMessageClass("disconnected"), "bridge-message error");
 assert.equal(helpers.bridgeMessageClass("checking"), "bridge-message ");
+
+assert.deepEqual(helpers.sourcePanelViewState({{
+  batch: "ready",
+  bridgeMode: "bridge",
+  bridgeStatus: "connected",
+  devMode: true,
+  exportableImages: 4,
+  folders: [{{ name: "Lote A" }}],
+  hasBatch: true,
+  hasScanError: false,
+  ignoredFiles: 2,
+  isBridgeBatch: true,
+  isMockBatch: false,
+  persistedFolderName: "Ultima",
+  scanStatus: "Listo",
+  scanningFolderName: "",
+}}), {{
+  panelClass: "bridge",
+  badgeClass: "bridge",
+  badgeLabel: "Local",
+  title: "Entrada",
+  folderName: "Lote A",
+  scanStatus: "4 exportables · 2 ignorados",
+  pickButtonLabel: "Cambiar",
+  scanButtonLabel: "↻",
+  scanButtonTitle: "Actualizar lote",
+  controlsDisabled: false,
+  message: "Listo.",
+  messageClass: "bridge-message ready",
+}});
+
+assert.deepEqual(helpers.sourcePanelViewState({{
+  batch: "scanning",
+  bridgeMode: "bridge",
+  bridgeStatus: "checking",
+  devMode: true,
+  exportableImages: 0,
+  folders: [],
+  hasBatch: false,
+  hasScanError: false,
+  ignoredFiles: 0,
+  isBridgeBatch: false,
+  isMockBatch: false,
+  persistedFolderName: "",
+  scanStatus: "Escaneando ruta",
+  scanningFolderName: "Entrada",
+}}), {{
+  panelClass: "scanning",
+  badgeClass: "",
+  badgeLabel: "Local",
+  title: "Seleccionar carpeta",
+  folderName: "Entrada",
+  scanStatus: "Leyendo imágenes",
+  pickButtonLabel: "Seleccionar carpeta",
+  scanButtonLabel: "Escanear",
+  scanButtonTitle: "Escanear carpeta",
+  controlsDisabled: true,
+  message: "Comprobando conexión.",
+  messageClass: "bridge-message ",
+}});
 """
     result = subprocess.run(
         ["node", "-e", script],

@@ -833,6 +833,38 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 35 - Extraccion de view state de origen
+
+Estado: completada.
+
+Cambios realizados:
+- `scan-state.js` ahora expone `sourcePanelViewState()` para derivar en un solo objeto:
+  - clase del panel de origen;
+  - badge y label de fuente;
+  - titulo, nombre de carpeta y estado compacto;
+  - labels/titles de botones de carpeta/escaneo;
+  - estado disabled de controles;
+  - mensaje y clase de bridge.
+- `renderBridge()` en `app.js` consume ese view state y deja de reconstruir cada label/clase por separado.
+- `sourceFolderName()` queda como wrapper porque se reutiliza en resumen y detalle de lote.
+- Se amplio `tests/test_frontend_scan_state.py` para cubrir view states de lote listo y escaneo activo.
+
+Impacto medido:
+- `app.js`: 7.192 -> 7.183 lineas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: sin cambios, 22.
+
+Validaciones ejecutadas:
+- `node --check apps/flatshot-desktop/frontend/scan-state.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_scan_state.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 282 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- HTTP local: `index.html`, `scan-state.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

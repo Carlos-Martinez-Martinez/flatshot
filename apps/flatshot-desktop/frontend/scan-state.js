@@ -258,6 +258,23 @@
     return `bridge-message ${bridgeStatus === "connected" ? "ready" : bridgeStatus === "disconnected" ? "error" : ""}`;
   }
 
+  function sourcePanelViewState(options = {}) {
+    return {
+      panelClass: sourcePanelClass(options),
+      badgeClass: sourceBadgeClass(options),
+      badgeLabel: sourceLabel(options),
+      title: sourceTitle(options),
+      folderName: sourceFolderName(options),
+      scanStatus: compactScanStatus(options),
+      pickButtonLabel: sourcePickButtonLabel(options),
+      scanButtonLabel: sourceScanButtonLabel(options),
+      scanButtonTitle: sourceScanButtonTitle(options),
+      controlsDisabled: options.bridgeStatus === "checking" || options.batch === "scanning",
+      message: normalBridgeMessage(options),
+      messageClass: bridgeMessageClass(options.bridgeStatus),
+    };
+  }
+
   return {
     bridgeMessageClass,
     compactScanStatus,
@@ -278,6 +295,7 @@
     sourcePickButtonLabel,
     sourceScanButtonLabel,
     sourceScanButtonTitle,
+    sourcePanelViewState,
     sourceTitle,
   };
 });

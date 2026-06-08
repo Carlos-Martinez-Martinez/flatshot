@@ -3296,90 +3296,81 @@ function renderBridge() {
   const sourcePanel = $("#source-panel");
   const sourceBadge = $("#scan-source-badge");
   const message = $("#bridge-message");
+  const counts = batchCounts();
+  const viewState = scanStateHelpers.sourcePanelViewState({
+    batch: state.batch,
+    bridgeMode: state.bridgeMode,
+    bridgeStatus: state.bridgeStatus,
+    devMode,
+    exportableImages: counts.exportableImages,
+    folders: sourceFoldersForDisplay(),
+    hasBatch: hasBatch(),
+    hasScanError: state.scanIssues.some((issue) => issue.level === "error"),
+    ignoredFiles: counts.ignoredFiles,
+    isBridgeBatch: isBridgeBatch(),
+    isMockBatch: isMockBatch(),
+    persistedFolderName: persistedScanFolderName(),
+    scanStatus: state.scanStatus,
+    scanningFolderName: scanningScanFolderName(),
+  });
 
   chip.className = `bridge-chip ${bridgeStatusClass()}`;
   chip.textContent = bridgeStatusLabel();
-  sourcePanel.className = `source-panel batch-rail__source ${sourcePanelClass()}`;
-  sourceBadge.className = `state-chip ${scanStateHelpers.sourceBadgeClass({
-    isBridgeBatch: isBridgeBatch(),
-    isMockBatch: isMockBatch(),
-  })}`;
-  sourceBadge.textContent = sourceLabel();
-  $("#source-title").textContent = scanStateHelpers.sourceTitle({ hasBatch: hasBatch(), batch: state.batch });
+  sourcePanel.className = `source-panel batch-rail__source ${viewState.panelClass}`;
+  sourceBadge.className = `state-chip ${viewState.badgeClass}`;
+  sourceBadge.textContent = viewState.badgeLabel;
+  $("#source-title").textContent = viewState.title;
   const sourceName = $("#source-folder-name");
   if (sourceName) {
-    sourceName.textContent = sourceFolderName();
-    sourceName.title = sourceFolderName();
+    sourceName.textContent = viewState.folderName;
+    sourceName.title = viewState.folderName;
   }
-  $("#scan-status").textContent = compactScanStatus();
+  $("#scan-status").textContent = viewState.scanStatus;
   $("#bridge-scan-path").value = state.bridgeScanPath;
-  $("#bridge-pick-folder").textContent = scanStateHelpers.sourcePickButtonLabel({ hasBatch: hasBatch(), batch: state.batch });
-  $("#bridge-scan-folder").textContent = scanStateHelpers.sourceScanButtonLabel({ hasBatch: hasBatch(), batch: state.batch });
-  $("#bridge-scan-folder").title = scanStateHelpers.sourceScanButtonTitle({ hasBatch: hasBatch(), batch: state.batch });
+  $("#bridge-pick-folder").textContent = viewState.pickButtonLabel;
+  $("#bridge-scan-folder").textContent = viewState.scanButtonLabel;
+  $("#bridge-scan-folder").title = viewState.scanButtonTitle;
   $("#bridge-scan-folder").setAttribute("aria-label", $("#bridge-scan-folder").title);
-  $("#bridge-pick-folder").disabled = state.bridgeStatus === "checking" || state.batch === "scanning";
-  $("#bridge-scan-folder").disabled = state.bridgeStatus === "checking" || state.batch === "scanning";
+  $("#bridge-pick-folder").disabled = viewState.controlsDisabled;
+  $("#bridge-scan-folder").disabled = viewState.controlsDisabled;
   $("#bridge-last-response").textContent = state.bridgeLastResponse;
   $("#bridge-capabilities").textContent = state.bridgeCapabilitiesSummary;
-  message.textContent = normalBridgeMessage();
-  message.className = scanStateHelpers.bridgeMessageClass(state.bridgeStatus);
+  message.textContent = viewState.message;
+  message.className = viewState.messageClass;
   renderBatchSummary();
 }
 
-function compactScanStatus() {
-  const counts = batchCounts();
-  return scanStateHelpers.compactScanStatus({
-    batch: state.batch,
-    exportableImages: counts.exportableImages,
-    ignoredFiles: counts.ignoredFiles,
-    scanStatus: state.scanStatus,
-  });
+function sourceFoldersForDisplay() {
+  if (state.batch === "ready") {
+    return activeFolders();
+  }
+  if (state.batch === "empty" && isBridgeBatch()) {
+    return state.realFolders;
+  }
+  return [];
+}
+
+function persistedScanFolderName() {
+  const persistedPath = parseFolderInput(state.bridgeScanPath)[0];
+  return persistedPath ? basename(persistedPath) || "Carpeta actual" : "";
+}
+
+function scanningScanFolderName() {
+  return basename(parseFolderInput(state.bridgeScanPath)[0]);
 }
 
 function sourceFolderName() {
-  const folders = state.batch === "ready"
-    ? activeFolders()
-    : state.batch === "empty" && isBridgeBatch()
-      ? state.realFolders
-      : [];
-  const persistedPath = parseFolderInput(state.bridgeScanPath)[0];
   if (state.batch === "scanning") {
     return scanStateHelpers.sourceFolderName({
       batch: state.batch,
-      scanningFolderName: basename(persistedPath),
+      scanningFolderName: scanningScanFolderName(),
     });
   }
   return scanStateHelpers.sourceFolderName({
     batch: state.batch,
-    folders,
+    folders: sourceFoldersForDisplay(),
     hasBatch: hasBatch(),
-    persistedFolderName: persistedPath ? basename(persistedPath) || "Carpeta actual" : "",
-  });
-}
-
-function normalBridgeMessage() {
-  return scanStateHelpers.normalBridgeMessage({
-    bridgeMode: state.bridgeMode,
-    bridgeStatus: state.bridgeStatus,
-    devMode,
-  });
-}
-
-function sourcePanelClass() {
-  return scanStateHelpers.sourcePanelClass({
-    batch: state.batch,
-    bridgeMode: state.bridgeMode,
-    hasScanError: state.scanIssues.some((issue) => issue.level === "error"),
-    isBridgeBatch: isBridgeBatch(),
-  });
-}
-
-function sourceLabel() {
-  return scanStateHelpers.sourceLabel({
-    bridgeMode: state.bridgeMode,
-    devMode,
-    isBridgeBatch: isBridgeBatch(),
-    isMockBatch: isMockBatch(),
+    persistedFolderName: persistedScanFolderName(),
   });
 }
 

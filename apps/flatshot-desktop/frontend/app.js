@@ -924,23 +924,6 @@ function ignoredImagesText(count = batchCounts().ignoredFiles) {
   return preflightHelpers.ignoredImagesText(count);
 }
 
-function sidebarLotSummaryText(counts = batchCounts()) {
-  if (state.batch === "scanning") {
-    return state.scanStatus || "Leyendo imágenes";
-  }
-  if (state.batch === "empty") {
-    return "No hay PNG válidos";
-  }
-  if (!hasBatch()) {
-    return "Sin carpeta";
-  }
-  const parts = [readyImagesText(counts.exportableImages)];
-  if (counts.nonBlockingWarnings) {
-    parts.push(`${counts.nonBlockingWarnings} aviso${counts.nonBlockingWarnings === 1 ? "" : "s"}`);
-  }
-  return parts.join(" · ");
-}
-
 function blockingValidationIssues() {
   return validationIssues().filter((issue) => issue.level === "error" && issue.title !== "Sin lote");
 }
@@ -3597,11 +3580,19 @@ function renderBatch() {
     return;
   }
 
+  const sidebarSummaryText = batchViewHelpers.sidebarLotSummaryText({
+    batch: state.batch,
+    hasBatch: hasBatch(),
+    nonBlockingWarnings: counts.nonBlockingWarnings,
+    readyLabel: readyImagesText(counts.exportableImages),
+    scanStatus: state.scanStatus,
+  });
+
   if (state.batch === "scanning") {
     $("#batch-count").textContent = "Escaneando";
     setBatchPill("Escaneando", "active");
     setGalleryTitle(0, "Escaneando");
-    $("#batch-visible-count").textContent = sidebarLotSummaryText(counts);
+    $("#batch-visible-count").textContent = sidebarSummaryText;
     $("#folder-list").innerHTML = folderItemHtml({
       id: "scan",
       name: isBridgeBatch() || !devMode ? basename(parseFolderInput(state.bridgeScanPath)[0]) || "Ruta" : "Camisetas Mayo",
@@ -3632,7 +3623,7 @@ function renderBatch() {
     $("#batch-count").textContent = "Sin imágenes";
     setBatchPill("Sin imágenes", "muted");
     setGalleryTitle(0, "No hay PNG válidos");
-    $("#batch-visible-count").textContent = sidebarLotSummaryText(counts);
+    $("#batch-visible-count").textContent = sidebarSummaryText;
     $("#folder-list").innerHTML = emptyFolders.map(folderItemHtml).join("");
     $("#image-list").innerHTML = "";
     $("#batch-empty-note").innerHTML = emptyBatchNoteHtml();

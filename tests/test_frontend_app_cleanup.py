@@ -21,6 +21,7 @@ def test_app_js_does_not_reintroduce_extracted_wrapper_helpers():
         "function reviewErrors(",
         "function sameOutputProfile(",
         "function pluralizeCount(",
+        "function sidebarLotSummaryText(",
     ]
 
     for wrapper in obsolete_wrappers:

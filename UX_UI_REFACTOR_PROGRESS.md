@@ -1758,6 +1758,34 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 66 - Extraccion de resumen lateral de lote
+
+Estado: completada.
+
+Cambios realizados:
+- `batch-view.js` ahora expone `sidebarLotSummaryText()` para calcular la microcopy del contador lateral del lote.
+- `app.js` conserva las fuentes de verdad (`state.batch`, `state.scanStatus`, `counts`) y pasa datos serializables al helper.
+- Se elimino de `app.js` la funcion global `sidebarLotSummaryText()`.
+- Se ampliaron:
+  - `tests/test_frontend_batch_view.py` para cubrir escaneo, vacio, sin lote, avisos y pluralizacion;
+  - `tests/test_frontend_app_cleanup.py` para evitar reintroducir el wrapper global.
+
+Impacto medido:
+- `app.js`: 6.383 -> 6.374 lineas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: sin cambios, 23.
+
+Validaciones ejecutadas:
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/batch-view.js`: OK.
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_batch_view.py tests/test_frontend_app_cleanup.py -q`: 3 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 283 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- HTTP local: `index.html`, `app.js` y `batch-view.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

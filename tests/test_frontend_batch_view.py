@@ -49,6 +49,28 @@ assert.deepEqual(helpers.batchPillState({{ issueCount: 0, adjustedCount: 0 }}), 
   label: "Listo",
   tone: "ready",
 }});
+assert.equal(helpers.sidebarLotSummaryText({{
+  batch: "scanning",
+  scanStatus: "Leyendo 3/8",
+}}), "Leyendo 3/8");
+assert.equal(helpers.sidebarLotSummaryText({{
+  batch: "scanning",
+  scanStatus: "",
+}}), "Leyendo imágenes");
+assert.equal(helpers.sidebarLotSummaryText({{ batch: "empty" }}), "No hay PNG válidos");
+assert.equal(helpers.sidebarLotSummaryText({{ batch: "none", hasBatch: false }}), "Sin carpeta");
+assert.equal(helpers.sidebarLotSummaryText({{
+  batch: "ready",
+  hasBatch: true,
+  readyLabel: "4 imágenes listas",
+  nonBlockingWarnings: 1,
+}}), "4 imágenes listas · 1 aviso");
+assert.equal(helpers.sidebarLotSummaryText({{
+  batch: "ready",
+  hasBatch: true,
+  readyLabel: "4 imágenes listas",
+  nonBlockingWarnings: 2,
+}}), "4 imágenes listas · 2 avisos");
 
 assert.equal(helpers.detectedFormatLabel([]), "PNG");
 assert.equal(helpers.detectedFormatLabel([{{ name: "a.png" }}, {{ name: "b.png" }}]), "PNG");

@@ -49,6 +49,24 @@
     return { label: "Listo", tone: "ready" };
   }
 
+  function sidebarLotSummaryText(options = {}) {
+    if (options.batch === "scanning") {
+      return options.scanStatus || "Leyendo imágenes";
+    }
+    if (options.batch === "empty") {
+      return "No hay PNG válidos";
+    }
+    if (!options.hasBatch) {
+      return "Sin carpeta";
+    }
+    const parts = [options.readyLabel || ""].filter(Boolean);
+    const warnings = Number(options.nonBlockingWarnings) || 0;
+    if (warnings) {
+      parts.push(warningCountLabel(warnings));
+    }
+    return parts.join(" · ");
+  }
+
   function detectedFormatLabel(images = []) {
     if (!images.length) {
       return "PNG";
@@ -342,6 +360,7 @@
     outputProfilesSummaryLabel,
     outputCountLabel,
     readyBatchSummaryText,
+    sidebarLotSummaryText,
     sourceInputDetail,
     warningCountLabel,
   };

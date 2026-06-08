@@ -222,6 +222,7 @@ const defaultOutputProfiles = [
   {
     id: "jpg-rgb230-1800x2400",
     name: "JPG gris claro 1800x2400",
+    enabled: true,
     format: "JPG",
     width: 1800,
     height: 2400,
@@ -234,6 +235,7 @@ const defaultOutputProfiles = [
   {
     id: "png-transparent-1800x2400",
     name: "PNG transparente 1800x2400",
+    enabled: false,
     format: "PNG",
     width: 1800,
     height: 2400,
@@ -246,6 +248,7 @@ const defaultOutputProfiles = [
   {
     id: "jpg-white-2000x2000",
     name: "JPG blanco 2000x2000",
+    enabled: false,
     format: "JPG",
     width: 2000,
     height: 2000,
@@ -256,8 +259,8 @@ const defaultOutputProfiles = [
     suffix: "_PRO",
   },
 ];
-const initialOutputProfiles = readOutputProfiles();
 const initialOutputProfileId = readPersistentValue(STORAGE_KEYS.activeOutputProfile);
+const initialOutputProfiles = readOutputProfiles(initialOutputProfileId);
 const initialOutputProfile = initialOutputProfiles.find((profile) => profile.id === initialOutputProfileId)
   || initialOutputProfiles[0]
   || defaultOutputProfiles[0];
@@ -511,7 +514,7 @@ function restoreSessionSnapshot() {
 
   const restored = snapshot.state;
   const outputProfiles = Array.isArray(restored.outputProfiles)
-    ? dedupeOutputProfileIds(restored.outputProfiles.map(normalizeOutputProfile))
+    ? normalizeOutputProfileList(restored.outputProfiles, restored.activeOutputProfileId)
     : state.outputProfiles;
   const selectedPath = String(restored.selectedImagePath || "");
   const realFolders = Array.isArray(restored.realFolders) ? restored.realFolders : [];
@@ -664,6 +667,7 @@ function normalizeOutputProfile(profile, index = 0) {
   return {
     id: String(source.id || uniqueOutputProfileId("formato", index)).trim(),
     name: outputProfileNameForDisplay(String(source.name || `Formato ${index + 1}`).trim()),
+    enabled: typeof source.enabled === "boolean" ? source.enabled : false,
     format,
     width,
     height,
@@ -689,11 +693,26 @@ function normalizeExportFormat(value) {
   return text === "PNG" ? "PNG" : "JPG";
 }
 
-function readOutputProfiles() {
+function readOutputProfiles(activeProfileId = "") {
   const saved = readPersistentJson(STORAGE_KEYS.outputProfiles, null);
   const profiles = Array.isArray(saved) ? saved : defaultOutputProfiles;
-  const normalized = profiles.map(normalizeOutputProfile).filter((profile) => profile.name);
-  return normalized.length ? dedupeOutputProfileIds(normalized) : defaultOutputProfiles.map(normalizeOutputProfile);
+  const normalized = normalizeOutputProfileList(profiles, activeProfileId);
+  return normalized.length ? normalized : normalizeOutputProfileList(defaultOutputProfiles, activeProfileId);
+}
+
+function normalizeOutputProfileList(profiles, activeProfileId = "") {
+  const normalized = Array.isArray(profiles)
+    ? profiles.map(normalizeOutputProfile).filter((profile) => profile.name)
+    : [];
+  const deduped = dedupeOutputProfileIds(normalized);
+  if (!deduped.length) {
+    return [];
+  }
+  if (!deduped.some((profile) => profile.enabled)) {
+    const preferred = deduped.find((profile) => profile.id === activeProfileId) || deduped[0];
+    preferred.enabled = true;
+  }
+  return deduped;
 }
 
 function dedupeOutputProfileIds(profiles) {
@@ -739,6 +758,46 @@ function activeOutputProfile() {
     || defaultOutputProfiles[0];
 }
 
+function enabledOutputProfiles() {
+  return state.outputProfiles.filter((profile) => profile.enabled);
+}
+
+function exportOutputProfiles() {
+  const current = { ...currentOutputProfileData(), enabled: true };
+  const activeId = state.activeOutputProfileId;
+  const profiles = [];
+  const seen = new Set();
+  const pushProfile = (profile) => {
+    if (!profile || seen.has(profile.id)) {
+      return;
+    }
+    seen.add(profile.id);
+    profiles.push(profile);
+  };
+
+  state.outputProfiles.forEach((profile) => {
+    if (!profile.enabled && profile.id !== activeId) {
+      return;
+    }
+    if (profile.id === activeId && !outputMatchesProfile(profile)) {
+      pushProfile(current);
+      return;
+    }
+    if (profile.enabled) {
+      pushProfile(profile);
+    }
+  });
+
+  if (!profiles.length) {
+    pushProfile(current);
+  }
+  return profiles;
+}
+
+function exportOutputCount() {
+  return exportOutputProfiles().length;
+}
+
 function currentOutputProfileData() {
   const size = parseOutputSize(state.size);
   return normalizeOutputProfile({
@@ -781,6 +840,7 @@ function applyOutputProfile(profileId, options = {}) {
     return false;
   }
   state.activeOutputProfileId = profile.id;
+  profile.enabled = true;
   state.format = profile.format;
   state.size = outputProfileSize(profile);
   state.background = profile.background;
@@ -796,6 +856,34 @@ function applyOutputProfile(profileId, options = {}) {
     render();
   }
   return true;
+}
+
+function setOutputProfileEnabled(profileId, enabled) {
+  const profile = state.outputProfiles.find((item) => item.id === profileId);
+  if (!profile) {
+    return;
+  }
+  const currentlyEnabled = profile.enabled;
+  if (!enabled && currentlyEnabled && enabledOutputProfiles().length <= 1) {
+    state.statusText = "Debe quedar al menos una salida activa";
+    render();
+    return;
+  }
+
+  profile.enabled = Boolean(enabled);
+  if (profile.enabled) {
+    applyOutputProfile(profile.id, { render: false, statusText: `Salida activa: ${profile.name}` });
+  } else if (state.activeOutputProfileId === profile.id) {
+    const next = enabledOutputProfiles()[0];
+    if (next) {
+      applyOutputProfile(next.id, { render: false, statusText: `Salida principal: ${next.name}` });
+    }
+  }
+
+  state.exportStatus = isExportReady() ? "ready" : "blocked";
+  state.statusText = profile.enabled ? `Salida activa: ${profile.name}` : `Salida desactivada: ${profile.name}`;
+  persistOutputProfiles();
+  render();
 }
 
 function selectedImage() {
@@ -1087,6 +1175,17 @@ function validationIssues() {
   if (state.destinationMode === "custom" && !state.destinationValue.trim()) {
     issues.push({ level: "error", title: "Carpeta de salida sin configurar", detail: "Elige una carpeta de salida." });
   }
+  exportOutputProfiles()
+    .filter((profile) => profile.id !== state.activeOutputProfileId)
+    .forEach((profile) => {
+      outputProfileValidation(outputProfileRawFromProfile(profile)).errors.forEach((message) => {
+        issues.push({
+          level: "error",
+          title: "Salida sin configurar",
+          detail: `${profile.name}: ${message}`,
+        });
+      });
+    });
   return issues;
 }
 
@@ -1282,10 +1381,10 @@ function imageDimensions(image) {
 }
 
 function lowResolutionImageCount() {
-  const target = parseOutputSize(state.size);
+  const targets = exportOutputProfiles().map((profile) => parseOutputSize(outputProfileSize(profile)));
   return exportableImages().filter((image) => {
     const dimensions = imageDimensions(image);
-    return dimensions && (dimensions.width < target.width || dimensions.height < target.height);
+    return dimensions && targets.some((target) => dimensions.width < target.width || dimensions.height < target.height);
   }).length;
 }
 
@@ -1322,6 +1421,23 @@ function warningCountLabel(count = visibleWarningCount()) {
 
 function imageCountLabel(count) {
   return `${count} ${count === 1 ? "imagen" : "imágenes"}`;
+}
+
+function exportActionLabel(imageCount = batchCounts().exportableImages) {
+  const outputCount = exportOutputCount();
+  if (outputCount > 1) {
+    const totalFiles = imageCount * outputCount;
+    return `Exportar ${totalFiles} archivos`;
+  }
+  return `Exportar ${imageCount} imágenes`;
+}
+
+function plannedExportTotal() {
+  return exportableImages().length * exportOutputCount();
+}
+
+function outputCountLabel(count = exportOutputCount()) {
+  return `${count} salida${count === 1 ? "" : "s"}`;
 }
 
 function detectedFormatLabel(images = activeImages()) {
@@ -1417,7 +1533,7 @@ function getVisibleAppState() {
   const summary = readyBatchSummaryText(counts);
 
   if (state.exportStatus === "running") {
-    const total = counts.exportableImages;
+    const total = plannedExportTotal() || counts.exportableImages;
     return {
       id: "exporting",
       tone: "busy",
@@ -1529,9 +1645,9 @@ function getVisibleAppState() {
       title: "Lote listo",
       subtitle: `${summary} · ${countText(counts.nonBlockingWarnings, "aviso", "avisos")}`,
       topSummary: compactHeaderStatusText(),
-      primaryAction: { label: `Exportar ${counts.exportableImages} imágenes`, action: "start-export", enabled: isExportReady() },
+      primaryAction: { label: exportActionLabel(counts.exportableImages), action: "start-export", enabled: isExportReady() },
       secondaryAction: { label: "Revisar avisos", action: "review-warnings", enabled: true },
-      nextStep: `Exportar ${counts.exportableImages} imágenes`,
+      nextStep: exportActionLabel(counts.exportableImages),
       counts,
     };
   }
@@ -1542,9 +1658,9 @@ function getVisibleAppState() {
     title: "Lote listo",
     subtitle: `${summary}${counts.ignoredFiles ? ` · ${ignoredNeutralText(counts.ignoredFiles)}` : ""} · ${output} · ${destination}`,
     topSummary: compactHeaderStatusText(),
-    primaryAction: { label: `Exportar ${counts.exportableImages} imágenes`, action: "start-export", enabled: isExportReady() },
+    primaryAction: { label: exportActionLabel(counts.exportableImages), action: "start-export", enabled: isExportReady() },
     secondaryAction: null,
-    nextStep: `Exportar ${counts.exportableImages} imágenes`,
+    nextStep: exportActionLabel(counts.exportableImages),
     counts,
   };
 }
@@ -2308,6 +2424,9 @@ async function startBridgeExport() {
 }
 
 function bridgeExportPayload() {
+  const profiles = exportOutputProfiles();
+  const primary = profiles.find((profile) => profile.id === state.activeOutputProfileId) || profiles[0] || currentOutputProfileData();
+  const seenVariantIds = new Set();
   return {
     imagePaths: exportableImages()
       .filter((image) => image.source === "bridge" && image.path)
@@ -2316,17 +2435,56 @@ function bridgeExportPayload() {
     settings: bridgePreviewSettings(),
     imageOverrides: state.imageOverrides,
     export: {
-      format: state.format,
-      size: state.size,
-      background: state.background,
-      destinationMode: state.destinationMode,
-      destinationValue: state.destinationValue,
-      outputFolderName: state.destinationMode === "source" ? state.destinationValue : "_SALIDA_PRO",
-      customOutputPath: state.destinationMode === "custom" ? state.destinationValue : "",
-      namingTemplate: state.naming,
-      suffix: state.suffix,
+      format: primary.format,
+      size: outputProfileSize(primary),
+      background: primary.background,
+      destinationMode: primary.destinationMode,
+      destinationValue: primary.destinationValue,
+      outputFolderName: primary.destinationMode === "source" ? primary.destinationValue : "_SALIDA_PRO",
+      customOutputPath: primary.destinationMode === "custom" ? primary.destinationValue : "",
+      namingTemplate: primary.naming,
+      suffix: primary.suffix,
+      variants: profiles.map((profile, index) => exportVariantPayloadFromProfile(profile, index, seenVariantIds)),
     },
   };
+}
+
+function exportVariantPayloadFromProfile(profile, index, seenVariantIds = new Set()) {
+  const size = parseOutputSize(outputProfileSize(profile));
+  const variantId = exportVariantId(profile, index, seenVariantIds);
+  return {
+    id: variantId,
+    label: profile.name,
+    enabled: true,
+    format: profile.format,
+    transparent_bg: profile.background === "transparent",
+    bg_color: backgroundColorTuple(profile.background),
+    suffix: profile.suffix,
+    naming_template: profile.naming,
+    output_destination: profile.destinationMode === "custom" ? "custom" : "subfolder",
+    output_folder_name: profile.destinationMode === "source" ? profile.destinationValue || "_SALIDA_PRO" : null,
+    custom_output_path: profile.destinationMode === "custom" ? profile.destinationValue : null,
+    output_width: size.width,
+    output_height: size.height,
+  };
+}
+
+function exportVariantId(profile, index, seenVariantIds = new Set()) {
+  const base = String(profile.id || profile.name || `salida-${index + 1}`)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    || `salida_${index + 1}`;
+  const safeBase = /^[A-Za-z0-9_-]+$/.test(base) ? base : `salida_${index + 1}`;
+  let candidate = safeBase;
+  let suffix = 2;
+  while (seenVariantIds.has(candidate)) {
+    candidate = `${safeBase}_${suffix}`;
+    suffix += 1;
+  }
+  seenVariantIds.add(candidate);
+  return candidate;
 }
 
 function scheduleBridgeExportPoll() {
@@ -2434,7 +2592,7 @@ function scheduleExportStep() {
       scheduleExportStep();
       return;
     }
-    const total = exportableImages().length;
+    const total = plannedExportTotal() || exportableImages().length;
     state.progress = Math.min(100, state.progress + 9);
     state.processed = Math.min(total, Math.max(1, Math.round((state.progress / 100) * total)));
     state.statusText = `Procesando ${state.processed}/${total}`;
@@ -3573,7 +3731,7 @@ function topStatusSummaryHtml(counts = batchCounts()) {
 function compactHeaderStatusText() {
   const counts = batchCounts();
   if (state.exportStatus === "running") {
-    const total = counts.exportableImages;
+    const total = plannedExportTotal() || counts.exportableImages;
     return state.paused ? `Pausado · ${state.processed}/${total}` : `Exportando ${state.processed}/${total}`;
   }
   if (state.exportStatus === "completed" || state.exportStatus === "partial") {
@@ -3622,7 +3780,7 @@ function topStatusText() {
     return "No hay PNG válidos";
   }
   if (state.exportStatus === "running") {
-    const total = exportableImages().length;
+    const total = plannedExportTotal() || exportableImages().length;
     return state.paused ? `Pausado · ${state.processed}/${total}` : `Exportando ${state.processed}/${total}`;
   }
   if (state.batch === "ready") {
@@ -3947,7 +4105,18 @@ function batchMetricHtml(label, value) {
 }
 
 function batchOutputLine() {
+  const profiles = exportOutputProfiles();
+  if (profiles.length > 1) {
+    return profiles.map((profile) => `${profile.format} ${outputProfileSize(profile).replace("x", "×")}`).join(" · ");
+  }
   return `${state.format} · ${state.size.replace("x", " × ")} · ${batchBackgroundLabel(state.background)}`;
+}
+
+function outputProfilesSummaryLabel(profiles = exportOutputProfiles()) {
+  if (profiles.length <= 1) {
+    return `${state.format} · ${outputSizeDisplay()} · ${backgroundLabel(state.background)}`;
+  }
+  return profiles.map((profile) => `${profile.name} (${profile.format})`).join(" · ");
 }
 
 function batchBackgroundLabel(value) {
@@ -3961,6 +4130,11 @@ function batchBackgroundLabel(value) {
 }
 
 function batchDestinationLine() {
+  const profiles = exportOutputProfiles();
+  if (profiles.length > 1) {
+    const destinations = Array.from(new Set(profiles.map(profileDestinationPreviewLabel)));
+    return destinations.length === 1 ? destinations[0] : `${destinations.length} destinos`;
+  }
   if (state.destinationMode === "custom") {
     return state.destinationValue || "Sin destino";
   }
@@ -4028,7 +4202,7 @@ function renderExportConfirm() {
     const count = batchCounts().exportableImages;
     action.textContent = blocking
       ? "Revisar problemas"
-      : `Exportar ${imageCountLabel(count)}`;
+      : exportActionLabel(count);
     action.classList.toggle("danger", blocking);
   }
   const subtitle = $("#export-confirm-subtitle");
@@ -4046,7 +4220,7 @@ function exportConfirmHtml(risks) {
   const exportable = counts.exportableImages;
   const summaryRows = [
     ["Imágenes", `${exportable} exportable${exportable === 1 ? "" : "s"}`],
-    ["Formato", `${state.format} · ${outputSizeDisplay()} · ${backgroundLabel(state.background)}`],
+    ["Salidas", outputProfilesSummaryLabel()],
     ["Destino", destinationFallbackLabel()],
     ["Nombre", namingExample()],
   ];
@@ -5831,12 +6005,13 @@ function renderExport() {
 
   const issues = preflightIssues();
   const exportable = exportableImages().length;
-  const outputCount = exportable;
+  const activeOutputs = exportOutputCount();
+  const outputCount = exportable * activeOutputs;
   const ready = isExportReady();
   const destinationText = destinationCompactLabel();
   const warningCount = visibleWarningCount();
   $("#export-readiness").textContent = state.outputEditMode ? "Editar salida" : outputProfileDisplayName();
-  $("#export-count").textContent = outputCount ? `${outputCount} img` : "Pendiente";
+  $("#export-count").textContent = outputCount ? `${outputCount} archivos` : "Pendiente";
   $("#export-count").classList.toggle("dirty", !ready);
   const warningsReadiness = $("#warnings-readiness");
   if (warningsReadiness) {
@@ -5861,6 +6036,18 @@ function renderExport() {
       <button type="button" data-action="edit-output">Editar campos</button>
     </div>
   ` : "";
+  const activeOutputProfiles = exportOutputProfiles();
+  const profileRowsHtml = activeOutputProfiles.length > 1
+    ? activeOutputProfiles.slice(0, 4).map((profile) => `
+      <div class="preset-summary-row">
+        <span>${escapeHtml(profile.format)}</span>
+        <strong title="${escapeHtml(`${profile.name} · ${outputProfileSize(profile)} · ${profileDestinationLabel(profile)}`)}">${escapeHtml(`${profile.name} · ${outputProfileSize(profile).replace("x", " × ")}`)}</strong>
+      </div>
+    `).join("")
+    : "";
+  const extraProfilesHtml = activeOutputProfiles.length > 4
+    ? `<div class="preset-summary-row"><span>Más</span><strong>${escapeHtml(`${activeOutputProfiles.length - 4} salidas más`)}</strong></div>`
+    : "";
 
   $("#export-summary").innerHTML = state.outputEditMode ? `
     <div class="compact-panel">
@@ -5874,20 +6061,23 @@ function renderExport() {
   ` : `
     <div class="preset-summary-card">
       <div class="preset-summary-main">
-        <span>Salida</span>
+        <span>${escapeHtml(activeOutputProfiles.length > 1 ? "Salidas" : "Salida")}</span>
         <strong>${escapeHtml(outputProfileDisplayName())}</strong>
+        ${activeOutputProfiles.length > 1 ? `<small>${escapeHtml(`${outputCount} archivos previstos`)}</small>` : ""}
       </div>
+      ${profileRowsHtml}
+      ${extraProfilesHtml}
       <div class="preset-summary-row">
         <span>Formato</span>
-        <strong>${escapeHtml(state.format)}</strong>
+        <strong>${escapeHtml(activeOutputProfiles.length > 1 ? outputCountLabel(activeOutputProfiles.length) : state.format)}</strong>
       </div>
       <div class="preset-summary-row">
         <span>Tamaño</span>
-        <strong>${escapeHtml(state.size.replace("x", " × "))}</strong>
+        <strong>${escapeHtml(activeOutputProfiles.length > 1 ? "Por salida" : state.size.replace("x", " × "))}</strong>
       </div>
       <div class="preset-summary-row">
         <span>Fondo</span>
-        <strong>${escapeHtml(backgroundLabel(state.background))}</strong>
+        <strong>${escapeHtml(activeOutputProfiles.length > 1 ? "Por salida" : backgroundLabel(state.background))}</strong>
       </div>
       <div class="preset-summary-row">
         <span>Destino</span>
@@ -5895,11 +6085,11 @@ function renderExport() {
       </div>
       <div class="preset-summary-row">
         <span>Nombre final</span>
-        <strong>${escapeHtml(namingHumanLabel())}</strong>
+        <strong>${escapeHtml(activeOutputProfiles.length > 1 ? "Por salida" : namingHumanLabel())}</strong>
       </div>
       <div class="preset-summary-row">
         <span>Ejemplo</span>
-        <strong title="${escapeHtml(namingExample())}">${escapeHtml(namingExample())}</strong>
+        <strong title="${escapeHtml(activeOutputProfiles.length > 1 ? outputNameForProfile(activeOutputProfiles[0]) : namingExample())}">${escapeHtml(activeOutputProfiles.length > 1 ? outputNameForProfile(activeOutputProfiles[0]) : namingExample())}</strong>
       </div>
     </div>
     ${warningSummary}
@@ -5927,6 +6117,10 @@ function renderOutputProfileSelect() {
 }
 
 function outputProfileDisplayName() {
+  const profiles = exportOutputProfiles();
+  if (profiles.length > 1) {
+    return outputCountLabel(profiles.length);
+  }
   const profile = activeOutputProfile();
   if (!profile || !outputMatchesProfile(profile)) {
     return "Salida personalizada";
@@ -6021,12 +6215,28 @@ function outputProfileFormRawData() {
   };
 }
 
+function outputProfileRawFromProfile(profile) {
+  return {
+    id: profile.id,
+    name: profile.name,
+    format: profile.format,
+    background: profile.background,
+    width: String(profile.width),
+    height: String(profile.height),
+    destinationMode: profile.destinationMode,
+    destinationValue: profile.destinationValue,
+    naming: profile.naming,
+    suffix: profile.suffix,
+  };
+}
+
 function outputProfileDraftFromForm() {
   const current = ensureOutputProfileDraft();
   const raw = outputProfileFormRawData();
   return normalizeOutputProfile({
     id: current.id,
     name: raw.name,
+    enabled: current.enabled,
     format: raw.format,
     background: raw.background,
     width: raw.width,
@@ -6070,6 +6280,7 @@ function newOutputProfile() {
     ...source,
     id,
     name: "Nuevo formato",
+    enabled: true,
   };
   state.appSettingsOpen = true;
   state.statusText = "Nuevo formato de salida";
@@ -6087,6 +6298,7 @@ function duplicateOutputProfile() {
     ...source,
     id,
     name: `${source.name || "Formato"} copia`,
+    enabled: true,
   };
   state.appSettingsOpen = true;
   state.statusText = "Formato duplicado";
@@ -6111,7 +6323,7 @@ function commitOutputProfileDraft() {
   } else {
     state.outputProfiles.push(saved);
   }
-  state.outputProfiles = dedupeOutputProfileIds(state.outputProfiles.map(normalizeOutputProfile));
+  state.outputProfiles = normalizeOutputProfileList(state.outputProfiles, saved.id);
   state.outputProfileEditorId = saved.id;
   state.outputProfileDraft = { ...saved };
   persistOutputProfiles();
@@ -6166,6 +6378,7 @@ function deleteManagedOutputProfile() {
   if (state.activeOutputProfileId === draft.id) {
     const next = state.outputProfiles[0];
     state.activeOutputProfileId = next.id;
+    next.enabled = true;
     state.format = next.format;
     state.size = outputProfileSize(next);
     state.background = next.background;
@@ -6478,7 +6691,9 @@ function outputProfileEditorHeadingHtml(profile, validation, dirty) {
     ? "Cambios sin guardar"
     : active
       ? "Activo en este lote"
-      : "Formato guardado";
+      : profile.enabled
+        ? "Salida activa"
+        : "Formato guardado";
   return `
     <div class="format-editor-title">
       <div>
@@ -6660,16 +6875,24 @@ function renderAppSettings() {
   $("#output-profile-list").innerHTML = rows.map((profile) => {
     const selected = profile.id === draft.id;
     const active = profile.id === state.activeOutputProfileId;
+    const enabled = profile.enabled;
     const unsaved = !state.outputProfiles.some((item) => item.id === profile.id);
+    const canToggle = !unsaved && (enabledOutputProfiles().length > 1 || !enabled);
     return `
-      <button type="button" class="output-profile-option${selected ? " selected" : ""}${active ? " active" : ""}" data-output-profile-id="${escapeHtml(profile.id)}">
-        <span>
-          <strong>${escapeHtml(profile.name)}</strong>
-          <small>${escapeHtml(outputProfileSummaryLine(profile))}</small>
-          <small>${escapeHtml(profileDestinationLabel(profile))}</small>
-        </span>
-        <em>${escapeHtml(unsaved ? "Sin guardar" : active ? "En uso" : profileDestinationLabel(profile))}</em>
-      </button>
+      <div class="output-profile-option${selected ? " selected" : ""}${active ? " active" : ""}${enabled ? " enabled" : ""}">
+        <label class="output-profile-toggle" title="${escapeHtml(canToggle ? "Activar esta salida en el lote" : unsaved ? "Guarda el formato para activarlo" : "Debe quedar al menos una salida activa")}">
+          <input type="checkbox" data-output-profile-enabled-id="${escapeHtml(profile.id)}" ${enabled ? "checked" : ""} ${canToggle ? "" : "disabled"} />
+          <span>${escapeHtml(enabled ? "Activa" : "Inactiva")}</span>
+        </label>
+        <button type="button" class="output-profile-edit" data-output-profile-id="${escapeHtml(profile.id)}">
+          <span>
+            <strong>${escapeHtml(profile.name)}</strong>
+            <small>${escapeHtml(outputProfileSummaryLine(profile))}</small>
+            <small>${escapeHtml(profileDestinationLabel(profile))}</small>
+          </span>
+          <em>${escapeHtml(unsaved ? "Sin guardar" : active ? "Principal" : enabled ? "Salida" : "Guardada")}</em>
+        </button>
+      </div>
     `;
   }).join("");
   setOutputProfileFormValues(draft);
@@ -7066,6 +7289,11 @@ function exportResultActionsHtml(issues, destinations) {
 }
 
 function destinationFallbackLabel() {
+  const profiles = exportOutputProfiles();
+  if (profiles.length > 1) {
+    const destinations = Array.from(new Set(profiles.map(profileDestinationPreviewLabel)));
+    return destinations.length === 1 ? destinations[0] : `${destinations.length} destinos`;
+  }
   if (state.destinationMode === "custom") {
     return state.destinationValue || "Carpeta de salida sin configurar";
   }
@@ -7473,12 +7701,14 @@ function statusBarText() {
   const counts = batchCounts();
   const selectedIndex = images.findIndex((image) => image.id === state.selectedImageId);
   const selectedText = selectedIndex >= 0 ? `Imagen ${selectedIndex + 1}/${images.length}` : "Sin selección";
-  const destination = state.destinationMode === "custom"
-    ? state.destinationValue || "sin destino"
-    : `origen / ${state.destinationValue}`;
+  const destination = exportOutputCount() > 1
+    ? outputCountLabel(exportOutputCount())
+    : state.destinationMode === "custom"
+      ? state.destinationValue || "sin destino"
+      : `origen / ${state.destinationValue}`;
 
   if (state.exportStatus === "running") {
-    const total = exportableImages().length;
+    const total = plannedExportTotal() || exportableImages().length;
     return `${state.paused ? "Pausado" : "Exportando"} ${state.processed}/${total} · ${state.statusText}`;
   }
   if (state.exportStatus === "completed") {
@@ -7911,6 +8141,10 @@ document.addEventListener("input", (event) => {
 });
 
 document.addEventListener("change", (event) => {
+  if (event.target.matches?.("[data-output-profile-enabled-id]")) {
+    setOutputProfileEnabled(event.target.dataset.outputProfileEnabledId, event.target.checked);
+    return;
+  }
   if (event.target.closest?.("#output-profile-form")) {
     updateOutputProfileDraftFromForm();
     renderOutputProfileModalState();

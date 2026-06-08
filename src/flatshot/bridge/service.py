@@ -288,6 +288,12 @@ class FlatShotBridgeService:
                     "id": variant.id,
                     "label": variant.label,
                     "format": variant.format or config.format,
+                    "outputWidth": variant.output_width or config.output_width,
+                    "outputHeight": variant.output_height or config.output_height,
+                    "destinationMode": variant.output_destination or config.output_destination,
+                    "outputFolderName": variant.output_folder_name or config.output_folder_name,
+                    "customOutputPath": variant.custom_output_path or config.custom_output_path,
+                    "namingTemplate": variant.naming_template or config.naming_template,
                     "suffix": variant.suffix,
                 }
                 for variant in variants

@@ -1976,6 +1976,7 @@ button,
 
 .top-format-action,
 .top-folder-action,
+.top-reset-action,
 .top-secondary-action,
 .top-more-menu > summary {
   min-height: 34px;
@@ -2362,6 +2363,7 @@ body {
 
 .top-format-action,
 .top-folder-action,
+.top-reset-action,
 .top-secondary-action,
 .top-more-menu > summary {
   min-height: 34px;
@@ -2373,6 +2375,7 @@ body {
 
 .top-format-action:hover:not(:disabled),
 .top-folder-action:hover:not(:disabled),
+.top-reset-action:hover:not(:disabled),
 .top-secondary-action:hover:not(:disabled),
 .top-more-menu > summary:hover {
   border-color: var(--color-border);
@@ -3024,6 +3027,7 @@ summary:focus-visible,
 .top-export,
 .top-format-action,
 .top-folder-action,
+.top-reset-action,
 .top-secondary-action,
 .top-more-menu > summary {
   min-height: var(--control-height);
@@ -3031,6 +3035,7 @@ summary:focus-visible,
 
 .top-format-action,
 .top-folder-action,
+.top-reset-action,
 .top-secondary-action,
 .top-more-menu > summary {
   border-color: var(--color-border);
@@ -3040,6 +3045,7 @@ summary:focus-visible,
 
 .top-format-action:hover:not(:disabled),
 .top-folder-action:hover:not(:disabled),
+.top-reset-action:hover:not(:disabled),
 .top-secondary-action:hover:not(:disabled),
 .top-more-menu > summary:hover {
   border-color: var(--color-border-strong);
@@ -3101,7 +3107,8 @@ summary:focus-visible,
 
 .app-shell[data-ui-state="scanning"] .top-more-menu,
 .app-shell[data-ui-state="scanning"] .top-format-action,
-.app-shell[data-ui-state="scanning"] .top-folder-action {
+.app-shell[data-ui-state="scanning"] .top-folder-action,
+.app-shell[data-ui-state="scanning"] .top-reset-action {
   display: none !important;
 }
 

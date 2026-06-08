@@ -114,6 +114,30 @@ def variant_export_format(export_config: ExportConfig, variant: ExportVariant) -
     return RenderCache.normalize_format(variant.format or export_config.format)
 
 
+def variant_naming_template(export_config: ExportConfig, variant: ExportVariant) -> str:
+    return variant.naming_template or export_config.naming_template
+
+
+def variant_target_size(export_config: ExportConfig, variant: ExportVariant) -> tuple[int, int]:
+    return (
+        int(variant.output_width or export_config.output_width),
+        int(variant.output_height or export_config.output_height),
+    )
+
+
+def variant_base_output_folder(
+    input_folder: Path,
+    export_config: ExportConfig,
+    variant: ExportVariant,
+) -> Path:
+    output_destination = variant.output_destination or export_config.output_destination
+    if output_destination == "custom":
+        custom_output_path = variant.custom_output_path or export_config.custom_output_path
+        return Path(custom_output_path) if custom_output_path else Path()
+    output_folder_name = variant.output_folder_name or export_config.output_folder_name
+    return input_folder / output_folder_name
+
+
 def variant_output_folder(base_output_folder: Path, variant: ExportVariant) -> Path:
     if variant.output_subfolder:
         return base_output_folder / variant.output_subfolder
@@ -131,7 +155,7 @@ def build_variant_output_path(
     fmt = variant_export_format(export_config, variant)
     output_folder = variant_output_folder(base_output_folder, variant)
     base_name = apply_naming_template(
-        export_config.naming_template,
+        variant_naming_template(export_config, variant),
         original_name,
         variant.suffix,
         folder_name,
@@ -203,13 +227,17 @@ def planned_output_paths_for_request(request: ExportJobRequest) -> list[dict]:
             if path.is_file() and path.suffix.lower() == ".png"
         ]
 
-    base_output_folder = ExportRunner._base_output_folder(request)
     enabled_variants = get_enabled_export_variants(request.export_config)
     parent_folder_name = request.input_folder.name
     planned_outputs: list[dict] = []
 
     for index, img_path in enumerate(sorted(image_paths, key=lambda path: path.name), start=1):
         for variant in enabled_variants:
+            base_output_folder = variant_base_output_folder(
+                request.input_folder,
+                request.export_config,
+                variant,
+            )
             save_path, fmt = build_variant_output_path(
                 base_output_folder,
                 request.export_config,
@@ -392,11 +420,6 @@ class ExportRunner:
                 ExportLogEvent("Salidas activas: " + ", ".join(variant.label for variant in enabled_variants))
             )
 
-            target_size = (
-                request.export_config.output_width,
-                request.export_config.output_height,
-            )
-            base_output_folder = self._base_output_folder(request)
             curve_data_dict = request.curve_data.model_dump() if request.curve_data else None
             parent_folder_name = request.input_folder.name
             cache = RenderCache()
@@ -414,8 +437,14 @@ class ExportRunner:
                 for variant in enabled_variants:
                     variant_settings = build_variant_settings(request.settings, variant)
                     settings_dict = variant_settings.model_dump()
+                    target_size = variant_target_size(request.export_config, variant)
+                    variant_base_folder = variant_base_output_folder(
+                        request.input_folder,
+                        request.export_config,
+                        variant,
+                    )
                     save_path, fmt = build_variant_output_path(
-                        base_output_folder,
+                        variant_base_folder,
                         request.export_config,
                         variant,
                         img_path.stem,

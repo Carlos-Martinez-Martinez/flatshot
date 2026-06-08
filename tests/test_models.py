@@ -124,11 +124,21 @@ class TestExportVariant:
             label="Blanco RGB255",
             bg_color=[255, 255, 255],
             suffix="_BLANCO",
+            output_destination="custom",
+            custom_output_path="/tmp/flatshot",
+            naming_template="{original}{suffix}",
+            output_width=1200,
+            output_height=1600,
             shadow_opacity_delta=-5,
         )
 
         assert variant.bg_color == (255, 255, 255)
         assert variant.suffix == "_BLANCO"
+        assert variant.output_destination == "custom"
+        assert variant.custom_output_path == "/tmp/flatshot"
+        assert variant.naming_template == "{original}{suffix}"
+        assert variant.output_width == 1200
+        assert variant.output_height == 1600
         assert variant.shadow_opacity_delta == -5
 
     def test_variant_rejects_invalid_rgb_suffix_and_delta(self):
@@ -140,6 +150,12 @@ class TestExportVariant:
 
         with pytest.raises(ValueError):
             ExportVariant(id="bad_delta", label="Bad", shadow_opacity_delta=-101)
+
+        with pytest.raises(ValueError):
+            ExportVariant(id="bad_destination", label="Bad", output_destination="ftp")
+
+        with pytest.raises(ValueError):
+            ExportVariant(id="bad_folder", label="Bad", output_folder_name="../OUT")
 
     def test_recommended_templates_are_named_output_variants(self):
         assert WEB_RGB230.label == "Web RGB230"

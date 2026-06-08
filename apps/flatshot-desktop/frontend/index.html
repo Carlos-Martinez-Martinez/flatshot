@@ -32,11 +32,11 @@
             <button type="button" class="top-secondary-action" id="top-secondary-action" data-action="secondary-primary" hidden></button>
             <button type="button" class="top-format-action" data-action="open-app-settings">Salida</button>
             <button type="button" class="top-folder-action" data-action="pick-bridge-folder">Carpeta</button>
+            <button type="button" class="top-reset-action" data-action="clear-batch">Nuevo lote</button>
             <details class="top-more-menu">
               <summary aria-label="Más opciones" title="Más opciones">...</summary>
               <div class="top-more-menu__content">
                 <button type="button" class="top-detail-action" data-action="open-batch-detail" title="Ver detalle del lote">Detalle lote</button>
-                <button type="button" class="top-reset-action" data-action="clear-batch">Nuevo lote</button>
               </div>
             </details>
             <button type="button" data-action="toggle-inspector">Diagnóstico</button>
@@ -445,7 +445,7 @@
 
             <div class="output-profile-row">
               <label>
-                <span>Formato de salida</span>
+                <span>Salidas</span>
                 <select id="output-profile-select"></select>
               </label>
               <button type="button" class="btn-linklike" data-action="open-app-settings">Cambiar</button>
@@ -549,7 +549,7 @@
             <div>
               <span class="eyebrow">Salida</span>
               <h2 id="app-settings-title">Formatos de salida</h2>
-              <small id="app-settings-subtitle">Formato, destino y nombre.</small>
+              <small id="app-settings-subtitle">Activa una o varias salidas.</small>
             </div>
             <button type="button" class="icon-button" data-action="close-app-settings" aria-label="Cerrar ajustes">×</button>
           </header>
@@ -557,7 +557,7 @@
           <div class="app-settings-content">
             <aside class="output-format-list" aria-label="Formatos de salida">
               <div class="settings-toolbar">
-                <strong>Formatos guardados</strong>
+                <strong>Salidas guardadas</strong>
                 <div class="settings-toolbar-actions">
                   <button type="button" data-action="new-output-profile">Nuevo</button>
                   <details class="format-more-menu">

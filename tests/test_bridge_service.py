@@ -516,6 +516,65 @@ def test_bridge_start_export_writes_output_and_reports_progress(tmp_path):
     assert (source / "_OUT" / "item_PRO.png").exists()
 
 
+def test_bridge_start_export_writes_multiple_format_variants(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    png = _png(source / "item.png")
+    custom_output = tmp_path / "archive"
+    service = _export_service(tmp_path / "config")
+
+    started = service.start_export(
+        {
+            "imagePaths": [str(png)],
+            "settings": {"opacity": 0, "blur": 0, "noise": 0},
+            "export": {
+                "format": "JPG",
+                "size": "12x12",
+                "destinationMode": "source",
+                "destinationValue": "_WEB",
+                "namingTemplate": "{original}{suffix}",
+                "suffix": "_WEB",
+                "variants": [
+                    {
+                        "id": "web_jpg",
+                        "label": "Web JPG",
+                        "enabled": True,
+                        "format": "JPG",
+                        "transparent_bg": False,
+                        "bg_color": [230, 230, 230],
+                        "suffix": "_WEB",
+                        "naming_template": "{original}{suffix}",
+                        "output_destination": "subfolder",
+                        "output_folder_name": "_WEB",
+                        "output_width": 12,
+                        "output_height": 12,
+                    },
+                    {
+                        "id": "archive_png",
+                        "label": "Archive PNG",
+                        "enabled": True,
+                        "format": "PNG",
+                        "transparent_bg": True,
+                        "bg_color": [230, 230, 230],
+                        "suffix": "_ARCH",
+                        "naming_template": "{original}{suffix}",
+                        "output_destination": "custom",
+                        "custom_output_path": str(custom_output),
+                        "output_width": 8,
+                        "output_height": 8,
+                    },
+                ],
+            },
+        }
+    )
+    final = _wait_for_export(service, started["jobId"])
+
+    assert final["status"] == "completed"
+    assert final["progress"] == {"processed": 2, "total": 2, "percent": 100}
+    assert (source / "_WEB" / "item_WEB.jpg").exists()
+    assert (custom_output / "item_ARCH.png").exists()
+
+
 def test_bridge_export_rejects_same_filename_across_folders_with_common_destination(tmp_path):
     first = tmp_path / "first"
     second = tmp_path / "second"

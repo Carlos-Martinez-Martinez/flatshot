@@ -9,8 +9,9 @@ from flatshot.application.export_runner import (
     ExportRunner,
     build_variant_output_path,
     validate_output_path_collisions,
+    variant_target_size,
 )
-from flatshot.core.models import CurveData, ExportConfig, ShadowSettings, WEB_RGB230, WHITE_RGB255
+from flatshot.core.models import CurveData, ExportConfig, ExportVariant, ShadowSettings, WEB_RGB230, WHITE_RGB255
 
 
 class InlineExecutor:
@@ -169,3 +170,115 @@ def test_single_variant_export_keeps_default_behavior(tmp_path):
 
     output = tmp_path / "_SALIDA_PRO" / "camiseta_001_PRO.png"
     assert output.exists()
+
+
+def test_variant_format_destination_template_and_size_override_are_independent(tmp_path):
+    jpg_variant = ExportVariant(
+        id="marketplace_jpg",
+        label="Marketplace JPG",
+        format="JPG",
+        suffix="_MK",
+        output_destination="subfolder",
+        output_folder_name="_MARKET",
+        naming_template="{folder}_{original}{suffix}",
+        output_width=120,
+        output_height=160,
+    )
+    png_variant = ExportVariant(
+        id="archive_png",
+        label="Archive PNG",
+        format="PNG",
+        suffix="_ARCH",
+        output_destination="custom",
+        custom_output_path=str(tmp_path / "archive"),
+        naming_template="{original}_{variant_id}{suffix}",
+        output_width=80,
+        output_height=80,
+    )
+    config = ExportConfig(
+        format="JPG",
+        output_width=40,
+        output_height=40,
+        variants=[jpg_variant, png_variant],
+    )
+
+    jpg_path, jpg_fmt = build_variant_output_path(
+        tmp_path / "_MARKET",
+        config,
+        jpg_variant,
+        "camiseta_001",
+        "Camisetas",
+        1,
+    )
+    png_path, png_fmt = build_variant_output_path(
+        tmp_path / "archive",
+        config,
+        png_variant,
+        "camiseta_001",
+        "Camisetas",
+        1,
+    )
+
+    assert jpg_path == tmp_path / "_MARKET" / "Camisetas_camiseta_001_MK.jpg"
+    assert jpg_fmt == "jpg"
+    assert variant_target_size(config, jpg_variant) == (120, 160)
+    assert png_path == tmp_path / "archive" / "camiseta_001_archive_png_ARCH.png"
+    assert png_fmt == "png"
+    assert variant_target_size(config, png_variant) == (80, 80)
+
+
+def test_export_runner_writes_variant_specific_formats_destinations_and_sizes(tmp_path):
+    _source(tmp_path)
+    custom_output = tmp_path / "custom-output"
+    config = ExportConfig(
+        format="JPG",
+        output_width=40,
+        output_height=40,
+        variants=[
+            ExportVariant(
+                id="shop_jpg",
+                label="Shop JPG",
+                format="JPG",
+                suffix="_SHOP",
+                output_destination="subfolder",
+                output_folder_name="_SHOP",
+                naming_template="{original}{suffix}",
+                output_width=30,
+                output_height=50,
+            ),
+            ExportVariant(
+                id="archive_png",
+                label="Archive PNG",
+                format="PNG",
+                suffix="_ARCH",
+                output_destination="custom",
+                custom_output_path=str(custom_output),
+                naming_template="{original}{suffix}",
+                output_width=20,
+                output_height=20,
+            ),
+        ],
+    )
+    settings = ShadowSettings(opacity=0, blur=0, noise=0)
+
+    result = ExportRunner(executor_factory=InlineExecutor).run(
+        ExportJobRequest(
+            input_folder=tmp_path,
+            settings=settings,
+            export_config=config,
+            curve_data=_curve(),
+        )
+    )
+
+    jpg_output = tmp_path / "_SHOP" / "camiseta_001_SHOP.jpg"
+    png_output = custom_output / "camiseta_001_ARCH.png"
+    assert result.success
+    assert result.total == 2
+    assert jpg_output.exists()
+    assert png_output.exists()
+    with Image.open(jpg_output) as jpg:
+        assert jpg.format == "JPEG"
+        assert jpg.size == (30, 50)
+    with Image.open(png_output) as png:
+        assert png.format == "PNG"
+        assert png.size == (20, 20)

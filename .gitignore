@@ -3,6 +3,7 @@
 # =========================
 __pycache__/
 *.py[cod]
+*$py.class
 
 # =========================
 # Virtual environments
@@ -17,38 +18,82 @@ env/
 build/
 dist/
 release/
+*.build/
+*.dist/
 *.egg-info/
 *.egg
 MANIFEST
+pip-wheel-metadata/
 
 # =========================
 # Logs
 # =========================
 logs/
 *.log
+*.log.*
 
 # =========================
-# Test / tooling caches
+# Test / coverage artifacts
 # =========================
 .pytest_cache/
+pytest-cache-files*/
+tmp-pytest-run*/
+.tox/
+.nox/
 .mypy_cache/
 .ruff_cache/
+.pyre/
 .coverage
+.coverage.*
+coverage.xml
 htmlcov/
+
+# =========================
+# Local tool artifacts
+# =========================
+.playwright-cli/
+playwright-report/
+test-results/
+output/playwright/
+.cache/
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # =========================
 # OS / editor noise
 # =========================
 .DS_Store
 Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
 
 # =========================
-# Optional: outputs (si tu app genera imágenes)
+# Local FlatShot data
+# =========================
+/presets.json
+/presets_v2.json
+/settings.json
+/flatshot_presets.json
+/legacy_presets.json
+/incoming_presets.json
+
+# =========================
+# Export / generated image outputs
 # =========================
 output/
 outputs/
 export/
 exports/
+_SALIDA*/
+_OUT/
+_WEB/
+_SHOP/
+custom-output/
 artifacts/shadow_contact_sheet.png
 artifacts/shadow_contact_sheet_noise5.png
 artifacts/shadow_contact_sheet_v2_retune.png

@@ -44,6 +44,7 @@ class ExportConfigService:
     def validate(self, config: ExportConfig) -> list[str]:
         errors: list[str] = []
         fmt = self._normalize_format(config.format)
+        active_variants = [variant for variant in normalize_export_variants(config) if variant.enabled]
 
         if fmt not in {"JPG", "PNG"}:
             errors.append("El formato de exportación debe ser JPG o PNG.")
@@ -57,6 +58,34 @@ class ExportConfigService:
             errors.append("El nombre de la subcarpeta de salida no puede estar vacío.")
         if not str(config.naming_template or "").strip():
             errors.append("La plantilla de nombre no puede estar vacía.")
+        if not active_variants:
+            errors.append("Activa al menos una salida de exportación.")
+
+        for variant in active_variants:
+            variant_format = self._normalize_format(variant.format or config.format)
+            destination_mode = variant.output_destination or config.output_destination
+            custom_output_path = variant.custom_output_path or config.custom_output_path
+            output_folder_name = variant.output_folder_name or config.output_folder_name
+            naming_template = variant.naming_template or config.naming_template
+            output_width = int(variant.output_width or config.output_width)
+            output_height = int(variant.output_height or config.output_height)
+
+            if variant_format not in {"JPG", "PNG"}:
+                errors.append(f"{variant.label}: el formato debe ser JPG o PNG.")
+            if output_width <= 0 or output_height <= 0:
+                errors.append(f"{variant.label}: el tamaño de exportación debe ser positivo.")
+            if destination_mode not in {"subfolder", "custom"}:
+                errors.append(f"{variant.label}: el destino debe ser subfolder o custom.")
+            if (
+                destination_mode == "custom"
+                and not custom_output_path
+                and variant.output_destination == "custom"
+            ):
+                errors.append(f"{variant.label}: el destino personalizado requiere una carpeta.")
+            if destination_mode == "subfolder" and not str(output_folder_name or "").strip():
+                errors.append(f"{variant.label}: la subcarpeta de salida no puede estar vacía.")
+            if not str(naming_template or "").strip():
+                errors.append(f"{variant.label}: la plantilla de nombre no puede estar vacía.")
 
         return errors
 
@@ -65,13 +94,22 @@ class ExportConfigService:
         folders: Iterable[str | Path],
         config: ExportConfig,
     ) -> list[Path]:
-        base_destinations = self._base_destinations(folders, config)
         active_variants = [variant for variant in normalize_export_variants(config) if variant.enabled]
         destinations: list[Path] = []
+        seen: set[str] = set()
 
-        for base_destination in base_destinations:
+        for folder in folders:
+            input_folder = Path(folder)
             for variant in active_variants:
-                destinations.append(self._variant_output_folder(base_destination, variant))
+                base_destination = self._variant_base_destination(input_folder, config, variant)
+                if base_destination is None:
+                    continue
+                destination = self._variant_output_folder(base_destination, variant)
+                key = str(destination)
+                if key in seen:
+                    continue
+                seen.add(key)
+                destinations.append(destination)
 
         return destinations
 
@@ -83,6 +121,19 @@ class ExportConfigService:
         if config.output_destination == "custom":
             return [Path(config.custom_output_path)] if config.custom_output_path else []
         return [Path(folder) / config.output_folder_name for folder in folders]
+
+    @staticmethod
+    def _variant_base_destination(
+        input_folder: Path,
+        config: ExportConfig,
+        variant: ExportVariant,
+    ) -> Path | None:
+        output_destination = variant.output_destination or config.output_destination
+        if output_destination == "custom":
+            custom_output_path = variant.custom_output_path or config.custom_output_path
+            return Path(custom_output_path) if custom_output_path else None
+        output_folder_name = variant.output_folder_name or config.output_folder_name
+        return input_folder / output_folder_name
 
     @staticmethod
     def _variant_output_folder(base_output_folder: Path, variant: ExportVariant) -> Path:

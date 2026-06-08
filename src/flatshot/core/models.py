@@ -94,9 +94,15 @@ class ExportVariant(BaseModel):
     # Variant-specific naming and optional destination.
     suffix: str = ""
     output_subfolder: Optional[str] = None
+    naming_template: Optional[str] = None
+    output_destination: Optional[str] = None
+    output_folder_name: Optional[str] = None
+    custom_output_path: Optional[str] = None
 
     # Optional output format. None inherits ExportConfig.format.
     format: Optional[str] = None
+    output_width: Optional[int] = Field(None, ge=1)
+    output_height: Optional[int] = Field(None, ge=1)
 
     # Shadow adjustment for adapting one output version to a different background.
     shadow_opacity_delta: int = Field(0, ge=-100, le=100)
@@ -148,6 +154,48 @@ class ExportVariant(BaseModel):
         if any(part in {"", ".", ".."} for part in re.split(r"[\\/]+", text)):
             raise ValueError("Variant output subfolder cannot contain empty or parent parts")
         return text.replace("\\", "/")
+
+    @field_validator("output_folder_name")
+    @classmethod
+    def _validate_output_folder_name(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        if text.startswith(("/", "\\")) or ":" in text:
+            raise ValueError("Variant output folder name must be relative")
+        if any(part in {"", ".", ".."} for part in re.split(r"[\\/]+", text)):
+            raise ValueError("Variant output folder name cannot contain empty or parent parts")
+        return text.replace("\\", "/")
+
+    @field_validator("output_destination")
+    @classmethod
+    def _validate_output_destination(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip().lower()
+        if not text:
+            return None
+        if text not in {"subfolder", "custom"}:
+            raise ValueError("Variant output destination must be subfolder, custom or None")
+        return text
+
+    @field_validator("custom_output_path")
+    @classmethod
+    def _validate_custom_output_path(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
+
+    @field_validator("naming_template")
+    @classmethod
+    def _validate_naming_template(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value)
+        return text if text.strip() else None
 
     @field_validator("format")
     @classmethod

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from flatshot.application.export_config_service import ExportConfigService
-from flatshot.core.models import ExportConfig, WEB_RGB230, WHITE_RGB255
+from flatshot.core.models import ExportConfig, ExportVariant, WEB_RGB230, WHITE_RGB255
 
 
 def test_build_from_settings_preserves_existing_defaults_and_normalizes_format():
@@ -111,3 +111,51 @@ def test_destinations_for_folders_returns_empty_for_missing_custom_path(tmp_path
     config = ExportConfig(output_destination="custom", custom_output_path=None, variants=[WEB_RGB230])
 
     assert service.destinations_for_folders([tmp_path], config) == []
+
+
+def test_validate_checks_variant_specific_destination_size_and_template(tmp_path):
+    service = ExportConfigService()
+    config = ExportConfig(
+        variants=[
+            ExportVariant(
+                id="bad_custom",
+                label="Bad Custom",
+                output_destination="custom",
+                custom_output_path=None,
+            ),
+        ],
+    )
+
+    errors = service.validate(config)
+
+    assert "Bad Custom: el destino personalizado requiere una carpeta." in errors
+
+
+def test_destinations_for_folders_uses_variant_specific_destinations(tmp_path):
+    service = ExportConfigService()
+    source = tmp_path / "source"
+    custom = tmp_path / "custom"
+    config = ExportConfig(
+        output_destination="subfolder",
+        output_folder_name="_BASE",
+        variants=[
+            ExportVariant(
+                id="web",
+                label="Web",
+                output_destination="subfolder",
+                output_folder_name="_WEB",
+            ),
+            ExportVariant(
+                id="archive",
+                label="Archive",
+                output_destination="custom",
+                custom_output_path=str(custom),
+                output_subfolder="png",
+            ),
+        ],
+    )
+
+    assert service.destinations_for_folders([source], config) == [
+        source / "_WEB",
+        custom / "png",
+    ]

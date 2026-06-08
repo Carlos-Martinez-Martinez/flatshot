@@ -691,6 +691,38 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 30 - Extraccion de filas preflight de exportacion
+
+Estado: completada.
+
+Cambios realizados:
+- `export-preflight-view.js` ahora tambien calcula:
+  - clase visual del estado de exportacion;
+  - filas preflight para lote ausente;
+  - filas preflight para lote vacio;
+  - filas preflight para lote listo;
+  - inclusion filtrada de issues adicionales;
+  - fila final de estado cuando no hay bloqueos ni avisos.
+- `app.js` conserva calculo de readiness, issues, destino, naming, avisos e ignorados; solo pasa datos serializables al helper.
+- Se amplio `tests/test_frontend_export_preflight_view.py` para cubrir clases de estado y filas de preflight.
+
+Impacto medido:
+- `app.js`: 7.285 -> 7.264 lineas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: sin cambios, 22.
+
+Validaciones ejecutadas:
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_export_preflight_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 282 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- `node --check apps/flatshot-desktop/frontend/export-preflight-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en Windows.
+- HTTP local en `http://127.0.0.1:4210/`: `index.html`, `export-preflight-view.js`, `export-summary-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

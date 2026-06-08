@@ -146,6 +146,130 @@ assert.equal(helpers.exportPreflightSummary({{
   exportable: 3,
   ready: true,
 }}), "3 imágenes listas");
+
+assert.equal(helpers.exportStatusClass({{
+  status: "failed",
+  ready: true,
+  issues: [],
+  hasActiveBatch: true,
+}}), "error");
+assert.equal(helpers.exportStatusClass({{
+  status: "idle",
+  ready: true,
+  issues: [{{ level: "error" }}],
+  hasActiveBatch: true,
+}}), "error");
+assert.equal(helpers.exportStatusClass({{
+  status: "running",
+  ready: true,
+  issues: [],
+  hasActiveBatch: true,
+}}), "running");
+assert.equal(helpers.exportStatusClass({{
+  status: "partial",
+  ready: true,
+  issues: [],
+  hasActiveBatch: true,
+}}), "warning");
+assert.equal(helpers.exportStatusClass({{
+  status: "idle",
+  ready: false,
+  issues: [],
+  hasActiveBatch: true,
+}}), "warning");
+assert.equal(helpers.exportStatusClass({{
+  status: "idle",
+  ready: true,
+  issues: [],
+  hasActiveBatch: true,
+}}), "ready");
+assert.equal(helpers.exportStatusClass({{
+  status: "idle",
+  ready: false,
+  issues: [],
+  hasActiveBatch: false,
+}}), "pending");
+
+assert.deepEqual(helpers.exportPreflightRows({{
+  batch: "none",
+  destinationFallback: "_SALIDA_PRO",
+}}), [
+  {{ state: "error", title: "Carpeta de origen", detail: "Elige una carpeta para empezar" }},
+  {{ state: "pending", title: "Imágenes exportables", detail: "Pendiente" }},
+  {{ state: "pending", title: "Carpeta de salida", detail: "_SALIDA_PRO" }},
+]);
+
+assert.deepEqual(helpers.exportPreflightRows({{
+  batch: "empty",
+  ignoredCount: 2,
+  ignoredSummary: "2 ignorados",
+}}), [
+  {{ state: "error", title: "Imágenes exportables", detail: "0 imágenes" }},
+  {{ state: "pending", title: "Ignorados", detail: "2 ignorados" }},
+  {{ state: "pending", title: "Carpeta de salida", detail: "Pendiente" }},
+]);
+
+const readyRows = helpers.exportPreflightRows({{
+  batch: "ready",
+  exportable: 3,
+  warningCount: 1,
+  ignoredCount: 1,
+  ignoredSummary: "1 ignorado",
+  destinationFallback: "C:/Export",
+  destinationMissing: false,
+  naming: "{{original}}{{suffix}}",
+  namingExample: "camisa_PRO.jpg",
+  issues: [
+    {{ level: "warning", title: "Alpha bajo", detail: "Revisar" }},
+    {{ level: "error", title: "Sin lote", detail: "Ignorar duplicado" }},
+  ],
+  ready: false,
+}});
+assert.deepEqual(readyRows, [
+  {{ state: "ok", title: "Imágenes exportables", detail: "3 imagenes" }},
+  {{ state: "warning", title: "Avisos", detail: "1 aviso" }},
+  {{ state: "pending", title: "Ignorados", detail: "1 ignorado" }},
+  {{ state: "ok", title: "Carpeta de salida", detail: "C:/Export" }},
+  {{ state: "ok", title: "Nombre de archivo", detail: "camisa_PRO.jpg" }},
+  {{ state: "warning", title: "Alpha bajo", detail: "Revisar" }},
+]);
+
+const blockedRows = helpers.exportPreflightRows({{
+  batch: "ready",
+  exportable: 0,
+  warningCount: 0,
+  ignoredCount: 0,
+  ignoredSummary: "Sin ignorados",
+  destinationFallback: "Carpeta de salida sin configurar",
+  destinationMissing: true,
+  naming: "",
+  namingExample: "Sin ejemplo",
+  issues: [],
+  ready: false,
+}});
+assert.deepEqual(blockedRows, [
+  {{ state: "error", title: "Imágenes exportables", detail: "0 imagenes" }},
+  {{ state: "ok", title: "Avisos", detail: "Sin avisos" }},
+  {{ state: "ok", title: "Ignorados", detail: "Sin ignorados" }},
+  {{ state: "error", title: "Carpeta de salida", detail: "Carpeta de salida sin configurar" }},
+  {{ state: "error", title: "Nombre de archivo", detail: "Plantilla vacía" }},
+]);
+
+const allReadyRows = helpers.exportPreflightRows({{
+  batch: "ready",
+  exportable: 1,
+  warningCount: 0,
+  ignoredCount: 0,
+  ignoredSummary: "Sin ignorados",
+  destinationFallback: "_SALIDA_PRO",
+  destinationMissing: false,
+  naming: "{{original}}",
+  namingExample: "camisa.jpg",
+  issues: [],
+  ready: true,
+}});
+assert.equal(allReadyRows.at(-1).title, "Estado");
+assert.equal(allReadyRows.at(-1).detail, "Sin bloqueos ni avisos");
 """
     result = subprocess.run(
         ["node", "-e", script],

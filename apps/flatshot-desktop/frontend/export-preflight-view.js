@@ -165,10 +165,72 @@
     return ready ? `${exportable} imágenes listas` : "Pendiente";
   }
 
+  function exportStatusClass(options = {}) {
+    const issues = Array.isArray(options.issues) ? options.issues : [];
+    const ready = Boolean(options.ready);
+    const status = options.status || "idle";
+    if (status === "failed" || issues.some((issue) => issue.level === "error")) {
+      return "error";
+    }
+    if (status === "running") {
+      return "running";
+    }
+    if (status === "partial" || issues.length || (options.hasActiveBatch && !ready)) {
+      return "warning";
+    }
+    return ready ? "ready" : "pending";
+  }
+
+  function exportPreflightRows(options = {}) {
+    const batch = options.batch || "none";
+    const issues = Array.isArray(options.issues) ? options.issues : [];
+    const exportable = Number(options.exportable) || 0;
+    const ready = Boolean(options.ready);
+    const ignoredCount = Number(options.ignoredCount) || 0;
+    const warningCount = Number(options.warningCount) || 0;
+    const ignoredSummary = options.ignoredSummary || "Sin ignorados";
+    const destinationFallback = options.destinationFallback || "";
+    const naming = String(options.naming || "");
+
+    if (batch === "none") {
+      return [
+        { state: "error", title: "Carpeta de origen", detail: "Elige una carpeta para empezar" },
+        { state: "pending", title: "Imágenes exportables", detail: "Pendiente" },
+        { state: "pending", title: "Carpeta de salida", detail: destinationFallback },
+      ];
+    }
+    if (batch === "empty") {
+      return [
+        { state: "error", title: "Imágenes exportables", detail: "0 imágenes" },
+        { state: ignoredCount ? "pending" : "pending", title: "Ignorados", detail: ignoredSummary },
+        { state: "pending", title: "Carpeta de salida", detail: "Pendiente" },
+      ];
+    }
+
+    const rows = [
+      { state: exportable > 0 ? "ok" : "error", title: "Imágenes exportables", detail: `${exportable} imagen${exportable === 1 ? "" : "es"}` },
+      { state: warningCount ? "warning" : "ok", title: "Avisos", detail: warningCount ? `${warningCount} aviso${warningCount === 1 ? "" : "s"}` : "Sin avisos" },
+      { state: ignoredCount ? "pending" : "ok", title: "Ignorados", detail: ignoredSummary },
+      { state: options.destinationMissing ? "error" : "ok", title: "Carpeta de salida", detail: destinationFallback },
+      { state: naming.trim() ? "ok" : "error", title: "Nombre de archivo", detail: naming.trim() ? options.namingExample || "Sin ejemplo" : "Plantilla vacía" },
+    ];
+    issues
+      .filter((issue) => !["Sin lote", "No hay PNG válidos", "Nombre de archivo vacío", "Carpeta de salida sin configurar", "Sin imágenes exportables"].includes(issue.title))
+      .forEach((issue) => {
+        rows.push({ state: issue.level === "error" ? "error" : "warning", title: issue.title, detail: issue.detail });
+      });
+    if (ready && !issues.length) {
+      rows.push({ state: "ok", title: "Estado", detail: "Sin bloqueos ni avisos" });
+    }
+    return rows;
+  }
+
   return {
     escapeHtml,
     exportPanelStatusLabel,
+    exportPreflightRows,
     exportPreflightSummary,
+    exportStatusClass,
     issueItemHtml,
     issueListHtml,
     outputWarningSummaryHtml,

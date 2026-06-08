@@ -5823,49 +5823,28 @@ function issueItemHtml(row) {
 }
 
 function exportStatusClass(ready, issues = preflightIssues()) {
-  if (state.exportStatus === "failed" || issues.some((issue) => issue.level === "error")) {
-    return "error";
-  }
-  if (state.exportStatus === "running") {
-    return "running";
-  }
-  if (state.exportStatus === "partial" || issues.length || (hasBatch() && !ready)) {
-    return "warning";
-  }
-  return ready ? "ready" : "pending";
+  return exportPreflightViewHelpers.exportStatusClass({
+    hasActiveBatch: hasBatch(),
+    issues,
+    ready,
+    status: state.exportStatus,
+  });
 }
 
 function exportPreflightRows(issues, exportable, ready) {
-  if (state.batch === "none") {
-    return [
-      { state: "error", title: "Carpeta de origen", detail: "Elige una carpeta para empezar" },
-      { state: "pending", title: "Imágenes exportables", detail: "Pendiente" },
-      { state: "pending", title: "Carpeta de salida", detail: destinationFallbackLabel() },
-    ];
-  }
-  if (state.batch === "empty") {
-    return [
-      { state: "error", title: "Imágenes exportables", detail: "0 imágenes" },
-      { state: ignoredOmissions().length ? "pending" : "pending", title: "Ignorados", detail: ignoredSummaryText() },
-      { state: "pending", title: "Carpeta de salida", detail: "Pendiente" },
-    ];
-  }
-  const rows = [
-    { state: exportable > 0 ? "ok" : "error", title: "Imágenes exportables", detail: `${exportable} imagen${exportable === 1 ? "" : "es"}` },
-    { state: visibleWarningCount() ? "warning" : "ok", title: "Avisos", detail: visibleWarningCount() ? `${visibleWarningCount()} aviso${visibleWarningCount() === 1 ? "" : "s"}` : "Sin avisos" },
-    { state: ignoredOmissions().length ? "pending" : "ok", title: "Ignorados", detail: ignoredSummaryText() },
-    { state: state.destinationMode === "custom" && !state.destinationValue.trim() ? "error" : "ok", title: "Carpeta de salida", detail: destinationFallbackLabel() },
-    { state: state.naming.trim() ? "ok" : "error", title: "Nombre de archivo", detail: state.naming.trim() ? namingExample() : "Plantilla vacía" },
-  ];
-  issues
-    .filter((issue) => !["Sin lote", "No hay PNG válidos", "Nombre de archivo vacío", "Carpeta de salida sin configurar", "Sin imágenes exportables"].includes(issue.title))
-    .forEach((issue) => {
-      rows.push({ state: issue.level === "error" ? "error" : "warning", title: issue.title, detail: issue.detail });
-    });
-  if (ready && !issues.length) {
-    rows.push({ state: "ok", title: "Estado", detail: "Sin bloqueos ni avisos" });
-  }
-  return rows;
+  return exportPreflightViewHelpers.exportPreflightRows({
+    batch: state.batch,
+    destinationFallback: destinationFallbackLabel(),
+    destinationMissing: state.destinationMode === "custom" && !state.destinationValue.trim(),
+    exportable,
+    ignoredCount: ignoredOmissions().length,
+    ignoredSummary: ignoredSummaryText(),
+    issues,
+    naming: state.naming,
+    namingExample: namingExample(),
+    ready,
+    warningCount: visibleWarningCount(),
+  });
 }
 
 function preflightListHtml(rows) {

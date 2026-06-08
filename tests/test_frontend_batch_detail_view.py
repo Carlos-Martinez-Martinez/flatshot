@@ -40,6 +40,25 @@ assert.equal(empty.includes('<strong title="Pendiente">Pendiente</strong>'), tru
 const missing = helpers.batchDetailRowHtml("Valor", null);
 assert.equal(missing.includes('<strong title="Pendiente">Pendiente</strong>'), true);
 
+const problem = helpers.batchDetailProblemHtml({{
+  tone: "warning",
+  title: "Archivo <raro>.txt",
+  titleAttr: 'C:/Entrada/"raro".txt',
+  detail: "Extensión & no admitida",
+}});
+assert.equal(problem.includes('class="batch-detail-problem warning"'), true);
+assert.equal(problem.includes('title="C:/Entrada/&quot;raro&quot;.txt"'), true);
+assert.equal(problem.includes('Archivo &lt;raro&gt;.txt'), true);
+assert.equal(problem.includes('Extensión &amp; no admitida'), true);
+
+const clearProblem = helpers.batchDetailProblemHtml({{
+  tone: "clear",
+  title: "Archivo ignorado",
+  detail: "Temporal",
+}});
+assert.equal(clearProblem.includes('class="batch-detail-problem clear"'), true);
+assert.equal(clearProblem.includes('title="Archivo ignorado"'), true);
+
 const folder = helpers.folderItemHtml({{
   name: "Carpeta <A>",
   detail: "2 imágenes & 1 aviso",

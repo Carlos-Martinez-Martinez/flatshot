@@ -23,6 +23,18 @@
   `;
   }
 
+  function batchDetailProblemHtml(options = {}) {
+    const tone = options.tone ? ` ${options.tone}` : "";
+    const title = options.title || "";
+    const detail = options.detail || "";
+    return `
+    <div class="batch-detail-problem${tone}">
+      <strong title="${escapeHtml(options.titleAttr || title)}">${escapeHtml(title)}</strong>
+      <span>${escapeHtml(detail)}</span>
+    </div>
+  `;
+  }
+
   function folderItemHtml(folder) {
     const className = folder.status === "warning" ? "empty" : folder.status === "error" ? "error" : folder.status || "";
     return `
@@ -39,6 +51,7 @@
   }
 
   return {
+    batchDetailProblemHtml,
     batchDetailRowHtml,
     escapeHtml,
     folderItemHtml,

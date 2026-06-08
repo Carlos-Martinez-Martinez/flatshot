@@ -3545,18 +3545,18 @@ function batchDetailHtml() {
       : state.bridgeScanPath;
   const files = counts.filesFound === null ? "Leyendo" : counts.filesFound;
   const valid = counts.validImages === null ? "Leyendo" : counts.validImages;
-  const ignoredRowsHtml = ignoredOmissions().slice(0, 8).map((item) => `
-    <div class="batch-detail-problem clear">
-      <strong title="${escapeHtml(item.path || item.name)}">${escapeHtml(item.name || "Archivo ignorado")}</strong>
-      <span>${escapeHtml(item.detail || omissionReasonLabel(item.reason))}</span>
-    </div>
-  `).join("");
-  const issueRowsHtml = actionableIssueRows().slice(0, 8).map((row) => `
-    <div class="batch-detail-problem ${row.level === "error" ? "error" : "warning"}">
-      <strong title="${escapeHtml(row.path || row.title)}">${escapeHtml(row.title)}</strong>
-      <span>${escapeHtml(row.detail || "Revisar")}</span>
-    </div>
-  `).join("");
+  const ignoredRowsHtml = ignoredOmissions().slice(0, 8).map((item) => batchDetailViewHelpers.batchDetailProblemHtml({
+    detail: item.detail || omissionReasonLabel(item.reason),
+    title: item.name || "Archivo ignorado",
+    titleAttr: item.path || item.name,
+    tone: "clear",
+  })).join("");
+  const issueRowsHtml = actionableIssueRows().slice(0, 8).map((row) => batchDetailViewHelpers.batchDetailProblemHtml({
+    detail: row.detail || "Revisar",
+    title: row.title,
+    titleAttr: row.path || row.title,
+    tone: row.level === "error" ? "error" : "warning",
+  })).join("");
   const outputRowsHtml = exportOutputProfiles().map((profile, index) => `
     <div class="batch-detail-output">
       <div class="batch-detail-output__title">

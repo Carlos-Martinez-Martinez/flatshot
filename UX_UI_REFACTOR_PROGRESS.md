@@ -1339,6 +1339,36 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 52 - Extraccion de fila de problema del detalle de lote
+
+Estado: completada.
+
+Cambios realizados:
+- `batch-detail-view.js` ahora expone `batchDetailProblemHtml()` para renderizar filas de incidencias e ignorados del detalle de lote.
+- `app.js` conserva la seleccion de incidencias, ignorados, limites y labels de motivo; solo delega el HTML de cada fila.
+- Se amplio `tests/test_frontend_batch_detail_view.py` para cubrir:
+  - clase visual `warning`;
+  - clase visual `clear`;
+  - escaping de titulo, ruta y detalle;
+  - fallback de `title` cuando no se entrega `titleAttr`.
+
+Impacto medido:
+- `app.js`: sin cambios netos, 6.556 lineas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: sin cambios, 22.
+
+Validaciones ejecutadas:
+- `node --check apps/flatshot-desktop/frontend/batch-detail-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_batch_detail_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 282 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en Windows.
+- HTTP local: `index.html`, `batch-detail-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

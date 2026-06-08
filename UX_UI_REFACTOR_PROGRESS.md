@@ -496,6 +496,38 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 24 - Extraccion de estado visual de cabecera
+
+Estado: completada.
+
+Cambios realizados:
+- Se agrego `apps/flatshot-desktop/frontend/top-status-view.js`.
+- Se movio presentacion pura de cabecera fuera de `app.js`:
+  - chips compactos de estado superior;
+  - texto compacto de lote/exportacion;
+  - texto de estado superior;
+  - label y clase del chip preflight.
+- `index.html` carga el helper antes de `app.js`.
+- `app.js` conserva lectura de estado global, conteos, readiness, bridge y totales planificados; solo pasa datos serializables al helper.
+- Se agrego `tests/test_frontend_top_status_view.py` para chips, escaping, estados de lote/exportacion, preflight y orden de carga.
+
+Impacto medido:
+- `app.js`: 7.504 -> 7.450 lineas.
+- Modulos JS frontend: 21 -> 22.
+- Tests frontend `test_frontend_*.py`: 20 -> 21.
+
+Validaciones ejecutadas:
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_top_status_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 280 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- `node --check apps/flatshot-desktop/frontend/top-status-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en Windows.
+- HTTP local en `http://127.0.0.1:4204/`: `index.html`, `top-status-view.js`, `export-preflight-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

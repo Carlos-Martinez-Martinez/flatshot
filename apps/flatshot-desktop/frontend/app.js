@@ -84,6 +84,7 @@ const exportStateHelpers = window.FlatShotExportState;
 const exportSummaryViewHelpers = window.FlatShotExportSummaryView;
 const exportResultViewHelpers = window.FlatShotExportResultView;
 const exportPreflightViewHelpers = window.FlatShotExportPreflightView;
+const topStatusViewHelpers = window.FlatShotTopStatusView;
 const preflightHelpers = window.FlatShotPreflight;
 const batchViewHelpers = window.FlatShotBatchView;
 const scanStateHelpers = window.FlatShotScanState;
@@ -3217,131 +3218,76 @@ function renderTop() {
 }
 
 function topStatusSummaryHtml(counts = batchCounts()) {
-  if (!hasBatch() || state.exportStatus === "running" || ["completed", "partial", "failed"].includes(state.exportStatus)) {
-    return "";
-  }
-  const files = counts.filesFound ?? activeImages().length;
-  const chips = [
-    detectedFormatLabel(activeImages()),
-    `${files} archivos`,
-    readyImagesText(counts.exportableImages),
-  ];
-  if (counts.ignoredFiles) {
-    chips.push(`${counts.ignoredFiles} ignorado${counts.ignoredFiles === 1 ? "" : "s"}`);
-  }
-  if (counts.nonBlockingWarnings) {
-    chips.push(`${counts.nonBlockingWarnings} aviso${counts.nonBlockingWarnings === 1 ? "" : "s"}`);
-  }
-  return `<span class="top-status-chips">${chips.map((chip) => `<span>${escapeHtml(chip)}</span>`).join("")}</span>`;
+  const images = activeImages();
+  return topStatusViewHelpers.topStatusSummaryHtml({
+    exportStatus: state.exportStatus,
+    formatLabel: detectedFormatLabel(images),
+    hasBatch: hasBatch(),
+    ignoredFiles: counts.ignoredFiles,
+    imageCount: images.length,
+    filesFound: counts.filesFound,
+    nonBlockingWarnings: counts.nonBlockingWarnings,
+    readyLabel: readyImagesText(counts.exportableImages),
+  });
 }
 
 function compactHeaderStatusText() {
   const counts = batchCounts();
-  if (state.exportStatus === "running") {
-    const total = plannedExportTotal() || counts.exportableImages;
-    return state.paused ? `Pausado · ${state.processed}/${total}` : `Exportando ${state.processed}/${total}`;
-  }
-  if (state.exportStatus === "completed" || state.exportStatus === "partial") {
-    const processed = Number(state.exportResult?.processed ?? state.processed ?? counts.exportableImages);
-    const total = Number(state.exportResult?.total ?? counts.exportableImages);
-    return state.exportStatus === "partial" ? `Exportado con avisos · ${processed}/${total}` : `Exportado · ${processed}/${total}`;
-  }
-  if (state.exportStatus === "failed") {
-    return "Exportación fallida";
-  }
-  if (state.batch === "scanning") {
-    return "Escaneando...";
-  }
-  if (state.batch === "none") {
-    return "Sin lote";
-  }
-  if (state.batch === "empty") {
-    const files = counts.filesFound || 0;
-    const ignored = counts.ignoredFiles || 0;
-    return ignored ? `${files} archivos · no hay PNG válidos · ${ignored} ignorados` : "No hay PNG válidos";
-  }
-  const parts = [
-    detectedFormatLabel(activeImages()),
-    `${counts.filesFound || activeImages().length} archivos`,
-    readyImagesText(counts.exportableImages),
-  ];
-  if (counts.nonBlockingWarnings) {
-    parts.push(`${counts.nonBlockingWarnings} aviso${counts.nonBlockingWarnings === 1 ? "" : "s"}`);
-  }
-  if (counts.ignoredFiles) {
-    parts.push(`${counts.ignoredFiles} ignorado${counts.ignoredFiles === 1 ? "" : "s"}`);
-  }
-  return parts.join(" · ");
+  const images = activeImages();
+  return topStatusViewHelpers.compactHeaderStatusText({
+    batch: state.batch,
+    exportResultProcessed: state.exportResult?.processed,
+    exportResultTotal: state.exportResult?.total,
+    exportStatus: state.exportStatus,
+    exportableImages: counts.exportableImages,
+    filesFound: counts.filesFound,
+    formatLabel: detectedFormatLabel(images),
+    ignoredFiles: counts.ignoredFiles,
+    imageCount: images.length,
+    nonBlockingWarnings: counts.nonBlockingWarnings,
+    paused: state.paused,
+    plannedTotal: plannedExportTotal(),
+    processed: state.processed,
+    readyLabel: readyImagesText(counts.exportableImages),
+  });
 }
 
 function topStatusText() {
-  const images = activeImages();
-  const warnings = visibleWarningCount();
-  if (state.batch === "scanning") {
-    return "Escaneando carpeta";
-  }
-  if (state.batch === "none") {
-    return "Sin lote";
-  }
-  if (state.batch === "empty") {
-    return "No hay PNG válidos";
-  }
-  if (state.exportStatus === "running") {
-    const total = plannedExportTotal() || exportableImages().length;
-    return state.paused ? `Pausado · ${state.processed}/${total}` : `Exportando ${state.processed}/${total}`;
-  }
-  if (state.batch === "ready") {
-    return compactHeaderStatusText();
-  }
-  if (state.bridgeMode === "bridge" && state.bridgeStatus === "disconnected") {
-    return "Conexión local no disponible";
-  }
-  return state.statusText;
+  return topStatusViewHelpers.topStatusText({
+    batch: state.batch,
+    bridgeMode: state.bridgeMode,
+    bridgeStatus: state.bridgeStatus,
+    compactHeaderStatus: compactHeaderStatusText(),
+    exportStatus: state.exportStatus,
+    exportableImages: exportableImages().length,
+    paused: state.paused,
+    plannedTotal: plannedExportTotal(),
+    processed: state.processed,
+    statusText: state.statusText,
+  });
 }
 
 function preflightStatusLabel() {
-  if (state.exportStatus === "running") {
-    return state.paused ? "Salida pausada" : "Exportando";
-  }
-  if (state.exportStatus === "completed") {
-    return "Salida completada";
-  }
-  if (state.exportStatus === "partial") {
-    return "Avisos";
-  }
-  if (state.exportStatus === "failed") {
-    return "Revisar";
-  }
   const ready = isExportReady();
   const counts = preflightCounts();
-  if (!ready && counts.errors > 0) {
-    return "Revisar";
-  }
-  if (!ready) {
-    return "Pendiente";
-  }
-  if (counts.warnings > 0) {
-    return `${counts.warnings} aviso${counts.warnings === 1 ? "" : "s"}`;
-  }
-  return "Listo";
+  return topStatusViewHelpers.preflightStatusLabel({
+    errors: counts.errors,
+    exportStatus: state.exportStatus,
+    paused: state.paused,
+    ready,
+    warnings: counts.warnings,
+  });
 }
 
 function preflightStatusClass() {
-  if (state.exportStatus === "failed") {
-    return "error";
-  }
-  if (state.exportStatus === "running" || state.exportStatus === "partial") {
-    return "warning";
-  }
   const ready = isExportReady();
   const counts = preflightCounts();
-  if (!ready || counts.errors > 0) {
-    return "error";
-  }
-  if (counts.warnings > 0) {
-    return "warning";
-  }
-  return "ready";
+  return topStatusViewHelpers.preflightStatusClass({
+    errors: counts.errors,
+    exportStatus: state.exportStatus,
+    ready,
+    warnings: counts.warnings,
+  });
 }
 
 function renderBridge() {

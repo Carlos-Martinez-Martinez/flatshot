@@ -31,6 +31,19 @@
   `;
   }
 
+  function inspectorMode(options = {}) {
+    if (options.outputEditMode || options.inspectorTab === "output") {
+      return "output";
+    }
+    if (options.inspectorTab === "advanced") {
+      return "advanced";
+    }
+    if (options.inspectorTab === "warnings") {
+      return "warnings";
+    }
+    return "summary";
+  }
+
   function contextualInspectorHtml(options = {}) {
     const state = options.batch || "ready";
     const preflightHtml = options.preflightHtml || "";
@@ -95,6 +108,7 @@
   return {
     contextualInspectorHtml,
     escapeHtml,
+    inspectorMode,
     inspectorSubviewHeaderHtml,
   };
 });

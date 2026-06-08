@@ -4664,16 +4664,10 @@ function advancedSettingsDirty() {
 }
 
 function inspectorMode() {
-  if (state.outputEditMode || state.inspectorTab === "output") {
-    return "output";
-  }
-  if (state.inspectorTab === "advanced") {
-    return "advanced";
-  }
-  if (state.inspectorTab === "warnings") {
-    return "warnings";
-  }
-  return "summary";
+  return inspectorContextViewHelpers.inspectorMode({
+    inspectorTab: state.inspectorTab,
+    outputEditMode: state.outputEditMode,
+  });
 }
 
 function renderInspector() {

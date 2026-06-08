@@ -28,6 +28,12 @@ const assert = require("node:assert/strict");
 const helpers = require({json.dumps(str(HELPER_PATH))});
 
 assert.equal(helpers.escapeHtml('<a&b"c>'), '&lt;a&amp;b&quot;c&gt;');
+assert.equal(helpers.inspectorMode({{ outputEditMode: true, inspectorTab: "review" }}), "output");
+assert.equal(helpers.inspectorMode({{ outputEditMode: false, inspectorTab: "output" }}), "output");
+assert.equal(helpers.inspectorMode({{ outputEditMode: false, inspectorTab: "advanced" }}), "advanced");
+assert.equal(helpers.inspectorMode({{ outputEditMode: false, inspectorTab: "warnings" }}), "warnings");
+assert.equal(helpers.inspectorMode({{ outputEditMode: false, inspectorTab: "review" }}), "summary");
+assert.equal(helpers.inspectorMode({{ outputEditMode: false, inspectorTab: "unknown" }}), "summary");
 
 const header = helpers.inspectorSubviewHeaderHtml({{
   title: "Editar <ajuste>",

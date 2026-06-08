@@ -283,3 +283,31 @@ Decisiones tomadas:
 Salida exportada:
 - Sin cambios esperados en apariencia de imagen exportada ni comportamiento de archivos.
 - No se modifico el pipeline de imagen ni la logica de escritura de archivos.
+
+## Fase 12 - Limpieza CSS acotada post-inventario
+
+Estado: completada.
+
+Cambios realizados:
+- Se redujo el primer bloque `:root` de `ux-foundation.css`.
+- Se retiraron 25 aliases tempranos que ya estaban redefinidos por el bloque final de la misma hoja.
+- Se conservaron tokens que esa capa sigue definiendo como fuente activa: `--semantic-success-soft`, `--semantic-info-*`, `--z-*` y `--ui-*`.
+- Se actualizaron las metricas en `docs/CSS_CASCADE_INVENTORY.md`.
+
+Impacto medido:
+- `ux-foundation.css`: 3.494 -> 3.469 lineas.
+- Declaraciones de tokens CSS totales: 463 -> 438.
+- Nombres de token duplicados: 164 -> 145.
+- `!important`: sin cambios, 337 en total.
+
+Validaciones ejecutadas:
+- `venv\Scripts\python.exe -m pytest -q`: 262 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en Windows.
+- HTTP local en `http://127.0.0.1:4192/`: `index.html`, `styles.css`, `ux-foundation.css`, `ux-refactor.css` y `app.js` respondieron 200.
+
+Checks manuales:
+- No se ejecuto flujo visual completo; esta fase solo retira aliases CSS redundantes que quedan definidos por el bloque final de la misma hoja.
+
+Salida exportada:
+- Sin cambios esperados. No se toco codigo de procesamiento ni exportacion.

@@ -22,15 +22,15 @@ Medicion no destructiva ejecutada sobre los tres CSS activos:
 | Archivo | Lineas | `!important` | Tokens declarados | `@media` | `@keyframes` |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | `styles.css` | 9.028 | 122 | 288 | 20 | 3 |
-| `ux-foundation.css` | 3.494 | 102 | 159 | 10 | 1 |
+| `ux-foundation.css` | 3.469 | 102 | 134 | 10 | 1 |
 | `ux-refactor.css` | 1.322 | 113 | 16 | 4 | 0 |
-| Total | 13.844 | 337 | 463 | 34 | 4 |
+| Total | 13.819 | 337 | 438 | 34 | 4 |
 
 Resumen de tokens:
 
-- Declaraciones de tokens CSS: 463.
+- Declaraciones de tokens CSS: 438.
 - Tokens unicos: 223.
-- Nombres de token declarados mas de una vez: 164.
+- Nombres de token declarados mas de una vez: 145.
 
 ## Duplicados principales
 
@@ -44,16 +44,20 @@ Tokens mas repetidos:
 | `--topbar-h` | 6 |
 | `--statusbar-h` | 5 |
 | `--viewer-min` | 5 |
-| `--border-subtle` | 4 |
 | `--control-h` | 4 |
 | `--control-h-sm` | 4 |
 | `--footer-height` | 4 |
 | `--gallery-width` | 4 |
 | `--lot-rail-width` | 4 |
-| `--surface-muted` | 4 |
-| `--text-muted` | 4 |
-| `--text-primary` | 4 |
-| `--text-secondary` | 4 |
+| `--app-bg` | 3 |
+| `--border-subtle` | 3 |
+| `--color-bg-muted` | 3 |
+| `--color-bg-soft` | 3 |
+| `--color-border` | 3 |
+| `--color-border-strong` | 3 |
+| `--color-text` | 3 |
+| `--column-lot` | 3 |
+| `--line` | 3 |
 
 Selectores simples con muchas repeticiones aproximadas:
 
@@ -183,10 +187,21 @@ Select-String -Path apps/flatshot-desktop/frontend/styles.css,apps/flatshot-desk
 Select-String -Path apps/flatshot-desktop/frontend/styles.css,apps/flatshot-desktop/frontend/ux-foundation.css,apps/flatshot-desktop/frontend/ux-refactor.css -Pattern '^\s*(--[A-Za-z0-9-]+)\s*:'
 ```
 
+## Primer ajuste aplicado
+
+Se retiraron 25 aliases tempranos de `ux-foundation.css` que estaban
+redefinidos por el bloque final de la misma hoja. Se conservaron los aliases que
+esta capa sigue poseyendo, como `--semantic-success-soft`, `--semantic-info-*`,
+`--z-*` y `--ui-*`.
+
+Este ajuste no cambia selectores, `!important`, orden de carga, layout ni valores
+finales esperados de tokens.
+
 ## Estado de esta fase
 
-- Archivos CSS modificados: ninguno.
-- Cambios funcionales: ninguno.
-- Checks manuales UI: no requeridos para inventario de documentacion.
+- Archivos CSS modificados: `apps/flatshot-desktop/frontend/ux-foundation.css`.
+- Cambios funcionales: ninguno esperado; limpieza de aliases CSS redundantes.
+- Checks manuales UI: no se ejecuto flujo visual completo; se verifico carga
+  estatica local de HTML/CSS/JS por HTTP.
 - Salida exportada: sin cambios; no se modifico procesamiento, preview,
   exportacion ni escritura de archivos.

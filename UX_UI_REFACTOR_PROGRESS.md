@@ -805,6 +805,34 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 34 - Extraccion de labels de ajustes y salida
+
+Estado: completada.
+
+Cambios realizados:
+- `settings-view.js` ahora tambien calcula:
+  - label humano de fondo (`transparent`, `white`, `rgb230`);
+  - linea resumen de preset/formato;
+  - label de estado de exportacion para el panel inferior.
+- `app.js` conserva estado activo, `paused`, readiness, formato, tamano y fondo; solo delega reglas de microcopy.
+- Se amplio `tests/test_frontend_settings_view.py` para cubrir labels de fondo, resumen de preset y estados de exportacion.
+
+Impacto medido:
+- `app.js`: 7.202 -> 7.192 lineas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: sin cambios, 22.
+
+Validaciones ejecutadas:
+- `node --check apps/flatshot-desktop/frontend/settings-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_settings_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 282 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- HTTP local: `index.html`, `settings-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

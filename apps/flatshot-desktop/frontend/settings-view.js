@@ -66,12 +66,46 @@
     return count ? `Avanzado · ${count} cambio${count === 1 ? "" : "s"}` : "Avanzado";
   }
 
+  function backgroundLabel(value) {
+    if (value === "transparent") {
+      return "transparente";
+    }
+    if (value === "white") {
+      return "blanco";
+    }
+    return "gris claro";
+  }
+
+  function presetSummaryLine(options = {}) {
+    return `${options.format || "JPG"} · ${options.size || "1800x2400"} · ${backgroundLabel(options.background)}`;
+  }
+
+  function exportStatusLabel(options = {}) {
+    const exportStatus = options.exportStatus || "idle";
+    if (exportStatus === "running") {
+      return options.paused ? "Pausada" : "Procesando";
+    }
+    if (exportStatus === "completed") {
+      return "Completada";
+    }
+    if (exportStatus === "partial") {
+      return "Con errores";
+    }
+    if (exportStatus === "failed") {
+      return "Fallida";
+    }
+    return options.ready ? "Lista" : "Configura salida";
+  }
+
   return {
     advancedSummaryTitle,
+    backgroundLabel,
     deletePresetButtonState,
     escapeHtml,
+    exportStatusLabel,
     localAdjustmentText,
     localSettingOutputText,
+    presetSummaryLine,
     presetChipHtml,
     presetDirtyLabel,
     presetListHtml,

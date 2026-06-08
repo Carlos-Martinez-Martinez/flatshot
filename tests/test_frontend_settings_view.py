@@ -80,6 +80,30 @@ assert.deepEqual(helpers.deletePresetButtonState(2), {{
 assert.equal(helpers.advancedSummaryTitle(0), "Avanzado");
 assert.equal(helpers.advancedSummaryTitle(1), "Avanzado · 1 cambio");
 assert.equal(helpers.advancedSummaryTitle(3), "Avanzado · 3 cambios");
+
+assert.equal(helpers.backgroundLabel("transparent"), "transparente");
+assert.equal(helpers.backgroundLabel("white"), "blanco");
+assert.equal(helpers.backgroundLabel("rgb230"), "gris claro");
+assert.equal(helpers.backgroundLabel("unknown"), "gris claro");
+
+assert.equal(helpers.presetSummaryLine({{
+  format: "PNG",
+  size: "1200x1600",
+  background: "transparent",
+}}), "PNG · 1200x1600 · transparente");
+assert.equal(helpers.presetSummaryLine({{
+  format: "JPG",
+  size: "1800x2400",
+  background: "white",
+}}), "JPG · 1800x2400 · blanco");
+
+assert.equal(helpers.exportStatusLabel({{ exportStatus: "running", paused: true, ready: true }}), "Pausada");
+assert.equal(helpers.exportStatusLabel({{ exportStatus: "running", paused: false, ready: true }}), "Procesando");
+assert.equal(helpers.exportStatusLabel({{ exportStatus: "completed", ready: true }}), "Completada");
+assert.equal(helpers.exportStatusLabel({{ exportStatus: "partial", ready: true }}), "Con errores");
+assert.equal(helpers.exportStatusLabel({{ exportStatus: "failed", ready: true }}), "Fallida");
+assert.equal(helpers.exportStatusLabel({{ exportStatus: "idle", ready: true }}), "Lista");
+assert.equal(helpers.exportStatusLabel({{ exportStatus: "idle", ready: false }}), "Configura salida");
 """
     result = subprocess.run(
         ["node", "-e", script],

@@ -5747,7 +5747,11 @@ function renderAppSettings() {
 }
 
 function presetSummaryLine() {
-  return `${state.format} · ${state.size} · ${backgroundLabel(state.background)}`;
+  return settingsViewHelpers.presetSummaryLine({
+    background: state.background,
+    format: state.format,
+    size: state.size,
+  });
 }
 
 function destinationCompactLabel() {
@@ -6195,29 +6199,15 @@ function closePresetEditor() {
 }
 
 function exportStatusLabel(ready) {
-  if (state.exportStatus === "running") {
-    return state.paused ? "Pausada" : "Procesando";
-  }
-  if (state.exportStatus === "completed") {
-    return "Completada";
-  }
-  if (state.exportStatus === "partial") {
-    return "Con errores";
-  }
-  if (state.exportStatus === "failed") {
-    return "Fallida";
-  }
-  return ready ? "Lista" : "Configura salida";
+  return settingsViewHelpers.exportStatusLabel({
+    exportStatus: state.exportStatus,
+    paused: state.paused,
+    ready,
+  });
 }
 
 function backgroundLabel(value) {
-  if (value === "transparent") {
-    return "transparente";
-  }
-  if (value === "white") {
-    return "blanco";
-  }
-  return "gris claro";
+  return settingsViewHelpers.backgroundLabel(value);
 }
 
 function renderFooter() {

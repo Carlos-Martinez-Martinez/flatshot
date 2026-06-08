@@ -405,6 +405,40 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 21 - Extraccion de vista resumen de exportacion
+
+Estado: completada.
+
+Cambios realizados:
+- Se agrego `apps/flatshot-desktop/frontend/export-summary-view.js`.
+- Se movio HTML puro del resumen de exportacion fuera de `app.js`:
+  - resumen compacto durante edicion de salida;
+  - aviso compacto de cambios temporales;
+  - acciones de aplicar/guardar/cancelar edicion;
+  - tarjeta de salida o salidas activas;
+  - filas resumidas de perfiles activos;
+  - acciones de editar salidas y gestionar presets.
+- `index.html` carga el helper antes de `app.js`.
+- `app.js` conserva calculos de readiness, perfiles activos, labels, destinos, ejemplos, avisos y estado; solo delega presentacion.
+- Se agrego `tests/test_frontend_export_summary_view.py` para HTML, escaping, acciones, multiples salidas y orden de carga.
+
+Impacto medido:
+- `app.js`: 7.589 -> 7.533 lineas.
+- Modulos JS frontend: 19 -> 20.
+- Tests frontend `test_frontend_*.py`: 18 -> 19.
+
+Validaciones ejecutadas:
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_export_summary_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 276 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- `node --check apps/flatshot-desktop/frontend/export-summary-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en Windows.
+- HTTP local en `http://127.0.0.1:4201/`: `index.html`, `export-summary-view.js`, `export-result-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

@@ -81,6 +81,7 @@ const outputProfileHelpers = window.FlatShotOutputProfiles;
 const outputProfileViewHelpers = window.FlatShotOutputProfileView;
 const exportPayloadHelpers = window.FlatShotExportPayload;
 const exportStateHelpers = window.FlatShotExportState;
+const exportSummaryViewHelpers = window.FlatShotExportSummaryView;
 const exportResultViewHelpers = window.FlatShotExportResultView;
 const exportPreflightViewHelpers = window.FlatShotExportPreflightView;
 const preflightHelpers = window.FlatShotPreflight;
@@ -5266,87 +5267,30 @@ function renderExport() {
 
   const warningSummary = outputWarningSummary(issues);
   const editDirty = !outputMatchesProfile(activeOutputProfile());
-  const editActions = state.outputEditMode ? `
-    <div class="inspector-actionbar output-edit-actions">
-      <button type="button" data-action="cancel-output-edit">Cancelar</button>
-      <button type="button" class="primary" data-action="apply-output-edit">Aplicar temporalmente</button>
-      <button type="button" data-action="save-output-current-profile">Guardar preset</button>
-      <button type="button" data-action="save-output-as-new">Guardar como nuevo</button>
-      <button type="button" class="btn-linklike" data-action="open-app-settings">Gestionar presets</button>
-    </div>
-  ` : "";
-  const presetActions = !state.outputEditMode ? `
-    <div class="inspector-actionbar">
-      <button type="button" class="primary" data-action="edit-output">Editar salidas</button>
-      <button type="button" data-action="open-app-settings">Gestionar presets</button>
-    </div>
-  ` : "";
   const activeOutputProfiles = exportOutputProfiles();
-  const profileRowsHtml = activeOutputProfiles.length > 1
-    ? activeOutputProfiles.slice(0, 4).map((profile) => `
-      <div class="preset-summary-row">
-        <span>${escapeHtml(profile.format)}</span>
-        <strong title="${escapeHtml(`${profile.name} · ${outputProfileSize(profile)} · ${profileDestinationLabel(profile)}`)}">${escapeHtml(`${profile.name} · ${outputProfileSize(profile).replace("x", " × ")}`)}</strong>
-      </div>
-    `).join("")
-    : "";
-  const extraProfilesHtml = activeOutputProfiles.length > 4
-    ? `<div class="preset-summary-row"><span>Más</span><strong>${escapeHtml(`${activeOutputProfiles.length - 4} salidas más`)}</strong></div>`
-    : "";
-
-  $("#export-summary").innerHTML = state.outputEditMode ? `
-    <div class="compact-panel">
-      <div>
-        <span>Salida</span>
-        <strong>${escapeHtml(outputProfileDisplayName())}</strong>
-      </div>
-      <small>${escapeHtml(presetSummaryLine())}</small>
-    </div>
-    ${editDirty ? `
-      <div class="temporary-output-notice temporary-output-notice--compact">
-        <strong>Cambios temporales</strong>
-        <span>Aplica al lote o guarda el preset.</span>
-      </div>
-    ` : ""}
-    ${editActions}
-  ` : `
-    <div class="preset-summary-card">
-      <div class="preset-summary-main">
-        <span>${escapeHtml(activeOutputProfiles.length > 1 ? "Salidas" : "Salida")}</span>
-        <strong>${escapeHtml(outputProfileDisplayName())}</strong>
-        ${activeOutputProfiles.length > 1 ? `<small>${escapeHtml(`${outputCount} archivos previstos`)}</small>` : ""}
-      </div>
-      ${profileRowsHtml}
-      ${extraProfilesHtml}
-      <div class="preset-summary-row">
-        <span>Formato</span>
-        <strong>${escapeHtml(activeOutputProfiles.length > 1 ? outputCountLabel(activeOutputProfiles.length) : state.format)}</strong>
-      </div>
-      <div class="preset-summary-row">
-        <span>Tamaño</span>
-        <strong>${escapeHtml(activeOutputProfiles.length > 1 ? "Por salida" : state.size.replace("x", " × "))}</strong>
-      </div>
-      <div class="preset-summary-row">
-        <span>Fondo</span>
-        <strong>${escapeHtml(activeOutputProfiles.length > 1 ? "Por salida" : backgroundLabel(state.background))}</strong>
-      </div>
-      <div class="preset-summary-row">
-        <span>Destino</span>
-        <strong title="${escapeHtml(destinationText)}">${escapeHtml(destinationText)}</strong>
-      </div>
-      <div class="preset-summary-row">
-        <span>Nombre final</span>
-        <strong>${escapeHtml(activeOutputProfiles.length > 1 ? "Por salida" : namingHumanLabel())}</strong>
-      </div>
-      <div class="preset-summary-row">
-        <span>Ejemplo</span>
-        <strong title="${escapeHtml(activeOutputProfiles.length > 1 ? outputNameForProfile(activeOutputProfiles[0]) : namingExample())}">${escapeHtml(activeOutputProfiles.length > 1 ? outputNameForProfile(activeOutputProfiles[0]) : namingExample())}</strong>
-      </div>
-    </div>
-    ${warningSummary}
-    ${!outputMatchesProfile(activeOutputProfile()) ? outputTemporaryNoticeHtml() : ""}
-    ${presetActions}
-  `;
+  const hasMultipleOutputs = activeOutputProfiles.length > 1;
+  $("#export-summary").innerHTML = exportSummaryViewHelpers.exportSummaryHtml({
+    editing: state.outputEditMode,
+    displayName: outputProfileDisplayName(),
+    presetSummary: presetSummaryLine(),
+    editDirty,
+    activeOutputCount: activeOutputProfiles.length,
+    outputCount,
+    profileRows: activeOutputProfiles.map((profile) => ({
+      format: profile.format,
+      name: profile.name,
+      size: outputProfileSize(profile),
+      destinationLabel: profileDestinationLabel(profile),
+    })),
+    formatLabel: hasMultipleOutputs ? outputCountLabel(activeOutputProfiles.length) : state.format,
+    sizeLabel: hasMultipleOutputs ? "Por salida" : state.size.replace("x", " × "),
+    backgroundLabel: hasMultipleOutputs ? "Por salida" : backgroundLabel(state.background),
+    destinationText,
+    namingLabel: hasMultipleOutputs ? "Por salida" : namingHumanLabel(),
+    example: hasMultipleOutputs ? outputNameForProfile(activeOutputProfiles[0]) : namingExample(),
+    warningSummaryHtml: warningSummary,
+    temporaryNoticeHtml: !outputMatchesProfile(activeOutputProfile()) ? outputTemporaryNoticeHtml() : "",
+  });
 
   renderExportResult();
 

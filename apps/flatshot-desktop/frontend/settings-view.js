@@ -66,6 +66,16 @@
     return count ? `Avanzado · ${count} cambio${count === 1 ? "" : "s"}` : "Avanzado";
   }
 
+  function advancedDirtyCount(options = {}) {
+    if (!options.presetDirty) {
+      return 0;
+    }
+    const keys = Array.isArray(options.keys) ? options.keys : [];
+    const currentSettings = options.currentSettings || {};
+    const presetSettings = options.presetSettings || {};
+    return keys.filter((key) => currentSettings[key] !== presetSettings[key]).length;
+  }
+
   function backgroundLabel(value) {
     if (value === "transparent") {
       return "transparente";
@@ -98,6 +108,7 @@
   }
 
   return {
+    advancedDirtyCount,
     advancedSummaryTitle,
     backgroundLabel,
     deletePresetButtonState,

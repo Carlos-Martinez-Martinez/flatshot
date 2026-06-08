@@ -1040,6 +1040,34 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 42 - Extraccion de conteo avanzado modificado
+
+Estado: completada.
+
+Cambios realizados:
+- `settings-view.js` ahora expone `advancedDirtyCount()` para contar diferencias entre settings actuales y preset base usando las claves avanzadas.
+- `app.js` conserva la normalizacion de settings y la lista `advancedSettingKeys`; solo delega el conteo.
+- Se amplio `tests/test_frontend_settings_view.py` para cubrir:
+  - preset sin cambios pendientes;
+  - comparacion estricta de claves avanzadas;
+  - claves ausentes en ambos lados.
+
+Impacto medido:
+- `app.js`: 7.160 -> 7.162 lineas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: sin cambios, 22.
+
+Validaciones ejecutadas:
+- `node --check apps/flatshot-desktop/frontend/settings-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_settings_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 282 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- HTTP local: `index.html`, `settings-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

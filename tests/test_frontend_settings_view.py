@@ -80,6 +80,24 @@ assert.deepEqual(helpers.deletePresetButtonState(2), {{
 assert.equal(helpers.advancedSummaryTitle(0), "Avanzado");
 assert.equal(helpers.advancedSummaryTitle(1), "Avanzado · 1 cambio");
 assert.equal(helpers.advancedSummaryTitle(3), "Avanzado · 3 cambios");
+assert.equal(helpers.advancedDirtyCount({{
+  presetDirty: false,
+  keys: ["spread"],
+  currentSettings: {{ spread: 3 }},
+  presetSettings: {{ spread: 0 }},
+}}), 0);
+assert.equal(helpers.advancedDirtyCount({{
+  presetDirty: true,
+  keys: ["spread", "noise", "adaptive_zoom"],
+  currentSettings: {{ spread: 3, noise: 2, adaptive_zoom: false }},
+  presetSettings: {{ spread: 0, noise: 2, adaptive_zoom: true }},
+}}), 2);
+assert.equal(helpers.advancedDirtyCount({{
+  presetDirty: true,
+  keys: ["spread", "missing"],
+  currentSettings: {{ spread: 0 }},
+  presetSettings: {{ spread: 0 }},
+}}), 0);
 
 assert.equal(helpers.backgroundLabel("transparent"), "transparente");
 assert.equal(helpers.backgroundLabel("white"), "blanco");

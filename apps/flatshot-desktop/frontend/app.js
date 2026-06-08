@@ -4650,11 +4650,13 @@ function outputNameForImage(image, index = 1) {
 }
 
 function advancedDirtyCount() {
-  if (!state.presetDirty) {
-    return 0;
-  }
   const presetSettings = normalizeSettings(activePresetItem()?.settings || defaultSettings);
-  return advancedSettingKeys.filter((key) => state.settings[key] !== presetSettings[key]).length;
+  return settingsViewHelpers.advancedDirtyCount({
+    currentSettings: state.settings,
+    keys: advancedSettingKeys,
+    presetDirty: state.presetDirty,
+    presetSettings,
+  });
 }
 
 function advancedSettingsDirty() {

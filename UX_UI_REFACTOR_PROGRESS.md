@@ -1429,6 +1429,36 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 55 - Extraccion del grid de detalle de lote
+
+Estado: completada.
+
+Cambios realizados:
+- `batch-detail-view.js` ahora expone `batchDetailGridHtml()` para renderizar la estructura principal del detalle de lote.
+- `app.js` conserva conteos, ruta de entrada, estado visible, incidencias, ignorados y salidas activas; solo delega el HTML de secciones.
+- Se amplio `tests/test_frontend_batch_detail_view.py` para cubrir:
+  - secciones `Resumen`, `Entrada`, `Lote`, `Salidas activas` e `Incidencias`;
+  - escaping de carpeta/ruta;
+  - inclusion de filas de salida, ignorados e incidencias;
+  - fallback de salidas e incidencias vacias.
+
+Impacto medido:
+- `app.js`: 6.540 -> 6.519 lineas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: sin cambios, 22.
+
+Validaciones ejecutadas:
+- `node --check apps/flatshot-desktop/frontend/batch-detail-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_batch_detail_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 282 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en Windows.
+- HTTP local: `index.html`, `batch-detail-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

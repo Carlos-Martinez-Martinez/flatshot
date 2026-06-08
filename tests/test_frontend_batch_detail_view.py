@@ -99,6 +99,37 @@ assert.equal(ignoredSection.includes('class="batch-detail-reasons"'), true);
 assert.equal(ignoredSection.includes('class="batch-detail-problem clear"'), true);
 assert.equal(helpers.batchDetailIgnoredSectionHtml({{ count: 0, rowsHtml: "" }}), "");
 
+const grid = helpers.batchDetailGridHtml({{
+  files: 5,
+  valid: 4,
+  counts: {{
+    exportableImages: 3,
+    ignoredFiles: 1,
+    nonExportableImages: 1,
+  }},
+  issueCount: 2,
+  sourceFolderName: "Entrada <uno>",
+  sourcePath: 'C:/Entrada/"uno"',
+  stateTitle: "Listo",
+  outputRowsHtml: output,
+  ignoredSectionHtml: ignoredSection,
+  issueRowsHtml: problem,
+}});
+assert.equal(grid.includes('batch-detail-grid batch-detail-grid--compact'), true);
+assert.equal(grid.includes("<h3>Resumen</h3>"), true);
+assert.equal(grid.includes("<h3>Entrada</h3>"), true);
+assert.equal(grid.includes("<h3>Lote</h3>"), true);
+assert.equal(grid.includes("<h3>Salidas activas</h3>"), true);
+assert.equal(grid.includes("<h3>Incidencias</h3>"), true);
+assert.equal(grid.includes("Entrada &lt;uno&gt;"), true);
+assert.equal(grid.includes('title="C:/Entrada/&quot;uno&quot;"'), true);
+assert.equal(grid.includes('class="batch-detail-output"'), true);
+assert.equal(grid.includes('class="batch-detail-problem warning"'), true);
+
+const emptyGrid = helpers.batchDetailGridHtml({{ counts: {{}} }});
+assert.equal(emptyGrid.includes("Sin salidas activas."), true);
+assert.equal(emptyGrid.includes("Sin incidencias."), true);
+
 const folder = helpers.folderItemHtml({{
   name: "Carpeta <A>",
   detail: "2 imágenes & 1 aviso",

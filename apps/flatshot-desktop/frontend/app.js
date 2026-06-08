@@ -3571,44 +3571,18 @@ function batchDetailHtml() {
     rowsHtml: ignoredRowsHtml,
   });
 
-  return `
-    <div class="batch-detail-grid batch-detail-grid--compact">
-      <section class="batch-detail-section">
-        <h3>Resumen</h3>
-        ${batchDetailRowHtml("Encontrados", files)}
-        ${batchDetailRowHtml("Exportables", counts.exportableImages)}
-        ${batchDetailRowHtml("Ignorados técnicos", counts.ignoredFiles)}
-        ${batchDetailRowHtml("Incidencias", actionableIssueRows().length)}
-      </section>
-
-      <section class="batch-detail-section">
-        <h3>Entrada</h3>
-        ${batchDetailRowHtml("Carpeta", sourceFolderName(), sourcePath)}
-        ${batchDetailRowHtml("Ruta", sourcePath || "Pendiente", sourcePath)}
-        ${batchDetailRowHtml("Imágenes", valid)}
-      </section>
-
-      <section class="batch-detail-section">
-        <h3>Lote</h3>
-        ${batchDetailRowHtml("Archivos", files)}
-        ${batchDetailRowHtml("Exportables", counts.exportableImages)}
-        ${batchDetailRowHtml("Excluidas", counts.nonExportableImages)}
-        ${batchDetailRowHtml("Estado", getVisibleAppState().title)}
-      </section>
-
-      <section class="batch-detail-section">
-        <h3>Salidas activas</h3>
-        ${outputRowsHtml || '<span class="batch-detail-muted">Sin salidas activas.</span>'}
-      </section>
-
-      ${ignoredSectionHtml}
-
-      <section class="batch-detail-section">
-        <h3>Incidencias</h3>
-        ${issueRowsHtml || '<span class="batch-detail-muted">Sin incidencias.</span>'}
-      </section>
-    </div>
-  `;
+  return batchDetailViewHelpers.batchDetailGridHtml({
+    counts,
+    files,
+    ignoredSectionHtml,
+    issueCount: actionableIssueRows().length,
+    issueRowsHtml,
+    outputRowsHtml,
+    sourceFolderName: sourceFolderName(),
+    sourcePath,
+    stateTitle: getVisibleAppState().title,
+    valid,
+  });
 }
 
 function batchDetailRowHtml(label, value, title = "") {

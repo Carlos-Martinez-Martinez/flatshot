@@ -71,6 +71,48 @@
   `;
   }
 
+  function batchDetailGridHtml(options = {}) {
+    const counts = options.counts || {};
+    return `
+    <div class="batch-detail-grid batch-detail-grid--compact">
+      <section class="batch-detail-section">
+        <h3>Resumen</h3>
+        ${batchDetailRowHtml("Encontrados", options.files)}
+        ${batchDetailRowHtml("Exportables", counts.exportableImages)}
+        ${batchDetailRowHtml("Ignorados técnicos", counts.ignoredFiles)}
+        ${batchDetailRowHtml("Incidencias", options.issueCount)}
+      </section>
+
+      <section class="batch-detail-section">
+        <h3>Entrada</h3>
+        ${batchDetailRowHtml("Carpeta", options.sourceFolderName, options.sourcePath)}
+        ${batchDetailRowHtml("Ruta", options.sourcePath || "Pendiente", options.sourcePath)}
+        ${batchDetailRowHtml("Imágenes", options.valid)}
+      </section>
+
+      <section class="batch-detail-section">
+        <h3>Lote</h3>
+        ${batchDetailRowHtml("Archivos", options.files)}
+        ${batchDetailRowHtml("Exportables", counts.exportableImages)}
+        ${batchDetailRowHtml("Excluidas", counts.nonExportableImages)}
+        ${batchDetailRowHtml("Estado", options.stateTitle)}
+      </section>
+
+      <section class="batch-detail-section">
+        <h3>Salidas activas</h3>
+        ${options.outputRowsHtml || '<span class="batch-detail-muted">Sin salidas activas.</span>'}
+      </section>
+
+      ${options.ignoredSectionHtml || ""}
+
+      <section class="batch-detail-section">
+        <h3>Incidencias</h3>
+        ${options.issueRowsHtml || '<span class="batch-detail-muted">Sin incidencias.</span>'}
+      </section>
+    </div>
+  `;
+  }
+
   function folderItemHtml(folder) {
     const className = folder.status === "warning" ? "empty" : folder.status === "error" ? "error" : folder.status || "";
     return `
@@ -87,6 +129,7 @@
   }
 
   return {
+    batchDetailGridHtml,
     batchDetailIgnoredSectionHtml,
     batchDetailOutputHtml,
     batchDetailProblemHtml,

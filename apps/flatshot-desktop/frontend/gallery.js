@@ -113,6 +113,32 @@
     return galleryFilterVisible(filter, counts) ? filter : DEFAULT_FILTERS.all;
   }
 
+  function galleryFilterButtonStates(options = {}) {
+    const counts = options.counts || {};
+    const activeFilter = options.activeFilter || DEFAULT_FILTERS.all;
+    const labels = {
+      all: "Todas",
+      valid: "Listas",
+      warnings: "Avisos",
+      excluded: "Excluidas",
+    };
+    const order = { all: 1, valid: 2, warnings: 3, excluded: 4 };
+    const visibleFilters = Object.keys(labels).filter((filter) => galleryFilterVisible(filter, counts));
+    return Object.keys(labels).map((filter) => {
+      const count = Number(counts[filter]) || 0;
+      return {
+        filter,
+        label: labels[filter],
+        count,
+        title: `${labels[filter]} ${count}`,
+        order: order[filter] || 9,
+        active: filter === activeFilter,
+        empty: filter !== DEFAULT_FILTERS.all && !count,
+        hidden: visibleFilters.length <= 1 || !visibleFilters.includes(filter),
+      };
+    });
+  }
+
   function filteredEmptyHtml(options = {}) {
     const total = Number(options.total) || 0;
     if (!total) {
@@ -294,6 +320,7 @@
     filterEmptyDetail,
     filterStatusText,
     galleryFilterCounts,
+    galleryFilterButtonStates,
     galleryFilterVisible,
     basename,
     compactImageDetail,

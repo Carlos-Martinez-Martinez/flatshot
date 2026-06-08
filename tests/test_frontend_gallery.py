@@ -90,6 +90,25 @@ assert.equal(helpers.filterDisplayName("warnings"), "con aviso");
 assert.equal(helpers.filterStatusText("all"), "Mostrando todo");
 assert.equal(helpers.filterStatusText("warnings"), "Mostrando con aviso");
 
+assert.deepEqual(helpers.galleryFilterButtonStates({{
+  activeFilter: "warnings",
+  counts,
+}}), [
+  {{ filter: "all", label: "Todas", count: 5, title: "Todas 5", order: 1, active: false, empty: false, hidden: false }},
+  {{ filter: "valid", label: "Listas", count: 3, title: "Listas 3", order: 2, active: false, empty: false, hidden: false }},
+  {{ filter: "warnings", label: "Avisos", count: 1, title: "Avisos 1", order: 3, active: true, empty: false, hidden: false }},
+  {{ filter: "excluded", label: "Excluidas", count: 2, title: "Excluidas 2", order: 4, active: false, empty: false, hidden: false }},
+]);
+assert.deepEqual(helpers.galleryFilterButtonStates({{
+  activeFilter: "all",
+  counts: {{ all: 2, valid: 2, warnings: 0, excluded: 0 }},
+}}), [
+  {{ filter: "all", label: "Todas", count: 2, title: "Todas 2", order: 1, active: true, empty: false, hidden: true }},
+  {{ filter: "valid", label: "Listas", count: 2, title: "Listas 2", order: 2, active: false, empty: false, hidden: true }},
+  {{ filter: "warnings", label: "Avisos", count: 0, title: "Avisos 0", order: 3, active: false, empty: true, hidden: true }},
+  {{ filter: "excluded", label: "Excluidas", count: 0, title: "Excluidas 0", order: 4, active: false, empty: true, hidden: true }},
+]);
+
 assert.equal(helpers.escapeHtml('<a&b"c>'), "&lt;a&amp;b&quot;c&gt;");
 assert.equal(helpers.filteredEmptyHtml({{ total: 0 }}), "No hay imágenes en este lote.");
 assert.equal(

@@ -893,6 +893,37 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 37 - Extraccion de estado de filtros de galeria
+
+Estado: completada.
+
+Cambios realizados:
+- `gallery.js` ahora expone `galleryFilterButtonStates()` para derivar:
+  - label y contador de cada filtro;
+  - titulo;
+  - orden visual;
+  - estado activo;
+  - estado vacio;
+  - visibilidad.
+- `renderFilterButtons()` en `app.js` conserva la aplicacion DOM y delega el calculo del estado de botones.
+- Se amplio `tests/test_frontend_gallery.py` para cubrir filtros visibles y filtros ocultos cuando solo queda `Todas`.
+
+Impacto medido:
+- `app.js`: 7.179 -> 7.178 lineas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: sin cambios, 22.
+
+Validaciones ejecutadas:
+- `node --check apps/flatshot-desktop/frontend/gallery.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_gallery.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 282 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- HTTP local: `index.html`, `gallery.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

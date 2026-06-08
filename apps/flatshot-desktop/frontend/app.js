@@ -4095,28 +4095,27 @@ function ensureGalleryFilterAvailable(images = activeImages()) {
 function renderFilterButtons() {
   const images = activeImages();
   const counts = galleryFilterCounts(images);
-  const labels = {
-    all: "Todas",
-    valid: "Listas",
-    warnings: "Avisos",
-    excluded: "Excluidas",
-  };
-  const order = { all: 1, valid: 2, warnings: 3, excluded: 4 };
-  const visibleFilters = Object.keys(labels).filter((filter) => galleryFilterVisible(filter, counts));
+  const buttonStates = galleryHelpers.galleryFilterButtonStates({
+    activeFilter: state.filter,
+    counts,
+  });
+  const visibleCount = buttonStates.filter((item) => !item.hidden).length;
   const filterGroup = $(".gallery-filter");
   if (filterGroup) {
-    filterGroup.hidden = visibleFilters.length <= 1;
+    filterGroup.hidden = visibleCount <= 1;
   }
   $$(".batch-filter button").forEach((button) => {
     const filter = button.dataset.filter;
-    const count = counts[filter] || 0;
-    button.innerHTML = `${escapeHtml(labels[filter])} <span>${escapeHtml(count)}</span>`;
-    button.title = `${labels[filter]} ${count}`;
-    button.style.order = String(order[filter] || 9);
-    button.classList.toggle("active", button.dataset.filter === state.filter);
-    const empty = filter !== "all" && !count;
-    button.classList.toggle("is-empty", empty);
-    button.hidden = visibleFilters.length <= 1 || !visibleFilters.includes(filter);
+    const buttonState = buttonStates.find((item) => item.filter === filter);
+    if (!buttonState) {
+      return;
+    }
+    button.innerHTML = `${escapeHtml(buttonState.label)} <span>${escapeHtml(buttonState.count)}</span>`;
+    button.title = buttonState.title;
+    button.style.order = String(buttonState.order);
+    button.classList.toggle("active", buttonState.active);
+    button.classList.toggle("is-empty", buttonState.empty);
+    button.hidden = buttonState.hidden;
   });
 }
 

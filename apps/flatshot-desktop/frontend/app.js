@@ -4952,10 +4952,10 @@ function progressPanelHtml(label, value = null) {
 }
 
 function presetSourceLabel() {
-  if (state.bridgePresetWarning) {
-    return state.presetDirty ? "Global · Modificado · aviso" : "Global · aviso";
-  }
-  return state.presetDirty ? "Global · Modificado" : "Global";
+  return settingsViewHelpers.presetSourceLabel({
+    bridgePresetWarning: state.bridgePresetWarning,
+    presetDirty: state.presetDirty,
+  });
 }
 
 function renderExport() {

@@ -35,6 +35,13 @@
     return presetDirty ? "Sin guardar" : "Sin cambios";
   }
 
+  function presetSourceLabel(options = {}) {
+    if (options.bridgePresetWarning) {
+      return options.presetDirty ? "Global · Modificado · aviso" : "Global · aviso";
+    }
+    return options.presetDirty ? "Global · Modificado" : "Global";
+  }
+
   function localAdjustmentText(localActive) {
     return localActive ? "Ajuste local activo" : "Sin ajuste local";
   }
@@ -120,6 +127,7 @@
     presetChipHtml,
     presetDirtyLabel,
     presetListHtml,
+    presetSourceLabel,
     savePresetButtonState,
   };
 });

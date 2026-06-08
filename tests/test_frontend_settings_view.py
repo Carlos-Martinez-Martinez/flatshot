@@ -51,6 +51,10 @@ assert.equal(helpers.presetListHtml([], "Luz"), '<span class="preset-empty">No h
 
 assert.equal(helpers.presetDirtyLabel(true), "Sin guardar");
 assert.equal(helpers.presetDirtyLabel(false), "Sin cambios");
+assert.equal(helpers.presetSourceLabel({{ bridgePresetWarning: "", presetDirty: false }}), "Global");
+assert.equal(helpers.presetSourceLabel({{ bridgePresetWarning: "", presetDirty: true }}), "Global · Modificado");
+assert.equal(helpers.presetSourceLabel({{ bridgePresetWarning: "Aviso", presetDirty: false }}), "Global · aviso");
+assert.equal(helpers.presetSourceLabel({{ bridgePresetWarning: "Aviso", presetDirty: true }}), "Global · Modificado · aviso");
 assert.equal(helpers.localAdjustmentText(true), "Ajuste local activo");
 assert.equal(helpers.localAdjustmentText(false), "Sin ajuste local");
 assert.equal(helpers.localSettingOutputText(3), "+3");

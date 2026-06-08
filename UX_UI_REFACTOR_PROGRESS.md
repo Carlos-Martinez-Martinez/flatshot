@@ -1099,6 +1099,35 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 44 - Extraccion de label de fuente de preset
+
+Estado: completada.
+
+Cambios realizados:
+- `settings-view.js` ahora expone `presetSourceLabel()` para calcular la microcopy de fuente del ajuste.
+- `app.js` conserva las fuentes de verdad (`bridgePresetWarning`, `presetDirty`) y solo delega el label.
+- Se amplio `tests/test_frontend_settings_view.py` para cubrir:
+  - global limpio;
+  - global modificado;
+  - aviso bridge sin cambios;
+  - aviso bridge con cambios.
+
+Impacto medido:
+- `app.js`: sin cambios netos, 7.156 lineas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: sin cambios, 22.
+
+Validaciones ejecutadas:
+- `node --check apps/flatshot-desktop/frontend/settings-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_settings_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 282 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- HTTP local: `index.html`, `settings-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

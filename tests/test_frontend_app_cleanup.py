@@ -26,6 +26,9 @@ def test_app_js_does_not_reintroduce_extracted_wrapper_helpers():
         "function imageCountLabel(",
         "function omittedSummaryText(",
         "function batchBackgroundLabel(",
+        "function outputCountLabel(",
+        "function detectedFormatLabel(",
+        "function bridgeScanMessage(",
     ]
 
     for wrapper in obsolete_wrappers:

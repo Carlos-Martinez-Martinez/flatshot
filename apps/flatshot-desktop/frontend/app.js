@@ -1257,14 +1257,6 @@ function plannedExportTotal() {
   return exportableImages().length * exportOutputCount();
 }
 
-function outputCountLabel(count = exportOutputCount()) {
-  return batchViewHelpers.outputCountLabel(count);
-}
-
-function detectedFormatLabel(images = activeImages()) {
-  return batchViewHelpers.detectedFormatLabel(images);
-}
-
 function firstOmittedItem() {
   const omitted = actionableOmissions();
   return omitted.length ? omitted[0] : null;
@@ -1464,7 +1456,7 @@ function getVisibleAppState() {
 
 function readyBatchSummaryText(counts = batchCounts()) {
   const readyText = readyImagesText(counts.filesFound > 0 || counts.exportableImages > 0 ? counts.exportableImages : 0);
-  return batchViewHelpers.readyBatchSummaryText(counts, detectedFormatLabel(activeImages()), readyText);
+  return batchViewHelpers.readyBatchSummaryText(counts, batchViewHelpers.detectedFormatLabel(activeImages()), readyText);
 }
 
 function setScenario(scenario) {
@@ -2607,7 +2599,7 @@ function applyBridgeScanResult(response) {
   const responseErrors = Array.isArray(response.errors) ? response.errors : [];
   state.bridgeStatus = "connected";
   state.batchSource = "bridge";
-  state.bridgeMessage = bridgeScanMessage(response.totalImages || 0, folderWarnings + responseErrors.length);
+  state.bridgeMessage = batchViewHelpers.bridgeScanMessage(response.totalImages || 0, folderWarnings + responseErrors.length);
   state.bridgeLastResponse = `scan OK · ${response.totalImages || 0} imágenes`;
   state.scanIssues = [
     ...state.realFolders
@@ -2653,10 +2645,6 @@ function parseFolderInput(value) {
     .split(/[;\n\r]+/)
     .map((item) => item.trim())
     .filter(Boolean);
-}
-
-function bridgeScanMessage(totalImages, warningCount) {
-  return batchViewHelpers.bridgeScanMessage(totalImages, warningCount);
 }
 
 function omissionReasonLabel(reason) {
@@ -3177,7 +3165,7 @@ function compactHeaderStatusText() {
     exportStatus: state.exportStatus,
     exportableImages: counts.exportableImages,
     filesFound: counts.filesFound,
-    formatLabel: detectedFormatLabel(images),
+    formatLabel: batchViewHelpers.detectedFormatLabel(images),
     ignoredFiles: counts.ignoredFiles,
     imageCount: images.length,
     nonBlockingWarnings: counts.nonBlockingWarnings,
@@ -4797,7 +4785,7 @@ function renderExport() {
       size: outputProfileSize(profile),
       destinationLabel: profileDestinationLabel(profile),
     })),
-    formatLabel: hasMultipleOutputs ? outputCountLabel(activeOutputProfiles.length) : state.format,
+    formatLabel: hasMultipleOutputs ? batchViewHelpers.outputCountLabel(activeOutputProfiles.length) : state.format,
     sizeLabel: hasMultipleOutputs ? "Por salida" : state.size.replace("x", " × "),
     backgroundLabel: hasMultipleOutputs ? "Por salida" : backgroundLabel(state.background),
     destinationText,
@@ -4827,7 +4815,7 @@ function renderOutputProfileSelect() {
 function outputProfileDisplayName() {
   const profiles = exportOutputProfiles();
   if (profiles.length > 1) {
-    return outputCountLabel(profiles.length);
+    return batchViewHelpers.outputCountLabel(profiles.length);
   }
   const profile = activeOutputProfile();
   if (!profile || !outputMatchesProfile(profile)) {

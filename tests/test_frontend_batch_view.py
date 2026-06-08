@@ -35,6 +35,20 @@ assert.equal(helpers.exportActionLabel(4, 1), "Exportar 4 imágenes");
 assert.equal(helpers.exportActionLabel(4, 2), "Exportar 8 archivos");
 assert.equal(helpers.outputCountLabel(1), "1 salida");
 assert.equal(helpers.outputCountLabel(3), "3 salidas");
+assert.equal(helpers.adjustedCountLabel(1), "1 ajustada");
+assert.equal(helpers.adjustedCountLabel(2), "2 ajustadas");
+assert.deepEqual(helpers.batchPillState({{ issueCount: 2, adjustedCount: 3 }}), {{
+  label: "2 avisos",
+  tone: "warning",
+}});
+assert.deepEqual(helpers.batchPillState({{ issueCount: 0, adjustedCount: 1 }}), {{
+  label: "1 ajustada",
+  tone: "active",
+}});
+assert.deepEqual(helpers.batchPillState({{ issueCount: 0, adjustedCount: 0 }}), {{
+  label: "Listo",
+  tone: "ready",
+}});
 
 assert.equal(helpers.detectedFormatLabel([]), "PNG");
 assert.equal(helpers.detectedFormatLabel([{{ name: "a.png" }}, {{ name: "b.png" }}]), "PNG");

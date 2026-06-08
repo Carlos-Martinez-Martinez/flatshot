@@ -20,6 +20,7 @@ def test_app_js_does_not_reintroduce_extracted_wrapper_helpers():
         "function outputPresetLabel(",
         "function reviewErrors(",
         "function sameOutputProfile(",
+        "function pluralizeCount(",
     ]
 
     for wrapper in obsolete_wrappers:

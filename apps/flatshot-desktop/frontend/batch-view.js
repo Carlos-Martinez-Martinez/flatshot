@@ -32,6 +32,23 @@
     return `${count} salida${count === 1 ? "" : "s"}`;
   }
 
+  function adjustedCountLabel(count) {
+    const value = Number(count) || 0;
+    return `${value} ajustada${value === 1 ? "" : "s"}`;
+  }
+
+  function batchPillState(options = {}) {
+    const issueCount = Number(options.issueCount) || 0;
+    const adjustedCount = Number(options.adjustedCount) || 0;
+    if (issueCount) {
+      return { label: warningCountLabel(issueCount), tone: "warning" };
+    }
+    if (adjustedCount) {
+      return { label: adjustedCountLabel(adjustedCount), tone: "active" };
+    }
+    return { label: "Listo", tone: "ready" };
+  }
+
   function detectedFormatLabel(images = []) {
     if (!images.length) {
       return "PNG";
@@ -304,10 +321,12 @@
   }
 
   return {
+    adjustedCountLabel,
     batchBackgroundLabel,
     batchDestinationLine,
     batchMetricHtml,
     batchOutputLine,
+    batchPillState,
     batchSummaryHtml,
     batchSummaryLabel,
     batchSummaryToneClass,

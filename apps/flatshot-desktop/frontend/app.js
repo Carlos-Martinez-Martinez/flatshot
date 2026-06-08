@@ -3552,17 +3552,6 @@ function batchDetailHtml() {
   });
 }
 
-function pluralizeCount(count, singular) {
-  const value = Number(count) || 0;
-  const irregular = {
-    imagen: "imágenes",
-    correcta: "correctas",
-    lista: "listas",
-  };
-  const plural = irregular[singular] || (singular.endsWith("s") ? singular : `${singular}s`);
-  return `${value} ${value === 1 ? singular : plural}`;
-}
-
 function bridgeStatusClass() {
   return scanStateHelpers.bridgeStatusClass({
     bridgeMode: state.bridgeMode,
@@ -3656,12 +3645,11 @@ function renderBatch() {
 
   const exportable = exportableImages().length;
   $("#batch-count").textContent = exportable ? readyImagesText(exportable) : "Sin exportables";
-  setBatchPill(
-    issueCount
-      ? warningCountLabel(issueCount)
-      : adjusted ? `${pluralizeCount(adjusted, "ajustada")}` : "Listo",
-    issueCount ? "warning" : adjusted ? "active" : "ready"
-  );
+  const batchPillState = batchViewHelpers.batchPillState({
+    adjustedCount: adjusted,
+    issueCount,
+  });
+  setBatchPill(batchPillState.label, batchPillState.tone);
   $("#folder-list").innerHTML = "";
   ensureGalleryFilterAvailable(images);
   renderFilterButtons();

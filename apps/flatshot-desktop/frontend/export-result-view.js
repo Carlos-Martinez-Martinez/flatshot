@@ -96,6 +96,15 @@
     return `<div class="result-actions">${actions.join("")}</div>`;
   }
 
+  function currentExportFileLabel(options = {}) {
+    const images = Array.isArray(options.images) ? options.images : [];
+    if (!images.length) {
+      return options.statusText || "Preparando";
+    }
+    const index = Math.min(Math.max(Number(options.processed) || 0, 0), images.length - 1);
+    return images[index]?.name || options.statusText || "Preparando";
+  }
+
   function exportResultHtml(options = {}) {
     const status = options.status || "running";
     const title = options.title || exportResultTitle(status, options.paused);
@@ -157,6 +166,7 @@
 
   return {
     escapeHtml,
+    currentExportFileLabel,
     exportIssueActionText,
     exportResultActionsHtml,
     exportResultClass,

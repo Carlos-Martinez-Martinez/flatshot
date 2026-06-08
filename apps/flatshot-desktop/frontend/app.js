@@ -5888,12 +5888,11 @@ function exportResultMeta(processed, total, errors) {
 }
 
 function currentExportFileLabel() {
-  const images = exportableImages();
-  if (!images.length) {
-    return state.statusText || "Preparando";
-  }
-  const index = Math.min(Math.max(Number(state.processed) || 0, 0), images.length - 1);
-  return images[index]?.name || state.statusText || "Preparando";
+  return exportResultViewHelpers.currentExportFileLabel({
+    images: exportableImages(),
+    processed: state.processed,
+    statusText: state.statusText,
+  });
 }
 
 function exportIssueActionText(issue) {

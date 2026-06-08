@@ -36,6 +36,36 @@ assert.equal(helpers.exportResultTitle("running", true), "Exportación pausada")
 assert.equal(helpers.exportResultTitle("completed"), "Exportación completada");
 assert.equal(helpers.exportResultMeta({{ status: "partial", processed: 2, total: 3, errors: 1 }}), "2/3 exportadas · 1 error");
 assert.equal(helpers.exportResultMeta({{ status: "failed", processed: 0, total: 3, errors: 0 }}), "No completada");
+assert.equal(helpers.currentExportFileLabel({{
+  images: [],
+  processed: 0,
+  statusText: "Preparando lote",
+}}), "Preparando lote");
+assert.equal(helpers.currentExportFileLabel({{
+  images: [],
+  processed: 0,
+  statusText: "",
+}}), "Preparando");
+assert.equal(helpers.currentExportFileLabel({{
+  images: [{{ name: "a.png" }}, {{ name: "b.png" }}],
+  processed: -1,
+  statusText: "Procesando",
+}}), "a.png");
+assert.equal(helpers.currentExportFileLabel({{
+  images: [{{ name: "a.png" }}, {{ name: "b.png" }}],
+  processed: 1,
+  statusText: "Procesando",
+}}), "b.png");
+assert.equal(helpers.currentExportFileLabel({{
+  images: [{{ name: "a.png" }}, {{ name: "b.png" }}],
+  processed: 99,
+  statusText: "Procesando",
+}}), "b.png");
+assert.equal(helpers.currentExportFileLabel({{
+  images: [{{ name: "" }}],
+  processed: 0,
+  statusText: "Procesando",
+}}), "Procesando");
 
 assert.equal(
   helpers.exportIssueActionText({{ title: "Destino", detail: "ocupado" }}, {{ existingOutput: true }}),

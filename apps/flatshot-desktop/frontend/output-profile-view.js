@@ -142,6 +142,37 @@
     return outputName;
   }
 
+  function basename(path) {
+    return String(path || "").split(/[\\/]/).filter(Boolean).pop() || "";
+  }
+
+  function imageFileStem(name) {
+    return basename(name).replace(/\.[^.\\/]+$/, "") || basename(name) || "Imagen";
+  }
+
+  function folderNameForImage(image = {}, folders = []) {
+    const folderItems = Array.isArray(folders) ? folders : [];
+    return folderItems.find((item) => item.id === image?.folderId)?.name
+      || folderItems[0]?.name
+      || "lote";
+  }
+
+  function outputNameForImage(options = {}) {
+    if (!String(options.naming || "").trim()) {
+      return "Nombre de archivo pendiente";
+    }
+    const image = options.image || {};
+    return outputNameFromTemplate({
+      naming: options.naming,
+      suffix: options.suffix || "_PRO",
+      format: options.format || "JPG",
+    }, {
+      original: imageFileStem(image?.name || "imagen_001.png"),
+      folder: folderNameForImage(image, options.folders),
+      index: options.index || 1,
+    });
+  }
+
   function destinationCompactLabel(options = {}) {
     if (options.destinationMode === "custom") {
       return options.destinationValue || "Sin destino";
@@ -217,6 +248,7 @@
     escapeHtml,
     namingExample,
     namingHumanLabel,
+    outputNameForImage,
     outputNameFromTemplate,
     outputProfileEditorHeadingHtml,
     outputProfileFooterState,

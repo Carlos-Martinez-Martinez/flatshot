@@ -4628,25 +4628,14 @@ function imageReviewIssues(image) {
 }
 
 function outputNameForImage(image, index = 1) {
-  if (!state.naming.trim()) {
-    return "Nombre de archivo pendiente";
-  }
-  const original = imageFileStem(image?.name || "imagen_001.png");
-  const folder = activeFolders().find((item) => item.id === image?.folderId)?.name
-    || activeFolders()[0]?.name
-    || "lote";
-  let outputName = state.naming
-    .replaceAll("{original}", original)
-    .replaceAll("{suffix}", state.suffix || "_PRO")
-    .replaceAll("{folder}", folder);
-  outputName = outputName.replace(/\{index(?::0?(\d+)d)?\}/g, (_match, width) => {
-    const digits = Number(width) || 1;
-    return String(index).padStart(digits, "0");
+  return outputProfileViewHelpers.outputNameForImage({
+    folders: activeFolders(),
+    format: state.format,
+    image,
+    index,
+    naming: state.naming,
+    suffix: state.suffix,
   });
-  if (!/\.[a-z0-9]+$/i.test(outputName)) {
-    outputName = `${outputName}.${state.format.toLowerCase()}`;
-  }
-  return outputName;
 }
 
 function advancedDirtyCount() {

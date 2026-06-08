@@ -103,6 +103,47 @@ const name = helpers.outputNameFromTemplate(profile, {{
 }});
 assert.equal(name, "Lote Junio_007_camisa_PRO.jpg");
 
+assert.equal(helpers.outputNameForImage({{
+  naming: "",
+  suffix: "_PRO",
+  format: "JPG",
+  image: {{ name: "camisa.png" }},
+  folders: [{{ id: "folder-a", name: "Lote A" }}],
+  index: 4,
+}}), "Nombre de archivo pendiente");
+assert.equal(helpers.outputNameForImage({{
+  naming: "{{folder}}_{{index:02d}}_{{original}}{{suffix}}",
+  suffix: "_WEB",
+  format: "PNG",
+  image: {{ name: "C:/Fotos/camisa.azul.png", folderId: "folder-b" }},
+  folders: [
+    {{ id: "folder-a", name: "Lote A" }},
+    {{ id: "folder-b", name: "Lote B" }},
+  ],
+  index: 4,
+}}), "Lote B_04_camisa.azul_WEB.png");
+assert.equal(helpers.outputNameForImage({{
+  naming: "{{folder}}_{{original}}{{suffix}}",
+  suffix: "",
+  format: "JPG",
+  image: {{ name: "camisa.png", folderId: "missing" }},
+  folders: [{{ id: "folder-a", name: "Lote A" }}],
+}}), "Lote A_camisa_PRO.jpg");
+assert.equal(helpers.outputNameForImage({{
+  naming: "{{folder}}_{{original}}{{suffix}}",
+  suffix: "",
+  format: "JPG",
+  image: {{}},
+  folders: [],
+}}), "lote_imagen_001_PRO.jpg");
+assert.equal(helpers.outputNameForImage({{
+  naming: "{{original}}.webp",
+  suffix: "_PRO",
+  format: "JPG",
+  image: {{ name: "camisa.png" }},
+  folders: [],
+}}), "camisa.webp");
+
 assert.equal(helpers.destinationCompactLabel({{
   destinationMode: "custom",
   destinationValue: "",

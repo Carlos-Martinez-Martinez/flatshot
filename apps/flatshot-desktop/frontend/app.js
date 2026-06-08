@@ -956,7 +956,7 @@ function countText(count, singular, plural = `${singular}s`) {
 
 function readyImagesText(count) {
   const value = Number(count) || 0;
-  return `${value} ${value === 1 ? "lista" : "listas"}`;
+  return `${value} ${value === 1 ? "imagen lista" : "imágenes listas"}`;
 }
 
 function ignoredNeutralText(count = batchCounts().ignoredFiles) {
@@ -977,7 +977,7 @@ function sidebarLotSummaryText(counts = batchCounts()) {
     return state.scanStatus || "Leyendo imágenes";
   }
   if (state.batch === "empty") {
-    return "0 listas";
+    return "No hay PNG válidos";
   }
   if (!hasBatch()) {
     return "Sin carpeta";
@@ -3594,6 +3594,7 @@ function renderShell() {
   shell.dataset.uiState = visible.id;
   if (gallery) {
     gallery.dataset.galleryView = state.galleryView;
+    gallery.dataset.outputBg = activeOutputProfile()?.background || state.background || "rgb230";
   }
 }
 
@@ -3776,7 +3777,7 @@ function compactHeaderStatusText() {
   if (state.batch === "empty") {
     const files = counts.filesFound || 0;
     const ignored = counts.ignoredFiles || 0;
-    return ignored ? `${files} archivos · 0 listas · ${ignored} ignorados` : "0 listas";
+    return ignored ? `${files} archivos · no hay PNG válidos · ${ignored} ignorados` : "No hay PNG válidos";
   }
   const parts = [
     detectedFormatLabel(activeImages()),
@@ -4309,7 +4310,6 @@ function batchDetailHtml() {
       : state.bridgeScanPath;
   const files = counts.filesFound === null ? "Leyendo" : counts.filesFound;
   const valid = counts.validImages === null ? "Leyendo" : counts.validImages;
-  const summary = `${files} encontrados · ${counts.exportableImages} exportables${counts.ignoredFiles ? ` · ${counts.ignoredFiles} ignorados` : ""}`;
   const ignoredRowsHtml = ignoredOmissions().slice(0, 8).map((item) => `
     <div class="batch-detail-problem clear">
       <strong title="${escapeHtml(item.path || item.name)}">${escapeHtml(item.name || "Archivo ignorado")}</strong>
@@ -4322,11 +4322,22 @@ function batchDetailHtml() {
       <span>${escapeHtml(row.detail || "Revisar")}</span>
     </div>
   `).join("");
-  const outputRowsHtml = exportOutputProfiles().map((profile) => `
-    <div class="batch-detail-row batch-detail-row--stacked">
-      <span>${escapeHtml(profile.id === state.activeOutputProfileId ? "Principal" : "Salida")}</span>
-      <strong title="${escapeHtml(profile.name)}">${escapeHtml(profile.name)}</strong>
-      <small>${escapeHtml(outputProfileSummaryLine(profile))}</small>
+  const outputRowsHtml = exportOutputProfiles().map((profile, index) => `
+    <div class="batch-detail-output">
+      <div class="batch-detail-output__title">
+        <span>${escapeHtml(`${index + 1}.`)}</span>
+        <strong title="${escapeHtml(profile.name)}">${escapeHtml(profile.name)}</strong>
+        ${profile.id === state.activeOutputProfileId ? '<em>Principal</em>' : ""}
+      </div>
+      <div class="batch-detail-output__meta">${escapeHtml(outputProfileSummaryLine(profile))}</div>
+      <div class="batch-detail-row">
+        <span>Destino</span>
+        <strong title="${escapeHtml(profileDestinationPreviewLabel(profile))}">${escapeHtml(profileDestinationPreviewLabel(profile))}</strong>
+      </div>
+      <div class="batch-detail-row">
+        <span>Ejemplo</span>
+        <strong title="${escapeHtml(outputNameForProfile(profile))}">${escapeHtml(outputNameForProfile(profile))}</strong>
+      </div>
     </div>
   `).join("");
   const ignoredSectionHtml = ignoredRowsHtml ? `
@@ -4345,8 +4356,10 @@ function batchDetailHtml() {
     <div class="batch-detail-grid batch-detail-grid--compact">
       <section class="batch-detail-section">
         <h3>Resumen</h3>
-        ${batchDetailRowHtml("Lote", summary)}
-        ${batchDetailRowHtml("Estado", getVisibleAppState().title)}
+        ${batchDetailRowHtml("Encontrados", files)}
+        ${batchDetailRowHtml("Exportables", counts.exportableImages)}
+        ${batchDetailRowHtml("Ignorados técnicos", counts.ignoredFiles)}
+        ${batchDetailRowHtml("Incidencias", actionableIssueRows().length)}
       </section>
 
       <section class="batch-detail-section">
@@ -4361,15 +4374,12 @@ function batchDetailHtml() {
         ${batchDetailRowHtml("Archivos", files)}
         ${batchDetailRowHtml("Exportables", counts.exportableImages)}
         ${batchDetailRowHtml("Excluidas", counts.nonExportableImages)}
-        ${batchDetailRowHtml("Avisos", counts.warningImages)}
+        ${batchDetailRowHtml("Estado", getVisibleAppState().title)}
       </section>
 
       <section class="batch-detail-section">
         <h3>Salidas activas</h3>
         ${outputRowsHtml || '<span class="batch-detail-muted">Sin salidas activas.</span>'}
-        ${batchDetailRowHtml("Destino", batchDestinationLine())}
-        ${batchDetailRowHtml("Nombre", namingHumanLabel())}
-        ${batchDetailRowHtml("Ejemplo", namingExample())}
       </section>
 
       ${ignoredSectionHtml}
@@ -4443,7 +4453,7 @@ function renderBatch() {
   if (state.batch === "none") {
     $("#batch-count").textContent = "Sin lote";
     setBatchPill("Sin carpeta", "muted");
-    setGalleryTitle(0, "Lote");
+    setGalleryTitle(0, "Sin lote");
     $("#batch-visible-count").textContent = "";
     $("#folder-list").innerHTML = "";
     $("#image-list").innerHTML = "";
@@ -4458,7 +4468,7 @@ function renderBatch() {
   if (state.batch === "scanning") {
     $("#batch-count").textContent = "Escaneando";
     setBatchPill("Escaneando", "active");
-    setGalleryTitle(0, "Lote");
+    setGalleryTitle(0, "Escaneando");
     $("#batch-visible-count").textContent = sidebarLotSummaryText(counts);
     $("#folder-list").innerHTML = folderItemHtml({
       id: "scan",
@@ -4489,7 +4499,7 @@ function renderBatch() {
         }];
     $("#batch-count").textContent = "Sin imágenes";
     setBatchPill("Sin imágenes", "muted");
-    setGalleryTitle(0, "Lote");
+    setGalleryTitle(0, "No hay PNG válidos");
     $("#batch-visible-count").textContent = sidebarLotSummaryText(counts);
     $("#folder-list").innerHTML = emptyFolders.map(folderItemHtml).join("");
     $("#image-list").innerHTML = "";
@@ -4502,7 +4512,7 @@ function renderBatch() {
   }
 
   const exportable = exportableImages().length;
-  $("#batch-count").textContent = exportable ? `${exportable} exportables` : "Sin exportables";
+  $("#batch-count").textContent = exportable ? readyImagesText(exportable) : "Sin exportables";
   setBatchPill(
     issueCount
       ? warningCountLabel(issueCount)
@@ -4514,10 +4524,10 @@ function renderBatch() {
   renderFilterButtons();
 
   const visible = filteredImages();
-  setGalleryTitle(exportable, "Lote");
+  setGalleryTitle(exportable);
   $("#batch-visible-count").textContent = visible.length === images.length
-    ? sidebarLotSummaryText(counts)
-    : `${visible.length}/${images.length} · ${sidebarLotSummaryText(counts)}`;
+    ? ""
+    : `${visible.length}/${images.length}`;
   $("#image-list").innerHTML = visible.map(imageItemHtml).join("");
   queueThumbnailPreload();
   $("#batch-empty-note").innerHTML = visible.length ? "" : filteredEmptyHtml(images.length, valid, warnings, errors);
@@ -4531,7 +4541,7 @@ function renderBatch() {
 function setGalleryTitle(count, label = "") {
   const title = $("#gallery-title");
   if (title) {
-    title.textContent = label || imageCountLabel(Number(count) || 0);
+    title.textContent = label || readyImagesText(Number(count) || 0);
   }
 }
 
@@ -5336,7 +5346,7 @@ function initialStateHtml() {
       <span>Carga un lote de imágenes PNG o JPG para revisar y exportar.</span>
       <div class="empty-state__actions">
         <button type="button" class="primary" data-action="pick-bridge-folder">Seleccionar carpeta</button>
-        <button type="button" class="ghost-action" data-action="open-app-settings">Configurar salidas</button>
+        <button type="button" class="ghost-action" data-action="open-app-settings">Gestionar salidas</button>
       </div>
       ${manualPathHtml}
     </div>
@@ -5809,8 +5819,8 @@ function outputInspectorCardHtml() {
   return `
     <section class="inspector-output-card">
       <div class="inspector-output-card__head">
-        <span>Salidas activas</span>
-        <strong>${escapeHtml(activeProfiles.length ? String(activeProfiles.length) : "0")}</strong>
+        <span>${escapeHtml(`Salidas activas · ${activeProfiles.length}`)}</span>
+        <strong>${escapeHtml(totalFiles ? "Listo para procesar" : "Pendiente")}</strong>
         <small>${escapeHtml(totalFiles ? `${totalFiles} archivos previstos` : "Pendiente de lote")}</small>
       </div>
       <div class="active-output-list" aria-label="Salidas del lote">
@@ -5818,7 +5828,7 @@ function outputInspectorCardHtml() {
       </div>
       ${dirty ? outputTemporaryNoticeHtml() : ""}
       <div class="inspector-output-card__actions">
-        <button type="button" data-action="edit-output">Editar salidas</button>
+        <button type="button" class="primary" data-action="edit-output">Editar salidas</button>
         <button type="button" data-action="open-app-settings">Gestionar presets</button>
       </div>
     </section>
@@ -5840,7 +5850,7 @@ function outputProfileInlineRowHtml(profile) {
         <strong>${escapeHtml(profile.name)}</strong>
         <small>${escapeHtml(summary)}</small>
       </button>
-      <span class="active-output-row__tag">${escapeHtml(active ? "Principal" : "")}</span>
+      <span class="active-output-row__tag">${escapeHtml(active ? "Principal" : enabled ? "Activa" : "")}</span>
     </div>
   `;
 }
@@ -5876,12 +5886,12 @@ function selectedImageInspectorCardHtml() {
   }
   const hasLocal = hasCurrentImageOverride(image) || image.status === "adjusted";
   return `
-    <section class="inspector-compact-row">
-      <div>
-        <span>Imagen</span>
-        <strong title="${escapeHtml(image.path || image.name)}">${escapeHtml(image.name)}</strong>
-        <small>${escapeHtml(image.detail || imageFileType(image))}</small>
-      </div>
+      <section class="inspector-compact-row">
+        <div>
+          <span>Imagen seleccionada</span>
+          <strong title="${escapeHtml(image.path || image.name)}">${escapeHtml(image.name)}</strong>
+          <small>${escapeHtml(image.detail || imageFileType(image))}</small>
+        </div>
       ${hasLocal ? '<button type="button" data-action="reset-local-adjustment">Quitar ajuste</button>' : ""}
     </section>
   `;
@@ -5926,9 +5936,9 @@ function aspectInspectorCardHtml() {
   return `
     <section class="inspector-compact-row inspector-compact-row--quiet">
       <div>
-        <span>Ajuste aplicado</span>
+        <span>Ajuste</span>
         <strong>${escapeHtml(state.activePreset)}</strong>
-        <small>${escapeHtml(state.presetDirty ? "Modificado" : "Activo")}</small>
+        <small>${escapeHtml(state.presetDirty ? "Global · Modificado" : "Global")}</small>
       </div>
       <button type="button" data-action="open-advanced">Editar ajuste</button>
     </section>
@@ -5960,7 +5970,7 @@ function actionableIssueRows() {
 function inspectorSubviewHeaderHtml(mode) {
   const labels = {
     output: ["Salida", state.outputEditMode ? "Editar salida" : viewerOutputCompactLabel()],
-    advanced: ["Ajustes", state.activePreset],
+    advanced: ["Editar ajuste", state.activePreset],
     warnings: ["Revisar", actionableIssueRows().length ? `${actionableIssueRows().length} punto${actionableIssueRows().length === 1 ? "" : "s"}` : "Sin avisos"],
   };
   const [title, subtitle] = labels[mode] || ["Detalle", ""];
@@ -6060,20 +6070,10 @@ function progressPanelHtml(label, value = null) {
 }
 
 function presetSourceLabel() {
-  if (state.bridgeMode === "bridge") {
-    const source = state.bridgePresetSource === "config"
-      ? "Config"
-      : state.bridgePresetSource === "legacy-config"
-        ? "Config anterior"
-        : state.bridgePresetSource === "defaults"
-          ? "Defaults"
-          : "Salida";
-    if (state.bridgePresetWarning) {
-      return `${source} · aviso`;
-    }
-    return state.presetDirty ? `${source} · modificado` : source;
+  if (state.bridgePresetWarning) {
+    return state.presetDirty ? "Global · Modificado · aviso" : "Global · aviso";
   }
-  return state.presetDirty ? "Modificado" : "Salida";
+  return state.presetDirty ? "Global · Modificado" : "Global";
 }
 
 function renderExport() {
@@ -6109,7 +6109,7 @@ function renderExport() {
   const editActions = state.outputEditMode ? `
     <div class="inspector-actionbar output-edit-actions">
       <button type="button" data-action="cancel-output-edit">Cancelar</button>
-      <button type="button" class="primary" data-action="apply-output-edit">Aplicar</button>
+      <button type="button" class="primary" data-action="apply-output-edit">Aplicar temporalmente</button>
       <button type="button" data-action="save-output-current-profile">Guardar preset</button>
       <button type="button" data-action="save-output-as-new">Guardar como nuevo</button>
       <button type="button" class="btn-linklike" data-action="open-app-settings">Gestionar presets</button>
@@ -6523,11 +6523,11 @@ function closeAppSettings() {
   if (state.appSettingsOpen && outputProfileHasUnsavedChanges() && !confirmDiscardOutputDraft("cerrar sin guardar")) {
     return;
   }
+  releaseModalFocusBeforeHide();
   state.appSettingsOpen = false;
   state.outputProfileDraft = null;
   state.statusText = "Configuración cerrada";
   render();
-  restoreModalFocusReturn();
 }
 
 function openBatchDetail() {
@@ -6540,10 +6540,10 @@ function openBatchDetail() {
 }
 
 function closeBatchDetail() {
+  releaseModalFocusBeforeHide();
   state.batchDetailOpen = false;
   state.statusText = hasBatch() ? "Lote cargado" : "Sin lote";
   render();
-  restoreModalFocusReturn();
 }
 
 function openExportConfirm(risks, options = {}) {
@@ -6562,12 +6562,12 @@ function openExportConfirm(risks, options = {}) {
 }
 
 function closeExportConfirm({ renderAfter = true } = {}) {
+  releaseModalFocusBeforeHide();
   state.exportConfirmOpen = false;
   state.exportConfirmRisks = [];
   state.exportConfirmOptions = null;
   if (renderAfter) {
     render();
-    restoreModalFocusReturn();
   }
 }
 
@@ -6598,8 +6598,16 @@ function restoreModalFocusReturn() {
   const target = modalFocusReturnTarget;
   modalFocusReturnTarget = null;
   if (target instanceof HTMLElement && document.contains(target)) {
-    window.requestAnimationFrame(() => target.focus({ preventScroll: true }));
+    target.focus({ preventScroll: true });
   }
+}
+
+function releaseModalFocusBeforeHide() {
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && active.closest(".app-settings-backdrop")) {
+    active.blur();
+  }
+  restoreModalFocusReturn();
 }
 
 function queueModalFocus(modalSelector, preferredSelector = "") {
@@ -6782,7 +6790,7 @@ function outputProfileEditorHeadingHtml(profile, validation, dirty) {
   const status = dirty
     ? "Cambios sin guardar"
     : active
-      ? "Activo en este lote"
+      ? "Activo en este lote · Principal"
       : profile.enabled
         ? "Salida activa"
         : "Formato guardado";
@@ -6808,7 +6816,7 @@ function outputProfilePreviewHtml(profile) {
     : resultName;
   return `
     <div class="format-preview-heading">
-      <span class="eyebrow">Ejemplo de exportación</span>
+      <span class="eyebrow">Ejemplo</span>
       <strong>${escapeHtml(resultName)}</strong>
     </div>
     <div class="format-preview-grid">
@@ -7830,7 +7838,7 @@ function renderDesignSystemComponents() {
   addComponentClass(".segmented", "ui-segmented-control");
   addComponentClass(".inspector-tabs", "ui-tabs");
   addComponentClass(".state-chip, .status-badge, .preflight-chip, .batch-rail__badge, .asset-state", "ui-status-badge");
-  addComponentClass(".batch-summary-card, .preset-summary-card, .compact-panel, .review-card, .format-preview-card, .format-validation-card, .export-confirm-summary", "ui-summary-card");
+  addComponentClass(".batch-summary-card, .preset-summary-card, .compact-panel, .review-card, .format-preview-card, .format-validation-card, .export-confirm-summary, .inspector-output-card, .inspector-summary, .inspector-compact-row, .active-output-row, .output-profile-option", "ui-summary-card");
   addComponentClass(".image-item", "ui-thumbnail-card");
   addComponentClass(".settings-section, .batch-detail-section, .export-confirm-section, .context-panel", "ui-inspector-section");
   addComponentClass(".app-settings-dialog", "ui-modal-shell");
@@ -8064,6 +8072,15 @@ function handleAction(action, target = null) {
   }
 }
 
+function closeTransientDetails(event) {
+  const target = event.target;
+  document.querySelectorAll("details.format-more-menu[open], details.debug-panel[open]").forEach((details) => {
+    if (!details.contains(target)) {
+      details.open = false;
+    }
+  });
+}
+
 document.addEventListener("load", (event) => {
   const target = event.target;
   if (target instanceof HTMLImageElement && target.classList.contains("thumb-image")) {
@@ -8133,6 +8150,8 @@ document.addEventListener("click", (event) => {
 }, true);
 
 document.addEventListener("click", (event) => {
+  closeTransientDetails(event);
+
   const disclosureSummary = event.target.closest(".settings-panel details > summary");
   if (disclosureSummary) {
     const details = disclosureSummary.closest("details");

@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>FlatShot Desktop</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./styles.css?v=20260605-ux2" />
-    <link rel="stylesheet" href="./ux-foundation.css?v=20260605-ux2" />
-    <link rel="stylesheet" href="./ux-refactor.css?v=20260608-ux-refactor" />
+    <link rel="stylesheet" href="./styles.css?v=20260608-ux3" />
+    <link rel="stylesheet" href="./ux-foundation.css?v=20260608-ux3" />
+    <link rel="stylesheet" href="./ux-refactor.css?v=20260608-ux3" />
   </head>
   <body>
     <main class="app-shell" aria-label="FlatShot nueva app">
@@ -170,7 +170,7 @@
         <aside class="gallery-column" aria-label="Galería de imágenes">
           <div class="gallery-header gallery-toolbar">
             <div class="gallery-heading">
-              <span class="gallery-eyebrow">Imágenes</span>
+              <span class="gallery-eyebrow">Lote</span>
               <strong id="gallery-title">0 imágenes</strong>
             </div>
             <span id="batch-visible-count">0</span>
@@ -267,9 +267,9 @@
           <details class="settings-section inspector-disclosure preset-section" data-inspector-section="advanced">
             <summary>
               <span class="summary-copy">
-                <span class="eyebrow">Ajuste de aspecto</span>
+                <span class="eyebrow">Editar ajuste</span>
                 <strong id="active-preset">Luz cenital</strong>
-                <small id="preset-source">Avanzado</small>
+                <small id="preset-source">Global</small>
               </span>
               <span class="change-chip" id="preset-dirty">Sin cambios</span>
             </summary>
@@ -297,7 +297,7 @@
           <details class="settings-section inspector-disclosure appearance-section" data-inspector-section="advanced">
             <summary>
               <span class="summary-copy">
-                <span class="eyebrow">Aspecto</span>
+                <span class="eyebrow">Ajuste</span>
                 <strong>Controles principales</strong>
                 <small>Ajuste global del lote</small>
               </span>
@@ -503,7 +503,6 @@
           <footer class="app-settings-footer">
             <button type="button" data-action="close-batch-detail">Cerrar</button>
             <button type="button" data-action="pick-bridge-folder">Cambiar carpeta</button>
-            <button type="button" class="primary" data-action="open-app-settings">Gestionar presets</button>
           </footer>
         </section>
       </div>
@@ -532,7 +531,7 @@
             <div>
               <span class="eyebrow">Presets</span>
               <h2 id="app-settings-title">Gestor de salidas</h2>
-              <small id="app-settings-subtitle">Crea y edita valores guardados.</small>
+              <small id="app-settings-subtitle">Crea y edita presets de exportación.</small>
             </div>
             <button type="button" class="icon-button" data-action="close-app-settings" aria-label="Cerrar ajustes">×</button>
           </header>
@@ -543,14 +542,9 @@
                 <strong>Salidas guardadas</strong>
                 <div class="settings-toolbar-actions">
                   <button type="button" data-action="new-output-profile">Nuevo</button>
-                  <details class="format-more-menu">
-                    <summary>Más opciones</summary>
-                    <div>
-                      <button type="button" data-action="duplicate-output-profile">Duplicar formato</button>
-                      <button type="button" data-action="reset-output-profile-draft">Restaurar cambios</button>
-                      <button type="button" class="danger-subtle" data-action="delete-output-profile">Eliminar formato...</button>
-                    </div>
-                  </details>
+                  <button type="button" data-action="duplicate-output-profile">Duplicar</button>
+                  <button type="button" data-action="reset-output-profile-draft">Restaurar</button>
+                  <button type="button" class="danger-subtle" data-action="delete-output-profile">Eliminar</button>
                 </div>
               </div>
               <div id="output-profile-list"></div>
@@ -660,6 +654,6 @@
       </footer>
     </main>
 
-    <script src="./app.js?v=20260605-ux2"></script>
+    <script src="./app.js?v=20260608-ux3"></script>
   </body>
 </html>

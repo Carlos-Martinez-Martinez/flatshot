@@ -3208,20 +3208,6 @@ function renderTop() {
   }
 }
 
-function topStatusSummaryHtml(counts = batchCounts()) {
-  const images = activeImages();
-  return topStatusViewHelpers.topStatusSummaryHtml({
-    exportStatus: state.exportStatus,
-    formatLabel: detectedFormatLabel(images),
-    hasBatch: hasBatch(),
-    ignoredFiles: counts.ignoredFiles,
-    imageCount: images.length,
-    filesFound: counts.filesFound,
-    nonBlockingWarnings: counts.nonBlockingWarnings,
-    readyLabel: readyImagesText(counts.exportableImages),
-  });
-}
-
 function compactHeaderStatusText() {
   const counts = batchCounts();
   const images = activeImages();
@@ -3576,10 +3562,6 @@ function batchDetailHtml() {
     stateTitle: getVisibleAppState().title,
     valid,
   });
-}
-
-function batchDetailRowHtml(label, value, title = "") {
-  return batchDetailViewHelpers.batchDetailRowHtml(label, value, title);
 }
 
 function pluralizeCount(count, singular) {
@@ -3975,18 +3957,6 @@ function imageItemHtml(image) {
     thumbState: thumbnailState(image, thumbnailSrc),
     thumbnailSrc,
   });
-}
-
-function compactImageDetail(detail) {
-  return galleryHelpers.compactImageDetail(detail);
-}
-
-function assetStatusLabel(status) {
-  return galleryHelpers.assetStatusLabel(status, statusLabels);
-}
-
-function assetStatusIcon(status) {
-  return galleryHelpers.assetStatusIcon(status);
 }
 
 function galleryFilterCounts(images = activeImages()) {

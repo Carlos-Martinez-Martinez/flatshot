@@ -1645,6 +1645,35 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 62 - Limpieza de wrappers frontend extraidos
+
+Estado: completada.
+
+Cambios realizados:
+- Se retiraron de `app.js` wrappers residuales ya cubiertos por modulos dedicados:
+  - `topStatusSummaryHtml()` -> `top-status-view.js`;
+  - `batchDetailRowHtml()` -> `batch-detail-view.js`;
+  - `compactImageDetail()` -> `gallery.js`;
+  - `assetStatusLabel()` -> `gallery.js`;
+  - `assetStatusIcon()` -> `gallery.js`.
+- Se agrego `tests/test_frontend_app_cleanup.py` para evitar reintroducir esos wrappers en `app.js`.
+- No se modificaron los helpers reales ni sus contratos de render; se mantuvieron las pruebas existentes de `top-status-view`, `batch-detail-view` y `gallery`.
+
+Impacto medido:
+- `app.js`: 6.448 -> 6.423 lineas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: 22 -> 23.
+
+Validaciones ejecutadas:
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_app_cleanup.py tests/test_frontend_top_status_view.py tests/test_frontend_batch_detail_view.py tests/test_frontend_gallery.py -q`: 7 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 283 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- HTTP local: `index.html`, `app.js`, `top-status-view.js`, `batch-detail-view.js` y `gallery.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

@@ -91,6 +91,7 @@ const emptyStateViewHelpers = window.FlatShotEmptyStateView;
 const batchDetailViewHelpers = window.FlatShotBatchDetailView;
 const galleryHelpers = window.FlatShotGallery;
 const previewStateHelpers = window.FlatShotPreviewState;
+const inspectorReviewViewHelpers = window.FlatShotInspectorReviewView;
 const STORAGE_KEYS = {
   bridgeScanPath: "flatshot.bridgeScanPath",
   selectedImagePath: "flatshot.selectedImagePath",
@@ -4787,16 +4788,16 @@ function renderReviewPanel() {
 function reviewPanelHtml() {
   const image = selectedImage();
   if (!image) {
-    return `
-      ${lotInspectorSummaryHtml()}
-      ${emptyStateHtml({
+    return inspectorReviewViewHelpers.reviewPanelHtml({
+      lotSummaryHtml: lotInspectorSummaryHtml(),
+      emptyStateHtml: emptyStateHtml({
       variant: "inline",
       title: "Selecciona una imagen",
       detail: "Elige una miniatura para revisar la salida.",
       actionLabel: activeImages().length ? "Seleccionar primera imagen" : "",
       action: activeImages().length ? "select-first-image" : "",
-    })}
-    `;
+    }),
+    });
   }
 
   const reviewState = imageReviewState(image);
@@ -4807,45 +4808,18 @@ function reviewPanelHtml() {
   const selectedIndex = images.findIndex((item) => item.id === image.id);
   const canNavigate = images.length > 1;
   const outputDetail = viewerOutputCompactLabel();
-  const issueList = issues.length ? `
-    <div class="review-issue-list">
-      ${issues.map((issue) => `
-        <div class="review-issue ${issue.level === "error" ? "error" : "warning"}">
-          <strong>${escapeHtml(issue.title)}</strong>
-          <span>${escapeHtml(issue.detail)}</span>
-        </div>
-      `).join("")}
-    </div>
-  ` : "";
 
-  return `
-    ${lotInspectorSummaryHtml()}
-
-    <div class="review-card review-card--compact ${escapeHtml(reviewState.tone)}">
-      <div class="review-card__header">
-        <div>
-          <strong title="${escapeHtml(image.path || image.name)}">${escapeHtml(image.name)}</strong>
-          <small>${escapeHtml(selectedIndex >= 0 ? `${selectedIndex + 1} de ${images.length}` : "Sin selección")}</small>
-        </div>
-        <span class="status-badge ${escapeHtml(reviewState.tone)}">${escapeHtml(reviewState.label)}</span>
-      </div>
-    </div>
-
-    <div class="review-output-card review-output-card--compact">
-      <strong title="${escapeHtml(outputName)}">${escapeHtml(outputName)}</strong>
-      <small>${escapeHtml(outputDetail)}</small>
-    </div>
-
-    ${issueList}
-
-    <div class="inspector-actionbar review-actions">
-      <button type="button" data-action="previous-image"${canNavigate ? "" : " disabled"}>Anterior</button>
-      <button type="button" data-action="next-image"${canNavigate ? "" : " disabled"}>Siguiente</button>
-      ${issues.length ? '<button type="button" data-action="review-errors">Revisar avisos</button>' : ""}
-      <button type="button" data-action="open-app-settings">Cambiar formato</button>
-      ${hasLocal ? '<button type="button" data-action="reset-local-adjustment">Quitar ajuste local</button>' : '<button type="button" data-action="open-advanced">Editar ajuste</button>'}
-    </div>
-  `;
+  return inspectorReviewViewHelpers.reviewPanelHtml({
+    lotSummaryHtml: lotInspectorSummaryHtml(),
+    image,
+    reviewState,
+    issues,
+    outputName,
+    outputDetail,
+    hasLocal,
+    selectedIndexLabel: selectedIndex >= 0 ? `${selectedIndex + 1} de ${images.length}` : "Sin selección",
+    canNavigate,
+  });
 }
 
 function lotInspectorSummaryHtml() {
@@ -4855,20 +4829,7 @@ function lotInspectorSummaryHtml() {
     : counts.reviewIssues
       ? `${counts.reviewIssues} aviso${counts.reviewIssues === 1 ? "" : "s"}`
       : "Listo";
-  return `
-    <div class="lot-summary-card">
-      <div class="lot-summary-card__head">
-        <span>Lote</span>
-        <strong>${escapeHtml(stateLabel)}</strong>
-      </div>
-      <div class="lot-summary-card__grid">
-        <span><em>Listas</em><strong>${escapeHtml(counts.readyImages)}</strong></span>
-        <span><em>Exportables</em><strong>${escapeHtml(counts.exportableImages)}</strong></span>
-        <span><em>Excluidas</em><strong>${escapeHtml(counts.nonExportableImages)}</strong></span>
-        <span><em>Ignorados</em><strong>${escapeHtml(counts.ignoredFiles)}</strong></span>
-      </div>
-    </div>
-  `;
+  return inspectorReviewViewHelpers.lotInspectorSummaryHtml({ counts, stateLabel });
 }
 
 function imageReviewState(image) {

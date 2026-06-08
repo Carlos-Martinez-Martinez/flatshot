@@ -374,6 +374,38 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 17 - Extraccion de vista de revision del inspector
+
+Estado: completada.
+
+Cambios realizados:
+- Se agrego `apps/flatshot-desktop/frontend/inspector-review-view.js`.
+- Se movio HTML puro del panel de revision fuera de `app.js`:
+  - resumen compacto del lote;
+  - estado vacio de seleccion;
+  - tarjeta de imagen seleccionada;
+  - salida prevista;
+  - lista de issues de imagen;
+  - acciones de navegacion/formato/ajuste local.
+- `index.html` carga el helper antes de `app.js`.
+- `app.js` conserva seleccion, calculo de estado, issues y datos derivados; solo delega presentacion.
+- Se agrego `tests/test_frontend_inspector_review_view.py` para HTML, escaping, acciones, estado local y orden de carga.
+
+Impacto medido:
+- `app.js`: 7.713 -> 7.674 lineas.
+
+Validaciones ejecutadas:
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_inspector_review_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 270 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- `node --check apps/flatshot-desktop/frontend/inspector-review-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en Windows.
+- HTTP local en `http://127.0.0.1:4197/`: `index.html`, `inspector-review-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 16 - Extension de helper preflight para progreso y resumen bloqueante
 
 Estado: completada.

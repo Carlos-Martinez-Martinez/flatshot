@@ -5,6 +5,14 @@
   }
   root.FlatShotBatchView = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;");
+  }
+
   function warningCountLabel(count) {
     return `${count} aviso${count === 1 ? "" : "s"}`;
   }
@@ -125,11 +133,155 @@
     return "gris claro";
   }
 
+  function sourceInputDetail(batch, filesLabel, validLabel) {
+    if (batch === "none") {
+      return "Pendiente";
+    }
+    if (batch === "scanning") {
+      return "Leyendo imágenes";
+    }
+    return `${filesLabel} archivos encontrados · ${validLabel} imágenes listas`;
+  }
+
+  function batchSummaryToneClass(tone) {
+    if (tone === "error") {
+      return "is-error";
+    }
+    if (tone === "warning") {
+      return "is-warning";
+    }
+    if (tone === "busy") {
+      return "is-busy";
+    }
+    if (tone === "ready") {
+      return "is-ready";
+    }
+    return "is-idle";
+  }
+
+  function batchMetricHtml(label, value) {
+    return `
+    <div class="batch-metric">
+      <span>${escapeHtml(label)}</span>
+      <strong title="${escapeHtml(value)}">${escapeHtml(value)}</strong>
+    </div>
+  `;
+  }
+
+  function diagnosticsHtml(options = {}) {
+    const diagnostics = options.diagnostics || {};
+    const open = options.hasScanError ? " open" : "";
+    const reasonRows = Object.entries(diagnostics.omittedByReason || {}).map(([reason, count]) => `
+    <div class="diagnostic-row">
+      <span>${escapeHtml(omissionReasonLabel(reason))}</span>
+      <strong>${escapeHtml(count)}</strong>
+    </div>
+  `).join("");
+    const sampleRows = (diagnostics.omitted || []).slice(0, 5).map((item) => `
+    <li title="${escapeHtml(item.path || item.name)}">
+      <span>${escapeHtml(item.name)}</span>
+      <small>${escapeHtml(item.detail || omissionReasonLabel(item.reason))}</small>
+    </li>
+  `).join("");
+    return `
+    <details class="batch-diagnostics"${open}>
+      <summary>${escapeHtml(diagnostics.totalOmitted ? "Ver diagnóstico" : "Diagnóstico")}</summary>
+      <div class="diagnostic-reasons">${reasonRows}</div>
+      ${sampleRows ? `<ul>${sampleRows}</ul>` : ""}
+    </details>
+  `;
+  }
+
+  function batchSummaryHtml(options = {}) {
+    const counts = options.counts || {};
+    const visible = options.visible || {};
+    const diagnostics = options.diagnostics || {};
+    const filesLabel = counts.filesFound === null ? "Leyendo" : counts.filesFound;
+    const validLabel = counts.validImages === null ? "Leyendo" : counts.validImages;
+    const outputLine = options.outputLine || "";
+    const destinationLine = options.destinationLine || "";
+    const sourceTitle = options.sourcePath || visible.subtitle || "";
+    const outputDetail = `${outputLine} · ${destinationLine}`;
+    const diagnosticBlock = diagnostics.totalOmitted || counts.blockingErrors
+      ? diagnosticsHtml({ diagnostics, hasScanError: options.hasScanError })
+      : `<div class="diagnostic-ok">${counts.nonBlockingWarnings ? "Avisos en la galería" : "Sin avisos"}</div>`;
+
+    return `
+    <div class="batch-summary-card ${batchSummaryToneClass(visible.tone)}">
+      <div class="batch-summary-section">
+        <span class="batch-rail__section-title">Entrada</span>
+        <strong title="${escapeHtml(sourceTitle)}">${escapeHtml(options.sourceFolderName || "")}</strong>
+        <small title="${escapeHtml(sourceTitle)}">${escapeHtml(sourceInputDetail(options.batch, filesLabel, validLabel))}</small>
+      </div>
+
+      <div class="batch-metric-grid" aria-label="Datos del lote">
+        ${batchMetricHtml("Archivos encontrados", filesLabel)}
+        ${batchMetricHtml("Imágenes listas", counts.readyImages)}
+        ${batchMetricHtml("Excluidas", counts.nonExportableImages)}
+        ${batchMetricHtml("Ignorados", counts.ignoredFiles)}
+      </div>
+
+      <div class="batch-summary-section">
+        <span class="batch-rail__section-title">Estado del lote</span>
+        <strong>${escapeHtml(visible.title || "")}</strong>
+        <small title="${escapeHtml(visible.subtitle || "")}">${escapeHtml(visible.subtitle || "")}</small>
+      </div>
+
+      <div class="batch-summary-lines batch-summary-lines--compact">
+        <div class="batch-summary__line">
+          <span>Listas</span>
+          <strong>${escapeHtml(counts.readyImages)}</strong>
+        </div>
+        <div class="batch-summary__line">
+          <span>Avisos</span>
+          <strong>${escapeHtml(counts.reviewIssues)}</strong>
+        </div>
+        <div class="batch-summary__line">
+          <span>Bloqueos</span>
+          <strong>${escapeHtml(counts.blockingErrors)}</strong>
+        </div>
+      </div>
+
+      <div class="batch-summary-section">
+        <span class="batch-rail__section-title">Salida</span>
+        <strong title="${escapeHtml(outputLine)}">${escapeHtml(options.outputProfileName || "")}</strong>
+        <small title="${escapeHtml(outputDetail)}">${escapeHtml(outputDetail)}</small>
+      </div>
+
+      <div class="batch-summary-lines">
+        <div class="batch-summary__line">
+          <span>Nombre de archivo</span>
+          <strong title="${escapeHtml(options.namingExample || "")}">${escapeHtml(options.namingLabel || "")}</strong>
+        </div>
+        <div class="batch-summary__line">
+          <span>Avisos</span>
+          <strong>${escapeHtml(options.warningsLabel || "Sin avisos")}</strong>
+        </div>
+        <div class="batch-summary__line">
+          <span>Ignorados</span>
+          <strong>${escapeHtml(options.ignoredLabel || "Sin ignorados")}</strong>
+        </div>
+      </div>
+
+      <div class="batch-next">
+        <span>Siguiente</span>
+        <strong>${escapeHtml(visible.nextStep || "")}</strong>
+      </div>
+      ${diagnosticBlock}
+    </div>
+  `;
+  }
+
   return {
     batchBackgroundLabel,
+    batchMetricHtml,
+    batchSummaryHtml,
     batchSummaryLabel,
+    batchSummaryToneClass,
     bridgeScanMessage,
     detectedFormatLabel,
+    diagnosticsHtml,
+    escapeHtml,
     exportActionLabel,
     imageCountLabel,
     omittedSummaryText,
@@ -137,6 +289,7 @@
     omissionSummaryText,
     outputCountLabel,
     readyBatchSummaryText,
+    sourceInputDetail,
     warningCountLabel,
   };
 });

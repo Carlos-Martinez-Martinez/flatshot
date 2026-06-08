@@ -628,6 +628,39 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 28 - Extraccion de resumen lateral de lote
+
+Estado: completada.
+
+Cambios realizados:
+- `batch-view.js` ahora tambien renderiza HTML puro del resumen lateral de lote:
+  - tarjeta `batch-summary-card`;
+  - metricas compactas;
+  - detalle de entrada;
+  - estado del lote;
+  - salida y naming;
+  - siguiente paso;
+  - bloque de diagnostico/omisiones.
+- `app.js` conserva calculo de rutas, estado visible, perfiles de salida, destino, naming y diagnosticos; solo delega presentacion.
+- Se amplio `tests/test_frontend_batch_view.py` para cubrir escaping, tono visual, metricas, diagnostico y resumen completo.
+
+Impacto medido:
+- `app.js`: 7.395 -> 7.286 lineas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: sin cambios, 22.
+
+Validaciones ejecutadas:
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_batch_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 282 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- `node --check apps/flatshot-desktop/frontend/batch-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en Windows.
+- HTTP local en `http://127.0.0.1:4208/`: `index.html`, `batch-view.js`, `batch-detail-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

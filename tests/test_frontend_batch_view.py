@@ -76,6 +76,99 @@ assert.equal(helpers.omissionSummaryText([
 assert.equal(helpers.batchBackgroundLabel("transparent"), "transparente");
 assert.equal(helpers.batchBackgroundLabel("white"), "blanco");
 assert.equal(helpers.batchBackgroundLabel("rgb230"), "gris claro");
+
+assert.equal(helpers.escapeHtml('<a&b"c>'), '&lt;a&amp;b&quot;c&gt;');
+assert.equal(helpers.sourceInputDetail("none", 3, 2), "Pendiente");
+assert.equal(helpers.sourceInputDetail("scanning", 3, 2), "Leyendo imágenes");
+assert.equal(helpers.sourceInputDetail("ready", 3, 2), "3 archivos encontrados · 2 imágenes listas");
+assert.equal(helpers.batchSummaryToneClass("error"), "is-error");
+assert.equal(helpers.batchSummaryToneClass("warning"), "is-warning");
+assert.equal(helpers.batchSummaryToneClass("busy"), "is-busy");
+assert.equal(helpers.batchSummaryToneClass("ready"), "is-ready");
+assert.equal(helpers.batchSummaryToneClass("idle"), "is-idle");
+
+const metric = helpers.batchMetricHtml("Archivos <encontrados>", '7 "total"');
+assert.equal(metric.includes("Archivos &lt;encontrados&gt;"), true);
+assert.equal(metric.includes('title="7 &quot;total&quot;"'), true);
+
+const diagnostics = helpers.diagnosticsHtml({{
+  hasScanError: true,
+  diagnostics: {{
+    totalOmitted: 2,
+    omittedByReason: {{ read_error: 1, unsupported_extension: 1 }},
+    omitted: [
+      {{ name: "bad <one>.txt", path: 'C:/bad "one".txt', reason: "unsupported_extension" }},
+      {{ name: "fail.png", path: "C:/fail.png", detail: "No abre" }},
+    ],
+  }},
+}});
+assert.equal(diagnostics.includes('class="batch-diagnostics" open'), true);
+assert.equal(diagnostics.includes("Ver diagnóstico"), true);
+assert.equal(diagnostics.includes("Error de lectura"), true);
+assert.equal(diagnostics.includes("bad &lt;one&gt;.txt"), true);
+assert.equal(diagnostics.includes('title="C:/bad &quot;one&quot;.txt"'), true);
+
+const summary = helpers.batchSummaryHtml({{
+  batch: "ready",
+  visible: {{
+    tone: "warning",
+    title: "Lote <actual>",
+    subtitle: '4 listas "ok"',
+    nextStep: "Revisar salida",
+  }},
+  counts: {{
+    filesFound: 6,
+    validImages: 4,
+    readyImages: 4,
+    nonExportableImages: 1,
+    ignoredFiles: 1,
+    reviewIssues: 2,
+    blockingErrors: 0,
+    nonBlockingWarnings: 2,
+  }},
+  diagnostics: {{ totalOmitted: 0, omittedByReason: {{}}, omitted: [] }},
+  sourcePath: 'C:/Lote/"uno"',
+  sourceFolderName: "Lote uno",
+  outputLine: "JPG 1800×2400",
+  destinationLine: "_SALIDA_PRO",
+  outputProfileName: "Marketplace",
+  namingExample: 'camisa <azul>.jpg',
+  namingLabel: "original + _PRO",
+  warningsLabel: "2 avisos",
+  ignoredLabel: "1 ignorado",
+}});
+assert.equal(summary.includes("batch-summary-card is-warning"), true);
+assert.equal(summary.includes("Lote &lt;actual&gt;"), true);
+assert.equal(summary.includes('title="C:/Lote/&quot;uno&quot;"'), true);
+assert.equal(summary.includes("6 archivos encontrados · 4 imágenes listas"), true);
+assert.equal(summary.includes("JPG 1800×2400 · _SALIDA_PRO"), true);
+assert.equal(summary.includes("camisa &lt;azul&gt;.jpg"), true);
+assert.equal(summary.includes("Avisos en la galería"), true);
+
+const blockedSummary = helpers.batchSummaryHtml({{
+  batch: "ready",
+  visible: {{ tone: "error", title: "Bloqueado", subtitle: "Error", nextStep: "Corregir" }},
+  counts: {{
+    filesFound: null,
+    validImages: null,
+    readyImages: 0,
+    nonExportableImages: 1,
+    ignoredFiles: 0,
+    reviewIssues: 1,
+    blockingErrors: 1,
+    nonBlockingWarnings: 0,
+  }},
+  diagnostics: {{
+    totalOmitted: 0,
+    omittedByReason: {{}},
+    omitted: [],
+  }},
+  hasScanError: true,
+}});
+assert.equal(blockedSummary.includes("batch-summary-card is-error"), true);
+assert.equal(blockedSummary.includes("Leyendo archivos encontrados · Leyendo imágenes listas"), true);
+assert.equal(blockedSummary.includes('class="batch-diagnostics" open'), true);
+assert.equal(blockedSummary.includes("Diagnóstico"), true);
 """
     result = subprocess.run(
         ["node", "-e", script],

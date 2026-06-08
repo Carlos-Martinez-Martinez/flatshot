@@ -3427,118 +3427,32 @@ function renderBatchSummary() {
   const visible = getVisibleAppState();
   const counts = visible.counts;
   const diagnostics = state.scanDiagnostics || emptyScanDiagnostics();
-  const tone = batchSummaryToneFromVisible(visible);
   const sourcePath = state.batch === "ready"
     ? activeFolders()[0]?.path || state.bridgeScanPath
     : state.batch === "empty" && state.realFolders.length
       ? state.realFolders[0]?.path || state.bridgeScanPath
       : state.bridgeScanPath;
-  const filesLabel = counts.filesFound === null ? "Leyendo" : counts.filesFound;
-  const validLabel = counts.validImages === null ? "Leyendo" : counts.validImages;
   const outputLine = batchOutputLine();
   const destinationLine = batchDestinationLine();
   const warningsLabel = counts.nonBlockingWarnings ? countText(counts.nonBlockingWarnings, "aviso", "avisos") : "Sin avisos";
   const ignoredLabel = counts.ignoredFiles ? countText(counts.ignoredFiles, "ignorado", "ignorados") : "Sin ignorados";
 
-  summary.innerHTML = `
-    <div class="batch-summary-card ${tone}">
-      <div class="batch-summary-section">
-        <span class="batch-rail__section-title">Entrada</span>
-        <strong title="${escapeHtml(sourcePath || visible.subtitle)}">${escapeHtml(sourceFolderName())}</strong>
-        <small title="${escapeHtml(sourcePath || visible.subtitle)}">${escapeHtml(sourceInputDetail(filesLabel, validLabel))}</small>
-      </div>
-
-      <div class="batch-metric-grid" aria-label="Datos del lote">
-        ${batchMetricHtml("Archivos encontrados", filesLabel)}
-        ${batchMetricHtml("Imágenes listas", counts.readyImages)}
-        ${batchMetricHtml("Excluidas", counts.nonExportableImages)}
-        ${batchMetricHtml("Ignorados", counts.ignoredFiles)}
-      </div>
-
-      <div class="batch-summary-section">
-        <span class="batch-rail__section-title">Estado del lote</span>
-        <strong>${escapeHtml(visible.title)}</strong>
-        <small title="${escapeHtml(visible.subtitle)}">${escapeHtml(visible.subtitle)}</small>
-      </div>
-
-      <div class="batch-summary-lines batch-summary-lines--compact">
-        <div class="batch-summary__line">
-          <span>Listas</span>
-          <strong>${escapeHtml(counts.readyImages)}</strong>
-        </div>
-        <div class="batch-summary__line">
-          <span>Avisos</span>
-          <strong>${escapeHtml(counts.reviewIssues)}</strong>
-        </div>
-        <div class="batch-summary__line">
-          <span>Bloqueos</span>
-          <strong>${escapeHtml(counts.blockingErrors)}</strong>
-        </div>
-      </div>
-
-      <div class="batch-summary-section">
-        <span class="batch-rail__section-title">Salida</span>
-        <strong title="${escapeHtml(outputLine)}">${escapeHtml(outputProfileDisplayName())}</strong>
-        <small title="${escapeHtml(`${outputLine} · ${destinationLine}`)}">${escapeHtml(`${outputLine} · ${destinationLine}`)}</small>
-      </div>
-
-      <div class="batch-summary-lines">
-        <div class="batch-summary__line">
-          <span>Nombre de archivo</span>
-          <strong title="${escapeHtml(namingExample())}">${escapeHtml(namingHumanLabel())}</strong>
-        </div>
-        <div class="batch-summary__line">
-          <span>Avisos</span>
-          <strong>${escapeHtml(warningsLabel)}</strong>
-        </div>
-        <div class="batch-summary__line">
-          <span>Ignorados</span>
-          <strong>${escapeHtml(ignoredLabel)}</strong>
-        </div>
-      </div>
-
-      <div class="batch-next">
-        <span>Siguiente</span>
-        <strong>${escapeHtml(visible.nextStep)}</strong>
-      </div>
-      ${diagnostics.totalOmitted || counts.blockingErrors ? diagnosticsHtml(diagnostics) : `<div class="diagnostic-ok">${counts.nonBlockingWarnings ? "Avisos en la galería" : "Sin avisos"}</div>`}
-    </div>
-  `;
-}
-
-function sourceInputDetail(filesLabel, validLabel) {
-  if (state.batch === "none") {
-    return "Pendiente";
-  }
-  if (state.batch === "scanning") {
-    return "Leyendo imágenes";
-  }
-  return `${filesLabel} archivos encontrados · ${validLabel} imágenes listas`;
-}
-
-function batchSummaryToneFromVisible(visible) {
-  if (visible.tone === "error") {
-    return "is-error";
-  }
-  if (visible.tone === "warning") {
-    return "is-warning";
-  }
-  if (visible.tone === "busy") {
-    return "is-busy";
-  }
-  if (visible.tone === "ready") {
-    return "is-ready";
-  }
-  return "is-idle";
-}
-
-function batchMetricHtml(label, value) {
-  return `
-    <div class="batch-metric">
-      <span>${escapeHtml(label)}</span>
-      <strong title="${escapeHtml(value)}">${escapeHtml(value)}</strong>
-    </div>
-  `;
+  summary.innerHTML = batchViewHelpers.batchSummaryHtml({
+    batch: state.batch,
+    counts,
+    destinationLine,
+    diagnostics,
+    hasScanError: state.scanIssues.some((issue) => issue.level === "error"),
+    ignoredLabel,
+    namingExample: namingExample(),
+    namingLabel: namingHumanLabel(),
+    outputLine,
+    outputProfileName: outputProfileDisplayName(),
+    sourceFolderName: sourceFolderName(),
+    sourcePath,
+    visible,
+    warningsLabel,
+  });
 }
 
 function batchOutputLine() {
@@ -3570,29 +3484,6 @@ function batchDestinationLine() {
     return state.destinationValue || "Sin destino";
   }
   return state.destinationValue ? `Junto al origen · ${state.destinationValue}` : "Junto al origen";
-}
-
-function diagnosticsHtml(diagnostics) {
-  const open = state.scanIssues.some((issue) => issue.level === "error") ? " open" : "";
-  const reasonRows = Object.entries(diagnostics.omittedByReason || {}).map(([reason, count]) => `
-    <div class="diagnostic-row">
-      <span>${escapeHtml(omissionReasonLabel(reason))}</span>
-      <strong>${escapeHtml(count)}</strong>
-    </div>
-  `).join("");
-  const sampleRows = (diagnostics.omitted || []).slice(0, 5).map((item) => `
-    <li title="${escapeHtml(item.path || item.name)}">
-      <span>${escapeHtml(item.name)}</span>
-      <small>${escapeHtml(item.detail || omissionReasonLabel(item.reason))}</small>
-    </li>
-  `).join("");
-  return `
-    <details class="batch-diagnostics"${open}>
-      <summary>${escapeHtml(diagnostics.totalOmitted ? "Ver diagnóstico" : "Diagnóstico")}</summary>
-      <div class="diagnostic-reasons">${reasonRows}</div>
-      ${sampleRows ? `<ul>${sampleRows}</ul>` : ""}
-    </details>
-  `;
 }
 
 function renderBatchDetail() {

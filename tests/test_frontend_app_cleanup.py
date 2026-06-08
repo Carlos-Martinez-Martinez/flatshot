@@ -29,6 +29,11 @@ def test_app_js_does_not_reintroduce_extracted_wrapper_helpers():
         "function outputCountLabel(",
         "function detectedFormatLabel(",
         "function bridgeScanMessage(",
+        "function folderItemHtml(",
+        "function progressPanelHtml(",
+        "function outputTemporaryNoticeHtml(",
+        "function issueItemHtml(",
+        "function preflightListHtml(",
     ]
 
     for wrapper in obsolete_wrappers:

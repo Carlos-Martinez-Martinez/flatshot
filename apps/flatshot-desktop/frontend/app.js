@@ -3565,7 +3565,7 @@ function renderBatch() {
     setBatchPill("Escaneando", "active");
     setGalleryTitle(0, "Escaneando");
     $("#batch-visible-count").textContent = sidebarSummaryText;
-    $("#folder-list").innerHTML = folderItemHtml({
+    $("#folder-list").innerHTML = batchDetailViewHelpers.folderItemHtml({
       id: "scan",
       name: isBridgeBatch() || !devMode ? basename(parseFolderInput(state.bridgeScanPath)[0]) || "Ruta" : "Camisetas Mayo",
       path: state.bridgeScanPath,
@@ -3596,7 +3596,7 @@ function renderBatch() {
     setBatchPill("Sin imágenes", "muted");
     setGalleryTitle(0, "No hay PNG válidos");
     $("#batch-visible-count").textContent = sidebarSummaryText;
-    $("#folder-list").innerHTML = emptyFolders.map(folderItemHtml).join("");
+    $("#folder-list").innerHTML = emptyFolders.map((folder) => batchDetailViewHelpers.folderItemHtml(folder)).join("");
     $("#image-list").innerHTML = "";
     $("#batch-empty-note").innerHTML = emptyBatchNoteHtml();
     if (filmstripCount) {
@@ -3679,10 +3679,6 @@ function emptyBatchNoteHtml() {
     ignoredSummary: ignoredSummaryText(),
     scanStatus: state.scanStatus,
   });
-}
-
-function folderItemHtml(folder) {
-  return batchDetailViewHelpers.folderItemHtml(folder);
 }
 
 function imageThumbnailSrc(image) {
@@ -4539,7 +4535,7 @@ function inspectorCardsHtml() {
           <strong>Escaneando carpeta...</strong>
         </div>
         <small>${escapeHtml(state.scanStatus || "Leyendo imágenes")}</small>
-        ${progressPanelHtml("Escaneando carpeta")}
+        ${exportPreflightViewHelpers.progressPanelHtml("Escaneando carpeta")}
       </section>
     `;
   }
@@ -4608,10 +4604,6 @@ function outputProfileInlineRowHtml(profile) {
     canToggle: enabledOutputProfiles().length > 1 || !enabled,
     summary: outputProfileSummaryLine(profile),
   });
-}
-
-function outputTemporaryNoticeHtml() {
-  return inspectorOutputViewHelpers.outputTemporaryNoticeHtml();
 }
 
 function selectedImageInspectorCardHtml() {
@@ -4693,8 +4685,8 @@ function contextualInspectorHtml() {
     return inspectorContextViewHelpers.contextualInspectorHtml({
       batch: state.batch,
       scanStatus: state.scanStatus,
-      progressHtml: progressPanelHtml("Preparando lote"),
-      preflightHtml: preflightListHtml(inspectorContextViewHelpers.contextualPreflightRows({
+      progressHtml: exportPreflightViewHelpers.progressPanelHtml("Preparando lote"),
+      preflightHtml: exportPreflightViewHelpers.preflightListHtml(inspectorContextViewHelpers.contextualPreflightRows({
         batch: state.batch,
       })),
     });
@@ -4703,7 +4695,7 @@ function contextualInspectorHtml() {
   if (state.batch === "none") {
     return inspectorContextViewHelpers.contextualInspectorHtml({
       batch: state.batch,
-      preflightHtml: preflightListHtml(inspectorContextViewHelpers.contextualPreflightRows({
+      preflightHtml: exportPreflightViewHelpers.preflightListHtml(inspectorContextViewHelpers.contextualPreflightRows({
         batch: state.batch,
       })),
       outputSummary: `${state.format} · ${state.size} · ${backgroundLabel(state.background)}`,
@@ -4715,7 +4707,7 @@ function contextualInspectorHtml() {
     return inspectorContextViewHelpers.contextualInspectorHtml({
       batch: state.batch,
       scanStatus: state.scanStatus,
-      preflightHtml: preflightListHtml(inspectorContextViewHelpers.contextualPreflightRows({
+      preflightHtml: exportPreflightViewHelpers.preflightListHtml(inspectorContextViewHelpers.contextualPreflightRows({
         batch: state.batch,
         ignoredSummary: ignoredSummaryText(),
         totalFiles: state.scanDiagnostics.totalFiles,
@@ -4727,10 +4719,6 @@ function contextualInspectorHtml() {
     batch: state.batch,
     compactStatus: compactHeaderStatusText(),
   });
-}
-
-function progressPanelHtml(label, value = null) {
-  return exportPreflightViewHelpers.progressPanelHtml(label, value);
 }
 
 function presetSourceLabel() {
@@ -4792,7 +4780,7 @@ function renderExport() {
     namingLabel: hasMultipleOutputs ? "Por salida" : namingHumanLabel(),
     example: hasMultipleOutputs ? outputNameForProfile(activeOutputProfiles[0]) : namingExample(),
     warningSummaryHtml: warningSummary,
-    temporaryNoticeHtml: !outputMatchesProfile(activeOutputProfile()) ? outputTemporaryNoticeHtml() : "",
+    temporaryNoticeHtml: !outputMatchesProfile(activeOutputProfile()) ? inspectorOutputViewHelpers.outputTemporaryNoticeHtml() : "",
   });
 
   renderExportResult();
@@ -5524,10 +5512,6 @@ function issueRows() {
   });
 }
 
-function issueItemHtml(row) {
-  return exportPreflightViewHelpers.issueItemHtml(row);
-}
-
 function exportStatusClass(ready, issues = preflightIssues()) {
   return exportPreflightViewHelpers.exportStatusClass({
     hasActiveBatch: hasBatch(),
@@ -5551,10 +5535,6 @@ function exportPreflightRows(issues, exportable, ready) {
     ready,
     warningCount: visibleWarningCount(),
   });
-}
-
-function preflightListHtml(rows) {
-  return exportPreflightViewHelpers.preflightListHtml(rows);
 }
 
 function exportPanelStatusLabel(ready, issues = preflightIssues()) {

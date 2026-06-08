@@ -59,6 +59,35 @@ const clearProblem = helpers.batchDetailProblemHtml({{
 assert.equal(clearProblem.includes('class="batch-detail-problem clear"'), true);
 assert.equal(clearProblem.includes('title="Archivo ignorado"'), true);
 
+const output = helpers.batchDetailOutputHtml({{
+  index: 1,
+  name: "Web <gris>",
+  active: true,
+  summary: "JPG · 1800 × 2400",
+  destination: 'C:/Salida/"web"',
+  example: "camisa <azul>.jpg",
+}});
+assert.equal(output.includes('class="batch-detail-output"'), true);
+assert.equal(output.includes("<span>2.</span>"), true);
+assert.equal(output.includes('title="Web &lt;gris&gt;"'), true);
+assert.equal(output.includes("Web &lt;gris&gt;"), true);
+assert.equal(output.includes("<em>Principal</em>"), true);
+assert.equal(output.includes("JPG · 1800 × 2400"), true);
+assert.equal(output.includes('<span>Destino</span>'), true);
+assert.equal(output.includes('title="C:/Salida/&quot;web&quot;"'), true);
+assert.equal(output.includes("camisa &lt;azul&gt;.jpg"), true);
+
+const secondaryOutput = helpers.batchDetailOutputHtml({{
+  index: 0,
+  name: "PNG",
+  active: false,
+  summary: "PNG",
+  destination: "_SALIDA_PRO",
+  example: "camisa.png",
+}});
+assert.equal(secondaryOutput.includes("<span>1.</span>"), true);
+assert.equal(secondaryOutput.includes("<em>Principal</em>"), false);
+
 const folder = helpers.folderItemHtml({{
   name: "Carpeta <A>",
   detail: "2 imágenes & 1 aviso",

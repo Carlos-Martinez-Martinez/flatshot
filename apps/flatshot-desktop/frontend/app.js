@@ -3557,24 +3557,14 @@ function batchDetailHtml() {
     titleAttr: row.path || row.title,
     tone: row.level === "error" ? "error" : "warning",
   })).join("");
-  const outputRowsHtml = exportOutputProfiles().map((profile, index) => `
-    <div class="batch-detail-output">
-      <div class="batch-detail-output__title">
-        <span>${escapeHtml(`${index + 1}.`)}</span>
-        <strong title="${escapeHtml(profile.name)}">${escapeHtml(profile.name)}</strong>
-        ${profile.id === state.activeOutputProfileId ? '<em>Principal</em>' : ""}
-      </div>
-      <div class="batch-detail-output__meta">${escapeHtml(outputProfileSummaryLine(profile))}</div>
-      <div class="batch-detail-row">
-        <span>Destino</span>
-        <strong title="${escapeHtml(profileDestinationPreviewLabel(profile))}">${escapeHtml(profileDestinationPreviewLabel(profile))}</strong>
-      </div>
-      <div class="batch-detail-row">
-        <span>Ejemplo</span>
-        <strong title="${escapeHtml(outputNameForProfile(profile))}">${escapeHtml(outputNameForProfile(profile))}</strong>
-      </div>
-    </div>
-  `).join("");
+  const outputRowsHtml = exportOutputProfiles().map((profile, index) => batchDetailViewHelpers.batchDetailOutputHtml({
+    active: profile.id === state.activeOutputProfileId,
+    destination: profileDestinationPreviewLabel(profile),
+    example: outputNameForProfile(profile),
+    index,
+    name: profile.name,
+    summary: outputProfileSummaryLine(profile),
+  })).join("");
   const ignoredSectionHtml = ignoredRowsHtml ? `
     <details class="batch-detail-section batch-detail-section--collapsed">
       <summary>

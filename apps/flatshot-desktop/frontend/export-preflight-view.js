@@ -62,6 +62,50 @@
   `;
   }
 
+  function issueRows(options = {}) {
+    const rows = [];
+    const statusLabels = options.statusLabels || {};
+    const omissions = Array.isArray(options.scanOmissions) ? options.scanOmissions : [];
+    const images = Array.isArray(options.images) ? options.images : [];
+    const errors = Array.isArray(options.errors) ? options.errors : [];
+
+    omissions.slice(0, 4).forEach((item) => {
+      const severity = item.severity || "warning";
+      rows.push({
+        level: severity === "ignored" ? "info" : severity,
+        title: item.name || (severity === "ignored" ? "Archivo ignorado" : "Archivo a revisar"),
+        detail: `Motivo: ${item.detail || item.reasonLabel || item.reason || "Revisar"}`,
+        path: item.path || item.folder || "",
+        actionLabel: "",
+      });
+    });
+
+    images
+      .filter((image) => image.status === "warning" || image.status === "error" || image.exportStatus === "error")
+      .forEach((image) => {
+        rows.push({
+          level: image.status === "error" || image.exportStatus === "error" ? "error" : "warning",
+          title: image.name,
+          detail: image.detail || statusLabels[image.status] || "Revisar imagen",
+          path: image.path || "",
+          imageId: image.id,
+          actionLabel: "Ir a imagen",
+        });
+      });
+
+    errors.slice(0, 4).forEach((issue) => {
+      rows.push({
+        level: issue.level,
+        title: issue.title,
+        detail: issue.detail,
+        path: "",
+        actionLabel: "",
+      });
+    });
+
+    return rows;
+  }
+
   function issueListHtml(options = {}) {
     const hasActiveBatch = Boolean(options.hasActiveBatch);
     const batch = options.batch || "none";
@@ -233,6 +277,7 @@
     exportStatusClass,
     issueItemHtml,
     issueListHtml,
+    issueRows,
     outputWarningSummaryHtml,
     preflightListHtml,
     progressPanelHtml,

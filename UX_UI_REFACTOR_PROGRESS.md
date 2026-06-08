@@ -753,6 +753,31 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 32 - Extraccion de filas de incidencias
+
+Estado: completada.
+
+Cambios realizados:
+- `export-preflight-view.js` ahora tambien construye filas de incidencias a partir de omisiones de escaneo, imagenes con aviso/error de exportacion y errores globales.
+- `app.js` conserva las fuentes de verdad (`scanOmissions`, `activeImages`, `state.errors`, `statusLabels`) y solo adapta los datos antes de delegar.
+- Se amplio `tests/test_frontend_export_preflight_view.py` para cubrir omisiones ignoradas, omisiones revisables, imagenes con warning, imagenes bloqueadas por exportacion y errores globales.
+
+Impacto medido:
+- `app.js`: 7.251 -> 7.231 lineas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: sin cambios, 22.
+
+Validaciones ejecutadas:
+- `node --check apps/flatshot-desktop/frontend/export-preflight-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_export_preflight_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 282 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- HTTP local: `index.html`, `export-preflight-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

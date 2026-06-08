@@ -5783,39 +5783,19 @@ function issueListHtml() {
 }
 
 function issueRows() {
-  const rows = [];
-  scanOmissions().slice(0, 4).forEach((item) => {
-    const severity = omissionSeverity(item);
-    rows.push({
-      level: severity === "ignored" ? "info" : severity,
-      title: item.name || (severity === "ignored" ? "Archivo ignorado" : "Archivo a revisar"),
-      detail: `Motivo: ${item.detail || omissionReasonLabel(item.reason)}`,
-      path: item.path || item.folder || "",
-      actionLabel: "",
-    });
+  return exportPreflightViewHelpers.issueRows({
+    scanOmissions: scanOmissions().map((item) => ({
+      ...item,
+      reasonLabel: omissionReasonLabel(item.reason),
+      severity: omissionSeverity(item),
+    })),
+    images: activeImages().map((image) => ({
+      ...image,
+      exportStatus: exportItemState(image)?.status,
+    })),
+    errors: state.errors,
+    statusLabels,
   });
-  activeImages()
-    .filter((image) => image.status === "warning" || image.status === "error" || exportItemState(image)?.status === "error")
-    .forEach((image) => {
-      rows.push({
-        level: image.status === "error" || exportItemState(image)?.status === "error" ? "error" : "warning",
-        title: image.name,
-        detail: image.detail || statusLabels[image.status] || "Revisar imagen",
-        path: image.path || "",
-        imageId: image.id,
-        actionLabel: "Ir a imagen",
-      });
-    });
-  state.errors.slice(0, 4).forEach((issue) => {
-    rows.push({
-      level: issue.level,
-      title: issue.title,
-      detail: issue.detail,
-      path: "",
-      actionLabel: "",
-    });
-  });
-  return rows;
 }
 
 function issueItemHtml(row) {

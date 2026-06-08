@@ -58,6 +58,72 @@ assert.equal(warningSummary.includes('title="C:/camisa.png"'), true);
 assert.equal(warningSummary.includes("Motivo: Ruta &quot;ocupada&quot;"), true);
 assert.equal(warningSummary.includes('data-action="review-errors"'), true);
 
+assert.deepEqual(helpers.issueRows({{
+  scanOmissions: [
+    {{
+      name: "desktop.ini",
+      detail: "",
+      reasonLabel: "Archivo de sistema",
+      severity: "ignored",
+      path: "C:/lote/desktop.ini",
+    }},
+    {{
+      name: "foto.psd",
+      detail: "Formato no soportado",
+      reasonLabel: "Extension no soportada",
+      severity: "warning",
+      folder: "C:/lote",
+    }},
+  ],
+  images: [
+    {{ id: "img-1", name: "ok.png", status: "ready", path: "C:/ok.png" }},
+    {{ id: "img-2", name: "aviso.png", status: "warning", detail: "", path: "C:/aviso.png" }},
+    {{ id: "img-3", name: "bloqueada.png", status: "ready", exportStatus: "error", path: "C:/bloqueada.png" }},
+  ],
+  errors: [
+    {{ level: "error", title: "Destino", detail: "ocupado" }},
+  ],
+  statusLabels: {{ ready: "Lista", warning: "Aviso", error: "Error" }},
+}}), [
+  {{
+    level: "info",
+    title: "desktop.ini",
+    detail: "Motivo: Archivo de sistema",
+    path: "C:/lote/desktop.ini",
+    actionLabel: "",
+  }},
+  {{
+    level: "warning",
+    title: "foto.psd",
+    detail: "Motivo: Formato no soportado",
+    path: "C:/lote",
+    actionLabel: "",
+  }},
+  {{
+    level: "warning",
+    title: "aviso.png",
+    detail: "Aviso",
+    path: "C:/aviso.png",
+    imageId: "img-2",
+    actionLabel: "Ir a imagen",
+  }},
+  {{
+    level: "error",
+    title: "bloqueada.png",
+    detail: "Lista",
+    path: "C:/bloqueada.png",
+    imageId: "img-3",
+    actionLabel: "Ir a imagen",
+  }},
+  {{
+    level: "error",
+    title: "Destino",
+    detail: "ocupado",
+    path: "",
+    actionLabel: "",
+  }},
+]);
+
 assert.equal(helpers.issueListHtml({{
   hasActiveBatch: false,
   batch: "none",

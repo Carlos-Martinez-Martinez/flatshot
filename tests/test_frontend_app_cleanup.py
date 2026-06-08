@@ -34,6 +34,11 @@ def test_app_js_does_not_reintroduce_extracted_wrapper_helpers():
         "function outputTemporaryNoticeHtml(",
         "function issueItemHtml(",
         "function preflightListHtml(",
+        "function imageSearchText(",
+        "function filterDisplayName(",
+        "function thumbnailHtml(",
+        "function galleryFilterVisible(",
+        "function previewModeLabel(",
     ]
 
     for wrapper in obsolete_wrappers:

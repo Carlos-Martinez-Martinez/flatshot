@@ -1015,14 +1015,6 @@ function filteredImages() {
   });
 }
 
-function imageSearchText(image) {
-  return galleryHelpers.imageSearchText(image);
-}
-
-function filterDisplayName(filter = state.filter) {
-  return galleryHelpers.filterDisplayName(filter);
-}
-
 function filterStatusText(filter = state.filter) {
   return galleryHelpers.filterStatusText(filter);
 }
@@ -3698,12 +3690,6 @@ function thumbnailState(image, src) {
   });
 }
 
-function thumbnailHtml(image) {
-  const src = imageThumbnailSrc(image);
-  const current = thumbnailState(image, src);
-  return galleryHelpers.thumbnailHtml(image, current, src);
-}
-
 function queueThumbnailPreload() {
   if (!hasBatch()) {
     return;
@@ -3892,10 +3878,6 @@ function imageItemHtml(image) {
 
 function galleryFilterCounts(images = activeImages()) {
   return galleryHelpers.galleryFilterCounts(images, exportItemStatusMap(images));
-}
-
-function galleryFilterVisible(filter, counts = galleryFilterCounts()) {
-  return galleryHelpers.galleryFilterVisible(filter, counts);
 }
 
 function ensureGalleryFilterAvailable(images = activeImages()) {
@@ -4182,10 +4164,6 @@ function previewSettingsLabel() {
     bridgeMode: state.bridgeMode,
     presetDirty: state.presetDirty,
   });
-}
-
-function previewModeLabel() {
-  return previewStateHelpers.previewModeLabel(state.previewMode);
 }
 
 function outputSizeDisplay() {

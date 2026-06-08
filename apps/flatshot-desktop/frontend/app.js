@@ -3782,32 +3782,7 @@ function imageThumbnailSrc(image) {
   if (image.source === "bridge") {
     return image.path ? bridgeThumbnailUrl(image.path) : "";
   }
-  return mockThumbnailDataUrl(image);
-}
-
-function mockThumbnailDataUrl(image) {
-  const palettes = {
-    "tone-a": ["#f8f1e8", "#b7d6c8", "#34534a"],
-    "tone-b": ["#f8e1dc", "#dfe9ec", "#723d45"],
-    "tone-c": ["#ded8cf", "#8db9ad", "#33423f"],
-    "tone-d": ["#f2e6bd", "#c7d7ea", "#67510f"],
-    "tone-e": ["#e3ecfa", "#b7d2c9", "#294d63"],
-  };
-  const [bgA, bgB, ink] = palettes[image?.tone] || palettes["tone-a"];
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
-      <defs>
-        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="${bgA}"/>
-          <stop offset="1" stop-color="${bgB}"/>
-        </linearGradient>
-      </defs>
-      <rect width="96" height="96" rx="8" fill="url(#bg)"/>
-      <path d="M34 18h28l13 12-9 11-6-4v38H36V37l-6 4-9-11 13-12z" fill="#fff" fill-opacity=".86"/>
-      <path d="M34 18h28l13 12-9 11-6-4v38H36V37l-6 4-9-11 13-12z" fill="none" stroke="${ink}" stroke-opacity=".34" stroke-width="2"/>
-    </svg>
-  `;
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.trim())}`;
+  return galleryHelpers.mockThumbnailDataUrl(image);
 }
 
 function thumbnailState(image, src) {

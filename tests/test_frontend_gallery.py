@@ -172,6 +172,18 @@ assert.deepEqual(helpers.thumbnailState({{
   error: "",
 }});
 
+const mockThumb = helpers.mockThumbnailDataUrl({{ tone: "tone-b" }});
+assert.equal(mockThumb.startsWith("data:image/svg+xml;charset=utf-8,"), true);
+const mockSvg = decodeURIComponent(mockThumb.split(",", 2)[1]);
+assert.equal(mockSvg.includes('viewBox="0 0 96 96"'), true);
+assert.equal(mockSvg.includes('stop-color="#f8e1dc"'), true);
+assert.equal(mockSvg.includes('stop-color="#dfe9ec"'), true);
+assert.equal(mockSvg.includes('stroke="#723d45"'), true);
+
+const fallbackSvg = decodeURIComponent(helpers.mockThumbnailDataUrl({{ tone: "missing" }}).split(",", 2)[1]);
+assert.equal(fallbackSvg.includes('stop-color="#f8f1e8"'), true);
+assert.equal(fallbackSvg.includes('stroke="#34534a"'), true);
+
 const thumb = helpers.thumbnailHtml(
   {{ id: "img-1", name: "Camisa <azul>.png" }},
   {{ status: "error", resolvedSrc: "data:image/png,<x>", error: "Sin <preview>" }},

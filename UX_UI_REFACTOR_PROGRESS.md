@@ -1581,6 +1581,37 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 60 - Extraccion de miniatura mock de galeria
+
+Estado: completada.
+
+Cambios realizados:
+- `gallery.js` ahora expone `mockThumbnailDataUrl()` para generar la miniatura SVG usada por datos mock de la galeria.
+- `app.js` conserva la decision de origen de miniatura:
+  - bridge: sigue usando `bridgeThumbnailUrl(image.path)`;
+  - mock/local demo: delega en `galleryHelpers.mockThumbnailDataUrl(image)`.
+- Se elimino de `app.js` el bloque embebido de paletas y SVG mock.
+- Se amplio `tests/test_frontend_gallery.py` para cubrir:
+  - prefijo `data:image/svg+xml;charset=utf-8`;
+  - paleta `tone-b`;
+  - fallback a `tone-a` cuando el tono no existe.
+
+Impacto medido:
+- `app.js`: 6.478 -> 6.454 lineas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: sin cambios, 22.
+
+Validaciones ejecutadas:
+- `node --check apps/flatshot-desktop/frontend/gallery.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_gallery.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 282 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- HTTP local: `index.html`, `gallery.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

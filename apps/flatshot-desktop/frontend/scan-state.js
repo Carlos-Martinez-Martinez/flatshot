@@ -150,15 +150,134 @@
     };
   }
 
+  function countText(count, singular, plural = `${singular}s`) {
+    const value = Number(count) || 0;
+    return `${value} ${value === 1 ? singular : plural}`;
+  }
+
+  function compactScanStatus(options = {}) {
+    const ignoredFiles = Number(options.ignoredFiles) || 0;
+    if (options.batch === "ready") {
+      return ignoredFiles
+        ? `${Number(options.exportableImages) || 0} exportables · ${countText(ignoredFiles, "ignorado", "ignorados")}`
+        : `${Number(options.exportableImages) || 0} exportables`;
+    }
+    if (options.batch === "empty") {
+      return ignoredFiles ? `0 exportables · ${countText(ignoredFiles, "ignorado", "ignorados")}` : "Sin imágenes compatibles";
+    }
+    if (options.batch === "scanning") {
+      return "Leyendo imágenes";
+    }
+    return options.scanStatus || "Sin lote";
+  }
+
+  function sourceFolderName(options = {}) {
+    const batch = options.batch || "none";
+    const folders = Array.isArray(options.folders) ? options.folders : [];
+    if (batch === "scanning") {
+      return options.scanningFolderName || "Carpeta";
+    }
+    if (folders.length === 1) {
+      return folders[0].name || "Carpeta actual";
+    }
+    if (folders.length > 1) {
+      return `${folders.length} carpetas`;
+    }
+    if (options.persistedFolderName) {
+      return options.persistedFolderName || "Carpeta actual";
+    }
+    return options.hasBatch || batch === "empty" ? "Carpeta actual" : "Pendiente";
+  }
+
+  function normalBridgeMessage(options = {}) {
+    if (options.bridgeMode !== "bridge") {
+      return options.devMode ? "Modo revisión activo." : "Elige una carpeta local.";
+    }
+    if (options.bridgeStatus === "connected") {
+      return "Listo.";
+    }
+    if (options.bridgeStatus === "checking") {
+      return "Comprobando conexión.";
+    }
+    if (options.bridgeStatus === "disconnected") {
+      return "Conexión local no disponible.";
+    }
+    return "Elige una carpeta local.";
+  }
+
+  function sourcePanelClass(options = {}) {
+    if (options.batch === "scanning") {
+      return "scanning";
+    }
+    if (options.hasScanError) {
+      return "error";
+    }
+    if (options.isBridgeBatch || options.bridgeMode === "bridge") {
+      return "bridge";
+    }
+    return "";
+  }
+
+  function sourceBadgeClass(options = {}) {
+    if (options.isBridgeBatch) {
+      return "bridge";
+    }
+    if (options.isMockBatch) {
+      return "ready";
+    }
+    return "";
+  }
+
+  function sourceLabel(options = {}) {
+    if (options.isBridgeBatch) {
+      return "Local";
+    }
+    if (options.isMockBatch) {
+      return options.devMode ? "Demo" : "Local";
+    }
+    return options.bridgeMode === "bridge" || !options.devMode ? "Local" : "Demo";
+  }
+
+  function sourceTitle(options = {}) {
+    return options.hasBatch || options.batch === "empty" ? "Entrada" : "Seleccionar carpeta";
+  }
+
+  function sourcePickButtonLabel(options = {}) {
+    return options.hasBatch || options.batch === "empty" ? "Cambiar" : "Seleccionar carpeta";
+  }
+
+  function sourceScanButtonLabel(options = {}) {
+    return options.hasBatch || options.batch === "empty" ? "↻" : "Escanear";
+  }
+
+  function sourceScanButtonTitle(options = {}) {
+    return options.hasBatch || options.batch === "empty" ? "Actualizar lote" : "Escanear carpeta";
+  }
+
+  function bridgeMessageClass(bridgeStatus) {
+    return `bridge-message ${bridgeStatus === "connected" ? "ready" : bridgeStatus === "disconnected" ? "error" : ""}`;
+  }
+
   return {
+    bridgeMessageClass,
+    compactScanStatus,
     emptyScanPathState,
     folderPickCancelledState,
     folderPickErrorState,
     folderPickSelectedState,
     folderPickStartState,
+    normalBridgeMessage,
     scanEmptyState,
     scanFailureState,
     scanReadyState,
     scanStartState,
+    sourceBadgeClass,
+    sourceFolderName,
+    sourceLabel,
+    sourcePanelClass,
+    sourcePickButtonLabel,
+    sourceScanButtonLabel,
+    sourceScanButtonTitle,
+    sourceTitle,
   };
 });

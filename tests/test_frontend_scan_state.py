@@ -157,6 +157,110 @@ assert.deepEqual(helpers.scanEmptyState([]), {{
   statusText: "No hay imágenes compatibles",
 }});
 assert.deepEqual(helpers.scanEmptyState([{{ detail: "Solo subcarpetas" }}]).scanStatus, "Solo subcarpetas");
+
+assert.equal(helpers.compactScanStatus({{
+  batch: "ready",
+  exportableImages: 4,
+  ignoredFiles: 2,
+}}), "4 exportables · 2 ignorados");
+assert.equal(helpers.compactScanStatus({{
+  batch: "ready",
+  exportableImages: 1,
+  ignoredFiles: 0,
+}}), "1 exportables");
+assert.equal(helpers.compactScanStatus({{
+  batch: "empty",
+  ignoredFiles: 1,
+}}), "0 exportables · 1 ignorado");
+assert.equal(helpers.compactScanStatus({{ batch: "empty" }}), "Sin imágenes compatibles");
+assert.equal(helpers.compactScanStatus({{ batch: "scanning" }}), "Leyendo imágenes");
+assert.equal(helpers.compactScanStatus({{ batch: "none", scanStatus: "" }}), "Sin lote");
+assert.equal(helpers.compactScanStatus({{ batch: "none", scanStatus: "Ruta vacía" }}), "Ruta vacía");
+
+assert.equal(helpers.sourceFolderName({{
+  batch: "scanning",
+  scanningFolderName: "Entrada",
+}}), "Entrada");
+assert.equal(helpers.sourceFolderName({{ batch: "scanning", scanningFolderName: "" }}), "Carpeta");
+assert.equal(helpers.sourceFolderName({{
+  batch: "ready",
+  folders: [{{ name: "Lote A" }}],
+}}), "Lote A");
+assert.equal(helpers.sourceFolderName({{
+  batch: "ready",
+  folders: [{{ name: "" }}],
+}}), "Carpeta actual");
+assert.equal(helpers.sourceFolderName({{
+  batch: "ready",
+  folders: [{{ name: "A" }}, {{ name: "B" }}],
+}}), "2 carpetas");
+assert.equal(helpers.sourceFolderName({{
+  batch: "none",
+  persistedFolderName: "Ultima",
+}}), "Ultima");
+assert.equal(helpers.sourceFolderName({{
+  batch: "empty",
+  folders: [],
+  hasBatch: false,
+}}), "Carpeta actual");
+assert.equal(helpers.sourceFolderName({{
+  batch: "none",
+  folders: [],
+  hasBatch: false,
+}}), "Pendiente");
+
+assert.equal(helpers.normalBridgeMessage({{
+  bridgeMode: "mock",
+  bridgeStatus: "connected",
+  devMode: true,
+}}), "Modo revisión activo.");
+assert.equal(helpers.normalBridgeMessage({{
+  bridgeMode: "mock",
+  bridgeStatus: "connected",
+  devMode: false,
+}}), "Elige una carpeta local.");
+assert.equal(helpers.normalBridgeMessage({{
+  bridgeMode: "bridge",
+  bridgeStatus: "connected",
+  devMode: true,
+}}), "Listo.");
+assert.equal(helpers.normalBridgeMessage({{
+  bridgeMode: "bridge",
+  bridgeStatus: "checking",
+  devMode: true,
+}}), "Comprobando conexión.");
+assert.equal(helpers.normalBridgeMessage({{
+  bridgeMode: "bridge",
+  bridgeStatus: "disconnected",
+  devMode: true,
+}}), "Conexión local no disponible.");
+
+assert.equal(helpers.sourcePanelClass({{ batch: "scanning" }}), "scanning");
+assert.equal(helpers.sourcePanelClass({{ batch: "ready", hasScanError: true }}), "error");
+assert.equal(helpers.sourcePanelClass({{ batch: "ready", isBridgeBatch: true }}), "bridge");
+assert.equal(helpers.sourcePanelClass({{ batch: "ready", bridgeMode: "bridge" }}), "bridge");
+assert.equal(helpers.sourcePanelClass({{ batch: "ready", bridgeMode: "mock" }}), "");
+
+assert.equal(helpers.sourceBadgeClass({{ isBridgeBatch: true, isMockBatch: false }}), "bridge");
+assert.equal(helpers.sourceBadgeClass({{ isBridgeBatch: false, isMockBatch: true }}), "ready");
+assert.equal(helpers.sourceBadgeClass({{ isBridgeBatch: false, isMockBatch: false }}), "");
+assert.equal(helpers.sourceLabel({{ isBridgeBatch: true, devMode: true }}), "Local");
+assert.equal(helpers.sourceLabel({{ isMockBatch: true, devMode: true }}), "Demo");
+assert.equal(helpers.sourceLabel({{ isMockBatch: true, devMode: false }}), "Local");
+assert.equal(helpers.sourceLabel({{ bridgeMode: "bridge", devMode: true }}), "Local");
+assert.equal(helpers.sourceLabel({{ bridgeMode: "mock", devMode: true }}), "Demo");
+
+assert.equal(helpers.sourceTitle({{ hasBatch: true, batch: "ready" }}), "Entrada");
+assert.equal(helpers.sourceTitle({{ hasBatch: false, batch: "none" }}), "Seleccionar carpeta");
+assert.equal(helpers.sourcePickButtonLabel({{ hasBatch: true, batch: "ready" }}), "Cambiar");
+assert.equal(helpers.sourcePickButtonLabel({{ hasBatch: false, batch: "none" }}), "Seleccionar carpeta");
+assert.equal(helpers.sourceScanButtonLabel({{ hasBatch: true, batch: "ready" }}), "↻");
+assert.equal(helpers.sourceScanButtonLabel({{ hasBatch: false, batch: "none" }}), "Escanear");
+assert.equal(helpers.sourceScanButtonTitle({{ hasBatch: true, batch: "ready" }}), "Actualizar lote");
+assert.equal(helpers.sourceScanButtonTitle({{ hasBatch: false, batch: "none" }}), "Escanear carpeta");
+assert.equal(helpers.bridgeMessageClass("connected"), "bridge-message ready");
+assert.equal(helpers.bridgeMessageClass("disconnected"), "bridge-message error");
+assert.equal(helpers.bridgeMessageClass("checking"), "bridge-message ");
 """
     result = subprocess.run(
         ["node", "-e", script],

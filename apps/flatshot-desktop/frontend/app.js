@@ -3300,9 +3300,12 @@ function renderBridge() {
   chip.className = `bridge-chip ${bridgeStatusClass()}`;
   chip.textContent = bridgeStatusLabel();
   sourcePanel.className = `source-panel batch-rail__source ${sourcePanelClass()}`;
-  sourceBadge.className = `state-chip ${isBridgeBatch() ? "bridge" : isMockBatch() ? "ready" : ""}`;
+  sourceBadge.className = `state-chip ${scanStateHelpers.sourceBadgeClass({
+    isBridgeBatch: isBridgeBatch(),
+    isMockBatch: isMockBatch(),
+  })}`;
   sourceBadge.textContent = sourceLabel();
-  $("#source-title").textContent = hasBatch() || state.batch === "empty" ? "Entrada" : "Seleccionar carpeta";
+  $("#source-title").textContent = scanStateHelpers.sourceTitle({ hasBatch: hasBatch(), batch: state.batch });
   const sourceName = $("#source-folder-name");
   if (sourceName) {
     sourceName.textContent = sourceFolderName();
@@ -3310,94 +3313,74 @@ function renderBridge() {
   }
   $("#scan-status").textContent = compactScanStatus();
   $("#bridge-scan-path").value = state.bridgeScanPath;
-  $("#bridge-pick-folder").textContent = hasBatch() || state.batch === "empty" ? "Cambiar" : "Seleccionar carpeta";
-  $("#bridge-scan-folder").textContent = hasBatch() || state.batch === "empty" ? "↻" : "Escanear";
-  $("#bridge-scan-folder").title = hasBatch() || state.batch === "empty" ? "Actualizar lote" : "Escanear carpeta";
+  $("#bridge-pick-folder").textContent = scanStateHelpers.sourcePickButtonLabel({ hasBatch: hasBatch(), batch: state.batch });
+  $("#bridge-scan-folder").textContent = scanStateHelpers.sourceScanButtonLabel({ hasBatch: hasBatch(), batch: state.batch });
+  $("#bridge-scan-folder").title = scanStateHelpers.sourceScanButtonTitle({ hasBatch: hasBatch(), batch: state.batch });
   $("#bridge-scan-folder").setAttribute("aria-label", $("#bridge-scan-folder").title);
   $("#bridge-pick-folder").disabled = state.bridgeStatus === "checking" || state.batch === "scanning";
   $("#bridge-scan-folder").disabled = state.bridgeStatus === "checking" || state.batch === "scanning";
   $("#bridge-last-response").textContent = state.bridgeLastResponse;
   $("#bridge-capabilities").textContent = state.bridgeCapabilitiesSummary;
   message.textContent = normalBridgeMessage();
-  message.className = `bridge-message ${state.bridgeStatus === "connected" ? "ready" : state.bridgeStatus === "disconnected" ? "error" : ""}`;
+  message.className = scanStateHelpers.bridgeMessageClass(state.bridgeStatus);
   renderBatchSummary();
 }
 
 function compactScanStatus() {
   const counts = batchCounts();
-  if (state.batch === "ready") {
-    return counts.ignoredFiles
-      ? `${counts.exportableImages} exportables · ${countText(counts.ignoredFiles, "ignorado", "ignorados")}`
-      : `${counts.exportableImages} exportables`;
-  }
-  if (state.batch === "empty") {
-    return counts.ignoredFiles ? `0 exportables · ${countText(counts.ignoredFiles, "ignorado", "ignorados")}` : "Sin imágenes compatibles";
-  }
-  if (state.batch === "scanning") {
-    return "Leyendo imágenes";
-  }
-  return state.scanStatus || "Sin lote";
+  return scanStateHelpers.compactScanStatus({
+    batch: state.batch,
+    exportableImages: counts.exportableImages,
+    ignoredFiles: counts.ignoredFiles,
+    scanStatus: state.scanStatus,
+  });
 }
 
 function sourceFolderName() {
-  if (state.batch === "scanning") {
-    return basename(parseFolderInput(state.bridgeScanPath)[0]) || "Carpeta";
-  }
   const folders = state.batch === "ready"
     ? activeFolders()
     : state.batch === "empty" && isBridgeBatch()
       ? state.realFolders
       : [];
-  if (folders.length === 1) {
-    return folders[0].name || "Carpeta actual";
-  }
-  if (folders.length > 1) {
-    return `${folders.length} carpetas`;
-  }
   const persistedPath = parseFolderInput(state.bridgeScanPath)[0];
-  if (persistedPath) {
-    return basename(persistedPath) || "Carpeta actual";
+  if (state.batch === "scanning") {
+    return scanStateHelpers.sourceFolderName({
+      batch: state.batch,
+      scanningFolderName: basename(persistedPath),
+    });
   }
-  return hasBatch() || state.batch === "empty" ? "Carpeta actual" : "Pendiente";
+  return scanStateHelpers.sourceFolderName({
+    batch: state.batch,
+    folders,
+    hasBatch: hasBatch(),
+    persistedFolderName: persistedPath ? basename(persistedPath) || "Carpeta actual" : "",
+  });
 }
 
 function normalBridgeMessage() {
-  if (state.bridgeMode !== "bridge") {
-    return devMode ? "Modo revisión activo." : "Elige una carpeta local.";
-  }
-  if (state.bridgeStatus === "connected") {
-    return "Listo.";
-  }
-  if (state.bridgeStatus === "checking") {
-    return "Comprobando conexión.";
-  }
-  if (state.bridgeStatus === "disconnected") {
-    return "Conexión local no disponible.";
-  }
-  return "Elige una carpeta local.";
+  return scanStateHelpers.normalBridgeMessage({
+    bridgeMode: state.bridgeMode,
+    bridgeStatus: state.bridgeStatus,
+    devMode,
+  });
 }
 
 function sourcePanelClass() {
-  if (state.batch === "scanning") {
-    return "scanning";
-  }
-  if (state.scanIssues.some((issue) => issue.level === "error")) {
-    return "error";
-  }
-  if (isBridgeBatch() || state.bridgeMode === "bridge") {
-    return "bridge";
-  }
-  return "";
+  return scanStateHelpers.sourcePanelClass({
+    batch: state.batch,
+    bridgeMode: state.bridgeMode,
+    hasScanError: state.scanIssues.some((issue) => issue.level === "error"),
+    isBridgeBatch: isBridgeBatch(),
+  });
 }
 
 function sourceLabel() {
-  if (isBridgeBatch()) {
-    return "Local";
-  }
-  if (isMockBatch()) {
-    return devMode ? "Demo" : "Local";
-  }
-  return state.bridgeMode === "bridge" || !devMode ? "Local" : "Demo";
+  return scanStateHelpers.sourceLabel({
+    bridgeMode: state.bridgeMode,
+    devMode,
+    isBridgeBatch: isBridgeBatch(),
+    isMockBatch: isMockBatch(),
+  });
 }
 
 function emptyScanDiagnostics() {

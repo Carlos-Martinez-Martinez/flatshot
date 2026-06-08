@@ -66,6 +66,22 @@ assert.equal(helpers.currentExportFileLabel({{
   processed: 0,
   statusText: "Procesando",
 }}), "Procesando");
+assert.equal(helpers.outputDestinationToOpen({{
+  exportDestinations: ["C:/Estado", "C:/Otro"],
+  resultDestinations: ["C:/Resultado"],
+}}), "C:/Estado");
+assert.equal(helpers.outputDestinationToOpen({{
+  exportDestinations: [],
+  resultDestinations: ["C:/Resultado", "C:/Otro"],
+}}), "C:/Resultado");
+assert.equal(helpers.outputDestinationToOpen({{
+  exportDestinations: [],
+  resultDestinations: [],
+}}), "");
+assert.equal(helpers.outputDestinationToOpen({{
+  exportDestinations: null,
+  resultDestinations: null,
+}}), "");
 
 assert.equal(
   helpers.exportIssueActionText({{ title: "Destino", detail: "ocupado" }}, {{ existingOutput: true }}),

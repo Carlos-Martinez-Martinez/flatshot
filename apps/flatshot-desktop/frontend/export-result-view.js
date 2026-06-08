@@ -105,6 +105,18 @@
     return images[index]?.name || options.statusText || "Preparando";
   }
 
+  function outputDestinationToOpen(options = {}) {
+    const exportDestinations = Array.isArray(options.exportDestinations) ? options.exportDestinations : [];
+    if (exportDestinations.length) {
+      return exportDestinations[0];
+    }
+    const resultDestinations = Array.isArray(options.resultDestinations) ? options.resultDestinations : [];
+    if (resultDestinations.length) {
+      return resultDestinations[0];
+    }
+    return "";
+  }
+
   function exportResultHtml(options = {}) {
     const status = options.status || "running";
     const title = options.title || exportResultTitle(status, options.paused);
@@ -173,5 +185,6 @@
     exportResultHtml,
     exportResultMeta,
     exportResultTitle,
+    outputDestinationToOpen,
   };
 });

@@ -2848,13 +2848,10 @@ function reviewOutput() {
 }
 
 function outputDestinationToOpen() {
-  if (state.exportDestinations.length) {
-    return state.exportDestinations[0];
-  }
-  if (Array.isArray(state.exportResult?.destinations) && state.exportResult.destinations.length) {
-    return state.exportResult.destinations[0];
-  }
-  return "";
+  return exportResultViewHelpers.outputDestinationToOpen({
+    exportDestinations: state.exportDestinations,
+    resultDestinations: state.exportResult?.destinations,
+  });
 }
 
 function openOutputFolder() {

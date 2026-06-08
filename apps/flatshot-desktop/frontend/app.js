@@ -91,6 +91,7 @@ const emptyStateViewHelpers = window.FlatShotEmptyStateView;
 const batchDetailViewHelpers = window.FlatShotBatchDetailView;
 const galleryHelpers = window.FlatShotGallery;
 const previewStateHelpers = window.FlatShotPreviewState;
+const inspectorOutputViewHelpers = window.FlatShotInspectorOutputView;
 const inspectorReviewViewHelpers = window.FlatShotInspectorReviewView;
 const STORAGE_KEYS = {
   bridgeScanPath: "flatshot.bridgeScanPath",
@@ -5061,56 +5062,40 @@ function outputInspectorCardHtml() {
   const exportable = exportableImages().length;
   const totalFiles = exportable * activeProfiles.length;
   const dirty = !outputMatchesProfile(activeOutputProfile());
-  return `
-    <section class="inspector-output-card">
-      <div class="inspector-output-card__head">
-        <span>${escapeHtml(`Salidas activas · ${activeProfiles.length}`)}</span>
-        <strong>${escapeHtml(totalFiles ? `${totalFiles} archivos previstos` : "Pendiente de lote")}</strong>
-        <small>${escapeHtml(exportable ? readyImagesText(exportable) : "Sin imágenes listas")}</small>
-      </div>
-      <div class="active-output-list" aria-label="Salidas del lote">
-        ${profiles.map(outputProfileInlineRowHtml).join("")}
-      </div>
-      ${dirty ? outputTemporaryNoticeHtml() : ""}
-      <div class="inspector-output-card__actions">
-        <button type="button" class="primary" data-action="edit-output">Editar salidas</button>
-        <button type="button" data-action="open-app-settings">Gestionar presets</button>
-      </div>
-    </section>
-  `;
+  const rows = profiles.map((profile) => {
+    const enabled = Boolean(profile.enabled || profile.id === state.activeOutputProfileId);
+    return {
+      id: profile.id,
+      name: profile.name,
+      enabled,
+      active: profile.id === state.activeOutputProfileId,
+      canToggle: enabledOutputProfiles().length > 1 || !enabled,
+      summary: outputProfileSummaryLine(profile),
+    };
+  });
+  return inspectorOutputViewHelpers.outputInspectorCardHtml({
+    activeCount: activeProfiles.length,
+    totalFiles,
+    readyLabel: exportable ? readyImagesText(exportable) : "Sin imágenes listas",
+    rows,
+    dirty,
+  });
 }
 
 function outputProfileInlineRowHtml(profile) {
   const enabled = Boolean(profile.enabled || profile.id === state.activeOutputProfileId);
-  const active = profile.id === state.activeOutputProfileId;
-  const canToggle = enabledOutputProfiles().length > 1 || !enabled;
-  const summary = outputProfileSummaryLine(profile);
-  return `
-    <div class="active-output-row${active ? " is-primary" : ""}${enabled ? " is-enabled" : " is-disabled"}">
-      <label class="output-toggle" title="${escapeHtml(canToggle ? "Activar o desactivar salida" : "Debe quedar al menos una salida activa")}">
-        <input type="checkbox" data-output-profile-enabled-id="${escapeHtml(profile.id)}" ${enabled ? "checked" : ""} ${canToggle ? "" : "disabled"} />
-        <span></span>
-      </label>
-      <button type="button" class="active-output-row__main" data-action="select-output-profile" data-output-profile-id="${escapeHtml(profile.id)}" title="${escapeHtml(`${profile.name} · ${summary}`)}">
-        <strong>${escapeHtml(profile.name)}</strong>
-        <small>${escapeHtml(summary)}</small>
-      </button>
-      <span class="active-output-row__tag">${escapeHtml(active ? "Principal" : "")}</span>
-    </div>
-  `;
+  return inspectorOutputViewHelpers.outputProfileInlineRowHtml({
+    id: profile.id,
+    name: profile.name,
+    enabled,
+    active: profile.id === state.activeOutputProfileId,
+    canToggle: enabledOutputProfiles().length > 1 || !enabled,
+    summary: outputProfileSummaryLine(profile),
+  });
 }
 
 function outputTemporaryNoticeHtml() {
-  return `
-    <div class="temporary-output-notice">
-      <strong>Cambios temporales en esta salida</strong>
-      <div>
-        <button type="button" data-action="save-output-current-profile">Guardar en preset</button>
-        <button type="button" data-action="save-output-as-new">Guardar como nuevo</button>
-        <button type="button" data-action="discard-output-overrides">Descartar</button>
-      </div>
-    </div>
-  `;
+  return inspectorOutputViewHelpers.outputTemporaryNoticeHtml();
 }
 
 function selectedImageInspectorCardHtml() {

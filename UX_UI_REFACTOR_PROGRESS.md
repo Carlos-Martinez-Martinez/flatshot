@@ -374,6 +374,35 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 18 - Extraccion de vista de salidas del inspector
+
+Estado: completada.
+
+Cambios realizados:
+- Se agrego `apps/flatshot-desktop/frontend/inspector-output-view.js`.
+- Se movio HTML puro de la tarjeta de salidas activas fuera de `app.js`:
+  - tarjeta `inspector-output-card`;
+  - filas `active-output-row`;
+  - aviso de cambios temporales.
+- `index.html` carga el helper antes de `app.js`.
+- `app.js` conserva conteos, perfil activo, toggles permitidos y summaries; solo delega presentacion.
+- Se agrego `tests/test_frontend_inspector_output_view.py` para filas, toggles, acciones, aviso temporal, escaping y orden de carga.
+
+Impacto medido:
+- `app.js`: 7.674 -> 7.659 lineas.
+
+Validaciones ejecutadas:
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_inspector_output_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 272 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- `node --check apps/flatshot-desktop/frontend/inspector-output-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en Windows.
+- HTTP local en `http://127.0.0.1:4198/`: `index.html`, `inspector-output-view.js`, `inspector-review-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 17 - Extraccion de vista de revision del inspector
 
 Estado: completada.

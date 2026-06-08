@@ -4719,18 +4719,11 @@ function lotInspectorCardHtml() {
     ? `${readyImagesText(0)}${ignored ? ` · ${ignored}` : ""}`
     : `${readyImagesText(counts.exportableImages)}${ignored ? ` · ${ignored}` : ""}`;
   const tone = counts.blockingErrors ? "error" : counts.nonBlockingWarnings ? "warning" : "";
-  return `
-    <section class="inspector-summary ${escapeHtml(tone)}">
-      <div class="inspector-summary__main">
-        <span>Lote</span>
-        <strong>${escapeHtml(visible.title)}</strong>
-        <small>${escapeHtml(meta)}</small>
-      </div>
-      <div class="inspector-summary__action">
-        <button type="button" data-action="open-batch-detail">Ver detalle</button>
-      </div>
-    </section>
-  `;
+  return inspectorReviewViewHelpers.lotInspectorCardHtml({
+    meta,
+    title: visible.title,
+    tone,
+  });
 }
 
 function outputInspectorCardHtml() {

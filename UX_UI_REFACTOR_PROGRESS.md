@@ -1459,6 +1459,36 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 56 - Extraccion de tarjeta compacta de lote del inspector
+
+Estado: completada.
+
+Cambios realizados:
+- `inspector-review-view.js` ahora expone `lotInspectorCardHtml()` para renderizar la tarjeta compacta de lote del inspector.
+- `app.js` conserva los conteos, titulo visible, meta y tono; solo delega la estructura HTML.
+- Se amplio `tests/test_frontend_inspector_review_view.py` para cubrir:
+  - tono visual;
+  - escaping de titulo y meta;
+  - accion `open-batch-detail`;
+  - texto visible `Ver detalle`.
+
+Impacto medido:
+- `app.js`: 6.519 -> 6.512 lineas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: sin cambios, 22.
+
+Validaciones ejecutadas:
+- `node --check apps/flatshot-desktop/frontend/inspector-review-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_inspector_review_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 282 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en Windows.
+- HTTP local: `index.html`, `inspector-review-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

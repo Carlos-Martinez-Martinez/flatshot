@@ -42,6 +42,18 @@ assert.equal(lot.includes("lot-summary-card"), true);
 assert.equal(lot.includes("2 avisos"), true);
 assert.equal(lot.includes("<em>Ignorados</em><strong>4</strong>"), true);
 
+const lotCard = helpers.lotInspectorCardHtml({{
+  title: "Lote <actual>",
+  meta: '3 imágenes listas · Ignorados "técnicos"',
+  tone: "warning",
+}});
+assert.equal(lotCard.includes('class="inspector-summary warning"'), true);
+assert.equal(lotCard.includes("<span>Lote</span>"), true);
+assert.equal(lotCard.includes("Lote &lt;actual&gt;"), true);
+assert.equal(lotCard.includes("Ignorados &quot;técnicos&quot;"), true);
+assert.equal(lotCard.includes('data-action="open-batch-detail"'), true);
+assert.equal(lotCard.includes("Ver detalle"), true);
+
 const noImage = helpers.reviewPanelHtml({{
   lotSummaryHtml: lot,
   image: null,

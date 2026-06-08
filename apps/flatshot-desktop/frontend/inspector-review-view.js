@@ -32,6 +32,22 @@
   `;
   }
 
+  function lotInspectorCardHtml(options = {}) {
+    const tone = options.tone || "";
+    return `
+    <section class="inspector-summary ${escapeHtml(tone)}">
+      <div class="inspector-summary__main">
+        <span>Lote</span>
+        <strong>${escapeHtml(options.title || "")}</strong>
+        <small>${escapeHtml(options.meta || "")}</small>
+      </div>
+      <div class="inspector-summary__action">
+        <button type="button" data-action="open-batch-detail">Ver detalle</button>
+      </div>
+    </section>
+  `;
+  }
+
   function reviewIssueListHtml(issues = []) {
     if (!issues.length) {
       return "";
@@ -168,6 +184,7 @@
     aspectInspectorCardHtml,
     escapeHtml,
     issuesInspectorCardHtml,
+    lotInspectorCardHtml,
     lotInspectorSummaryHtml,
     reviewIssueListHtml,
     reviewPanelHtml,

@@ -1582,7 +1582,7 @@ function getVisibleAppState() {
       title: "Escaneando carpeta...",
       subtitle: state.scanStatus || "Leyendo imágenes",
       topSummary: compactHeaderStatusText(),
-      primaryAction: { label: "Escaneando...", action: "", enabled: false },
+      primaryAction: { label: "Escaneando", action: "", enabled: false },
       secondaryAction: null,
       nextStep: "Escaneando carpeta",
       counts,
@@ -1670,7 +1670,7 @@ function readyBatchSummaryText(counts = batchCounts()) {
   if (counts.filesFound > 0 || counts.exportableImages > 0) {
     return `${format} · ${counts.filesFound} archivos · ${readyImagesText(counts.exportableImages)}`;
   }
-  return `${format} · 0 listas`;
+  return `${format} · ${readyImagesText(0)}`;
 }
 
 function setScenario(scenario) {
@@ -5423,8 +5423,11 @@ function previewSubtitle(image) {
 
 function renderSettings() {
   renderReviewPanel();
-  $("#active-preset").textContent = state.activePreset;
-  $("#preset-source").textContent = presetSourceLabel();
+  const activePreset = $("#active-preset");
+  if (activePreset) {
+    activePreset.textContent = state.activePreset;
+  }
+  $("#preset-source").textContent = `${state.activePreset} · ${presetSourceLabel()}`;
   $("#preset-dirty").textContent = state.presetDirty ? "Sin guardar" : "Sin cambios";
   $("#preset-dirty").classList.toggle("dirty", state.presetDirty);
   const presetItems = activePresetItems();
@@ -5483,9 +5486,11 @@ function renderSettings() {
       numberInput.value = value;
     }
   });
-  $("#save-preset").disabled = false;
-  $("#save-preset").title = "Guardar el ajuste activo";
-  $("#save-preset").textContent = state.presetDirty ? "Guardar cambios" : "Guardar";
+  const savePresetButton = $("#save-preset");
+  savePresetButton.disabled = !state.presetDirty;
+  savePresetButton.title = state.presetDirty ? "Guardar el ajuste activo" : "Sin cambios pendientes";
+  savePresetButton.textContent = "Guardar cambios";
+  savePresetButton.classList.toggle("primary", state.presetDirty);
   const deletePresetButton = $("#delete-preset");
   if (deletePresetButton) {
     const canDeletePreset = presetItems.length > 1;
@@ -5751,6 +5756,14 @@ function syncAdvancedInspectorDetails(mode) {
       details.open = false;
       return;
     }
+    if (state.presetEditorOpen) {
+      details.open = details.classList.contains("preset-section");
+      return;
+    }
+    if (details.classList.contains("preset-section")) {
+      details.open = false;
+      return;
+    }
     if (
       details.classList.contains("appearance-section")
       || details.classList.contains("local-adjustment")
@@ -5791,9 +5804,9 @@ function inspectorCardsHtml() {
 function lotInspectorCardHtml() {
   const counts = batchCounts();
   const visible = getVisibleAppState();
-  const ignored = counts.ignoredFiles ? "Ignorados en detalle" : "";
+  const ignored = counts.ignoredFiles ? "Ignorados técnicos en detalle" : "";
   const meta = state.batch === "empty"
-    ? `0 listas${ignored ? ` · ${ignored}` : ""}`
+    ? `${readyImagesText(0)}${ignored ? ` · ${ignored}` : ""}`
     : `${readyImagesText(counts.exportableImages)}${ignored ? ` · ${ignored}` : ""}`;
   const tone = counts.blockingErrors ? "error" : counts.nonBlockingWarnings ? "warning" : "";
   return `
@@ -5804,7 +5817,7 @@ function lotInspectorCardHtml() {
         <small>${escapeHtml(meta)}</small>
       </div>
       <div class="inspector-summary__action">
-        <button type="button" data-action="open-batch-detail">Detalle</button>
+        <button type="button" data-action="open-batch-detail">Ver detalle</button>
       </div>
     </section>
   `;
@@ -5820,8 +5833,8 @@ function outputInspectorCardHtml() {
     <section class="inspector-output-card">
       <div class="inspector-output-card__head">
         <span>${escapeHtml(`Salidas activas · ${activeProfiles.length}`)}</span>
-        <strong>${escapeHtml(totalFiles ? "Listo para procesar" : "Pendiente")}</strong>
-        <small>${escapeHtml(totalFiles ? `${totalFiles} archivos previstos` : "Pendiente de lote")}</small>
+        <strong>${escapeHtml(totalFiles ? `${totalFiles} archivos previstos` : "Pendiente de lote")}</strong>
+        <small>${escapeHtml(exportable ? readyImagesText(exportable) : "Sin imágenes listas")}</small>
       </div>
       <div class="active-output-list" aria-label="Salidas del lote">
         ${profiles.map(outputProfileInlineRowHtml).join("")}
@@ -5850,7 +5863,7 @@ function outputProfileInlineRowHtml(profile) {
         <strong>${escapeHtml(profile.name)}</strong>
         <small>${escapeHtml(summary)}</small>
       </button>
-      <span class="active-output-row__tag">${escapeHtml(active ? "Principal" : enabled ? "Activa" : "")}</span>
+      <span class="active-output-row__tag">${escapeHtml(active ? "Principal" : "")}</span>
     </div>
   `;
 }
@@ -5968,20 +5981,26 @@ function actionableIssueRows() {
 }
 
 function inspectorSubviewHeaderHtml(mode) {
+  const isPresetManager = mode === "advanced" && state.presetEditorOpen;
   const labels = {
     output: ["Salida", state.outputEditMode ? "Editar salida" : viewerOutputCompactLabel()],
-    advanced: ["Editar ajuste", state.activePreset],
+    advanced: [isPresetManager ? "Gestionar ajustes" : "Editar ajuste", state.activePreset, presetSourceLabel()],
     warnings: ["Revisar", actionableIssueRows().length ? `${actionableIssueRows().length} punto${actionableIssueRows().length === 1 ? "" : "s"}` : "Sin avisos"],
   };
-  const [title, subtitle] = labels[mode] || ["Detalle", ""];
-  const backAction = state.outputEditMode ? "cancel-output-edit" : "close-inspector-subview";
+  const [title, subtitle, detail = ""] = labels[mode] || ["Detalle", ""];
+  const backAction = state.outputEditMode ? "cancel-output-edit" : isPresetManager ? "close-preset-editor" : "close-inspector-subview";
   const backLabel = state.outputEditMode ? "Cancelar" : "Volver";
+  const manageAction = mode === "advanced" && !isPresetManager
+    ? '<button type="button" data-action="open-preset-editor">Gestionar ajustes</button>'
+    : "";
   return `
     <section class="inspector-subview-head">
       <div>
         <span>${escapeHtml(title)}</span>
         <strong>${escapeHtml(subtitle)}</strong>
+        ${detail ? `<small>${escapeHtml(detail)}</small>` : ""}
       </div>
+      ${manageAction}
       <button type="button" data-action="${escapeHtml(backAction)}">${escapeHtml(backLabel)}</button>
     </section>
   `;
@@ -6946,7 +6965,11 @@ function updateOutputProfileFooterState(validation, dirty) {
   const applyButton = $("[data-action='apply-output-profile']");
   if (applyButton) {
     applyButton.disabled = validation.errors.length > 0;
-    applyButton.textContent = dirty ? "Guardar y aplicar" : "Aplicar al lote";
+    applyButton.textContent = dirty
+      ? "Guardar y aplicar"
+      : draft.enabled
+        ? "Aplicar cambios al lote"
+        : "Activar en este lote";
   }
   const footerNote = $("#output-profile-unsaved");
   if (footerNote) {
@@ -7638,14 +7661,14 @@ function openPresetEditor() {
   state.presetEditorOpen = true;
   state.outputEditMode = false;
   state.inspectorTab = "advanced";
-  state.statusText = "Cambia o ajusta el ajuste activo";
+  state.statusText = "Gestionar ajustes";
   render();
 }
 
 function closePresetEditor() {
   state.presetEditorOpen = false;
-  state.inspectorTab = "output";
-  state.statusText = "Ajuste aplicado";
+  state.inspectorTab = "advanced";
+  state.statusText = "Editar ajuste";
   render();
 }
 

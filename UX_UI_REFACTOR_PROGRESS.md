@@ -172,3 +172,58 @@ Validaciones ejecutadas:
 Limitaciones:
 - La validacion visual se hizo con estados mock/dev. No se ejecuto exportacion real de archivos desde una carpeta de produccion en esta pasada.
 - No se modifico salida de imagen ni comportamiento de archivos exportados.
+
+## Fase 10 - Consolidacion adicional del informe v2
+
+Estado: completada.
+
+Cambios realizados:
+- Estado de escaneo reforzado como estado centrado de una sola columna: sin galeria, panel derecho ni rail lateral visibles durante el escaneo.
+- Boton superior de escaneo tratado como estado pasivo deshabilitado (`Escaneando`) y no como CTA primario.
+- Selector de fondo del visor ajustado para usar swatches cuadrados, evitando indicadores circulares que podian leerse como radios.
+- Panel derecho de salidas ajustado a `Salidas activas · N` + archivos previstos como dato principal.
+- Eliminado el badge textual `Activa` en filas de salida; el checkbox comunica activo y `Principal` queda como unico badge.
+- Microcopy corregida: `0 imagenes listas`, `Ignorados tecnicos en detalle`, `Ver detalle`.
+- Gestor de salidas: CTA del footer aclarado entre `Guardar y aplicar`, `Aplicar cambios al lote` y `Activar en este lote`.
+- Editor de ajustes: `Gestionar ajustes` queda como subvista secundaria explicita; la edicion operativa mantiene un unico encabezado, controles principales, avanzado colapsado y ajuste por imagen.
+- Guardar ajustes queda deshabilitado cuando no hay cambios pendientes; eliminar mantiene estilo destructivo.
+
+Archivos modificados:
+- `apps/flatshot-desktop/frontend/index.html`
+- `apps/flatshot-desktop/frontend/app.js`
+- `apps/flatshot-desktop/frontend/ux-refactor.css`
+- `UX_UI_REFACTOR_PROGRESS.md`
+
+Decisiones tomadas:
+- No tocar motor de imagen, preview service, export runner, presets Python ni logica de archivos.
+- No anadir dependencias.
+- Mantener el refactor en la capa frontend existente para evitar una reescritura amplia.
+- Usar estados mock/dev para la revision visual, sin abrir carpetas reales ni ejecutar exportacion real.
+
+Validaciones ejecutadas:
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en archivos frontend modificados.
+- `pytest`: 237 passed.
+- Playwright CLI en `http://127.0.0.1:4185/?dev=1`:
+  - sin lote: una columna, sin galeria/panel derecho, sin overflow horizontal;
+  - escaneo: una columna, paneles laterales ocultos, texto `Escaneando carpeta...`, boton `Escaneando` deshabilitado, sin overflow;
+  - lote mock: galeria visible, panel derecho visible, `4 imagenes listas`, selector de fondo con swatch 12x12 y radio 3px;
+  - varias salidas activas: `Salidas activas · 2`, 8 archivos previstos, 2 checkboxes activos, solo badge `Principal`;
+  - detalle de lote: 2 salidas activas listadas, footer `Cerrar` / `Cambiar carpeta`, Escape cierra;
+  - gestor de salidas: 3 presets, 1 seleccionado, 1 principal, 2 activos por checkbox, footer `Aplicar cambios al lote`, Escape cierra;
+  - editor de ajustes: encabezado unico, controles principales y ajuste por imagen abiertos, avanzado colapsado;
+  - avanzado expandido: sliders e inputs numericos alineados con la misma grilla;
+  - gestionar ajustes: subvista separada, controles principales/locales ocultos, guardar deshabilitado sin cambios, eliminar destructivo;
+  - viewport 1120x760 y 1000x760: sin overflow horizontal.
+
+Problemas encontrados:
+- El navegador integrado de Codex volvio a mostrar una pagina de crash al navegar a localhost, por lo que la revision visual final se hizo con Playwright CLI.
+- PowerShell quedo bloqueado durante comandos Playwright paralelos; las validaciones finales se ejecutaron mediante Node `child_process`.
+- La captura Playwright intentada en paralelo no se conservo como evidencia; se conservaron los resultados textuales de checks DOM/computed-style.
+
+Deuda tecnica pendiente:
+- Seria conveniente convertir los controles de ajuste en un componente JS/HTML unico (`SliderField`) en una pasada posterior, aunque visualmente ya comparten grilla y comportamiento.
+- La capa CSS sigue teniendo reglas historicas duplicadas en `styles.css`, `ux-foundation.css` y `ux-refactor.css`; se mantuvo la consolidacion final para minimizar riesgo.
+
+Salida exportada:
+- Sin cambios esperados en apariencia de imagen exportada ni comportamiento de archivos. No se ejecuto exportacion real.

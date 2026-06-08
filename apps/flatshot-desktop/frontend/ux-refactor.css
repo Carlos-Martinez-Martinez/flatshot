@@ -1259,3 +1259,64 @@ html:not(.dev-mode) .debug-panel {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Final consolidation fixes for the v2 UX/UI report. */
+.app-shell.is-scanning .workspace,
+.app-shell[data-ui-state="scanning"] .workspace {
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+}
+
+.app-shell.is-scanning .batch-panel,
+.app-shell.is-scanning .gallery-column,
+.app-shell.is-scanning .settings-panel,
+.app-shell[data-ui-state="scanning"] .batch-panel,
+.app-shell[data-ui-state="scanning"] .gallery-column,
+.app-shell[data-ui-state="scanning"] .settings-panel {
+  display: none !important;
+}
+
+.app-shell.is-scanning .preview-panel,
+.app-shell[data-ui-state="scanning"] .preview-panel {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+}
+
+.app-shell.is-scanning #top-primary-action {
+  border-color: var(--color-border) !important;
+  background: var(--color-bg-soft) !important;
+  color: var(--color-text-muted) !important;
+  cursor: default;
+}
+
+.viewer-background-switch button::before {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.inspector-subview-head {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.inspector-subview-head small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preset-section > summary .summary-copy,
+.appearance-section > summary .summary-copy,
+.advanced-block > summary .summary-copy,
+.local-adjustment > summary .summary-copy {
+  gap: 2px;
+}
+
+.preset-actions #save-preset.primary:disabled {
+  border-color: var(--color-border);
+  background: var(--color-bg-soft);
+  color: var(--color-text-muted);
+}

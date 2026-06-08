@@ -342,3 +342,34 @@ Validaciones ejecutadas:
 
 Salida exportada:
 - Sin cambios esperados. No se modifico pipeline de imagen, bridge Python ni escritura de archivos.
+
+## Fase 14 - Extraccion de vista de resultado de exportacion
+
+Estado: completada.
+
+Cambios realizados:
+- Se agrego `apps/flatshot-desktop/frontend/export-result-view.js`.
+- Se movio HTML puro del bloque de resultado de exportacion fuera de `app.js`:
+  - titulo y clase visual del resultado;
+  - metadata procesadas/totales/errores;
+  - resumen de issue de exportacion;
+  - acciones (`Abrir carpeta`, `Revisar avisos`, `Reintentar`);
+  - render de destinos, archivo actual e items procesados.
+- `index.html` carga el helper antes de `app.js`.
+- `app.js` mantiene los datos de estado, readiness, destino abierto y seleccion de issues; solo delega presentacion.
+- Se agrego `tests/test_frontend_export_result_view.py` para labels, acciones, escaping, HTML final y orden de carga.
+
+Impacto medido:
+- `app.js`: 7.865 -> 7.796 lineas.
+
+Validaciones ejecutadas:
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_export_result_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 266 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- `node --check apps/flatshot-desktop/frontend/export-result-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en Windows.
+- HTTP local en `http://127.0.0.1:4194/`: `index.html`, `export-result-view.js`, `output-profile-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.

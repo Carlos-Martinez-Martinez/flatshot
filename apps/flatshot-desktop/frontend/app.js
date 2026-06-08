@@ -81,6 +81,7 @@ const outputProfileHelpers = window.FlatShotOutputProfiles;
 const outputProfileViewHelpers = window.FlatShotOutputProfileView;
 const exportPayloadHelpers = window.FlatShotExportPayload;
 const exportStateHelpers = window.FlatShotExportState;
+const exportResultViewHelpers = window.FlatShotExportResultView;
 const preflightHelpers = window.FlatShotPreflight;
 const batchViewHelpers = window.FlatShotBatchView;
 const scanStateHelpers = window.FlatShotScanState;
@@ -6439,92 +6440,37 @@ function renderExportResult() {
   const issues = state.exportIssues.length ? state.exportIssues : state.errors;
   const items = Array.isArray(state.exportCompletedItems) ? state.exportCompletedItems.slice(-8) : [];
   const title = exportResultTitle();
-  const resultClass = state.exportStatus === "failed"
-    ? "error"
-    : state.exportStatus === "partial"
-      ? "warning"
-      : state.exportStatus === "completed"
-        ? "ready"
-        : "running";
   const meta = exportResultMeta(processed, total, errors);
-
-  const destinationHtml = destinations.length
-    ? destinations.slice(0, 3).map((path) => `
-      <div class="result-path" title="${escapeHtml(path)}">
-        <span>Carpeta</span>
-        <strong>${escapeHtml(path)}</strong>
-      </div>
-    `).join("")
-    : `<div class="result-path muted"><span>Carpeta</span><strong>${escapeHtml(destinationFallbackLabel())}</strong></div>`;
-
-  const currentItemHtml = state.exportStatus === "running" ? `
-    <div class="result-path muted">
-      <span>Actual</span>
-      <strong title="${escapeHtml(currentExportFileLabel())}">${escapeHtml(currentExportFileLabel())}</strong>
-    </div>
-  ` : "";
-
-  const issuesHtml = issues.length ? `
-    <div class="result-issues">
-      <strong>${errors ? `${errors} error${errors === 1 ? "" : "es"}` : `${issues.length} aviso${issues.length === 1 ? "" : "s"}`}</strong>
-      <span>${escapeHtml(exportIssueActionText(issues[0]))}</span>
-    </div>
-  ` : "";
-
-  const itemsHtml = items.length ? `
-    <div class="result-items" aria-label="Archivos procesados">
-      ${items.map((item) => `
-        <span class="result-item ${item.success ? "ready" : "error"}" title="${escapeHtml(item.name || "Archivo")}">
-          ${escapeHtml(item.name || "Archivo")}
-        </span>
-      `).join("")}
-    </div>
-  ` : "";
   const actionsHtml = exportResultActionsHtml(issues, destinations);
 
-  target.innerHTML = `
-    <div class="result-header ${resultClass}">
-      <strong>${escapeHtml(title)}</strong>
-      <span>${escapeHtml(meta)}</span>
-    </div>
-    ${destinationHtml}
-    ${currentItemHtml}
-    ${issuesHtml}
-    ${itemsHtml}
-    ${actionsHtml}
-  `;
+  target.innerHTML = exportResultViewHelpers.exportResultHtml({
+    status: state.exportStatus,
+    title,
+    meta,
+    processed,
+    total,
+    errors,
+    destinations,
+    destinationFallback: destinationFallbackLabel(),
+    currentFileLabel: currentExportFileLabel(),
+    issues,
+    issueSummary: exportIssueActionText(issues[0]),
+    items,
+    actionsHtml,
+  });
 }
 
 function exportResultTitle() {
-  if (state.exportStatus === "running") {
-    return state.paused ? "Exportación pausada" : "Exportando";
-  }
-  if (state.exportStatus === "completed") {
-    return "Exportación completada";
-  }
-  if (state.exportStatus === "partial") {
-    return "Completada con avisos";
-  }
-  if (state.exportStatus === "failed") {
-    return "Exportación fallida";
-  }
-  return "Resultado";
+  return exportResultViewHelpers.exportResultTitle(state.exportStatus, state.paused);
 }
 
 function exportResultMeta(processed, total, errors) {
-  if (state.exportStatus === "running") {
-    return `${processed}/${total} imágenes`;
-  }
-  if (state.exportStatus === "completed") {
-    return `${processed}/${total} exportadas`;
-  }
-  if (state.exportStatus === "partial") {
-    return `${processed}/${total} exportadas · ${errors} error${errors === 1 ? "" : "es"}`;
-  }
-  if (state.exportStatus === "failed") {
-    return errors ? `${errors} error${errors === 1 ? "" : "es"}` : "No completada";
-  }
-  return `${processed}/${total}`;
+  return exportResultViewHelpers.exportResultMeta({
+    status: state.exportStatus,
+    processed,
+    total,
+    errors,
+  });
 }
 
 function currentExportFileLabel() {
@@ -6537,34 +6483,19 @@ function currentExportFileLabel() {
 }
 
 function exportIssueActionText(issue) {
-  if (!issue) {
-    return "Revisa el resultado.";
-  }
-  if (issueMentionsExistingOutput(issue)) {
-    return "Ya hay archivos en destino. Cambia la carpeta o el nombre final.";
-  }
-  const title = issue.title || "Exportación";
-  const detail = issue.detail || "Revisa el resultado.";
-  return `${title} · ${detail}`;
+  return exportResultViewHelpers.exportIssueActionText(issue, {
+    existingOutput: issueMentionsExistingOutput(issue),
+  });
 }
 
 function exportResultActionsHtml(issues, destinations) {
-  const actions = [];
-  if ((state.exportStatus === "completed" || state.exportStatus === "partial") && outputDestinationToOpen()) {
-    actions.push('<button type="button" data-action="open-output">Abrir carpeta</button>');
-  }
-  if (issues.length || state.exportStatus === "failed" || state.exportStatus === "partial") {
-    actions.push('<button type="button" data-action="review-errors">Revisar avisos</button>');
-  }
-  if (state.exportStatus === "failed" && isExportReady()) {
-    actions.push('<button type="button" class="primary" data-action="start-export">Reintentar</button>');
-  }
-  if (!actions.length || destinations.length > 3) {
-    return destinations.length > 3
-      ? `<div class="result-actions"><span>${escapeHtml(destinations.length - 3)} carpetas más</span>${actions.join("")}</div>`
-      : "";
-  }
-  return `<div class="result-actions">${actions.join("")}</div>`;
+  return exportResultViewHelpers.exportResultActionsHtml({
+    status: state.exportStatus,
+    issues,
+    destinations,
+    canOpenOutput: Boolean(outputDestinationToOpen()),
+    canRetry: isExportReady(),
+  });
 }
 
 function destinationFallbackLabel() {

@@ -22,6 +22,10 @@ def test_app_js_does_not_reintroduce_extracted_wrapper_helpers():
         "function sameOutputProfile(",
         "function pluralizeCount(",
         "function sidebarLotSummaryText(",
+        "function warningCountLabel(",
+        "function imageCountLabel(",
+        "function omittedSummaryText(",
+        "function batchBackgroundLabel(",
     ]
 
     for wrapper in obsolete_wrappers:

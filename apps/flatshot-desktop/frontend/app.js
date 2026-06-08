@@ -1249,14 +1249,6 @@ function visibleWarningCount() {
   return batchCounts().nonBlockingWarnings;
 }
 
-function warningCountLabel(count = visibleWarningCount()) {
-  return batchViewHelpers.warningCountLabel(count);
-}
-
-function imageCountLabel(count) {
-  return batchViewHelpers.imageCountLabel(count);
-}
-
 function exportActionLabel(imageCount = batchCounts().exportableImages) {
   return batchViewHelpers.exportActionLabel(imageCount, exportOutputCount());
 }
@@ -2667,10 +2659,6 @@ function bridgeScanMessage(totalImages, warningCount) {
   return batchViewHelpers.bridgeScanMessage(totalImages, warningCount);
 }
 
-function omittedSummaryText(diagnostics = state.scanDiagnostics) {
-  return batchViewHelpers.omittedSummaryText(diagnostics);
-}
-
 function omissionReasonLabel(reason) {
   return batchViewHelpers.omissionReasonLabel(reason);
 }
@@ -3412,10 +3400,6 @@ function outputProfilesSummaryLabel(profiles = exportOutputProfiles()) {
     profileLabels: profiles.length > 1 ? profiles.map((profile) => `${profile.name} (${profile.format})`) : [],
     sizeLabel: outputSizeDisplay(),
   });
-}
-
-function batchBackgroundLabel(value) {
-  return batchViewHelpers.batchBackgroundLabel(value);
 }
 
 function batchDestinationLine() {

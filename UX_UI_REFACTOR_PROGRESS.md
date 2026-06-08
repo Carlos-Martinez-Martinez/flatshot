@@ -227,3 +227,59 @@ Deuda tecnica pendiente:
 
 Salida exportada:
 - Sin cambios esperados en apariencia de imagen exportada ni comportamiento de archivos. No se ejecuto exportacion real.
+
+## Fase 11 - Implementacion del audit de higiene de codigo
+
+Estado: completada.
+
+Rama de trabajo:
+- `codex/code-health-audit-implementation`.
+
+Commits subidos:
+- `aac39c3 Add CODE_HEALTH_AUDIT.md (FlatShot)`.
+- `166b84e Extract frontend audit helpers`.
+- `c3bb087 Document CSS cascade inventory`.
+- `26e6bf6 Add export output parity coverage`.
+
+Cambios realizados:
+- Se creo `CODE_HEALTH_AUDIT.md` como informe raiz en espanol, especifico al estado inspeccionado del repo.
+- Se extrajeron helpers frontend puros desde `app.js` sin introducir build step ni dependencias:
+  - perfiles de salida y mapping de exportacion;
+  - preflight/readiness;
+  - galeria, lote, detalle de lote y empty states;
+  - preview, scan y export state;
+  - formatters y modal de confirmacion de exportacion.
+- `index.html` carga los nuevos modulos JS antes de `app.js`.
+- Se documentaron contratos de frontera:
+  - `docs/FRONTEND_BRIDGE_EXPORT_CONTRACT.md`;
+  - `docs/FRONTEND_STATE_CONTRACT.md`;
+  - `docs/LOW_USE_MODELS_AUDIT.md`;
+  - `docs/CSS_CASCADE_INVENTORY.md`.
+- `docs/ARCHITECTURE_GUARDS.md` referencia los contratos para evitar que futuras fases rompan la frontera frontend/bridge, estados, modelos de bajo uso o cascada CSS.
+- Se agregaron tests unitarios ligeros para los helpers frontend.
+- Se agrego cobertura de salida/exportacion para DPI, JPG 4:4:4, PNG transparente, variantes y no mutacion de fuente.
+
+Archivos CSS:
+- No se modificaron `styles.css`, `ux-foundation.css` ni `ux-refactor.css`.
+- La fase CSS fue inventario y estrategia; la reduccion real de tokens/overrides queda pendiente de capturas antes/despues.
+
+Validaciones ejecutadas:
+- `venv\Scripts\python.exe -m pytest -q`: 262 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en Windows.
+- Test aislado nuevo: `tests/test_export_variants.py::test_export_runner_preserves_output_metadata_transparency_and_source_file`: OK.
+- Carga estatica previa de frontend por HTTP local: `index.html`, helpers JS y `app.js` respondieron 200.
+
+Checks manuales:
+- No se ejecuto un flujo UI manual completo en esta fase porque los cambios son extracciones puras, documentacion y tests.
+- No se ejecuto exportacion real sobre carpetas de produccion; la nueva prueba de paridad usa archivos temporales de test.
+
+Decisiones tomadas:
+- No tocar `src/flatshot/application/export_runner.py`, `src/flatshot/core/engine.py`, `src/flatshot/core/scaling.py` ni `src/flatshot/bridge/service.py` en esta pasada.
+- No borrar `JobItem`; queda marcado para investigacion antes de cualquier eliminacion.
+- No hacer reescritura de stack, migracion ni dependencia nueva.
+- Mantener payloads y nombres existentes mientras se extraen helpers alrededor.
+
+Salida exportada:
+- Sin cambios esperados en apariencia de imagen exportada ni comportamiento de archivos.
+- No se modifico el pipeline de imagen ni la logica de escritura de archivos.

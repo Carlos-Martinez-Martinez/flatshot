@@ -924,6 +924,33 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 38 - Extraccion de labels de estado bridge
+
+Estado: completada.
+
+Cambios realizados:
+- `scan-state.js` ahora expone:
+  - `bridgeStatusClass()`;
+  - `bridgeStatusLabel()`.
+- `app.js` conserva `bridgeMode`, `bridgeStatus` y `devMode`; solo delega clase y texto del chip de bridge.
+- Se amplio `tests/test_frontend_scan_state.py` para cubrir modo demo, conectado, comprobando, desconectado y pendiente.
+
+Impacto medido:
+- `app.js`: 7.178 -> 7.171 lineas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: sin cambios, 22.
+
+Validaciones ejecutadas:
+- `node --check apps/flatshot-desktop/frontend/scan-state.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_scan_state.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 282 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- HTTP local: `index.html`, `scan-state.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

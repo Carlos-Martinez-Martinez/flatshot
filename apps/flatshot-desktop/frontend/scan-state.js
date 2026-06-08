@@ -258,6 +258,29 @@
     return `bridge-message ${bridgeStatus === "connected" ? "ready" : bridgeStatus === "disconnected" ? "error" : ""}`;
   }
 
+  function bridgeStatusClass(options = {}) {
+    if (options.bridgeMode !== "bridge" && options.devMode) {
+      return "idle";
+    }
+    return options.bridgeStatus || "idle";
+  }
+
+  function bridgeStatusLabel(options = {}) {
+    if (options.bridgeMode !== "bridge" && options.devMode) {
+      return "Demo";
+    }
+    if (options.bridgeStatus === "connected") {
+      return "Listo";
+    }
+    if (options.bridgeStatus === "checking") {
+      return "Comprobando";
+    }
+    if (options.bridgeStatus === "disconnected") {
+      return "Sin conexión local";
+    }
+    return "Pendiente";
+  }
+
   function sourcePanelViewState(options = {}) {
     return {
       panelClass: sourcePanelClass(options),
@@ -277,6 +300,8 @@
 
   return {
     bridgeMessageClass,
+    bridgeStatusClass,
+    bridgeStatusLabel,
     compactScanStatus,
     emptyScanPathState,
     folderPickCancelledState,

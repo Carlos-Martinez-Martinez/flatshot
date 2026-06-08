@@ -3650,26 +3650,19 @@ function pluralizeCount(count, singular) {
 }
 
 function bridgeStatusClass() {
-  if (state.bridgeMode !== "bridge" && devMode) {
-    return "idle";
-  }
-  return state.bridgeStatus;
+  return scanStateHelpers.bridgeStatusClass({
+    bridgeMode: state.bridgeMode,
+    bridgeStatus: state.bridgeStatus,
+    devMode,
+  });
 }
 
 function bridgeStatusLabel() {
-  if (state.bridgeMode !== "bridge" && devMode) {
-    return "Demo";
-  }
-  if (state.bridgeStatus === "connected") {
-    return "Listo";
-  }
-  if (state.bridgeStatus === "checking") {
-    return "Comprobando";
-  }
-  if (state.bridgeStatus === "disconnected") {
-    return "Sin conexión local";
-  }
-  return "Pendiente";
+  return scanStateHelpers.bridgeStatusLabel({
+    bridgeMode: state.bridgeMode,
+    bridgeStatus: state.bridgeStatus,
+    devMode,
+  });
 }
 
 function renderBatch() {

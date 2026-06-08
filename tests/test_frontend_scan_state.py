@@ -262,6 +262,53 @@ assert.equal(helpers.bridgeMessageClass("connected"), "bridge-message ready");
 assert.equal(helpers.bridgeMessageClass("disconnected"), "bridge-message error");
 assert.equal(helpers.bridgeMessageClass("checking"), "bridge-message ");
 
+assert.equal(helpers.bridgeStatusClass({{
+  bridgeMode: "mock",
+  bridgeStatus: "connected",
+  devMode: true,
+}}), "idle");
+assert.equal(helpers.bridgeStatusClass({{
+  bridgeMode: "mock",
+  bridgeStatus: "connected",
+  devMode: false,
+}}), "connected");
+assert.equal(helpers.bridgeStatusClass({{
+  bridgeMode: "bridge",
+  bridgeStatus: "checking",
+  devMode: true,
+}}), "checking");
+assert.equal(helpers.bridgeStatusClass({{
+  bridgeMode: "bridge",
+  bridgeStatus: "",
+  devMode: true,
+}}), "idle");
+
+assert.equal(helpers.bridgeStatusLabel({{
+  bridgeMode: "mock",
+  bridgeStatus: "connected",
+  devMode: true,
+}}), "Demo");
+assert.equal(helpers.bridgeStatusLabel({{
+  bridgeMode: "bridge",
+  bridgeStatus: "connected",
+  devMode: true,
+}}), "Listo");
+assert.equal(helpers.bridgeStatusLabel({{
+  bridgeMode: "bridge",
+  bridgeStatus: "checking",
+  devMode: true,
+}}), "Comprobando");
+assert.equal(helpers.bridgeStatusLabel({{
+  bridgeMode: "bridge",
+  bridgeStatus: "disconnected",
+  devMode: true,
+}}), "Sin conexión local");
+assert.equal(helpers.bridgeStatusLabel({{
+  bridgeMode: "bridge",
+  bridgeStatus: "idle",
+  devMode: true,
+}}), "Pendiente");
+
 assert.deepEqual(helpers.sourcePanelViewState({{
   batch: "ready",
   bridgeMode: "bridge",

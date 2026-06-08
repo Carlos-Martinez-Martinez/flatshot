@@ -3586,6 +3586,8 @@ function renderShell() {
   shell.classList.toggle("can-export", derived.canExport);
   shell.classList.toggle("is-exporting", derived.isExporting);
   shell.classList.toggle("is-scanning", state.batch === "scanning");
+  shell.classList.toggle("is-output-editing", state.outputEditMode);
+  shell.classList.toggle("is-settings-open", state.appSettingsOpen);
   shell.classList.toggle("has-status-footer", hasStatusFooter);
   shell.classList.toggle("export-completed", ["completed", "partial", "failed"].includes(state.exportStatus));
   shell.classList.toggle("inspector-collapsed", state.inspectorCollapsed);
@@ -4320,6 +4322,24 @@ function batchDetailHtml() {
       <span>${escapeHtml(row.detail || "Revisar")}</span>
     </div>
   `).join("");
+  const outputRowsHtml = exportOutputProfiles().map((profile) => `
+    <div class="batch-detail-row batch-detail-row--stacked">
+      <span>${escapeHtml(profile.id === state.activeOutputProfileId ? "Principal" : "Salida")}</span>
+      <strong title="${escapeHtml(profile.name)}">${escapeHtml(profile.name)}</strong>
+      <small>${escapeHtml(outputProfileSummaryLine(profile))}</small>
+    </div>
+  `).join("");
+  const ignoredSectionHtml = ignoredRowsHtml ? `
+    <details class="batch-detail-section batch-detail-section--collapsed">
+      <summary>
+        <h3>Ignorados técnicos</h3>
+        <span>${escapeHtml(`${ignoredOmissions().length} archivo${ignoredOmissions().length === 1 ? "" : "s"}`)}</span>
+      </summary>
+      <div class="batch-detail-reasons">
+        ${ignoredRowsHtml}
+      </div>
+    </details>
+  ` : "";
 
   return `
     <div class="batch-detail-grid batch-detail-grid--compact">
@@ -4345,19 +4365,14 @@ function batchDetailHtml() {
       </section>
 
       <section class="batch-detail-section">
-        <h3>Salida</h3>
-        ${batchDetailRowHtml("Formato", viewerOutputCompactLabel())}
+        <h3>Salidas activas</h3>
+        ${outputRowsHtml || '<span class="batch-detail-muted">Sin salidas activas.</span>'}
         ${batchDetailRowHtml("Destino", batchDestinationLine())}
         ${batchDetailRowHtml("Nombre", namingHumanLabel())}
         ${batchDetailRowHtml("Ejemplo", namingExample())}
       </section>
 
-      ${ignoredRowsHtml ? `
-        <section class="batch-detail-section">
-          <h3>Ignorados</h3>
-          ${ignoredRowsHtml}
-        </section>
-      ` : ""}
+      ${ignoredSectionHtml}
 
       <section class="batch-detail-section">
         <h3>Incidencias</h3>
@@ -4866,6 +4881,12 @@ function imageItemHtml(image) {
   const previewNote = thumbState.status === "error" ? " · sin preview" : "";
   const statusText = chipLabel ? ` · ${chipLabel}` : "";
   const stateIcon = assetStatusIcon(effectiveStatus);
+  const stateBadgeHtml = effectiveStatus === "ready" ? "" : `
+      <span class="asset-state ${chipClass}" role="img" title="${escapeHtml(chipLabel || "Lista")}" aria-label="${escapeHtml(chipLabel || "Lista")}">
+        <span aria-hidden="true">${escapeHtml(stateIcon)}</span>
+        <em>${escapeHtml(chipLabel || "Lista")}</em>
+      </span>
+    `;
   return `
     <button type="button" class="image-item asset-row ${selected} ${chipClass}" data-image-id="${escapeHtml(image.id)}" title="${escapeHtml(title)}" aria-pressed="${selected ? "true" : "false"}" aria-label="${escapeHtml(`${image.name}${statusText}`)}">
       ${thumbnailHtml(image)}
@@ -4873,10 +4894,7 @@ function imageItemHtml(image) {
         <strong>${escapeHtml(displayName)}</strong>
         <small>${escapeHtml(`${metadata}${previewNote}`)}</small>
       </span>
-      <span class="asset-state ${chipClass}" role="img" title="${escapeHtml(chipLabel || "Lista")}" aria-label="${escapeHtml(chipLabel || "Lista")}">
-        <span aria-hidden="true">${escapeHtml(stateIcon)}</span>
-        <em>${escapeHtml(chipLabel || "Lista")}</em>
-      </span>
+      ${stateBadgeHtml}
     </button>
   `;
 }
@@ -4955,7 +4973,7 @@ function renderFilterButtons() {
     all: "Todas",
     valid: "Listas",
     warnings: "Avisos",
-    excluded: "Ignoradas",
+    excluded: "Excluidas",
   };
   const order = { all: 1, valid: 2, warnings: 3, excluded: 4 };
   const visibleFilters = Object.keys(labels).filter((filter) => galleryFilterVisible(filter, counts));
@@ -4991,7 +5009,7 @@ function renderPreview() {
   const isBridgeImage = image?.source === "bridge";
   const previewControlsDisabled = !image || state.previewStatus === "empty" || state.previewStatus === "error";
   const compareControlsDisabled = !image || isBridgeImage || state.previewStatus === "empty" || state.previewStatus === "error";
-  $("#preview-name").textContent = image
+  const previewName = image
     ? image.name
     : filterIsEmpty
       ? "Sin imágenes en este filtro"
@@ -5002,6 +5020,8 @@ function renderPreview() {
         : state.batch === "scanning"
           ? "Escaneando carpeta..."
           : "Selecciona una imagen";
+  $("#preview-name").textContent = previewName;
+  $("#preview-name").title = previewName;
   $("#preview-subtitle").textContent = previewSubtitle(image);
   $("#zoom-label").textContent = `${currentViewerZoom()}%`;
   const visibleIndex = visibleImages.findIndex((item) => item.id === state.selectedImageId);
@@ -5789,8 +5809,8 @@ function outputInspectorCardHtml() {
   return `
     <section class="inspector-output-card">
       <div class="inspector-output-card__head">
-        <span>Salidas</span>
-        <strong>${escapeHtml(activeProfiles.length ? `${activeProfiles.length} activa${activeProfiles.length === 1 ? "" : "s"}` : "Sin salidas activas")}</strong>
+        <span>Salidas activas</span>
+        <strong>${escapeHtml(activeProfiles.length ? String(activeProfiles.length) : "0")}</strong>
         <small>${escapeHtml(totalFiles ? `${totalFiles} archivos previstos` : "Pendiente de lote")}</small>
       </div>
       <div class="active-output-list" aria-label="Salidas del lote">
@@ -5798,7 +5818,7 @@ function outputInspectorCardHtml() {
       </div>
       ${dirty ? outputTemporaryNoticeHtml() : ""}
       <div class="inspector-output-card__actions">
-        <button type="button" data-action="edit-output">Editar parámetros</button>
+        <button type="button" data-action="edit-output">Editar salidas</button>
         <button type="button" data-action="open-app-settings">Gestionar presets</button>
       </div>
     </section>
@@ -5820,7 +5840,7 @@ function outputProfileInlineRowHtml(profile) {
         <strong>${escapeHtml(profile.name)}</strong>
         <small>${escapeHtml(summary)}</small>
       </button>
-      <span class="active-output-row__tag">${escapeHtml(active ? "Principal" : enabled ? "Activa" : "Inactiva")}</span>
+      <span class="active-output-row__tag">${escapeHtml(active ? "Principal" : "")}</span>
     </div>
   `;
 }
@@ -5862,9 +5882,7 @@ function selectedImageInspectorCardHtml() {
         <strong title="${escapeHtml(image.path || image.name)}">${escapeHtml(image.name)}</strong>
         <small>${escapeHtml(image.detail || imageFileType(image))}</small>
       </div>
-      ${hasLocal
-        ? '<button type="button" data-action="reset-local-adjustment">Quitar ajuste</button>'
-        : '<button type="button" data-action="open-advanced">Editar ajuste</button>'}
+      ${hasLocal ? '<button type="button" data-action="reset-local-adjustment">Quitar ajuste</button>' : ""}
     </section>
   `;
 }
@@ -5908,7 +5926,7 @@ function aspectInspectorCardHtml() {
   return `
     <section class="inspector-compact-row inspector-compact-row--quiet">
       <div>
-        <span>Ajustes de imagen</span>
+        <span>Ajuste aplicado</span>
         <strong>${escapeHtml(state.activePreset)}</strong>
         <small>${escapeHtml(state.presetDirty ? "Modificado" : "Activo")}</small>
       </div>
@@ -6087,18 +6105,19 @@ function renderExport() {
   }
 
   const warningSummary = outputWarningSummary(issues);
+  const editDirty = !outputMatchesProfile(activeOutputProfile());
   const editActions = state.outputEditMode ? `
-    <div class="inspector-actionbar">
-      <button type="button" class="primary" data-action="apply-output-edit">Aplicar temporal</button>
-      <button type="button" data-action="save-output-current-profile">Guardar en preset</button>
-      <button type="button" data-action="save-output-as-new">Guardar como nuevo</button>
+    <div class="inspector-actionbar output-edit-actions">
       <button type="button" data-action="cancel-output-edit">Cancelar</button>
+      <button type="button" class="primary" data-action="apply-output-edit">Aplicar</button>
+      <button type="button" data-action="save-output-current-profile">Guardar preset</button>
+      <button type="button" data-action="save-output-as-new">Guardar como nuevo</button>
       <button type="button" class="btn-linklike" data-action="open-app-settings">Gestionar presets</button>
     </div>
   ` : "";
   const presetActions = !state.outputEditMode ? `
     <div class="inspector-actionbar">
-      <button type="button" class="primary" data-action="edit-output">Editar parámetros</button>
+      <button type="button" class="primary" data-action="edit-output">Editar salidas</button>
       <button type="button" data-action="open-app-settings">Gestionar presets</button>
     </div>
   ` : "";
@@ -6123,6 +6142,12 @@ function renderExport() {
       </div>
       <small>${escapeHtml(presetSummaryLine())}</small>
     </div>
+    ${editDirty ? `
+      <div class="temporary-output-notice temporary-output-notice--compact">
+        <strong>Cambios temporales</strong>
+        <span>Aplica al lote o guarda el preset.</span>
+      </div>
+    ` : ""}
     ${editActions}
   ` : `
     <div class="preset-summary-card">
@@ -6949,15 +6974,15 @@ function renderAppSettings() {
       <div class="output-profile-option${selected ? " selected" : ""}${active ? " active" : ""}${enabled ? " enabled" : ""}">
         <label class="output-profile-toggle" title="${escapeHtml(canToggle ? "Activar esta salida en el lote" : unsaved ? "Guarda el formato para activarlo" : "Debe quedar al menos una salida activa")}">
           <input type="checkbox" data-output-profile-enabled-id="${escapeHtml(profile.id)}" ${enabled ? "checked" : ""} ${canToggle ? "" : "disabled"} />
-          <span>${escapeHtml(enabled ? "Activa" : "Inactiva")}</span>
+          <span aria-hidden="true"></span>
         </label>
-        <button type="button" class="output-profile-edit" data-output-profile-id="${escapeHtml(profile.id)}">
+        <button type="button" class="output-profile-edit" data-output-profile-id="${escapeHtml(profile.id)}" title="${escapeHtml(`${profile.name} · ${outputProfileSummaryLine(profile)}`)}">
           <span>
             <strong>${escapeHtml(profile.name)}</strong>
             <small>${escapeHtml(outputProfileSummaryLine(profile))}</small>
             <small>${escapeHtml(profileDestinationLabel(profile))}</small>
           </span>
-          <em>${escapeHtml(unsaved ? "Sin guardar" : active ? "Principal" : enabled ? "Salida" : "Guardada")}</em>
+          <em>${escapeHtml(unsaved ? "Sin guardar" : active ? "Principal" : "")}</em>
         </button>
       </div>
     `;

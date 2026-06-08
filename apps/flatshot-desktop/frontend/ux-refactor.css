@@ -1,6 +1,6 @@
 /* FlatShot UX/UI refactor overrides. Loaded last on purpose. */
 :root {
-  --column-gallery: clamp(330px, 24vw, 430px);
+  --column-gallery: clamp(300px, 22vw, 360px);
   --column-inspector: clamp(330px, 22vw, 390px);
   --viewer-max: 820px;
   --viewer-pad: clamp(14px, 2vw, 28px);
@@ -39,18 +39,25 @@ html:not(.dev-mode) .debug-panel {
   grid-template-columns: var(--column-gallery) minmax(420px, 1fr) var(--column-inspector) !important;
 }
 
+.app-shell.is-output-editing .workspace {
+  grid-template-columns: var(--column-gallery) minmax(420px, 1fr) clamp(460px, 34vw, 520px) !important;
+}
+
 .preview-header {
+  display: flex !important;
+  flex-wrap: wrap;
+  justify-content: space-between;
   width: 100%;
-  max-width: var(--viewer-max);
+  max-width: none;
   min-height: 52px;
   margin: 0 auto;
-  grid-template-columns: minmax(210px, 1fr) minmax(0, auto) !important;
   align-items: center;
-  column-gap: var(--space-2);
+  gap: var(--space-2) var(--space-3);
   padding: var(--space-2) var(--space-3);
 }
 
 .preview-title-block {
+  flex: 1 1 280px;
   min-width: 0;
   overflow: hidden;
 }
@@ -65,15 +72,17 @@ html:not(.dev-mode) .debug-panel {
 .preview-title-block h2 {
   margin: 0;
   font-size: var(--font-size-md);
-  max-width: 100%;
+  max-width: min(100%, 560px);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .preview-toolbar {
+  flex: 0 1 auto;
+  display: flex !important;
   justify-content: flex-end;
-  max-width: min(520px, 100%);
+  max-width: 100%;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
@@ -89,12 +98,23 @@ html:not(.dev-mode) .debug-panel {
 
 .preview-mode-switch,
 .viewer-background-switch,
-.zoom-controls {
+.viewer-control-group {
   flex: 0 0 auto;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-bg-soft);
   padding: 3px;
+}
+
+.zoom-controls {
+  display: flex !important;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  border: 0 !important;
+  background: transparent !important;
+  padding: 0 !important;
 }
 
 .viewer-background-switch::before {
@@ -104,7 +124,7 @@ html:not(.dev-mode) .debug-panel {
 
 .preview-mode-switch button,
 .viewer-background-switch button,
-.zoom-controls button {
+.viewer-control-group button {
   min-height: 30px;
   border-radius: 6px;
   padding-inline: 7px;
@@ -112,17 +132,22 @@ html:not(.dev-mode) .debug-panel {
 }
 
 .viewer-background-switch button {
-  width: 30px;
-  min-width: 30px;
-  padding: 0 !important;
-  color: transparent !important;
-  font-size: 0 !important;
+  width: auto;
+  min-width: 58px;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding-inline: 8px !important;
+  color: var(--color-text) !important;
+  font-size: var(--font-size-sm) !important;
 }
 
 .viewer-background-switch button::before {
   content: "";
-  width: 15px;
-  height: 15px;
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
   border: 1px solid var(--color-border-strong);
   border-radius: 999px;
   background: #e6e9e8;
@@ -216,17 +241,22 @@ html:not(.dev-mode) .debug-panel {
   filter: none !important;
 }
 
-.gallery-column .image-list {
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)) !important;
+.gallery-column[data-gallery-view="thumbs"] .image-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   gap: var(--space-2);
   padding: var(--space-3);
 }
 
+.gallery-column[data-gallery-view="list"] .image-list {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
 .gallery-column .image-item,
 .gallery-column[data-gallery-view="thumbs"] .image-item {
-  min-height: 142px;
+  min-height: 158px;
   border-radius: var(--radius-sm);
   padding: var(--space-2);
+  box-shadow: none !important;
 }
 
 .gallery-column .thumb {
@@ -307,7 +337,7 @@ html:not(.dev-mode) .debug-panel {
 .active-output-row {
   min-width: 0;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, auto);
   align-items: center;
   gap: var(--space-2);
   border: 1px solid var(--color-border);
@@ -319,6 +349,10 @@ html:not(.dev-mode) .debug-panel {
 .active-output-row.is-primary {
   border-color: var(--color-accent-border);
   background: var(--color-primary-soft);
+}
+
+.active-output-row.is-disabled {
+  opacity: 0.78;
 }
 
 .active-output-row__main {
@@ -346,11 +380,65 @@ html:not(.dev-mode) .debug-panel {
 }
 
 .active-output-row__tag {
-  min-width: 58px;
+  min-width: 0;
   color: var(--color-muted);
   text-align: right;
   font-size: var(--font-size-xs);
   font-weight: 600;
+}
+
+.active-output-row__tag:empty {
+  display: none;
+}
+
+.inspector-output-card__actions,
+.inspector-actionbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.settings-panel.is-editing-output {
+  overflow-x: hidden;
+}
+
+.settings-panel.is-editing-output .export-section {
+  display: grid !important;
+  gap: var(--space-3);
+  min-width: 0;
+  overflow: visible;
+}
+
+.settings-panel.is-editing-output .export-section .form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-panel.is-editing-output .export-section label,
+.settings-panel.is-editing-output .export-section input,
+.settings-panel.is-editing-output .export-section select {
+  min-width: 0;
+}
+
+.settings-panel.is-editing-output #export-summary {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.settings-panel.is-editing-output .output-edit-actions {
+  position: sticky;
+  bottom: calc(var(--space-3) * -1);
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) 0 0;
+  background: linear-gradient(to top, var(--color-bg-panel) 85%, rgba(255, 255, 255, 0));
+}
+
+.settings-panel.is-editing-output .output-edit-actions button {
+  max-width: 100%;
+  white-space: nowrap;
 }
 
 .temporary-output-notice {
@@ -464,6 +552,169 @@ html:not(.dev-mode) .debug-panel {
   display: none !important;
 }
 
+#app-settings-modal:not(.is-hidden),
+#batch-detail-modal:not(.is-hidden) {
+  display: flex !important;
+  align-items: stretch;
+  justify-content: flex-end;
+}
+
+#app-settings-modal .app-settings-dialog {
+  width: min(1060px, calc(100vw - 32px));
+  max-width: none;
+  height: calc(100vh - 32px);
+  max-height: none;
+  margin: 16px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+#app-settings-modal .app-settings-content {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(340px, 0.92fr) minmax(420px, 1.08fr);
+  gap: var(--space-4);
+  overflow: hidden;
+}
+
+#app-settings-modal .output-format-list,
+#app-settings-modal .output-format-form {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+#app-settings-modal .app-settings-footer,
+#batch-detail-modal .app-settings-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  background: var(--color-bg-panel);
+}
+
+.output-profile-option {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.output-profile-toggle {
+  min-width: 28px;
+  display: grid;
+  place-items: center;
+}
+
+.output-profile-toggle span {
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.output-profile-edit {
+  min-width: 0;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: left;
+}
+
+.output-profile-edit strong,
+.output-profile-edit small {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.output-profile-edit em:empty {
+  display: none;
+}
+
+.format-preview-card {
+  max-height: 120px;
+  overflow: auto;
+}
+
+.format-form-section .form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#batch-detail-modal .batch-detail-dialog {
+  width: min(920px, calc(100vw - 32px));
+  max-width: none;
+  height: calc(100vh - 32px);
+  max-height: none;
+  margin: 16px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+.batch-detail-content {
+  min-height: 0;
+  overflow: auto;
+}
+
+.batch-detail-grid {
+  align-items: start;
+}
+
+.batch-detail-row,
+.batch-detail-problem {
+  min-width: 0;
+}
+
+.batch-detail-row strong,
+.batch-detail-row small,
+.batch-detail-problem strong,
+.batch-detail-problem span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.batch-detail-row--stacked {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px var(--space-2);
+}
+
+.batch-detail-row--stacked small {
+  grid-column: 2;
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+}
+
+.batch-detail-section--collapsed {
+  padding: 0;
+}
+
+.batch-detail-section--collapsed > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  cursor: pointer;
+}
+
+.batch-detail-section--collapsed > summary h3 {
+  margin: 0;
+}
+
+.batch-detail-section--collapsed .batch-detail-reasons {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) var(--space-3);
+}
+
 @media (max-width: 1280px) {
   :root {
     --column-gallery: clamp(300px, 25vw, 360px);
@@ -474,6 +725,10 @@ html:not(.dev-mode) .debug-panel {
   .preview-toolbar {
     flex-wrap: wrap;
     justify-content: flex-end;
+  }
+
+  .app-shell.is-output-editing .workspace {
+    grid-template-columns: minmax(300px, 340px) minmax(360px, 1fr) minmax(440px, 500px) !important;
   }
 }
 
@@ -486,5 +741,14 @@ html:not(.dev-mode) .debug-panel {
 
   .settings-panel {
     display: none !important;
+  }
+
+  #app-settings-modal .app-settings-content {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .format-form-section .form-grid,
+  .settings-panel.is-editing-output .export-section .form-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

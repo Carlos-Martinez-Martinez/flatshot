@@ -3449,10 +3449,12 @@ function batchOutputLine() {
 }
 
 function outputProfilesSummaryLabel(profiles = exportOutputProfiles()) {
-  if (profiles.length <= 1) {
-    return `${state.format} · ${outputSizeDisplay()} · ${backgroundLabel(state.background)}`;
-  }
-  return profiles.map((profile) => `${profile.name} (${profile.format})`).join(" · ");
+  return batchViewHelpers.outputProfilesSummaryLabel({
+    backgroundLabel: backgroundLabel(state.background),
+    format: state.format,
+    profileLabels: profiles.length > 1 ? profiles.map((profile) => `${profile.name} (${profile.format})`) : [],
+    sizeLabel: outputSizeDisplay(),
+  });
 }
 
 function batchBackgroundLabel(value) {

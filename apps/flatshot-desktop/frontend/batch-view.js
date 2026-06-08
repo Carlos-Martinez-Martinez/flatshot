@@ -154,6 +154,16 @@
     return `${options.format || "JPG"} · ${size} · ${batchBackgroundLabel(options.background)}`;
   }
 
+  function outputProfilesSummaryLabel(options = {}) {
+    const profileLabels = Array.isArray(options.profileLabels) ? options.profileLabels : [];
+    if (profileLabels.length > 1) {
+      return profileLabels.join(" · ");
+    }
+    const size = options.sizeLabel || String(options.size || "1800x2400").replace("x", "×");
+    const background = options.backgroundLabel || batchBackgroundLabel(options.background);
+    return `${options.format || "JPG"} · ${size} · ${background}`;
+  }
+
   function sourceInputDetail(batch, filesLabel, validLabel) {
     if (batch === "none") {
       return "Pendiente";
@@ -310,6 +320,7 @@
     omittedSummaryText,
     omissionReasonLabel,
     omissionSummaryText,
+    outputProfilesSummaryLabel,
     outputCountLabel,
     readyBatchSummaryText,
     sourceInputDetail,

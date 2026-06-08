@@ -107,6 +107,15 @@ assert.equal(helpers.batchOutputLine({{
   profileLines: ["JPG 1800×2400", "PNG 1200×1600"],
 }}), "JPG 1800×2400 · PNG 1200×1600");
 assert.equal(helpers.batchOutputLine({{}}), "JPG · 1800 × 2400 · gris claro");
+assert.equal(helpers.outputProfilesSummaryLabel({{
+  format: "PNG",
+  sizeLabel: "1200×1600",
+  backgroundLabel: "transparente",
+}}), "PNG · 1200×1600 · transparente");
+assert.equal(helpers.outputProfilesSummaryLabel({{
+  profileLabels: ["Web (JPG)", "Catalogo (PNG)"],
+}}), "Web (JPG) · Catalogo (PNG)");
+assert.equal(helpers.outputProfilesSummaryLabel({{}}), "JPG · 1800×2400 · gris claro");
 
 assert.equal(helpers.escapeHtml('<a&b"c>'), '&lt;a&amp;b&quot;c&gt;');
 assert.equal(helpers.sourceInputDetail("none", 3, 2), "Pendiente");

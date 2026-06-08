@@ -1283,6 +1283,36 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 50 - Extraccion de resumen de salidas del lote
+
+Estado: completada.
+
+Cambios realizados:
+- `batch-view.js` ahora expone `outputProfilesSummaryLabel()` para formatear el resumen visible de salidas.
+- Se movio fuera de `app.js` la microcopy para:
+  - una salida con formato, tamano y fondo;
+  - multiples perfiles con `Nombre (Formato)`;
+  - fallback de tamano/fondo en ausencia de datos.
+- `app.js` conserva `outputSizeDisplay()`, `backgroundLabel()` y la construccion de labels de perfiles; solo delega el formato final.
+- Se amplio `tests/test_frontend_batch_view.py` para cubrir salida unica, multiples perfiles y fallback.
+
+Impacto medido:
+- `app.js`: 6.550 -> 6.552 lineas; aumento neto por objeto de parametros, con menos reglas embebidas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: sin cambios, 22.
+
+Validaciones ejecutadas:
+- `node --check apps/flatshot-desktop/frontend/batch-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_batch_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 282 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en Windows.
+- HTTP local: `index.html`, `batch-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

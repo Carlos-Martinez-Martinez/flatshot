@@ -88,6 +88,17 @@ const secondaryOutput = helpers.batchDetailOutputHtml({{
 assert.equal(secondaryOutput.includes("<span>1.</span>"), true);
 assert.equal(secondaryOutput.includes("<em>Principal</em>"), false);
 
+const ignoredSection = helpers.batchDetailIgnoredSectionHtml({{
+  count: 2,
+  rowsHtml: clearProblem,
+}});
+assert.equal(ignoredSection.includes('batch-detail-section--collapsed'), true);
+assert.equal(ignoredSection.includes("<h3>Ignorados técnicos</h3>"), true);
+assert.equal(ignoredSection.includes("<span>2 archivos</span>"), true);
+assert.equal(ignoredSection.includes('class="batch-detail-reasons"'), true);
+assert.equal(ignoredSection.includes('class="batch-detail-problem clear"'), true);
+assert.equal(helpers.batchDetailIgnoredSectionHtml({{ count: 0, rowsHtml: "" }}), "");
+
 const folder = helpers.folderItemHtml({{
   name: "Carpeta <A>",
   detail: "2 imágenes & 1 aviso",

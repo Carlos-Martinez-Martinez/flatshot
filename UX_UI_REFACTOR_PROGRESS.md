@@ -1399,6 +1399,36 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 54 - Extraccion de seccion de ignorados del detalle de lote
+
+Estado: completada.
+
+Cambios realizados:
+- `batch-detail-view.js` ahora expone `batchDetailIgnoredSectionHtml()` para renderizar la seccion colapsable de ignorados tecnicos.
+- `app.js` conserva la lista de ignorados, el limite de filas visibles y los motivos; solo delega la seccion final.
+- Se ajusto `app.js` para reutilizar una lista local `ignoredItems`, evitando recalcular `ignoredOmissions()` para filas y conteo.
+- Se amplio `tests/test_frontend_batch_detail_view.py` para cubrir:
+  - seccion presente con conteo plural;
+  - inclusion de filas ya renderizadas;
+  - seccion vacia sin HTML.
+
+Impacto medido:
+- `app.js`: 6.546 -> 6.540 lineas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: sin cambios, 22.
+
+Validaciones ejecutadas:
+- `node --check apps/flatshot-desktop/frontend/batch-detail-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_batch_detail_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 282 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en Windows.
+- HTTP local: `index.html`, `batch-detail-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

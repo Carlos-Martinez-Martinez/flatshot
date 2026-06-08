@@ -52,6 +52,25 @@
   `;
   }
 
+  function batchDetailIgnoredSectionHtml(options = {}) {
+    if (!options.rowsHtml) {
+      return "";
+    }
+    const count = Number(options.count) || 0;
+    const countLabel = `${count} archivo${count === 1 ? "" : "s"}`;
+    return `
+    <details class="batch-detail-section batch-detail-section--collapsed">
+      <summary>
+        <h3>Ignorados técnicos</h3>
+        <span>${escapeHtml(countLabel)}</span>
+      </summary>
+      <div class="batch-detail-reasons">
+        ${options.rowsHtml}
+      </div>
+    </details>
+  `;
+  }
+
   function folderItemHtml(folder) {
     const className = folder.status === "warning" ? "empty" : folder.status === "error" ? "error" : folder.status || "";
     return `
@@ -68,6 +87,7 @@
   }
 
   return {
+    batchDetailIgnoredSectionHtml,
     batchDetailOutputHtml,
     batchDetailProblemHtml,
     batchDetailRowHtml,

@@ -3545,7 +3545,8 @@ function batchDetailHtml() {
       : state.bridgeScanPath;
   const files = counts.filesFound === null ? "Leyendo" : counts.filesFound;
   const valid = counts.validImages === null ? "Leyendo" : counts.validImages;
-  const ignoredRowsHtml = ignoredOmissions().slice(0, 8).map((item) => batchDetailViewHelpers.batchDetailProblemHtml({
+  const ignoredItems = ignoredOmissions();
+  const ignoredRowsHtml = ignoredItems.slice(0, 8).map((item) => batchDetailViewHelpers.batchDetailProblemHtml({
     detail: item.detail || omissionReasonLabel(item.reason),
     title: item.name || "Archivo ignorado",
     titleAttr: item.path || item.name,
@@ -3565,17 +3566,10 @@ function batchDetailHtml() {
     name: profile.name,
     summary: outputProfileSummaryLine(profile),
   })).join("");
-  const ignoredSectionHtml = ignoredRowsHtml ? `
-    <details class="batch-detail-section batch-detail-section--collapsed">
-      <summary>
-        <h3>Ignorados técnicos</h3>
-        <span>${escapeHtml(`${ignoredOmissions().length} archivo${ignoredOmissions().length === 1 ? "" : "s"}`)}</span>
-      </summary>
-      <div class="batch-detail-reasons">
-        ${ignoredRowsHtml}
-      </div>
-    </details>
-  ` : "";
+  const ignoredSectionHtml = batchDetailViewHelpers.batchDetailIgnoredSectionHtml({
+    count: ignoredItems.length,
+    rowsHtml: ignoredRowsHtml,
+  });
 
   return `
     <div class="batch-detail-grid batch-detail-grid--compact">

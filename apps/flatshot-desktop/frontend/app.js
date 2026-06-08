@@ -887,10 +887,6 @@ function activeFolders() {
   return isMockBatch() ? mockFolders : [];
 }
 
-function activePresets() {
-  return activePresetItems().map((preset) => preset.name);
-}
-
 function activePresetItems() {
   if (state.bridgeMode === "bridge" && state.bridgePresets.length) {
     return state.bridgePresets;
@@ -1292,10 +1288,6 @@ function outputCountLabel(count = exportOutputCount()) {
 
 function detectedFormatLabel(images = activeImages()) {
   return batchViewHelpers.detectedFormatLabel(images);
-}
-
-function outputPresetLabel() {
-  return state.activePreset || "Salida";
 }
 
 function firstOmittedItem() {
@@ -2367,10 +2359,6 @@ async function controlBridgeExport(action) {
   }
   render();
   scheduleBridgeExportPoll();
-}
-
-function reviewErrors() {
-  reviewWarnings();
 }
 
 function clearFilter() {
@@ -5345,21 +5333,6 @@ function outputProfileHasUnsavedChanges() {
     return true;
   }
   return !sameOutputProfileRaw(saved, raw);
-}
-
-function sameOutputProfile(a, b) {
-  if (!a || !b) {
-    return false;
-  }
-  return a.name === b.name
-    && a.format === b.format
-    && a.width === b.width
-    && a.height === b.height
-    && a.background === b.background
-    && a.destinationMode === b.destinationMode
-    && a.destinationValue === b.destinationValue
-    && a.naming === b.naming
-    && a.suffix === b.suffix;
 }
 
 function sameOutputProfileRaw(profile, raw) {

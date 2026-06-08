@@ -1700,6 +1700,34 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 64 - Limpieza de funciones frontend muertas
+
+Estado: completada.
+
+Cambios realizados:
+- Se retiraron de `app.js` funciones declaradas sin referencias activas:
+  - `activePresets()`;
+  - `outputPresetLabel()`;
+  - `reviewErrors()`;
+  - `sameOutputProfile()`.
+- Se mantuvo intacto el handler real de `review-errors`, que ya delegaba directamente en `reviewWarnings()`.
+- Se amplio `tests/test_frontend_app_cleanup.py` para evitar reintroducir esas funciones muertas.
+
+Impacto medido:
+- `app.js`: 6.417 -> 6.394 lineas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: sin cambios, 23.
+
+Validaciones ejecutadas:
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_app_cleanup.py -q`: 1 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 283 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- HTTP local: `index.html`, `app.js`, `output-profile-view.js` y `gallery.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

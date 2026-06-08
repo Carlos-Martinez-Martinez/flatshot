@@ -16,6 +16,10 @@ def test_app_js_does_not_reintroduce_extracted_wrapper_helpers():
         "function assetStatusIcon(",
         "function batchFormatHtml(",
         "function previewOutputContextHtml(",
+        "function activePresets(",
+        "function outputPresetLabel(",
+        "function reviewErrors(",
+        "function sameOutputProfile(",
     ]
 
     for wrapper in obsolete_wrappers:

@@ -94,6 +94,7 @@ const batchDetailViewHelpers = window.FlatShotBatchDetailView;
 const galleryHelpers = window.FlatShotGallery;
 const previewViewHelpers = window.FlatShotPreviewView;
 const previewStateHelpers = window.FlatShotPreviewState;
+const settingsViewHelpers = window.FlatShotSettingsView;
 const inspectorOutputViewHelpers = window.FlatShotInspectorOutputView;
 const inspectorReviewViewHelpers = window.FlatShotInspectorReviewView;
 const inspectorContextViewHelpers = window.FlatShotInspectorContextView;
@@ -4623,24 +4624,14 @@ function renderSettings() {
     activePreset.textContent = state.activePreset;
   }
   $("#preset-source").textContent = `${state.activePreset} · ${presetSourceLabel()}`;
-  $("#preset-dirty").textContent = state.presetDirty ? "Sin guardar" : "Sin cambios";
+  $("#preset-dirty").textContent = settingsViewHelpers.presetDirtyLabel(state.presetDirty);
   $("#preset-dirty").classList.toggle("dirty", state.presetDirty);
   const presetItems = activePresetItems();
   const presetCount = $("#preset-count");
   if (presetCount) {
     presetCount.textContent = `${presetItems.length}`;
   }
-  $("#preset-list").innerHTML = presetItems.length
-    ? presetItems.map((preset) => {
-      const active = preset.name === state.activePreset;
-      return `
-      <button type="button" class="preset-chip${active ? " active" : ""}" data-preset="${escapeHtml(preset.name)}" aria-pressed="${active ? "true" : "false"}" title="${escapeHtml(active ? `${preset.name} activo` : `Cambiar a ${preset.name}`)}">
-        <span class="preset-chip__name">${escapeHtml(preset.name)}</span>
-        <span class="preset-chip__meta">${escapeHtml(active ? "Activo" : preset.category || "Ajuste")}</span>
-      </button>
-    `;
-    }).join("")
-    : '<span class="preset-empty">No hay ajustes guardados</span>';
+  $("#preset-list").innerHTML = settingsViewHelpers.presetListHtml(presetItems, state.activePreset);
 
   Object.entries(state.settings).forEach(([key, value]) => {
     const input = $(`[data-setting="${key}"]`);
@@ -4665,7 +4656,7 @@ function renderSettings() {
   const localOverride = currentImageOverride(image);
   const localActive = Object.keys(localOverride).length > 0 || image?.status === "adjusted";
   $("#local-adjustment").classList.toggle("active", localActive);
-  $("#local-adjustment-text").textContent = localActive ? "Ajuste local activo" : "Sin ajuste local";
+  $("#local-adjustment-text").textContent = settingsViewHelpers.localAdjustmentText(localActive);
   localOverrideKeys.forEach((key) => {
     const value = Number(localOverride[key] || 0);
     const input = $(`[data-local-setting="${key}"]`);
@@ -4675,28 +4666,28 @@ function renderSettings() {
       input.value = value;
     }
     if (output) {
-      output.textContent = value > 0 ? `+${value}` : String(value);
+      output.textContent = settingsViewHelpers.localSettingOutputText(value);
     }
     if (numberInput && document.activeElement !== numberInput) {
       numberInput.value = value;
     }
   });
   const savePresetButton = $("#save-preset");
-  savePresetButton.disabled = !state.presetDirty;
-  savePresetButton.title = state.presetDirty ? "Guardar el ajuste activo" : "Sin cambios pendientes";
-  savePresetButton.textContent = "Guardar cambios";
-  savePresetButton.classList.toggle("primary", state.presetDirty);
+  const savePresetState = settingsViewHelpers.savePresetButtonState(state.presetDirty);
+  savePresetButton.disabled = savePresetState.disabled;
+  savePresetButton.title = savePresetState.title;
+  savePresetButton.textContent = savePresetState.text;
+  savePresetButton.classList.toggle("primary", savePresetState.primary);
   const deletePresetButton = $("#delete-preset");
   if (deletePresetButton) {
-    const canDeletePreset = presetItems.length > 1;
-    deletePresetButton.disabled = !canDeletePreset;
-    deletePresetButton.title = canDeletePreset ? "Eliminar el ajuste activo" : "Debe quedar al menos un ajuste";
+    const deletePresetState = settingsViewHelpers.deletePresetButtonState(presetItems.length);
+    deletePresetButton.disabled = deletePresetState.disabled;
+    deletePresetButton.title = deletePresetState.title;
   }
   const advanced = $("#advanced-settings");
   const advancedSummaryTitle = advanced?.querySelector("summary strong");
   if (advancedSummaryTitle) {
-    const dirtyCount = advancedDirtyCount();
-    advancedSummaryTitle.textContent = dirtyCount ? `Avanzado · ${dirtyCount} cambio${dirtyCount === 1 ? "" : "s"}` : "Avanzado";
+    advancedSummaryTitle.textContent = settingsViewHelpers.advancedSummaryTitle(advancedDirtyCount());
   }
 }
 

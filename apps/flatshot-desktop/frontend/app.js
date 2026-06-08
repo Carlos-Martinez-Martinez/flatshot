@@ -4371,7 +4371,11 @@ function outputSizeDisplay() {
 }
 
 function viewerOutputCompactLabel() {
-  return `${state.format} · ${outputSizeDisplay()} · ${backgroundLabel(state.background)}`;
+  return previewViewHelpers.viewerOutputCompactLabel({
+    backgroundLabel: backgroundLabel(state.background),
+    format: state.format,
+    sizeLabel: outputSizeDisplay(),
+  });
 }
 
 function previewStateHtml(title, detail) {

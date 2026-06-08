@@ -78,6 +78,13 @@ assert.equal(mock.includes('Render con &quot;fallback&quot;'), true);
 
 const mockWithoutWarning = helpers.mockPreviewHtml();
 assert.equal(mockWithoutWarning.includes('preview-warning-card'), false);
+
+assert.equal(helpers.viewerOutputCompactLabel({{
+  format: "PNG",
+  sizeLabel: "1200×1600",
+  backgroundLabel: "transparente",
+}}), "PNG · 1200×1600 · transparente");
+assert.equal(helpers.viewerOutputCompactLabel({{}}), "JPG · 1800×2400 · gris claro");
 """
     result = subprocess.run(
         ["node", "-e", script],

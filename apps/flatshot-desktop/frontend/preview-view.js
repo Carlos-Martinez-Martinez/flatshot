@@ -75,6 +75,10 @@
   `;
   }
 
+  function viewerOutputCompactLabel(options = {}) {
+    return `${options.format || "JPG"} · ${options.sizeLabel || "1800×2400"} · ${options.backgroundLabel || "gris claro"}`;
+  }
+
   return {
     escapeHtml,
     mockPreviewHtml,
@@ -82,5 +86,6 @@
     realPreviewImageHtml,
     realPreviewPlaceholderHtml,
     scanningStateHtml,
+    viewerOutputCompactLabel,
   };
 });

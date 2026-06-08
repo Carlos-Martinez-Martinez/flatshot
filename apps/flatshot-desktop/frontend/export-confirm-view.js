@@ -68,9 +68,23 @@
   `;
   }
 
+  function exportConfirmModalState(options = {}) {
+    const risks = Array.isArray(options.risks) ? options.risks : [];
+    const blocking = risks.some((risk) => risk.blocking);
+    return {
+      actionDanger: blocking,
+      actionText: blocking ? "Revisar problemas" : String(options.actionText || ""),
+      blocking,
+      subtitle: blocking
+        ? "Hay puntos que impiden exportar."
+        : "Confirma solo los puntos que requieren atención.",
+    };
+  }
+
   return {
     escapeHtml,
     exportConfirmHtml,
+    exportConfirmModalState,
     exportConfirmRiskHtml,
   };
 });

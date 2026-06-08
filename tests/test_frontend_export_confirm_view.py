@@ -69,6 +69,26 @@ const blockingHtml = helpers.exportConfirmHtml({{
 }});
 assert.equal(blockingHtml.includes('<h3>Bloqueos</h3>'), true);
 assert.equal(blockingHtml.includes('FlatShot mantiene la validación segura'), true);
+
+assert.deepEqual(helpers.exportConfirmModalState({{
+  risks: [],
+  actionText: "Exportar 4 imágenes",
+}}), {{
+  actionDanger: false,
+  actionText: "Exportar 4 imágenes",
+  blocking: false,
+  subtitle: "Confirma solo los puntos que requieren atención.",
+}});
+
+assert.deepEqual(helpers.exportConfirmModalState({{
+  risks: [{{ blocking: true, title: "Destino" }}],
+  actionText: "Exportar 4 imágenes",
+}}), {{
+  actionDanger: true,
+  actionText: "Revisar problemas",
+  blocking: true,
+  subtitle: "Hay puntos que impiden exportar.",
+}});
 """
     result = subprocess.run(
         ["node", "-e", script],

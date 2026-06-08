@@ -3502,21 +3502,18 @@ function renderExportConfirm() {
   if (body) {
     body.innerHTML = exportConfirmHtml(risks);
   }
+  const modalState = exportConfirmViewHelpers.exportConfirmModalState({
+    actionText: exportActionLabel(batchCounts().exportableImages),
+    risks,
+  });
   const action = $("#export-confirm-action");
   if (action) {
-    const blocking = risks.some((risk) => risk.blocking);
-    const count = batchCounts().exportableImages;
-    action.textContent = blocking
-      ? "Revisar problemas"
-      : exportActionLabel(count);
-    action.classList.toggle("danger", blocking);
+    action.textContent = modalState.actionText;
+    action.classList.toggle("danger", modalState.actionDanger);
   }
   const subtitle = $("#export-confirm-subtitle");
   if (subtitle) {
-    const blocking = risks.some((risk) => risk.blocking);
-    subtitle.textContent = blocking
-      ? "Hay puntos que impiden exportar."
-      : "Confirma solo los puntos que requieren atención.";
+    subtitle.textContent = modalState.subtitle;
   }
 }
 
@@ -3530,10 +3527,6 @@ function exportConfirmHtml(risks) {
     ["Nombre", namingExample()],
   ];
   return exportConfirmViewHelpers.exportConfirmHtml({ risks, summaryRows });
-}
-
-function exportConfirmRiskHtml(risk) {
-  return exportConfirmViewHelpers.exportConfirmRiskHtml(risk);
 }
 
 function batchDetailHtml() {

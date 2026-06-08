@@ -76,6 +76,18 @@ const urlParams = new URLSearchParams(window.location.search);
 const defaultBridgeUrl = "http://127.0.0.1:8765";
 const initialBridgeUrl = urlParams.get("bridge") || defaultBridgeUrl;
 const devMode = urlParams.get("dev") === "1";
+const formatterHelpers = window.FlatShotFormatters;
+const outputProfileHelpers = window.FlatShotOutputProfiles;
+const exportPayloadHelpers = window.FlatShotExportPayload;
+const exportStateHelpers = window.FlatShotExportState;
+const preflightHelpers = window.FlatShotPreflight;
+const batchViewHelpers = window.FlatShotBatchView;
+const scanStateHelpers = window.FlatShotScanState;
+const exportConfirmViewHelpers = window.FlatShotExportConfirmView;
+const emptyStateViewHelpers = window.FlatShotEmptyStateView;
+const batchDetailViewHelpers = window.FlatShotBatchDetailView;
+const galleryHelpers = window.FlatShotGallery;
+const previewStateHelpers = window.FlatShotPreviewState;
 const STORAGE_KEYS = {
   bridgeScanPath: "flatshot.bridgeScanPath",
   selectedImagePath: "flatshot.selectedImagePath",
@@ -609,8 +621,7 @@ function restoreSessionSnapshot() {
     state.exportStatus = isExportReady() ? "ready" : "blocked";
     if (nextImage?.path) {
       writePersistentValue(STORAGE_KEYS.selectedImagePath, nextImage.path);
-      state.previewStatus = "loading";
-      state.statusText = "Restaurando vista";
+      Object.assign(state, previewStateHelpers.previewLoadingState({ statusText: "Restaurando vista" }));
       setTimer(() => requestBridgePreview(nextImage), 0);
     }
   } else if (state.batch === "empty") {
@@ -656,41 +667,15 @@ function clearTimers() {
 }
 
 function normalizeOutputProfile(profile, index = 0) {
-  const source = profile && typeof profile === "object" ? profile : {};
-  const width = Math.max(1, Number.parseInt(source.width, 10) || 1800);
-  const height = Math.max(1, Number.parseInt(source.height, 10) || 2400);
-  const format = normalizeExportFormat(source.format);
-  const background = ["rgb230", "white", "transparent"].includes(source.background)
-    ? source.background
-    : "rgb230";
-  const destinationMode = source.destinationMode === "custom" ? "custom" : "source";
-  return {
-    id: String(source.id || uniqueOutputProfileId("formato", index)).trim(),
-    name: outputProfileNameForDisplay(String(source.name || `Formato ${index + 1}`).trim()),
-    enabled: typeof source.enabled === "boolean" ? source.enabled : false,
-    format,
-    width,
-    height,
-    background,
-    destinationMode,
-    destinationValue: String(source.destinationValue || (destinationMode === "custom" ? "" : "_SALIDA_PRO")),
-    naming: String(source.naming || "{original}{suffix}"),
-    suffix: source.suffix === undefined || source.suffix === null ? "_PRO" : String(source.suffix),
-  };
+  return outputProfileHelpers.normalizeOutputProfile(profile, index);
 }
 
 function outputProfileNameForDisplay(name) {
-  return String(name || "")
-    .replace(/\bRGB\s*230\b/gi, "gris claro")
-    .replace(/\bRGB230\b/gi, "gris claro");
+  return outputProfileHelpers.outputProfileNameForDisplay(name);
 }
 
 function normalizeExportFormat(value) {
-  const text = String(value || "JPG").trim().toUpperCase().replace(/^\./, "");
-  if (text === "JPEG") {
-    return "JPG";
-  }
-  return text === "PNG" ? "PNG" : "JPG";
+  return outputProfileHelpers.normalizeExportFormat(value);
 }
 
 function readOutputProfiles(activeProfileId = "") {
@@ -701,55 +686,23 @@ function readOutputProfiles(activeProfileId = "") {
 }
 
 function normalizeOutputProfileList(profiles, activeProfileId = "") {
-  const normalized = Array.isArray(profiles)
-    ? profiles.map(normalizeOutputProfile).filter((profile) => profile.name)
-    : [];
-  const deduped = dedupeOutputProfileIds(normalized);
-  if (!deduped.length) {
-    return [];
-  }
-  if (!deduped.some((profile) => profile.enabled)) {
-    const preferred = deduped.find((profile) => profile.id === activeProfileId) || deduped[0];
-    preferred.enabled = true;
-  }
-  return deduped;
+  return outputProfileHelpers.normalizeOutputProfileList(profiles, activeProfileId);
 }
 
 function dedupeOutputProfileIds(profiles) {
-  const seen = new Set();
-  return profiles.map((profile, index) => {
-    let id = profile.id || uniqueOutputProfileId(profile.name, index);
-    while (seen.has(id)) {
-      id = uniqueOutputProfileId(profile.name, index + seen.size);
-    }
-    seen.add(id);
-    return { ...profile, id };
-  });
+  return outputProfileHelpers.dedupeOutputProfileIds(profiles);
 }
 
 function uniqueOutputProfileId(name = "formato", seed = Date.now()) {
-  const base = String(name)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    || "formato";
-  return `${base}-${String(seed).replace(/\D/g, "").slice(-6) || Date.now()}`;
+  return outputProfileHelpers.uniqueOutputProfileId(name, seed);
 }
 
 function outputProfileSize(profile) {
-  return `${Math.max(1, Number(profile?.width) || 1800)}x${Math.max(1, Number(profile?.height) || 2400)}`;
+  return outputProfileHelpers.outputProfileSize(profile);
 }
 
 function parseOutputSize(value) {
-  const match = /^(\d+)\s*[x×]\s*(\d+)$/i.exec(String(value || "").trim());
-  if (!match) {
-    return { width: 1800, height: 2400, normalized: "1800x2400" };
-  }
-  const width = Math.max(1, Number.parseInt(match[1], 10) || 1800);
-  const height = Math.max(1, Number.parseInt(match[2], 10) || 2400);
-  return { width, height, normalized: `${width}x${height}` };
+  return outputProfileHelpers.parseOutputSize(value);
 }
 
 function activeOutputProfile() {
@@ -950,26 +903,19 @@ function exportableImages() {
 }
 
 function countText(count, singular, plural = `${singular}s`) {
-  const value = Number(count) || 0;
-  return `${value} ${value === 1 ? singular : plural}`;
+  return preflightHelpers.countText(count, singular, plural);
 }
 
 function readyImagesText(count) {
-  const value = Number(count) || 0;
-  return `${value} ${value === 1 ? "imagen lista" : "imágenes listas"}`;
+  return preflightHelpers.readyImagesText(count);
 }
 
 function ignoredNeutralText(count = batchCounts().ignoredFiles) {
-  const value = Number(count) || 0;
-  if (!value) {
-    return "";
-  }
-  return `${value} ignorado${value === 1 ? "" : "s"} · no afectan`;
+  return preflightHelpers.ignoredNeutralText(count);
 }
 
 function ignoredImagesText(count = batchCounts().ignoredFiles) {
-  const value = Number(count) || 0;
-  return `${value} ignorada${value === 1 ? "" : "s"}`;
+  return preflightHelpers.ignoredImagesText(count);
 }
 
 function sidebarLotSummaryText(counts = batchCounts()) {
@@ -998,94 +944,53 @@ function scanOmissions() {
   return Array.isArray(omitted) ? omitted : [];
 }
 
+function omissionReasonOptions() {
+  return {
+    ignoredReasons: IGNORED_OMISSION_REASONS,
+    actionableReasons: ACTIONABLE_OMISSION_REASONS,
+  };
+}
+
 function omissionSeverity(item) {
-  const severity = String(item?.severity || "").toLowerCase();
-  if (["ignored", "warning", "error"].includes(severity)) {
-    return severity;
-  }
-  const category = String(item?.category || "").toLowerCase();
-  if (["ignored", "warning", "error"].includes(category)) {
-    return category;
-  }
-  const reason = String(item?.reason || "");
-  if (ACTIONABLE_OMISSION_REASONS.has(reason)) {
-    return "warning";
-  }
-  if (IGNORED_OMISSION_REASONS.has(reason)) {
-    return "ignored";
-  }
-  return "ignored";
+  return preflightHelpers.omissionSeverity(item, omissionReasonOptions());
 }
 
 function ignoredOmissions() {
-  return scanOmissions().filter((item) => omissionSeverity(item) === "ignored");
+  return preflightHelpers.splitOmissions(scanOmissions(), omissionReasonOptions()).ignored;
 }
 
 function actionableOmissions() {
-  return scanOmissions().filter((item) => omissionSeverity(item) !== "ignored");
+  return preflightHelpers.splitOmissions(scanOmissions(), omissionReasonOptions()).actionable;
 }
 
 function imageWarningCount(images = activeImages()) {
-  return images.filter((image) => image.status === "warning").length;
+  return preflightHelpers.imageWarningCount(images);
 }
 
 function excludedImageCount(images = activeImages()) {
-  return images.filter((image) =>
-    !image.exportable || image.status === "error" || exportItemState(image)?.status === "error"
-  ).length;
+  return preflightHelpers.excludedImageCount(images, exportItemStatusMap(images));
+}
+
+function exportItemStatusMap(images = activeImages()) {
+  return new Map(images.map((image) => [image.id, exportItemState(image)]));
 }
 
 function batchCounts() {
   const images = activeImages();
   const diagnostics = state.scanDiagnostics || emptyScanDiagnostics();
-  const omittedFiles = Number(diagnostics.totalOmitted || 0);
-  const ignoredFiles = ignoredOmissions().length;
-  const warningFiles = actionableOmissions().filter((item) => omissionSeverity(item) === "warning").length;
-  const errorFiles = actionableOmissions().filter((item) => omissionSeverity(item) === "error").length;
-  const filesFound = state.batch === "scanning"
-    ? null
-    : Math.max(
-      Number(diagnostics.totalFiles || 0),
-      Number(diagnostics.totalImages || 0) + omittedFiles,
-      images.length + omittedFiles
-    );
-  const validImages = state.batch === "scanning"
-    ? null
-    : Math.max(Number(diagnostics.totalImages || 0), images.length);
   const exportables = exportableImages();
-  const exportedErrors = new Set(
-    images
-      .filter((image) => exportItemState(image)?.status === "error")
-      .map((image) => image.id)
-  );
-  const exportableWarningImages = imageWarningCount(exportables);
-  const nonExportableImages = images.filter((image) =>
-    !image.exportable || image.status === "error" || exportedErrors.has(image.id)
-  ).length;
-  const warningImages = exportableWarningImages;
-  const readyImages = exportables.filter((image) =>
-    !["warning", "error"].includes(image.status) && !exportedErrors.has(image.id)
-  ).length;
-  const stateErrors = state.errors.filter((issue) => issue.level === "error").length;
-  const stateWarnings = state.errors.length - stateErrors;
-  const blockingErrors = blockingValidationIssues().length + stateErrors + errorFiles + (state.exportStatus === "failed" ? 1 : 0);
-  const reviewIssues = warningImages + nonExportableImages + warningFiles + stateWarnings;
-
-  return {
-    filesFound,
-    validImages,
-    exportableImages: exportables.length,
-    readyImages,
-    warningImages,
-    omittedFiles,
-    ignoredFiles,
-    warningFiles,
-    errorFiles,
-    nonExportableImages,
-    blockingErrors,
-    nonBlockingWarnings: reviewIssues,
-    reviewIssues,
-  };
+  return preflightHelpers.calculateBatchCounts({
+    batch: state.batch,
+    images,
+    exportables,
+    diagnostics,
+    omissions: scanOmissions(),
+    exportItemStatuses: exportItemStatusMap(images),
+    stateErrors: state.errors,
+    exportStatus: state.exportStatus,
+    blockingValidationIssueCount: blockingValidationIssues().length,
+    ...omissionReasonOptions(),
+  });
 }
 
 function exportItemState(image) {
@@ -1112,47 +1017,25 @@ function exportItemState(image) {
 }
 
 function filteredImages() {
-  const term = state.search.trim().toLowerCase();
-  return activeImages().filter((image) => {
-    if (term && !imageSearchText(image).includes(term)) {
-      return false;
-    }
-    if (state.filter === BATCH_FILTERS.valid) {
-      return image.status === "ready" || image.status === "adjusted";
-    }
-    if (state.filter === BATCH_FILTERS.warnings) {
-      return image.status === "warning";
-    }
-    if (state.filter === BATCH_FILTERS.excluded) {
-      return !image.exportable || image.status === "error" || exportItemState(image)?.status === "error";
-    }
-    return true;
+  const images = activeImages();
+  return galleryHelpers.filteredImages(images, {
+    exportItemStatuses: exportItemStatusMap(images),
+    filter: state.filter,
+    filters: BATCH_FILTERS,
+    search: state.search,
   });
 }
 
 function imageSearchText(image) {
-  const name = String(image?.name || "");
-  const stem = imageFileStem(name);
-  const path = String(image?.path || "");
-  const tokens = stem.split(/[^a-z0-9]+/i).filter(Boolean);
-  return [name, stem, path, ...tokens].join(" ").toLowerCase();
+  return galleryHelpers.imageSearchText(image);
 }
 
 function filterDisplayName(filter = state.filter) {
-  const labels = {
-    all: "todas",
-    valid: "listas",
-    warnings: "con aviso",
-    excluded: "excluidas",
-  };
-  return labels[filter] || "imágenes";
+  return galleryHelpers.filterDisplayName(filter);
 }
 
 function filterStatusText(filter = state.filter) {
-  if (filter === "all") {
-    return "Mostrando todo";
-  }
-  return `Mostrando ${filterDisplayName(filter)}`;
+  return galleryHelpers.filterStatusText(filter);
 }
 
 function validationIssues() {
@@ -1187,50 +1070,22 @@ function validationIssues() {
 }
 
 function preflightIssues() {
-  const issues = [...validationIssues(), ...state.errors];
   const counts = batchCounts();
-  const actionableOmitted = actionableOmissions();
-  const warningImages = imageWarningCount();
-  const errorImages = excludedImageCount();
-
-  if (actionableOmitted.length > 0 && hasBatch()) {
-    issues.push({
-      level: "warning",
-      title: `${actionableOmitted.length} archivo${actionableOmitted.length === 1 ? "" : "s"} a revisar`,
-      detail: actionableOmissionSummaryText(),
-    });
-  }
-  if (warningImages > 0) {
-    issues.push({
-      level: "warning",
-      title: "Imágenes con aviso",
-      detail: `${warningImages} imagen${warningImages === 1 ? "" : "es"} requiere${warningImages === 1 ? "" : "n"} revisión.`,
-    });
-  }
-  if (errorImages > 0 && exportableImages().length > 0) {
-    issues.push({
-      level: "warning",
-      title: "Imágenes excluidas",
-      detail: `${errorImages} imagen${errorImages === 1 ? "" : "es"} quedará${errorImages === 1 ? "" : "n"} fuera de la salida.`,
-    });
-  }
-  if (counts.errorFiles > 0) {
-    issues.push({
-      level: "error",
-      title: "Errores de lectura",
-      detail: actionableOmissionSummaryText(),
-    });
-  }
-
-  return issues;
+  return preflightHelpers.buildPreflightIssues({
+    validationIssues: validationIssues(),
+    stateErrors: state.errors,
+    counts,
+    actionableOmissions: actionableOmissions(),
+    hasBatch: hasBatch(),
+    warningImages: imageWarningCount(),
+    errorImages: excludedImageCount(),
+    exportableCount: exportableImages().length,
+    actionableOmissionSummary: actionableOmissionSummaryText(),
+  });
 }
 
 function preflightCounts() {
-  const issues = preflightIssues();
-  return {
-    errors: issues.filter((issue) => issue.level === "error").length,
-    warnings: issues.filter((issue) => issue.level !== "error").length,
-  };
+  return preflightHelpers.preflightCounts(preflightIssues());
 }
 
 function exportConfirmationRisks() {
@@ -1340,20 +1195,11 @@ function exportConfirmationRisks() {
 }
 
 function dedupeExportRisks(risks) {
-  const seen = new Set();
-  return risks.filter((risk) => {
-    const key = risk.id || `${risk.title}-${risk.detail}`;
-    if (seen.has(key)) {
-      return false;
-    }
-    seen.add(key);
-    return true;
-  });
+  return preflightHelpers.dedupeExportRisks(risks);
 }
 
 function issueMentionsExistingOutput(issue) {
-  const text = `${issue?.title || ""} ${issue?.detail || ""}`.toLowerCase();
-  return /ya existe|existente|existentes|sobrescri|overwrite|already exists|collision|colisi/.test(text);
+  return preflightHelpers.issueMentionsExistingOutput(issue);
 }
 
 function hasPreviousExportDestination() {
@@ -1386,9 +1232,11 @@ function lowResolutionImageCount() {
 }
 
 function isExportReady() {
-  return validationIssues().filter((issue) => issue.level === "error" || issue.title !== "Sin lote").length === 0
-    && hasBatch()
-    && exportableImages().length > 0;
+  return preflightHelpers.isExportReady({
+    validationIssues: validationIssues(),
+    hasBatch: hasBatch(),
+    exportableCount: exportableImages().length,
+  });
 }
 
 function uiState() {
@@ -1413,20 +1261,15 @@ function visibleWarningCount() {
 }
 
 function warningCountLabel(count = visibleWarningCount()) {
-  return `${count} aviso${count === 1 ? "" : "s"}`;
+  return batchViewHelpers.warningCountLabel(count);
 }
 
 function imageCountLabel(count) {
-  return `${count} ${count === 1 ? "imagen" : "imágenes"}`;
+  return batchViewHelpers.imageCountLabel(count);
 }
 
 function exportActionLabel(imageCount = batchCounts().exportableImages) {
-  const outputCount = exportOutputCount();
-  if (outputCount > 1) {
-    const totalFiles = imageCount * outputCount;
-    return `Exportar ${totalFiles} archivos`;
-  }
-  return `Exportar ${imageCount} imágenes`;
+  return batchViewHelpers.exportActionLabel(imageCount, exportOutputCount());
 }
 
 function plannedExportTotal() {
@@ -1434,24 +1277,11 @@ function plannedExportTotal() {
 }
 
 function outputCountLabel(count = exportOutputCount()) {
-  return `${count} salida${count === 1 ? "" : "s"}`;
+  return batchViewHelpers.outputCountLabel(count);
 }
 
 function detectedFormatLabel(images = activeImages()) {
-  if (!images.length) {
-    return "PNG";
-  }
-  const suffixes = Array.from(new Set(images.map((image) =>
-    String(image.name || image.suffix || "")
-      .split(".")
-      .pop()
-      ?.toUpperCase()
-      || "PNG"
-  )));
-  if (suffixes.length === 1) {
-    return suffixes[0];
-  }
-  return "PNG/JPG";
+  return batchViewHelpers.detectedFormatLabel(images);
 }
 
 function outputPresetLabel() {
@@ -1501,18 +1331,11 @@ function firstActionableIssue() {
 }
 
 function batchSummaryLabel() {
-  const count = activeImages().length;
-  if (state.batch === "none") {
-    return "Sin lote";
-  }
-  if (state.batch === "scanning") {
-    return "Escaneando";
-  }
-  if (state.batch === "empty") {
-    return "Sin imágenes";
-  }
-  const warnings = visibleWarningCount();
-  return `${imageCountLabel(count)}${warnings ? ` · ${warningCountLabel(warnings)}` : ""}`;
+  return batchViewHelpers.batchSummaryLabel({
+    batch: state.batch,
+    count: activeImages().length,
+    warnings: visibleWarningCount(),
+  });
 }
 
 function firstBlockingIssue() {
@@ -1663,14 +1486,8 @@ function getVisibleAppState() {
 }
 
 function readyBatchSummaryText(counts = batchCounts()) {
-  const format = detectedFormatLabel(activeImages());
-  if (counts.filesFound === null) {
-    return "Leyendo archivos";
-  }
-  if (counts.filesFound > 0 || counts.exportableImages > 0) {
-    return `${format} · ${counts.filesFound} archivos · ${readyImagesText(counts.exportableImages)}`;
-  }
-  return `${format} · ${readyImagesText(0)}`;
+  const readyText = readyImagesText(counts.filesFound > 0 || counts.exportableImages > 0 ? counts.exportableImages : 0);
+  return batchViewHelpers.readyBatchSummaryText(counts, detectedFormatLabel(activeImages()), readyText);
 }
 
 function setScenario(scenario) {
@@ -1944,14 +1761,10 @@ function selectImage(imageId) {
     void requestBridgePreview(image);
     return;
   }
-  state.previewStatus = "loading";
-  state.previewData = null;
-  state.previewError = "";
-  state.statusText = "Generando vista";
+  Object.assign(state, previewStateHelpers.previewLoadingState());
   render();
   setTimer(() => {
-    state.previewStatus = image.status === "error" ? "error" : image.status === "warning" ? "warning" : "ready";
-    state.statusText = state.previewStatus === "error" ? "Vista no disponible" : "Vista lista";
+    Object.assign(state, previewStateHelpers.previewImageStatusState(image.status));
     render();
   }, 380);
 }
@@ -1993,9 +1806,7 @@ function clearPreviewSelection() {
   clearTimers();
   state.selectedImageId = null;
   state.localOverride = false;
-  state.previewStatus = "empty";
-  state.previewData = null;
-  state.previewError = "";
+  Object.assign(state, previewStateHelpers.previewEmptyState());
   state.fitZoom = 100;
   resetViewerPan();
 }
@@ -2144,21 +1955,15 @@ function clampViewerPan() {
 }
 
 function isAutoViewerMode(mode = state.fitMode) {
-  return ["fit", "height", "width"].includes(mode);
+  return previewStateHelpers.isAutoViewerMode(mode);
 }
 
 function viewerModeLabel(mode = state.fitMode) {
-  return VIEW_MODE_LABELS[mode] || VIEW_MODE_LABELS.manual;
+  return previewStateHelpers.viewerModeLabel(mode, VIEW_MODE_LABELS);
 }
 
 function viewerModeClass(mode = state.fitMode) {
-  if (mode === "height") {
-    return "fit-height-mode";
-  }
-  if (mode === "width") {
-    return "fit-width-mode";
-  }
-  return mode === "fit" ? "fit-mode" : "zoom-mode";
+  return previewStateHelpers.viewerModeClass(mode);
 }
 
 function currentViewerZoom() {
@@ -2166,7 +1971,7 @@ function currentViewerZoom() {
 }
 
 function clampViewerZoom(value) {
-  return Math.max(25, Math.min(320, Math.round(value)));
+  return previewStateHelpers.clampViewerZoom(value);
 }
 
 function setViewerZoom(nextZoom, anchorEvent = null) {
@@ -2316,10 +2121,7 @@ function markPresetDirty() {
 
 function refreshPreviewAfterSettingChange() {
   if (selectedImage()?.source === "bridge") {
-    state.previewStatus = "loading";
-    state.previewData = null;
-    state.previewError = "";
-    state.statusText = "Generando vista";
+    Object.assign(state, previewStateHelpers.previewLoadingState());
     render();
     clearTimers();
     setTimer(() => {
@@ -2331,13 +2133,11 @@ function refreshPreviewAfterSettingChange() {
     return;
   }
   if (hasBatch() && state.previewStatus !== "error") {
-    state.previewStatus = "loading";
-    state.statusText = "Generando vista";
+    Object.assign(state, previewStateHelpers.previewLoadingState({ clearData: false }));
     render();
     clearTimers();
     setTimer(() => {
-      state.previewStatus = selectedImage()?.status === "warning" ? "warning" : "ready";
-      state.statusText = "Vista lista";
+      Object.assign(state, previewStateHelpers.previewImageStatusState(selectedImage()?.status, { errorAsReady: true }));
       render();
     }, 420);
   } else {
@@ -2387,44 +2187,17 @@ function startExport(options = {}) {
     return;
   }
 
-  Object.assign(state, {
+  Object.assign(state, exportStateHelpers.exportStartState({
     scenario: options.keepScenario ? "export-running" : state.scenario,
-    exportStatus: "running",
-    progress: 0,
-    processed: 0,
-    exportJobId: null,
-    exportDestinations: [],
-    exportMessages: [],
-    exportCompletedItems: [],
-    exportIssues: [],
-    exportResult: null,
-    exportConfirmOpen: false,
-    exportConfirmRisks: [],
-    exportConfirmOptions: null,
-    errors: [],
-    paused: false,
-    statusText: "Preparando exportación",
-  });
+    resetConfirm: true,
+  }));
   render();
   scheduleExportStep();
 }
 
 async function startBridgeExport() {
   clearBridgeExportPoll();
-  Object.assign(state, {
-    exportStatus: "running",
-    progress: 0,
-    processed: 0,
-    exportJobId: null,
-    exportDestinations: [],
-    exportMessages: [],
-    exportCompletedItems: [],
-    exportIssues: [],
-    exportResult: null,
-    errors: [],
-    paused: false,
-    statusText: "Preparando exportación",
-  });
+  Object.assign(state, exportStateHelpers.exportStartState());
   render();
 
   try {
@@ -2438,81 +2211,29 @@ async function startBridgeExport() {
     scheduleBridgeExportPoll();
   } catch (error) {
     const message = bridgeErrorMessage(error);
-    Object.assign(state, {
-      exportStatus: "failed",
-      progress: 0,
-      processed: 0,
-      exportIssues: [{ level: "error", title: "Exportación fallida", detail: message }],
-      exportResult: null,
-      errors: [{ level: "error", title: "Exportación fallida", detail: message }],
-      statusText: "Exportación fallida",
-    });
+    Object.assign(state, exportStateHelpers.bridgeRunFailureState(message));
     render();
   }
 }
 
 function bridgeExportPayload() {
-  const profiles = exportOutputProfiles();
-  const primary = profiles.find((profile) => profile.id === state.activeOutputProfileId) || profiles[0] || currentOutputProfileData();
-  const seenVariantIds = new Set();
-  return {
-    imagePaths: exportableImages()
-      .filter((image) => image.source === "bridge" && image.path)
-      .map((image) => image.path),
-    presetName: state.activePreset,
-    settings: bridgePreviewSettings(),
+  return exportPayloadHelpers.buildBridgeExportPayload({
+    activeOutputProfileId: state.activeOutputProfileId,
+    fallbackProfile: currentOutputProfileData(),
     imageOverrides: state.imageOverrides,
-    export: {
-      format: primary.format,
-      size: outputProfileSize(primary),
-      background: primary.background,
-      destinationMode: primary.destinationMode,
-      destinationValue: primary.destinationValue,
-      outputFolderName: primary.destinationMode === "source" ? primary.destinationValue : "_SALIDA_PRO",
-      customOutputPath: primary.destinationMode === "custom" ? primary.destinationValue : "",
-      namingTemplate: primary.naming,
-      suffix: primary.suffix,
-      variants: profiles.map((profile, index) => exportVariantPayloadFromProfile(profile, index, seenVariantIds)),
-    },
-  };
+    images: exportableImages(),
+    presetName: state.activePreset,
+    profiles: exportOutputProfiles(),
+    settings: bridgePreviewSettings(),
+  });
 }
 
 function exportVariantPayloadFromProfile(profile, index, seenVariantIds = new Set()) {
-  const size = parseOutputSize(outputProfileSize(profile));
-  const variantId = exportVariantId(profile, index, seenVariantIds);
-  return {
-    id: variantId,
-    label: profile.name,
-    enabled: true,
-    format: profile.format,
-    transparent_bg: profile.background === "transparent",
-    bg_color: backgroundColorTuple(profile.background),
-    suffix: profile.suffix,
-    naming_template: profile.naming,
-    output_destination: profile.destinationMode === "custom" ? "custom" : "subfolder",
-    output_folder_name: profile.destinationMode === "source" ? profile.destinationValue || "_SALIDA_PRO" : null,
-    custom_output_path: profile.destinationMode === "custom" ? profile.destinationValue : null,
-    output_width: size.width,
-    output_height: size.height,
-  };
+  return outputProfileHelpers.exportVariantPayloadFromProfile(profile, index, seenVariantIds);
 }
 
 function exportVariantId(profile, index, seenVariantIds = new Set()) {
-  const base = String(profile.id || profile.name || `salida-${index + 1}`)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^A-Za-z0-9_-]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    || `salida_${index + 1}`;
-  const safeBase = /^[A-Za-z0-9_-]+$/.test(base) ? base : `salida_${index + 1}`;
-  let candidate = safeBase;
-  let suffix = 2;
-  while (seenVariantIds.has(candidate)) {
-    candidate = `${safeBase}_${suffix}`;
-    suffix += 1;
-  }
-  seenVariantIds.add(candidate);
-  return candidate;
+  return outputProfileHelpers.exportVariantId(profile, index, seenVariantIds);
 }
 
 function scheduleBridgeExportPoll() {
@@ -2531,12 +2252,7 @@ function scheduleBridgeExportPoll() {
       scheduleBridgeExportPoll();
     } catch (error) {
       const message = bridgeErrorMessage(error);
-      Object.assign(state, {
-        exportStatus: "failed",
-        paused: false,
-        errors: [{ level: "error", title: "Progreso no disponible", detail: message }],
-        statusText: "Progreso no disponible",
-      });
+      Object.assign(state, exportStateHelpers.bridgeProgressUnavailableState(message));
       render();
     }
   }, 450);
@@ -2550,65 +2266,12 @@ function clearBridgeExportPoll() {
 }
 
 function applyBridgeExportStatus(payload) {
-  state.exportJobId = payload.jobId || state.exportJobId;
-  state.exportDestinations = Array.isArray(payload.destinations) ? payload.destinations : state.exportDestinations;
-  state.exportMessages = Array.isArray(payload.messages) ? payload.messages : state.exportMessages;
-  state.exportCompletedItems = Array.isArray(payload.completedItems) ? payload.completedItems : state.exportCompletedItems;
-  state.exportIssues = Array.isArray(payload.issues) ? payload.issues.map(normalizeBridgeIssue) : state.exportIssues;
-  state.exportResult = payload.result || state.exportResult;
-  state.progress = Number(payload.progress?.percent) || 0;
-  state.processed = Number(payload.progress?.processed) || 0;
-  state.paused = payload.status === "paused";
-
-  if (payload.status === "completed") {
-    state.exportStatus = "completed";
-    state.progress = 0;
-    state.statusText = `Exportación completada · ${state.processed}/${payload.progress?.total || state.processed}`;
-  } else if (payload.status === "partial") {
-    state.exportStatus = "partial";
-    state.progress = 0;
-    state.statusText = "Exportación con avisos";
-  } else if (payload.status === "failed" || payload.status === "cancelled") {
-    state.exportStatus = "failed";
-    state.progress = 0;
-    state.paused = false;
-    state.statusText = payload.status === "cancelled" ? "Exportación cancelada" : "Exportación fallida";
-  } else if (payload.status === "paused") {
-    state.exportStatus = "running";
-    state.statusText = "Pausado";
-  } else if (payload.status === "cancelling") {
-    state.exportStatus = "running";
-    state.statusText = "Deteniendo...";
-  } else {
-    state.exportStatus = "running";
-    state.statusText = `Procesando ${state.processed}/${payload.progress?.total || "..."}`;
-  }
-
-  const failedItems = state.exportCompletedItems.filter((item) => !item.success);
-  if (["partial", "failed", "cancelled"].includes(payload.status) || failedItems.length || state.exportIssues.length) {
-    const messageItems = (payload.messages || []).slice(-4).map((message) => ({
-      level: payload.status === "partial" ? "warning" : "error",
-      title: "Exportación",
-      detail: message,
-    }));
-    const itemErrors = failedItems.slice(-4).map((item) => ({
-      level: "error",
-      title: item.name || "Imagen",
-      detail: "No se pudo exportar.",
-    }));
-    state.errors = state.exportIssues.length ? state.exportIssues : [...itemErrors, ...messageItems];
-  } else {
-    state.errors = [];
-  }
+  Object.assign(state, exportStateHelpers.bridgeStatusPatch(payload, state));
+  state.errors = exportStateHelpers.bridgeStatusErrors(payload, state.exportCompletedItems, state.exportIssues);
 }
 
 function normalizeBridgeIssue(issue) {
-  const source = issue && typeof issue === "object" ? issue : {};
-  return {
-    level: source.level === "error" ? "error" : "warning",
-    title: String(source.title || "Exportación"),
-    detail: String(source.detail || "Revisa el resultado."),
-  };
+  return exportStateHelpers.normalizeBridgeIssue(issue);
 }
 
 function scheduleExportStep() {
@@ -2672,12 +2335,7 @@ function stopExport() {
   }
   clearTimers();
   clearBridgeExportPoll();
-  Object.assign(state, {
-    exportStatus: "failed",
-    paused: false,
-    errors: [{ level: "error", title: "Exportación detenida", detail: "No se generaron más archivos." }],
-    statusText: "Exportación fallida",
-  });
+  Object.assign(state, exportStateHelpers.stoppedExportState());
   render();
 }
 
@@ -2754,10 +2412,7 @@ async function bridgeRequest(path, options = {}) {
 async function requestBridgePreview(image) {
   const requestId = state.previewRequestId + 1;
   state.previewRequestId = requestId;
-  state.previewStatus = "loading";
-  state.previewData = null;
-  state.previewError = "";
-  state.statusText = "Generando vista";
+  Object.assign(state, previewStateHelpers.previewLoadingState());
   render();
 
   try {
@@ -2776,18 +2431,13 @@ async function requestBridgePreview(image) {
       return;
     }
 
-    state.previewData = previewResponseToData(response);
-    state.previewStatus = response.warning ? "warning" : "ready";
-    state.statusText = response.warning ? "Vista con aviso" : "Vista lista";
+    Object.assign(state, previewStateHelpers.previewBridgeResultState(previewResponseToData(response), response.warning));
   } catch (error) {
     if (isStalePreviewResponse(requestId, image)) {
       return;
     }
     const message = bridgeErrorMessage(error);
-    state.previewStatus = "error";
-    state.previewData = null;
-    state.previewError = message;
-    state.statusText = "Vista no disponible";
+    Object.assign(state, previewStateHelpers.previewErrorState(message));
   }
 
   render();
@@ -2833,10 +2483,7 @@ function previewTargetSize() {
 }
 
 function backgroundColorTuple(value) {
-  if (value === "white") {
-    return [255, 255, 255];
-  }
-  return [230, 230, 230];
+  return outputProfileHelpers.backgroundColorTuple(value);
 }
 
 async function checkBridge() {
@@ -2877,14 +2524,7 @@ async function checkBridge() {
 }
 
 async function pickBridgeFolder() {
-  state.batchDetailOpen = false;
-  state.exportConfirmOpen = false;
-  state.bridgeMode = "bridge";
-  state.bridgeStatus = "checking";
-  state.bridgeMessage = "Abriendo selector";
-  state.bridgeLastResponse = "Solicitando /folders/pick";
-  state.scanStatus = "Elige una carpeta";
-  state.statusText = "Elige una carpeta";
+  Object.assign(state, scanStateHelpers.folderPickStartState());
   render();
 
   try {
@@ -2893,32 +2533,19 @@ async function pickBridgeFolder() {
       body: JSON.stringify({ initialPath: parseFolderInput(state.bridgeScanPath)[0] || "" }),
       timeoutMs: 300000,
     });
-    state.bridgeStatus = "connected";
     if (!selected.selected || !selected.path) {
-      state.bridgeMessage = "Selección cancelada";
-      state.bridgeLastResponse = "folder pick cancelado";
-      state.scanStatus = "Selección cancelada";
-      state.statusText = "Selección cancelada";
+      Object.assign(state, scanStateHelpers.folderPickCancelledState());
       render();
       return;
     }
 
-    state.bridgeScanPath = selected.path;
+    Object.assign(state, scanStateHelpers.folderPickSelectedState(selected.path));
     persistBridgeScanPath();
-    state.bridgeMessage = "Carpeta seleccionada";
-    state.bridgeLastResponse = "folder pick OK";
-    state.scanStatus = "Carpeta seleccionada";
-    state.statusText = "Carpeta seleccionada";
     render();
     await scanBridgeFolder();
   } catch (error) {
     const message = bridgeErrorMessage(error);
-    state.bridgeStatus = "disconnected";
-    state.bridgeMessage = message;
-    state.bridgeLastResponse = `error: ${message}`;
-    state.scanStatus = "No se pudo seleccionar";
-    state.scanIssues = [{ level: "error", title: "Selector no disponible", detail: message }];
-    state.statusText = "Selector no disponible";
+    Object.assign(state, scanStateHelpers.folderPickErrorState(message));
     render();
   }
 }
@@ -2961,11 +2588,7 @@ async function scanBridgeFolder() {
   state.bridgeMode = "bridge";
   const folders = parseFolderInput(state.bridgeScanPath);
   if (!folders.length) {
-    state.bridgeStatus = state.bridgeStatus === "connected" ? "connected" : "disconnected";
-    state.bridgeMessage = "Ruta vacía";
-    state.scanStatus = "Ruta vacía";
-    state.scanIssues = [{ level: "warning", title: "Ruta vacía", detail: "Pega una carpeta para escanear." }];
-    state.statusText = "Ruta vacía";
+    Object.assign(state, scanStateHelpers.emptyScanPathState(state.bridgeStatus === "connected"));
     render();
     return;
   }
@@ -2976,38 +2599,7 @@ async function scanBridgeFolder() {
   thumbnailFallbackQueue.length = 0;
   thumbnailFallbackInFlight.clear();
   clearBridgeExportPoll();
-  Object.assign(state, {
-    batch: "scanning",
-    batchSource: "bridge",
-    selectedImageId: null,
-    previewStatus: "empty",
-    previewData: null,
-    previewError: "",
-    thumbnailStatus: {},
-    thumbnailErrors: [],
-    exportStatus: "blocked",
-    progress: 0,
-    processed: 0,
-    exportJobId: null,
-    exportDestinations: [],
-    exportMessages: [],
-    exportCompletedItems: [],
-    exportIssues: [],
-    exportResult: null,
-    errors: [],
-    filter: "all",
-    search: "",
-    fitMode: DEFAULT_VIEW_MODE,
-    fitZoom: 100,
-    zoom: 100,
-    panX: 0,
-    panY: 0,
-    scanIssues: [],
-    scanDiagnostics: emptyScanDiagnostics(),
-    scanStatus: folders.length === 1 ? "Escaneando ruta" : `Escaneando ${folders.length} rutas`,
-    statusText: "Escaneando ruta",
-  });
-  state.bridgeLastResponse = "Solicitando /folders/scan";
+  Object.assign(state, scanStateHelpers.scanStartState(folders, emptyScanDiagnostics(), DEFAULT_VIEW_MODE));
   render();
 
   try {
@@ -3022,22 +2614,7 @@ async function scanBridgeFolder() {
     applyBridgeScanResult(response);
   } catch (error) {
     const message = bridgeErrorMessage(error);
-    Object.assign(state, {
-      batch: "none",
-      batchSource: "none",
-      selectedImageId: null,
-      previewStatus: "empty",
-      previewData: null,
-      previewError: "",
-      exportStatus: "blocked",
-      scanDiagnostics: emptyScanDiagnostics(),
-      bridgeStatus: "disconnected",
-      bridgeMessage: message,
-      bridgeLastResponse: `error: ${message}`,
-      scanStatus: "Conexión local no disponible",
-      scanIssues: [{ level: "error", title: "Conexión local no disponible", detail: message }],
-      statusText: "No se pudo escanear",
-    });
+    Object.assign(state, scanStateHelpers.scanFailureState(message, emptyScanDiagnostics()));
   }
 
   render();
@@ -3083,35 +2660,19 @@ function applyBridgeScanResult(response) {
       ? state.realImages.find((image) => image.path === rememberedPath)
       : null;
     const selectedImage = rememberedImage || state.realImages[0];
-    state.batch = "ready";
-    state.selectedImageId = selectedImage.id;
-    state.localOverride = hasCurrentImageOverride(selectedImage) || selectedImage.status === "adjusted";
+    Object.assign(state, scanStateHelpers.scanReadyState({
+      defaultViewMode: DEFAULT_VIEW_MODE,
+      imageCount: state.realImages.length,
+      localOverride: hasCurrentImageOverride(selectedImage) || selectedImage.status === "adjusted",
+      scanIssueCount: state.scanIssues.length,
+      selectedImageId: selectedImage.id,
+    }));
     rememberSelectedImage(selectedImage);
-    state.previewStatus = "loading";
-    state.previewData = null;
-    state.previewError = "";
-    state.fitMode = DEFAULT_VIEW_MODE;
-    state.fitZoom = 100;
-    state.zoom = 100;
-    state.panX = 0;
-    state.panY = 0;
-    state.exportStatus = "blocked";
-    state.scanStatus = state.scanIssues.length
-      ? `Escaneo completado con ${state.scanIssues.length} aviso${state.scanIssues.length === 1 ? "" : "s"}`
-      : `${state.realImages.length} imágenes encontradas`;
-    state.statusText = "Generando vista";
     void requestBridgePreview(selectedImage);
     return;
   }
 
-  state.batch = "empty";
-  state.selectedImageId = null;
-  state.previewStatus = "empty";
-  state.previewData = null;
-  state.previewError = "";
-  state.exportStatus = "blocked";
-  state.scanStatus = state.scanIssues.length ? state.scanIssues[0].detail : "No se encontraron PNG válidos";
-  state.statusText = state.scanIssues.length ? "Revisa carpeta" : "No hay imágenes compatibles";
+  Object.assign(state, scanStateHelpers.scanEmptyState(state.scanIssues));
 }
 
 function parseFolderInput(value) {
@@ -3122,71 +2683,23 @@ function parseFolderInput(value) {
 }
 
 function bridgeScanMessage(totalImages, warningCount) {
-  if (warningCount) {
-    return `Escaneo completado con ${warningCount} aviso${warningCount === 1 ? "" : "s"}`;
-  }
-  if (totalImages === 0) {
-    return "No se encontraron PNG válidos";
-  }
-  return `${totalImages} imágenes encontradas`;
+  return batchViewHelpers.bridgeScanMessage(totalImages, warningCount);
 }
 
 function omittedSummaryText(diagnostics = state.scanDiagnostics) {
-  if (!diagnostics.totalOmitted) {
-    return "Sin ignorados";
-  }
-  return Object.entries(diagnostics.omittedByReason || {})
-    .map(([reason, count]) => `${count} ${omissionReasonLabel(reason).toLowerCase()}`)
-    .join(" · ") || `${diagnostics.totalOmitted} ignorados`;
+  return batchViewHelpers.omittedSummaryText(diagnostics);
 }
 
 function omissionReasonLabel(reason) {
-  if (reason === "system_file") {
-    return "Archivo del sistema";
-  }
-  if (reason === "temporary_or_config_file") {
-    return "Archivo temporal o de configuración";
-  }
-  if (reason === "unsupported_extension") {
-    return "Extensión no admitida";
-  }
-  if (reason === "read_error") {
-    return "Error de lectura";
-  }
-  if (reason === "subfolder_not_scanned") {
-    return "Subcarpeta no escaneada";
-  }
-  return "Ignorado";
+  return batchViewHelpers.omissionReasonLabel(reason);
 }
 
 function actionableOmissionSummaryText() {
-  const actionable = actionableOmissions();
-  if (!actionable.length) {
-    return "Sin avisos de archivos";
-  }
-  const counts = actionable.reduce((acc, item) => {
-    const label = omissionReasonLabel(item.reason).toLowerCase();
-    acc[label] = (acc[label] || 0) + 1;
-    return acc;
-  }, {});
-  return Object.entries(counts)
-    .map(([label, count]) => `${count} ${label}`)
-    .join(" · ");
+  return batchViewHelpers.omissionSummaryText(actionableOmissions(), "Sin avisos de archivos");
 }
 
 function ignoredSummaryText() {
-  const ignored = ignoredOmissions();
-  if (!ignored.length) {
-    return "Sin archivos ignorados";
-  }
-  const counts = ignored.reduce((acc, item) => {
-    const label = omissionReasonLabel(item.reason).toLowerCase();
-    acc[label] = (acc[label] || 0) + 1;
-    return acc;
-  }, {});
-  return Object.entries(counts)
-    .map(([label, count]) => `${count} ${label}`)
-    .join(" · ");
+  return batchViewHelpers.omissionSummaryText(ignoredOmissions(), "Sin archivos ignorados");
 }
 
 function folderActionableOmissionCount(folder) {
@@ -3242,31 +2755,19 @@ function bridgeImageToItem(image, folderIndex, imageIndex) {
 }
 
 function basename(path) {
-  return String(path || "").split(/[\\/]/).filter(Boolean).pop() || "";
+  return formatterHelpers.basename(path);
 }
 
 function imageFileStem(name) {
-  return basename(name).replace(/\.[^.\\/]+$/, "") || basename(name) || "Imagen";
+  return formatterHelpers.imageFileStem(name);
 }
 
 function imageFileType(image) {
-  const fromName = String(image?.name || "").split(".").pop();
-  if (fromName && fromName !== image?.name) {
-    return fromName.toUpperCase();
-  }
-  const fromDetail = String(image?.detail || "").split("·")[0]?.trim();
-  return fromDetail || state.format || "Imagen";
+  return formatterHelpers.imageFileType(image, state.format || "Imagen");
 }
 
 function formatBytes(bytes) {
-  const value = Number(bytes) || 0;
-  if (value >= 1024 * 1024) {
-    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
-  }
-  if (value >= 1024) {
-    return `${Math.round(value / 1024)} KB`;
-  }
-  return `${value} B`;
+  return formatterHelpers.formatBytes(bytes);
 }
 
 function bridgeErrorMessage(error) {
@@ -3277,23 +2778,7 @@ function bridgeErrorMessage(error) {
 }
 
 function capabilitiesSummary(capabilities) {
-  if (!capabilities) {
-    return "Sin comprobar";
-  }
-  const available = [];
-  if (capabilities.folderScan) {
-    available.push("scan");
-  }
-  if (capabilities.presetsRead) {
-    available.push("presets");
-  }
-  if (capabilities.previewRender) {
-    available.push("preview");
-  }
-  if (capabilities.exportRun) {
-    available.push("export");
-  }
-  return available.length ? available.join(" · ") : "Sin capacidades activas";
+  return formatterHelpers.capabilitiesSummary(capabilities);
 }
 
 function showReviewScenario(scenario) {
@@ -3375,14 +2860,7 @@ function openOutputFolder() {
 }
 
 function pathToFileUrl(path) {
-  const normalized = String(path || "").replaceAll("\\", "/");
-  if (/^[a-z]:\//i.test(normalized)) {
-    return `file:///${encodeURI(normalized)}`;
-  }
-  if (normalized.startsWith("/")) {
-    return `file://${encodeURI(normalized)}`;
-  }
-  return encodeURI(normalized);
+  return formatterHelpers.pathToFileUrl(path);
 }
 
 function statusMode() {
@@ -3644,12 +3122,7 @@ function setDebugText(id, value) {
 }
 
 function debugUrlLabel(value) {
-  const text = String(value || "");
-  if (text.startsWith("data:")) {
-    const comma = text.indexOf(",");
-    return comma > 0 ? `${text.slice(0, comma)}...` : "data URL";
-  }
-  return text.length > 120 ? `${text.slice(0, 117)}...` : text;
+  return formatterHelpers.debugUrlLabel(value);
 }
 
 function thumbnailStats() {
@@ -4146,13 +3619,7 @@ function outputProfilesSummaryLabel(profiles = exportOutputProfiles()) {
 }
 
 function batchBackgroundLabel(value) {
-  if (value === "transparent") {
-    return "transparente";
-  }
-  if (value === "white") {
-    return "blanco";
-  }
-  return "gris claro";
+  return batchViewHelpers.batchBackgroundLabel(value);
 }
 
 function batchDestinationLine() {
@@ -4242,7 +3709,6 @@ function renderExportConfirm() {
 
 function exportConfirmHtml(risks) {
   const counts = batchCounts();
-  const blocking = risks.some((risk) => risk.blocking);
   const exportable = counts.exportableImages;
   const summaryRows = [
     ["Imágenes", `${exportable} exportable${exportable === 1 ? "" : "s"}`],
@@ -4250,55 +3716,11 @@ function exportConfirmHtml(risks) {
     ["Destino", destinationFallbackLabel()],
     ["Nombre", namingExample()],
   ];
-  const riskTitle = blocking ? "Bloqueos" : "Avisos";
-  const riskRows = risks.length
-    ? risks.map(exportConfirmRiskHtml).join("")
-    : `
-      <div class="export-confirm-risk ready">
-        <span aria-hidden="true">✓</span>
-        <div>
-          <strong>Sin avisos</strong>
-          <small>El lote se exportará con el formato activo.</small>
-        </div>
-      </div>
-    `;
-  const overwriteNote = risks.some((risk) => risk.id === "previous-export-destination" || risk.id === "existing-output-blocker")
-    ? `
-      <div class="export-confirm-note">
-        <strong>Archivos existentes</strong>
-        <span>FlatShot mantiene la validación segura: no sobrescribe archivos existentes sin soporte explícito del motor local.</span>
-      </div>
-    `
-    : "";
-
-  return `
-    <div class="export-confirm-summary">
-      ${summaryRows.map(([label, value]) => `
-        <div>
-          <span>${escapeHtml(label)}</span>
-          <strong title="${escapeHtml(value)}">${escapeHtml(value)}</strong>
-        </div>
-      `).join("")}
-    </div>
-    <section class="export-confirm-section">
-      <h3>${escapeHtml(riskTitle)}</h3>
-      <div class="export-confirm-risks">${riskRows}</div>
-    </section>
-    ${overwriteNote}
-  `;
+  return exportConfirmViewHelpers.exportConfirmHtml({ risks, summaryRows });
 }
 
 function exportConfirmRiskHtml(risk) {
-  const icon = risk.blocking ? "!" : "⚠";
-  return `
-    <div class="export-confirm-risk ${risk.blocking ? "error" : "warning"}">
-      <span aria-hidden="true">${escapeHtml(icon)}</span>
-      <div>
-        <strong>${escapeHtml(risk.title)}</strong>
-        <small>${escapeHtml(risk.detail || "Revisar antes de exportar.")}</small>
-      </div>
-    </div>
-  `;
+  return exportConfirmViewHelpers.exportConfirmRiskHtml(risk);
 }
 
 function batchDetailHtml() {
@@ -4393,13 +3815,7 @@ function batchDetailHtml() {
 }
 
 function batchDetailRowHtml(label, value, title = "") {
-  const text = value === null || value === undefined || value === "" ? "Pendiente" : String(value);
-  return `
-    <div class="batch-detail-row">
-      <span>${escapeHtml(label)}</span>
-      <strong title="${escapeHtml(title || text)}">${escapeHtml(text)}</strong>
-    </div>
-  `;
+  return batchDetailViewHelpers.batchDetailRowHtml(label, value, title);
 }
 
 function pluralizeCount(count, singular) {
@@ -4562,61 +3978,29 @@ function updateBatchSearchClear() {
 }
 
 function filteredEmptyHtml(total, valid, warnings, errors) {
-  if (!total) {
-    return "No hay imágenes en este lote.";
-  }
-  const labels = {
-    valid: "listas",
-    warnings: "con avisos",
-    excluded: "excluidas",
-  };
-  if (state.search.trim()) {
-    const term = state.search.trim();
-    const searchDetail = state.filter === "all"
-      ? `No hay imágenes que coincidan con "${term}".`
-      : `No hay imágenes que coincidan con "${term}" en el filtro actual.`;
-    return `
-      <strong>No hay imágenes que coincidan</strong>
-      <span>${escapeHtml(searchDetail)}</span>
-      <button type="button" data-action="clear-filter">Limpiar búsqueda</button>
-    `;
-  }
-  const counts = { valid, warnings, excluded: errors };
-  const label = labels[state.filter] || "con este filtro";
-  const count = counts[state.filter] || 0;
-  return `
-    <strong>No hay imágenes ${escapeHtml(label)}.</strong>
-    <small>${escapeHtml(total)} imágenes en el lote · ${escapeHtml(count)} en este filtro</small>
-    <button type="button" data-action="clear-filter">Ver todas</button>
-  `;
+  return galleryHelpers.filteredEmptyHtml({
+    errors,
+    filter: state.filter,
+    search: state.search,
+    total,
+    valid,
+    warnings,
+  });
 }
 
 function filterEmptyDetail() {
-  if (state.search.trim()) {
-    return `No hay coincidencias para "${state.search.trim()}".`;
-  }
-  if (state.filter === BATCH_FILTERS.warnings) {
-    return "El lote no contiene imágenes con avisos.";
-  }
-  if (state.filter === BATCH_FILTERS.excluded) {
-    return "No hay imágenes excluidas de la exportación.";
-  }
-  if (state.filter === BATCH_FILTERS.valid) {
-    return "No hay imágenes listas en este filtro.";
-  }
-  return "No hay imágenes visibles con el filtro activo.";
+  return galleryHelpers.filterEmptyDetail({
+    filter: state.filter,
+    search: state.search,
+  });
 }
 
 function emptyBatchNoteHtml() {
-  const ignored = ignoredOmissions().length;
-  const detail = ignored
-    ? `Esta carpeta no contiene PNG válidos. ${ignoredSummaryText()}.`
-    : state.scanStatus || "Esta carpeta no contiene imágenes compatibles.";
-  return `
-    <strong>No se encontraron imágenes compatibles</strong>
-    <span>${escapeHtml(detail)}</span>
-    <button type="button" class="primary" data-action="pick-bridge-folder">Elegir otra carpeta</button>
-  `;
+  return galleryHelpers.emptyBatchNoteHtml({
+    ignored: ignoredOmissions().length,
+    ignoredSummary: ignoredSummaryText(),
+    scanStatus: state.scanStatus,
+  });
 }
 
 function batchFormatHtml(images, omittedCount = 0) {
@@ -4624,18 +4008,7 @@ function batchFormatHtml(images, omittedCount = 0) {
 }
 
 function folderItemHtml(folder) {
-  const className = folder.status === "warning" ? "empty" : folder.status === "error" ? "error" : folder.status || "";
-  return `
-    <div class="folder-item ${className}" title="${escapeHtml(folder.path || folder.detail)}">
-      <div>
-        <strong>${escapeHtml(folder.name)}</strong>
-        <small>${escapeHtml(folder.detail)}</small>
-      </div>
-      <span class="state-chip ${folder.status === "warning" ? "warning" : folder.status === "error" ? "error" : ""}">
-        ${escapeHtml(folder.count)}
-      </span>
-    </div>
-  `;
+  return batchDetailViewHelpers.folderItemHtml(folder);
 }
 
 function imageThumbnailSrc(image) {
@@ -4687,17 +4060,7 @@ function thumbnailState(image, src) {
 function thumbnailHtml(image) {
   const src = imageThumbnailSrc(image);
   const current = thumbnailState(image, src);
-  const status = current.status || "loading";
-  const error = current.error || "Sin preview";
-  const alt = `Miniatura de ${image.name}`;
-  const displaySrc = current.resolvedSrc || current.src || src;
-  return `
-    <span class="thumb is-${escapeHtml(status)}" data-thumb-id="${escapeHtml(image.id)}">
-      ${displaySrc ? `<img class="thumb-image" src="${escapeHtml(displaySrc)}" alt="${escapeHtml(alt)}" loading="eager" data-image-id="${escapeHtml(image.id)}" />` : ""}
-      <span class="thumb-skeleton" aria-hidden="true"></span>
-      <span class="thumb-error">${escapeHtml(error)}</span>
-    </span>
-  `;
+  return galleryHelpers.thumbnailHtml(image, current, src);
 }
 
 function queueThumbnailPreload() {
@@ -4871,108 +4234,45 @@ function applyThumbnailDomStatus(imageId, status, resolvedSrc = "") {
 }
 
 function imageItemHtml(image) {
-  const selected = image.id === state.selectedImageId ? "active" : "";
   const exportState = exportItemState(image);
   const imageStatus = hasCurrentImageOverride(image) ? "adjusted" : image.status;
-  const effectiveStatus = exportState?.status || imageStatus;
-  const chipClass = effectiveStatus === "warning" ? "warning" : effectiveStatus === "error" ? "error" : effectiveStatus === "exported" ? "exported" : imageStatus === "adjusted" ? "adjusted" : "ready";
-  const chipLabel = exportState?.label || assetStatusLabel(imageStatus);
-  const title = image.path || image.name;
-  const detail = image.detail === "Lista" ? "" : image.detail;
-  const displayName = imageFileStem(image.name);
-  const fileType = imageFileType(image);
-  const compactDetail = compactImageDetail(detail);
-  const metadata = !compactDetail
-    ? fileType
-    : compactDetail.toUpperCase().startsWith(fileType)
-    ? compactDetail
-    : `${fileType} · ${compactDetail}`;
-  const thumbState = thumbnailState(image, imageThumbnailSrc(image));
-  const previewNote = thumbState.status === "error" ? " · sin preview" : "";
-  const statusText = chipLabel ? ` · ${chipLabel}` : "";
-  const stateIcon = assetStatusIcon(effectiveStatus);
-  const stateBadgeHtml = effectiveStatus === "ready" ? "" : `
-      <span class="asset-state ${chipClass}" role="img" title="${escapeHtml(chipLabel || "Lista")}" aria-label="${escapeHtml(chipLabel || "Lista")}">
-        <span aria-hidden="true">${escapeHtml(stateIcon)}</span>
-        <em>${escapeHtml(chipLabel || "Lista")}</em>
-      </span>
-    `;
-  return `
-    <button type="button" class="image-item asset-row ${selected} ${chipClass}" data-image-id="${escapeHtml(image.id)}" title="${escapeHtml(title)}" aria-pressed="${selected ? "true" : "false"}" aria-label="${escapeHtml(`${image.name}${statusText}`)}">
-      ${thumbnailHtml(image)}
-      <span class="image-copy">
-        <strong>${escapeHtml(displayName)}</strong>
-        <small>${escapeHtml(`${metadata}${previewNote}`)}</small>
-      </span>
-      ${stateBadgeHtml}
-    </button>
-  `;
+  const thumbnailSrc = imageThumbnailSrc(image);
+  return galleryHelpers.imageItemHtml({
+    exportState,
+    fileType: imageFileType(image),
+    image,
+    imageStatus,
+    selected: image.id === state.selectedImageId,
+    statusLabels,
+    thumbState: thumbnailState(image, thumbnailSrc),
+    thumbnailSrc,
+  });
 }
 
 function compactImageDetail(detail) {
-  return String(detail || "")
-    .replace(/^PNG\s*·\s*/i, "")
-    .replace(/^JPG\s*·\s*/i, "")
-    .replace(/^JPEG\s*·\s*/i, "")
-    .replace(/^Lista$/i, "")
-    .trim();
+  return galleryHelpers.compactImageDetail(detail);
 }
 
 function assetStatusLabel(status) {
-  if (status === "ready") {
-    return "Lista";
-  }
-  if (status === "adjusted") {
-    return "Ajustada";
-  }
-  return statusLabels[status] || "Lista";
+  return galleryHelpers.assetStatusLabel(status, statusLabels);
 }
 
 function assetStatusIcon(status) {
-  if (status === "warning") {
-    return "!";
-  }
-  if (status === "error") {
-    return "×";
-  }
-  if (status === "exported") {
-    return "✓";
-  }
-  if (status === "adjusted") {
-    return "*";
-  }
-  return "✓";
+  return galleryHelpers.assetStatusIcon(status);
 }
 
 function galleryFilterCounts(images = activeImages()) {
-  return {
-    all: images.length,
-    valid: images.filter((image) => image.status === "ready" || image.status === "adjusted").length,
-    warnings: images.filter((image) => image.status === "warning").length,
-    excluded: images.filter((image) => !image.exportable || image.status === "error" || exportItemState(image)?.status === "error").length,
-  };
+  return galleryHelpers.galleryFilterCounts(images, exportItemStatusMap(images));
 }
 
 function galleryFilterVisible(filter, counts = galleryFilterCounts()) {
-  if (filter === "all") {
-    return true;
-  }
-  if (filter === "valid") {
-    return counts.valid > 0 && counts.valid !== counts.all;
-  }
-  if (filter === "warnings") {
-    return counts.warnings > 0;
-  }
-  if (filter === "excluded") {
-    return counts.excluded > 0;
-  }
-  return false;
+  return galleryHelpers.galleryFilterVisible(filter, counts);
 }
 
 function ensureGalleryFilterAvailable(images = activeImages()) {
-  const counts = galleryFilterCounts(images);
-  if (!galleryFilterVisible(state.filter, counts)) {
-    state.filter = "all";
+  const nextFilter = galleryHelpers.resolveAvailableFilter(state.filter, images, exportItemStatusMap(images));
+  if (nextFilter !== state.filter) {
+    state.filter = nextFilter;
   }
 }
 
@@ -5261,33 +4561,24 @@ function realPreviewHtml(image) {
 }
 
 function bridgePreviewMeta() {
-  if (state.previewStatus === "loading") {
-    return "Generando vista";
-  }
-  if (state.previewStatus === "error") {
-    return state.previewError || "Vista no disponible";
-  }
-  if (state.previewData) {
-    return state.previewData.warning ? "Vista con aviso" : state.activePreset;
-  }
-  return "Vista pendiente";
+  return previewStateHelpers.bridgePreviewMeta({
+    activePreset: state.activePreset,
+    previewData: state.previewData,
+    previewError: state.previewError,
+    previewStatus: state.previewStatus,
+  });
 }
 
 function previewSettingsLabel() {
-  if (state.bridgeMode === "bridge" && activePresetItem()?.source === "bridge") {
-    return state.presetDirty ? "Aspecto modificado" : "Salida";
-  }
-  return state.presetDirty ? "Aspecto modificado" : "Aspecto";
+  return previewStateHelpers.previewSettingsLabel({
+    activePresetSource: activePresetItem()?.source,
+    bridgeMode: state.bridgeMode,
+    presetDirty: state.presetDirty,
+  });
 }
 
 function previewModeLabel() {
-  if (state.previewMode === "original") {
-    return "Original";
-  }
-  if (state.previewMode === "compare") {
-    return "Comparación";
-  }
-  return "Vista";
+  return previewStateHelpers.previewModeLabel(state.previewMode);
 }
 
 function previewOutputContextHtml(image) {
@@ -5308,19 +4599,7 @@ function previewStateHtml(title, detail) {
 }
 
 function emptyStateHtml({ variant = "inline", title, detail, actionLabel = "", action = "", meta = "" }) {
-  const actionHtml = actionLabel && action
-    ? `<button type="button" class="primary" data-action="${escapeHtml(action)}">${escapeHtml(actionLabel)}</button>`
-    : "";
-  const metaHtml = meta ? `<small>${escapeHtml(meta)}</small>` : "";
-  return `
-    <div class="empty-state ${escapeHtml(variant)}">
-      <span class="empty-icon" aria-hidden="true"></span>
-      <strong>${escapeHtml(title)}</strong>
-      <span>${escapeHtml(detail)}</span>
-      ${actionHtml}
-      ${metaHtml}
-    </div>
-  `;
+  return emptyStateViewHelpers.emptyStateHtml({ variant, title, detail, actionLabel, action, meta });
 }
 
 function initialStateHtml() {
@@ -5364,18 +4643,7 @@ function scanningStateHtml() {
 }
 
 function previewOrientation() {
-  const width = Number(state.previewData?.width || 0);
-  const height = Number(state.previewData?.height || 0);
-  if (!width || !height) {
-    return "portrait";
-  }
-  if (height > width * 1.08) {
-    return "portrait";
-  }
-  if (width > height * 1.08) {
-    return "landscape";
-  }
-  return "square";
+  return previewStateHelpers.previewOrientation(state.previewData);
 }
 
 function previewSubtitle(image) {
@@ -6743,65 +6011,7 @@ function sameOutputProfileRaw(profile, raw) {
 }
 
 function outputProfileValidation(raw = outputProfileFormRawData()) {
-  const errors = [];
-  const warnings = [];
-  const fields = {};
-  const width = Number.parseInt(raw.width, 10);
-  const height = Number.parseInt(raw.height, 10);
-  const invalidFilenameChars = /[<>:"/\\|?*]/;
-  const addError = (field, message) => {
-    errors.push(message);
-    if (field) {
-      fields[field] = "error";
-    }
-  };
-  const addWarning = (field, message) => {
-    warnings.push(message);
-    if (field && fields[field] !== "error") {
-      fields[field] = "warning";
-    }
-  };
-
-  if (!String(raw.name || "").trim()) {
-    addError("name", "Pon un nombre al formato.");
-  }
-  if (!["JPG", "PNG"].includes(normalizeExportFormat(raw.format))) {
-    addError("format", "Elige JPG o PNG como tipo de archivo.");
-  }
-  if (!["rgb230", "white", "transparent"].includes(raw.background)) {
-    addError("background", "Elige un fondo de salida válido.");
-  }
-  if (!String(raw.width || "").trim() || !Number.isInteger(width) || width <= 0) {
-    addError("width", "La anchura debe ser un número mayor que 0.");
-  }
-  if (!String(raw.height || "").trim() || !Number.isInteger(height) || height <= 0) {
-    addError("height", "La altura debe ser un número mayor que 0.");
-  }
-  if (invalidFilenameChars.test(String(raw.suffix || ""))) {
-    addError("suffix", "El sufijo contiene caracteres no válidos.");
-  }
-  if (!String(raw.naming || "").trim()) {
-    addError("naming", "Define el nombre de archivo.");
-  } else if (invalidFilenameChars.test(String(raw.naming || "").replaceAll("{original}", "").replaceAll("{suffix}", "").replaceAll("{folder}", "").replace(/\{index(?::0?\d+d)?\}/g, ""))) {
-    addError("naming", "El nombre de archivo contiene caracteres no válidos.");
-  } else if (!String(raw.naming || "").includes("{original}")) {
-    addWarning("naming", "Incluye {original} para mantener la referencia del archivo.");
-  }
-  if (raw.destinationMode === "custom") {
-    if (!String(raw.destinationValue || "").trim()) {
-      addError("destinationValue", "Indica una carpeta de salida personalizada.");
-    }
-  } else if (raw.destinationMode !== "source") {
-    addError("destinationMode", "Elige una ubicación de salida válida.");
-  } else {
-    const destination = String(raw.destinationValue || "").trim();
-    if (!destination) {
-      addError("destinationValue", "Indica una subcarpeta de salida.");
-    } else if (destination.includes("..") || /[<>:"|?*]/.test(destination)) {
-      addError("destinationValue", "La subcarpeta de salida contiene caracteres no válidos.");
-    }
-  }
-  return { errors: Array.from(new Set(errors)), warnings: Array.from(new Set(warnings)), fields };
+  return outputProfileHelpers.outputProfileValidation(raw);
 }
 
 function outputProfileEditorHeadingHtml(profile, validation, dirty) {
@@ -7917,34 +7127,10 @@ function statusBarText() {
 }
 
 function previewFooterLabel() {
-  if (selectedImage()?.source === "bridge") {
-    if (state.previewStatus === "loading") {
-      return "Generando";
-    }
-    if (state.previewStatus === "warning") {
-      return "Con aviso";
-    }
-    if (state.previewStatus === "error") {
-      return "Error";
-    }
-    if (state.previewStatus === "ready") {
-      return "Real";
-    }
-    return "Pendiente";
-  }
-  if (state.previewStatus === "loading") {
-    return "Generando";
-  }
-  if (state.previewStatus === "warning") {
-    return "Con aviso";
-  }
-  if (state.previewStatus === "error") {
-    return "Error";
-  }
-  if (state.previewStatus === "ready") {
-    return "Lista";
-  }
-  return "Sin imagen";
+  return previewStateHelpers.previewFooterLabel({
+    previewStatus: state.previewStatus,
+    selectedImageSource: selectedImage()?.source,
+  });
 }
 
 function handleAction(action, target = null) {

@@ -1,0 +1,141 @@
+import json
+import shutil
+import subprocess
+from pathlib import Path
+
+import pytest
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
+OUTPUT_PROFILES_PATH = FRONTEND_DIR / "output-profiles.js"
+HELPER_PATH = FRONTEND_DIR / "export-payload.js"
+INDEX_PATH = FRONTEND_DIR / "index.html"
+
+
+def test_export_payload_helper_loads_after_profiles_and_before_app_script():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+
+    profiles_index = html.index("output-profiles.js")
+    payload_index = html.index("export-payload.js")
+    app_index = html.index("app.js")
+
+    assert profiles_index < payload_index < app_index
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
+def test_export_payload_helper_keeps_bridge_json_contract():
+    script = f"""
+const assert = require("node:assert/strict");
+require({json.dumps(str(OUTPUT_PROFILES_PATH))});
+const helpers = require({json.dumps(str(HELPER_PATH))});
+
+const images = [
+  {{ id: "a", source: "bridge", path: "C:/lote/a.png" }},
+  {{ id: "b", source: "mock", path: "C:/lote/b.png" }},
+  {{ id: "c", source: "bridge", path: "" }},
+  {{ id: "d", source: "bridge", path: "C:/lote/d.png" }},
+];
+const profiles = [
+  {{
+    id: "web_rgb230",
+    name: "Web gris claro",
+    format: "JPG",
+    background: "rgb230",
+    destinationMode: "source",
+    destinationValue: "_SALIDA_PRO",
+    naming: "{{original}}{{suffix}}",
+    suffix: "_PRO",
+    width: 1800,
+    height: 2400,
+  }},
+  {{
+    id: "web_rgb230",
+    name: "PNG transparente",
+    format: "PNG",
+    background: "transparent",
+    destinationMode: "custom",
+    destinationValue: "C:/salida",
+    naming: "{{folder}}_{{original}}{{suffix}}",
+    suffix: "_PNG",
+    width: 1000,
+    height: 1200,
+  }},
+];
+const settings = {{ opacity: 20, blur: 14 }};
+const imageOverrides = {{ "C:/lote/a.png": {{ opacity: 10 }} }};
+
+assert.deepEqual(helpers.bridgeImagePaths(images), ["C:/lote/a.png", "C:/lote/d.png"]);
+assert.equal(helpers.primaryOutputProfile(profiles, "missing", profiles[1]), profiles[0]);
+assert.equal(helpers.primaryOutputProfile(profiles, "web_rgb230", profiles[1]), profiles[0]);
+assert.equal(helpers.primaryOutputProfile([], "missing", profiles[1]), profiles[1]);
+
+const payload = helpers.buildBridgeExportPayload({{
+  activeOutputProfileId: "web_rgb230",
+  fallbackProfile: profiles[1],
+  imageOverrides,
+  images,
+  presetName: "Luz cenital",
+  profiles,
+  settings,
+}});
+
+assert.deepEqual(payload, {{
+  imagePaths: ["C:/lote/a.png", "C:/lote/d.png"],
+  presetName: "Luz cenital",
+  settings,
+  imageOverrides,
+  export: {{
+    format: "JPG",
+    size: "1800x2400",
+    background: "rgb230",
+    destinationMode: "source",
+    destinationValue: "_SALIDA_PRO",
+    outputFolderName: "_SALIDA_PRO",
+    customOutputPath: "",
+    namingTemplate: "{{original}}{{suffix}}",
+    suffix: "_PRO",
+    variants: [
+      {{
+        id: "web_rgb230",
+        label: "Web gris claro",
+        enabled: true,
+        format: "JPG",
+        transparent_bg: false,
+        bg_color: [230, 230, 230],
+        suffix: "_PRO",
+        naming_template: "{{original}}{{suffix}}",
+        output_destination: "subfolder",
+        output_folder_name: "_SALIDA_PRO",
+        custom_output_path: null,
+        output_width: 1800,
+        output_height: 2400,
+      }},
+      {{
+        id: "web_rgb230_2",
+        label: "PNG transparente",
+        enabled: true,
+        format: "PNG",
+        transparent_bg: true,
+        bg_color: [230, 230, 230],
+        suffix: "_PNG",
+        naming_template: "{{folder}}_{{original}}{{suffix}}",
+        output_destination: "custom",
+        output_folder_name: null,
+        custom_output_path: "C:/salida",
+        output_width: 1000,
+        output_height: 1200,
+      }},
+    ],
+  }},
+}});
+"""
+    result = subprocess.run(
+        ["node", "-e", script],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout

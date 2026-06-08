@@ -82,6 +82,7 @@ const outputProfileViewHelpers = window.FlatShotOutputProfileView;
 const exportPayloadHelpers = window.FlatShotExportPayload;
 const exportStateHelpers = window.FlatShotExportState;
 const exportResultViewHelpers = window.FlatShotExportResultView;
+const exportPreflightViewHelpers = window.FlatShotExportPreflightView;
 const preflightHelpers = window.FlatShotPreflight;
 const batchViewHelpers = window.FlatShotBatchView;
 const scanStateHelpers = window.FlatShotScanState;
@@ -6221,31 +6222,13 @@ function outputWarningSummary(issues) {
 }
 
 function issueListHtml() {
-  if (!hasBatch() && state.batch !== "empty") {
-    return "";
-  }
-  const rows = issueRows();
-  const counts = preflightCounts();
-  const warningCount = visibleWarningCount();
-  const onlyIgnored = rows.length > 0 && warningCount === 0 && counts.errors === 0;
-  const footerAction = counts.errors
-      ? '<button type="button" class="primary" data-action="edit-output">Revisar salida</button>'
-      : "";
-  if (!rows.length) {
-    return `
-      <div class="issue-list-summary ready issue-list-summary--compact">
-        <strong>Sin avisos</strong>
-      </div>
-    `;
-  }
-  return `
-    <div class="issue-list-summary ${counts.errors ? "error" : onlyIgnored ? "clear" : "warning"}">
-      <strong>${escapeHtml(counts.errors ? `${counts.errors} bloqueo${counts.errors === 1 ? "" : "s"}` : onlyIgnored ? `${rows.length} ignorado${rows.length === 1 ? "" : "s"}` : `${warningCount || rows.length} aviso${(warningCount || rows.length) === 1 ? "" : "s"}`)}</strong>
-      <span>${escapeHtml(counts.errors ? "Resuelve los bloqueos antes de exportar." : onlyIgnored ? "No afectan a la exportación." : "Puedes revisar sin bloquear la exportación.")}</span>
-    </div>
-    ${rows.slice(0, 8).map(issueItemHtml).join("")}
-    ${footerAction ? `<div class="inspector-actionbar warning-actions">${footerAction}</div>` : ""}
-  `;
+  return exportPreflightViewHelpers.issueListHtml({
+    hasActiveBatch: hasBatch(),
+    batch: state.batch,
+    rows: issueRows(),
+    counts: preflightCounts(),
+    warningCount: visibleWarningCount(),
+  });
 }
 
 function issueRows() {
@@ -6285,18 +6268,7 @@ function issueRows() {
 }
 
 function issueItemHtml(row) {
-  const action = row.imageId
-    ? `<button type="button" data-action="select-image-id" data-image-id="${escapeHtml(row.imageId)}">${escapeHtml(row.actionLabel || "Ir a imagen")}</button>`
-    : "";
-  return `
-    <div class="issue-item ${row.level === "error" ? "error" : row.level === "info" || row.level === "ignored" ? "clear" : "warning"}" title="${escapeHtml(row.path || row.detail || row.title)}">
-      <div>
-        <strong>${escapeHtml(row.title)}</strong>
-        <span>${escapeHtml(row.detail || "Revisar")}</span>
-      </div>
-      ${action}
-    </div>
-  `;
+  return exportPreflightViewHelpers.issueItemHtml(row);
 }
 
 function exportStatusClass(ready, issues = preflightIssues()) {
@@ -6346,56 +6318,22 @@ function exportPreflightRows(issues, exportable, ready) {
 }
 
 function preflightListHtml(rows) {
-  return `
-    <div class="preflight-list">
-      ${rows.map((row) => `
-        <div class="preflight-item ${escapeHtml(row.state)}">
-          <span aria-hidden="true"></span>
-          <div>
-            <strong>${escapeHtml(row.title)}</strong>
-            <small title="${escapeHtml(row.detail)}">${escapeHtml(row.detail)}</small>
-          </div>
-        </div>
-      `).join("")}
-    </div>
-  `;
+  return exportPreflightViewHelpers.preflightListHtml(rows);
 }
 
 function exportPanelStatusLabel(ready, issues = preflightIssues()) {
-  if (state.exportStatus === "running") {
-    return state.paused ? "Pausado" : "Exportando";
-  }
-  if (state.exportStatus === "completed") {
-    return "Exportado";
-  }
-  if (state.exportStatus === "partial") {
-    return "Exportado con avisos";
-  }
-  if (state.exportStatus === "failed") {
-    return "Revisar antes de exportar";
-  }
-  if (issues.some((issue) => issue.level === "error")) {
-    return "Revisar antes de exportar";
-  }
-  if (state.batch === "empty" || (hasBatch() && !ready)) {
-    return "Pendiente";
-  }
-  if (ready && issues.length) {
-    return `${issues.length} aviso${issues.length === 1 ? "" : "s"} antes de exportar`;
-  }
-  return ready ? "Listo para exportar" : "Configura salida";
+  return exportPreflightViewHelpers.exportPanelStatusLabel({
+    status: state.exportStatus,
+    paused: state.paused,
+    batch: state.batch,
+    hasActiveBatch: hasBatch(),
+    ready,
+    issues,
+  });
 }
 
 function exportPreflightSummary(issues, exportable, ready) {
-  const errors = issues.filter((issue) => issue.level === "error").length;
-  const warnings = issues.length - errors;
-  if (errors) {
-    return `${errors} bloqueo${errors === 1 ? "" : "s"} · ${exportable} exportables`;
-  }
-  if (warnings) {
-    return `${warnings} aviso${warnings === 1 ? "" : "s"} · ${exportable} exportables`;
-  }
-  return ready ? `${exportable} imágenes listas` : "Pendiente";
+  return exportPreflightViewHelpers.exportPreflightSummary({ issues, exportable, ready });
 }
 
 function namingExample() {

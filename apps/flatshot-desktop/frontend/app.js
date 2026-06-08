@@ -5302,13 +5302,10 @@ function renderOutputProfileSelect() {
   if (!select) {
     return;
   }
-  const customLabel = outputMatchesProfile() ? "" : '<option value="__custom">Personalizado sin guardar</option>';
-  select.innerHTML = `
-    ${state.outputProfiles.map((profile) => `
-      <option value="${escapeHtml(profile.id)}">${escapeHtml(profile.name)}</option>
-    `).join("")}
-    ${customLabel}
-  `;
+  select.innerHTML = exportSummaryViewHelpers.outputProfileSelectOptionsHtml(
+    state.outputProfiles,
+    { includeCustom: !outputMatchesProfile() }
+  );
   select.value = outputMatchesProfile() ? state.activeOutputProfileId : "__custom";
 }
 

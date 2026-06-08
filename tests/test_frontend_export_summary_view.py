@@ -38,6 +38,20 @@ const presetActions = helpers.exportPresetActionsHtml();
 assert.equal(presetActions.includes('data-action="edit-output"'), true);
 assert.equal(presetActions.includes('data-action="open-app-settings"'), true);
 
+const selectOptions = helpers.outputProfileSelectOptionsHtml(
+  [
+    {{ id: "main", name: "Principal" }},
+    {{ id: 'custom-"id"', name: "Salida <especial>" }},
+  ],
+  {{ includeCustom: true }}
+);
+assert.equal(selectOptions.includes('value="main"'), true);
+assert.equal(selectOptions.includes("Principal"), true);
+assert.equal(selectOptions.includes('value="custom-&quot;id&quot;"'), true);
+assert.equal(selectOptions.includes("Salida &lt;especial&gt;"), true);
+assert.equal(selectOptions.includes('value="__custom"'), true);
+assert.equal(selectOptions.includes("Personalizado sin guardar"), true);
+
 const compactNotice = helpers.outputTemporaryNoticeHtml({{ compact: true }});
 assert.equal(compactNotice.includes('temporary-output-notice--compact'), true);
 assert.equal(compactNotice.includes('Aplica al lote o guarda el preset.'), true);

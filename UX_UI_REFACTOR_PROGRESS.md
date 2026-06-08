@@ -439,6 +439,30 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 22 - Extension del selector de perfiles de salida
+
+Estado: completada.
+
+Cambios realizados:
+- `export-summary-view.js` ahora tambien renderiza las opciones del selector de perfil de salida.
+- `renderOutputProfileSelect()` conserva el nodo DOM, el valor seleccionado y la decision de mostrar `Personalizado sin guardar`; solo delega el HTML de `<option>`.
+- Se amplio `tests/test_frontend_export_summary_view.py` para cubrir escaping de IDs/nombres y opcion personalizada.
+
+Impacto medido:
+- `app.js`: 7.533 -> 7.530 lineas.
+
+Validaciones ejecutadas:
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_export_summary_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 276 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- `node --check apps/flatshot-desktop/frontend/export-summary-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en Windows.
+- HTTP local en `http://127.0.0.1:4202/`: `index.html`, `export-summary-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

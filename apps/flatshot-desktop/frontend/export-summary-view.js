@@ -60,6 +60,18 @@
     return `${visibleRows}${extraRows}`;
   }
 
+  function outputProfileSelectOptionsHtml(profiles = [], options = {}) {
+    const customOption = options.includeCustom
+      ? '<option value="__custom">Personalizado sin guardar</option>'
+      : "";
+    return `
+    ${profiles.map((profile) => `
+      <option value="${escapeHtml(profile.id)}">${escapeHtml(profile.name)}</option>
+    `).join("")}
+    ${customOption}
+  `;
+  }
+
   function exportEditSummaryHtml(options = {}) {
     return `
     <div class="compact-panel">
@@ -133,6 +145,7 @@
     exportPresetActionsHtml,
     exportSummaryHtml,
     outputTemporaryNoticeHtml,
+    outputProfileSelectOptionsHtml,
     profileSummaryRowsHtml,
   };
 });

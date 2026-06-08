@@ -145,6 +145,15 @@
     return options.destinationValue ? `Junto al origen · ${options.destinationValue}` : "Junto al origen";
   }
 
+  function batchOutputLine(options = {}) {
+    const profileLines = Array.isArray(options.profileLines) ? options.profileLines : [];
+    if (profileLines.length > 1) {
+      return profileLines.join(" · ");
+    }
+    const size = String(options.size || "1800x2400").replace("x", " × ");
+    return `${options.format || "JPG"} · ${size} · ${batchBackgroundLabel(options.background)}`;
+  }
+
   function sourceInputDetail(batch, filesLabel, validLabel) {
     if (batch === "none") {
       return "Pendiente";
@@ -288,6 +297,7 @@
     batchBackgroundLabel,
     batchDestinationLine,
     batchMetricHtml,
+    batchOutputLine,
     batchSummaryHtml,
     batchSummaryLabel,
     batchSummaryToneClass,

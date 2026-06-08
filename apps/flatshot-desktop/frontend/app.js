@@ -3438,10 +3438,14 @@ function renderBatchSummary() {
 
 function batchOutputLine() {
   const profiles = exportOutputProfiles();
-  if (profiles.length > 1) {
-    return profiles.map((profile) => `${profile.format} ${outputProfileSize(profile).replace("x", "×")}`).join(" · ");
-  }
-  return `${state.format} · ${state.size.replace("x", " × ")} · ${batchBackgroundLabel(state.background)}`;
+  return batchViewHelpers.batchOutputLine({
+    background: state.background,
+    format: state.format,
+    profileLines: profiles.length > 1
+      ? profiles.map((profile) => `${profile.format} ${outputProfileSize(profile).replace("x", "×")}`)
+      : [],
+    size: state.size,
+  });
 }
 
 function outputProfilesSummaryLabel(profiles = exportOutputProfiles()) {

@@ -374,6 +374,32 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 16 - Extension de helper preflight para progreso y resumen bloqueante
+
+Estado: completada.
+
+Cambios realizados:
+- `export-preflight-view.js` ahora tambien renderiza:
+  - panel compacto de progreso;
+  - resumen bloqueante de avisos de salida.
+- `app.js` conserva la seleccion de issue accionable y conteos; delega solo HTML.
+- Se amplio `tests/test_frontend_export_preflight_view.py` con contratos para progreso determinado/indeterminado y resumen bloqueante con archivo.
+
+Impacto medido:
+- `app.js`: 7.734 -> 7.713 lineas.
+
+Validaciones ejecutadas:
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_export_preflight_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 268 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- `node --check apps/flatshot-desktop/frontend/export-preflight-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en Windows.
+- HTTP local en `http://127.0.0.1:4196/`: `index.html`, `export-preflight-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 15 - Extraccion de vista preflight y avisos de exportacion
 
 Estado: completada.

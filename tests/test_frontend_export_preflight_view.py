@@ -29,6 +29,35 @@ const helpers = require({json.dumps(str(HELPER_PATH))});
 
 assert.equal(helpers.escapeHtml('<a&b"c>'), '&lt;a&amp;b&quot;c&gt;');
 
+const progress = helpers.progressPanelHtml("Preparando <lote>", 42.4);
+assert.equal(progress.includes('class="context-progress"'), true);
+assert.equal(progress.includes("Preparando &lt;lote&gt;"), true);
+assert.equal(progress.includes("<strong>42%</strong>"), true);
+
+const indeterminate = helpers.progressPanelHtml("Escaneando");
+assert.equal(indeterminate.includes("is-indeterminate"), true);
+assert.equal(indeterminate.includes("<strong>"), false);
+
+const noWarningSummary = helpers.outputWarningSummaryHtml({{
+  issues: [{{ level: "warning", title: "Aviso", detail: "no bloquea" }}],
+  visibleWarningCount: 1,
+}});
+assert.equal(noWarningSummary, "");
+
+const warningSummary = helpers.outputWarningSummaryHtml({{
+  issues: [
+    {{ level: "error", title: "Destino", detail: "ocupado" }},
+    {{ level: "warning", title: "Alpha", detail: "bajo" }},
+  ],
+  firstIssue: {{ level: "error", title: "camisa.png", detail: 'Ruta "ocupada"', file: "camisa.png", path: "C:/camisa.png" }},
+  visibleWarningCount: 3,
+}});
+assert.equal(warningSummary.includes('class="warning-summary error"'), true);
+assert.equal(warningSummary.includes("3 avisos"), true);
+assert.equal(warningSummary.includes('title="C:/camisa.png"'), true);
+assert.equal(warningSummary.includes("Motivo: Ruta &quot;ocupada&quot;"), true);
+assert.equal(warningSummary.includes('data-action="review-errors"'), true);
+
 assert.equal(helpers.issueListHtml({{
   hasActiveBatch: false,
   batch: "none",

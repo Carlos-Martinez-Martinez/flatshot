@@ -28,6 +28,40 @@
   `;
   }
 
+  function progressPanelHtml(label, value = null) {
+    const valueHtml = value === null ? "" : `<strong>${escapeHtml(Math.round(value))}%</strong>`;
+    return `
+    <div class="context-progress${value === null ? " is-indeterminate" : ""}">
+      <span>${escapeHtml(label)}</span>
+      ${valueHtml}
+    </div>
+  `;
+  }
+
+  function outputWarningSummaryHtml(options = {}) {
+    const issues = Array.isArray(options.issues) ? options.issues : [];
+    const warnings = issues.filter((issue) => issue.title !== "Sin lote");
+    if (!warnings.length) {
+      return "";
+    }
+    const hasBlocking = warnings.some((issue) => issue.level === "error");
+    if (!hasBlocking) {
+      return "";
+    }
+    const first = options.firstIssue || warnings[0];
+    const count = Math.max(warnings.length, Number(options.visibleWarningCount) || 0);
+    const fileLine = first.file ? `<span title="${escapeHtml(first.path || first.file)}">${escapeHtml(first.file)}</span>` : "";
+    const detail = first.file ? `Motivo: ${first.detail}` : `${first.title}${first.detail ? `: ${first.detail}` : ""}`;
+    return `
+    <div class="warning-summary ${warnings.some((issue) => issue.level === "error") ? "error" : ""}">
+      <strong>${count} aviso${count === 1 ? "" : "s"}</strong>
+      ${fileLine}
+      <span>${escapeHtml(detail)}</span>
+      <button type="button" data-action="review-errors">Revisar aviso</button>
+    </div>
+  `;
+  }
+
   function issueListHtml(options = {}) {
     const hasActiveBatch = Boolean(options.hasActiveBatch);
     const batch = options.batch || "none";
@@ -137,6 +171,8 @@
     exportPreflightSummary,
     issueItemHtml,
     issueListHtml,
+    outputWarningSummaryHtml,
     preflightListHtml,
+    progressPanelHtml,
   };
 });

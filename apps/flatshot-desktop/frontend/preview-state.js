@@ -145,6 +145,50 @@
     return options.selectedImageSource === "bridge" ? "Pendiente" : "Sin imagen";
   }
 
+  function previewSubtitle(options = {}) {
+    const previewStatus = options.previewStatus;
+    if (!options.hasImage) {
+      if (options.filterIsEmpty) {
+        return options.filterEmptyDetail || "";
+      }
+      if (options.batch === "none") {
+        return "Sin lote";
+      }
+      if (options.batch === "empty") {
+        return options.scanStatus || "No hay PNG válidos";
+      }
+      if (options.batch === "scanning") {
+        return options.scanStatus || "Escaneando";
+      }
+      return "Sin selección";
+    }
+    if (options.imageSource === "bridge") {
+      if (previewStatus === "loading") {
+        return "Generando vista";
+      }
+      if (previewStatus === "warning") {
+        return "Vista con aviso";
+      }
+      if (previewStatus === "error") {
+        return "Vista no disponible";
+      }
+      if (previewStatus === "ready") {
+        return "Vista generada";
+      }
+      return "Vista pendiente";
+    }
+    if (previewStatus === "loading") {
+      return "Generando vista";
+    }
+    if (previewStatus === "warning") {
+      return "Vista con aviso";
+    }
+    if (previewStatus === "error") {
+      return "Vista no disponible";
+    }
+    return previewStatus === "ready" ? "Vista generada" : options.imageDetail;
+  }
+
   return {
     bridgePreviewMeta,
     clampViewerZoom,
@@ -158,6 +202,7 @@
     previewModeLabel,
     previewOrientation,
     previewSettingsLabel,
+    previewSubtitle,
     viewerModeClass,
     viewerModeLabel,
   };

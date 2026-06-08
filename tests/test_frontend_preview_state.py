@@ -113,6 +113,74 @@ assert.equal(helpers.previewFooterLabel({{ selectedImageSource: "mock", previewS
 assert.equal(helpers.previewFooterLabel({{ selectedImageSource: "mock", previewStatus: "empty" }}), "Sin imagen");
 assert.equal(helpers.previewFooterLabel({{ selectedImageSource: "mock", previewStatus: "warning" }}), "Con aviso");
 assert.equal(helpers.previewFooterLabel({{ selectedImageSource: "mock", previewStatus: "error" }}), "Error");
+
+assert.equal(helpers.previewSubtitle({{
+  hasImage: false,
+  filterIsEmpty: true,
+  filterEmptyDetail: "Filtro sin resultados",
+}}), "Filtro sin resultados");
+assert.equal(helpers.previewSubtitle({{ hasImage: false, batch: "none" }}), "Sin lote");
+assert.equal(helpers.previewSubtitle({{ hasImage: false, batch: "empty", scanStatus: "" }}), "No hay PNG válidos");
+assert.equal(helpers.previewSubtitle({{ hasImage: false, batch: "empty", scanStatus: "Sin compatibles" }}), "Sin compatibles");
+assert.equal(helpers.previewSubtitle({{ hasImage: false, batch: "scanning", scanStatus: "" }}), "Escaneando");
+assert.equal(helpers.previewSubtitle({{ hasImage: false, batch: "ready" }}), "Sin selección");
+
+assert.equal(helpers.previewSubtitle({{
+  hasImage: true,
+  imageSource: "bridge",
+  previewStatus: "loading",
+}}), "Generando vista");
+assert.equal(helpers.previewSubtitle({{
+  hasImage: true,
+  imageSource: "bridge",
+  previewStatus: "warning",
+}}), "Vista con aviso");
+assert.equal(helpers.previewSubtitle({{
+  hasImage: true,
+  imageSource: "bridge",
+  previewStatus: "error",
+}}), "Vista no disponible");
+assert.equal(helpers.previewSubtitle({{
+  hasImage: true,
+  imageSource: "bridge",
+  previewStatus: "ready",
+}}), "Vista generada");
+assert.equal(helpers.previewSubtitle({{
+  hasImage: true,
+  imageSource: "bridge",
+  previewStatus: "empty",
+}}), "Vista pendiente");
+
+assert.equal(helpers.previewSubtitle({{
+  hasImage: true,
+  imageSource: "mock",
+  previewStatus: "loading",
+  imageDetail: "Detalle",
+}}), "Generando vista");
+assert.equal(helpers.previewSubtitle({{
+  hasImage: true,
+  imageSource: "mock",
+  previewStatus: "warning",
+  imageDetail: "Detalle",
+}}), "Vista con aviso");
+assert.equal(helpers.previewSubtitle({{
+  hasImage: true,
+  imageSource: "mock",
+  previewStatus: "error",
+  imageDetail: "Detalle",
+}}), "Vista no disponible");
+assert.equal(helpers.previewSubtitle({{
+  hasImage: true,
+  imageSource: "mock",
+  previewStatus: "ready",
+  imageDetail: "Detalle",
+}}), "Vista generada");
+assert.equal(helpers.previewSubtitle({{
+  hasImage: true,
+  imageSource: "mock",
+  previewStatus: "empty",
+  imageDetail: "1800x2400",
+}}), "1800x2400");
 """
     result = subprocess.run(
         ["node", "-e", script],

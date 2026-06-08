@@ -4575,46 +4575,17 @@ function previewOrientation() {
 }
 
 function previewSubtitle(image) {
-  if (!image) {
-    if (hasBatch() && activeImages().length && !filteredImages().length) {
-      return filterEmptyDetail();
-    }
-    if (state.batch === "none") {
-      return "Sin lote";
-    }
-    if (state.batch === "empty") {
-      return state.scanStatus || "No hay PNG válidos";
-    }
-    if (state.batch === "scanning") {
-      return state.scanStatus || "Escaneando";
-    }
-    return "Sin selección";
-  }
-  if (image.source === "bridge") {
-    if (state.previewStatus === "loading") {
-      return "Generando vista";
-    }
-    if (state.previewStatus === "warning") {
-      return "Vista con aviso";
-    }
-    if (state.previewStatus === "error") {
-      return "Vista no disponible";
-    }
-    if (state.previewStatus === "ready") {
-      return "Vista generada";
-    }
-    return "Vista pendiente";
-  }
-  if (state.previewStatus === "loading") {
-    return "Generando vista";
-  }
-  if (state.previewStatus === "warning") {
-    return "Vista con aviso";
-  }
-  if (state.previewStatus === "error") {
-    return "Vista no disponible";
-  }
-  return state.previewStatus === "ready" ? "Vista generada" : image.detail;
+  const filterIsEmpty = !image && hasBatch() && activeImages().length && !filteredImages().length;
+  return previewStateHelpers.previewSubtitle({
+    batch: state.batch,
+    filterEmptyDetail: filterIsEmpty ? filterEmptyDetail() : "",
+    filterIsEmpty,
+    hasImage: Boolean(image),
+    imageDetail: image?.detail,
+    imageSource: image?.source,
+    previewStatus: state.previewStatus,
+    scanStatus: state.scanStatus,
+  });
 }
 
 function renderSettings() {

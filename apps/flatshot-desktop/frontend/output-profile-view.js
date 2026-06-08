@@ -182,6 +182,24 @@
     });
   }
 
+  function profileDestinationLabel(profile) {
+    if (!profile) {
+      return "Sin destino";
+    }
+    if (profile.destinationMode === "custom") {
+      return profile.destinationValue || "Carpeta personalizada";
+    }
+    return profile.destinationValue || "_SALIDA_PRO";
+  }
+
+  function profileDestinationPreviewLabel(profile) {
+    const destination = profileDestinationLabel(profile);
+    if (profile?.destinationMode === "custom") {
+      return destination;
+    }
+    return destination ? destination : "junto al origen";
+  }
+
   function destinationCompactLabel(options = {}) {
     if (options.destinationMode === "custom") {
       return options.destinationValue || "Sin destino";
@@ -265,5 +283,7 @@
     outputProfileManagerRowHtml,
     outputProfilePreviewHtml,
     outputProfileValidationHtml,
+    profileDestinationLabel,
+    profileDestinationPreviewLabel,
   };
 });

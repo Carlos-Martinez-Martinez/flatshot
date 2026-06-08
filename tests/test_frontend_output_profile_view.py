@@ -177,6 +177,28 @@ assert.equal(helpers.destinationCompactLabel({{
   destinationValue: "SALIDA",
 }}), "SALIDA");
 
+assert.equal(helpers.profileDestinationLabel(null), "Sin destino");
+assert.equal(helpers.profileDestinationLabel({{
+  destinationMode: "custom",
+  destinationValue: "",
+}}), "Carpeta personalizada");
+assert.equal(helpers.profileDestinationLabel({{
+  destinationMode: "custom",
+  destinationValue: "C:/Export",
+}}), "C:/Export");
+assert.equal(helpers.profileDestinationLabel({{
+  destinationMode: "source",
+  destinationValue: "",
+}}), "_SALIDA_PRO");
+assert.equal(helpers.profileDestinationPreviewLabel({{
+  destinationMode: "custom",
+  destinationValue: "",
+}}), "Carpeta personalizada");
+assert.equal(helpers.profileDestinationPreviewLabel({{
+  destinationMode: "source",
+  destinationValue: "WEB",
+}}), "WEB");
+
 assert.equal(helpers.namingHumanLabel({{
   naming: "{{original}}{{suffix}}",
   suffix: "_PRO",

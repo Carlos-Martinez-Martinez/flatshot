@@ -5047,21 +5047,11 @@ function outputProfileSummaryLine(profile) {
 }
 
 function profileDestinationLabel(profile) {
-  if (!profile) {
-    return "Sin destino";
-  }
-  if (profile.destinationMode === "custom") {
-    return profile.destinationValue || "Carpeta personalizada";
-  }
-  return profile.destinationValue || "_SALIDA_PRO";
+  return outputProfileViewHelpers.profileDestinationLabel(profile);
 }
 
 function profileDestinationPreviewLabel(profile) {
-  const destination = profileDestinationLabel(profile);
-  if (profile?.destinationMode === "custom") {
-    return destination;
-  }
-  return destination ? destination : "junto al origen";
+  return outputProfileViewHelpers.profileDestinationPreviewLabel(profile);
 }
 
 function ensureOutputProfileDraft() {

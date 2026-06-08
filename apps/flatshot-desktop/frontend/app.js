@@ -3674,7 +3674,7 @@ function renderBatch() {
       : adjusted ? `${pluralizeCount(adjusted, "ajustada")}` : "Listo",
     issueCount ? "warning" : adjusted ? "active" : "ready"
   );
-  $("#folder-list").innerHTML = batchFormatHtml(images, ignored);
+  $("#folder-list").innerHTML = "";
   ensureGalleryFilterAvailable(images);
   renderFilterButtons();
 
@@ -3740,10 +3740,6 @@ function emptyBatchNoteHtml() {
     ignoredSummary: ignoredSummaryText(),
     scanStatus: state.scanStatus,
   });
-}
-
-function batchFormatHtml(images, omittedCount = 0) {
-  return "";
 }
 
 function folderItemHtml(folder) {
@@ -4040,7 +4036,7 @@ function renderPreview() {
     : image ? state.activePreset : "Sin lote";
   const outputContext = $("#preview-output-context");
   if (outputContext) {
-    outputContext.innerHTML = previewOutputContextHtml(image);
+    outputContext.innerHTML = "";
   }
   $("#canvas-area").className = `canvas-area bg-${state.previewBg === "transparent" ? "transparent" : state.previewBg}`;
   $$(".preview-toolbar [data-preview-mode]").forEach((button) => {
@@ -4255,10 +4251,6 @@ function previewSettingsLabel() {
 
 function previewModeLabel() {
   return previewStateHelpers.previewModeLabel(state.previewMode);
-}
-
-function previewOutputContextHtml(image) {
-  return "";
 }
 
 function outputSizeDisplay() {

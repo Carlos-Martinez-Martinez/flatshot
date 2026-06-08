@@ -14,6 +14,8 @@ def test_app_js_does_not_reintroduce_extracted_wrapper_helpers():
         "function compactImageDetail(",
         "function assetStatusLabel(",
         "function assetStatusIcon(",
+        "function batchFormatHtml(",
+        "function previewOutputContextHtml(",
     ]
 
     for wrapper in obsolete_wrappers:

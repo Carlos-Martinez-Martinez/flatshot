@@ -7,6 +7,7 @@
     <link rel="icon" href="data:," />
     <link rel="stylesheet" href="./styles.css?v=20260605-ux2" />
     <link rel="stylesheet" href="./ux-foundation.css?v=20260605-ux2" />
+    <link rel="stylesheet" href="./ux-refactor.css?v=20260608-ux-refactor" />
   </head>
   <body>
     <main class="app-shell" aria-label="FlatShot nueva app">
@@ -16,29 +17,23 @@
             <div class="brand-mark" aria-hidden="true">F</div>
             <div class="brand-copy">
               <strong>FlatShot</strong>
-              <span id="active-batch-label">Sin lote</span>
+              <span id="active-batch-label" hidden>Sin lote</span>
             </div>
           </div>
 
-          <div class="top-summary" aria-live="polite">
+          <div class="top-summary" aria-live="polite" hidden>
             <span class="status-dot" id="status-dot"></span>
             <span id="top-status-text">Sin lote</span>
             <span class="bridge-chip idle" id="bridge-status">Bridge pendiente</span>
           </div>
 
           <div class="top-actions">
-            <span class="preflight-chip" id="top-preflight-status">Exportación bloqueada</span>
+            <span class="preflight-chip" id="top-preflight-status" hidden>Exportación bloqueada</span>
             <button type="button" class="primary top-export" id="top-primary-action" data-action="primary">Seleccionar carpeta</button>
             <button type="button" class="top-secondary-action" id="top-secondary-action" data-action="secondary-primary" hidden></button>
             <button type="button" class="top-format-action" data-action="open-app-settings">Salida</button>
             <button type="button" class="top-folder-action" data-action="pick-bridge-folder">Carpeta</button>
             <button type="button" class="top-reset-action" data-action="clear-batch">Nuevo lote</button>
-            <details class="top-more-menu">
-              <summary aria-label="Más opciones" title="Más opciones">...</summary>
-              <div class="top-more-menu__content">
-                <button type="button" class="top-detail-action" data-action="open-batch-detail" title="Ver detalle del lote">Detalle lote</button>
-              </div>
-            </details>
             <button type="button" data-action="toggle-inspector">Diagnóstico</button>
             <details class="debug-panel" id="debug-panel">
               <summary>Debug</summary>
@@ -215,9 +210,14 @@
 
             <div class="preview-toolbar" aria-label="Herramientas de vista">
               <div class="segmented compact preview-mode-switch" aria-label="Modo de vista">
-                <button type="button" data-preview-mode="processed">Vista</button>
+                <button type="button" data-preview-mode="processed">Procesada</button>
                 <button type="button" data-preview-mode="original">Original</button>
                 <button type="button" data-preview-mode="compare">Comparar</button>
+              </div>
+              <div class="segmented compact viewer-background-switch background-switch" aria-label="Fondo de revisión">
+                <button type="button" data-preview-bg="rgb230" title="Fondo gris de revisión" aria-label="Fondo gris de revisión">Gris</button>
+                <button type="button" data-preview-bg="white" title="Fondo blanco de revisión" aria-label="Fondo blanco de revisión">Blanco</button>
+                <button type="button" data-preview-bg="transparent" title="Fondo transparente de revisión" aria-label="Fondo transparente de revisión">Transp.</button>
               </div>
               <div class="zoom-controls" aria-label="Zoom">
                 <div class="viewer-control-group viewer-nav" aria-label="Navegación">
@@ -306,40 +306,23 @@
               <label class="control-row">
                 <span>Opacidad</span>
                 <input id="opacity-input" type="range" min="0" max="100" value="20" data-setting="opacity" />
-                <output id="opacity-output">20</output>
+                <input id="opacity-number" class="number-input setting-number" type="number" min="0" max="100" step="1" value="20" data-setting-number="opacity" aria-label="Opacidad" />
               </label>
               <label class="control-row">
                 <span>Desenfoque</span>
                 <input id="blur-input" type="range" min="0" max="80" value="30" data-setting="blur" />
-                <output id="blur-output">30</output>
+                <input id="blur-number" class="number-input setting-number" type="number" min="0" max="80" step="1" value="30" data-setting-number="blur" aria-label="Desenfoque" />
               </label>
               <label class="control-row">
                 <span>Distancia</span>
                 <input id="distance-input" type="range" min="0" max="80" value="25" data-setting="distance" />
-                <output id="distance-output">25</output>
+                <input id="distance-number" class="number-input setting-number" type="number" min="0" max="80" step="1" value="25" data-setting-number="distance" aria-label="Distancia" />
               </label>
               <label class="control-row">
                 <span>Padding</span>
                 <input id="padding-input" type="range" min="0" max="30" value="10" data-setting="padding" />
-                <output id="padding-output">10</output>
+                <input id="padding-number" class="number-input setting-number" type="number" min="0" max="30" step="1" value="10" data-setting-number="padding" aria-label="Padding" />
               </label>
-            </div>
-          </details>
-
-          <details class="settings-section inspector-disclosure review-background-panel" data-inspector-section="advanced">
-            <summary>
-              <span class="summary-copy">
-                <span class="eyebrow">Vista</span>
-                <strong>Fondo</strong>
-                <small>Revisión y salida</small>
-              </span>
-            </summary>
-            <div class="inspector-disclosure__body">
-              <div class="segmented compact background-switch inspector-background-switch" aria-label="Fondo de revisión">
-                <button type="button" data-preview-bg="rgb230">Gris claro</button>
-                <button type="button" data-preview-bg="white">Blanco</button>
-                <button type="button" data-preview-bg="transparent">Transparente</button>
-              </div>
             </div>
           </details>
 
@@ -355,37 +338,37 @@
                 <label class="control-row">
                   <span>Spread</span>
                   <input type="range" min="0" max="20" value="0" data-setting="spread" />
-                  <output id="spread-output">0</output>
+                  <input class="number-input setting-number" type="number" min="0" max="20" step="1" value="0" data-setting-number="spread" aria-label="Spread" />
                 </label>
                 <label class="control-row">
                   <span>Ruido</span>
                   <input type="range" min="0" max="20" value="2" data-setting="noise" />
-                  <output id="noise-output">2</output>
+                  <input class="number-input setting-number" type="number" min="0" max="20" step="1" value="2" data-setting-number="noise" aria-label="Ruido" />
                 </label>
                 <label class="control-row">
                   <span>Contacto</span>
                   <input type="range" min="0" max="40" value="10" data-setting="contact_blur" />
-                  <output id="contact_blur-output">10</output>
+                  <input class="number-input setting-number" type="number" min="0" max="40" step="1" value="10" data-setting-number="contact_blur" aria-label="Contacto" />
                 </label>
                 <label class="control-row">
                   <span>Escala</span>
                   <input type="range" min="-30" max="30" value="0" data-setting="scale_adjustment" />
-                  <output id="scale_adjustment-output">0</output>
+                  <input class="number-input setting-number" type="number" min="-30" max="30" step="1" value="0" data-setting-number="scale_adjustment" aria-label="Escala" />
                 </label>
                 <label class="control-row">
                   <span>Fusión</span>
                   <input type="range" min="0" max="20" value="1" data-setting="fusion" />
-                  <output id="fusion-output">1</output>
+                  <input class="number-input setting-number" type="number" min="0" max="20" step="1" value="1" data-setting-number="fusion" aria-label="Fusión" />
                 </label>
                 <label class="control-row">
                   <span>Ángulo</span>
                   <input type="range" min="0" max="360" value="180" data-setting="angle" />
-                  <output id="angle-output">180</output>
+                  <input class="number-input setting-number" type="number" min="0" max="360" step="1" value="180" data-setting-number="angle" aria-label="Ángulo" />
                 </label>
                 <label class="control-row">
                   <span>Contracción</span>
                   <input type="range" min="0" max="80" value="0" data-setting="contraction" />
-                  <output id="contraction-output">0</output>
+                  <input class="number-input setting-number" type="number" min="0" max="80" step="1" value="0" data-setting-number="contraction" aria-label="Contracción" />
                 </label>
                 <label class="control-row control-row--toggle">
                   <span>Zoom auto</span>
@@ -416,17 +399,17 @@
               <label class="local-control-row">
                 <span>Tamaño</span>
                 <input type="range" min="-30" max="30" value="0" data-local-setting="size_delta" />
-                <output id="local-size_delta-output">0</output>
+                <input class="number-input local-setting-number" type="number" min="-30" max="30" step="1" value="0" data-local-setting-number="size_delta" aria-label="Tamaño por imagen" />
               </label>
               <label class="local-control-row">
                 <span>Sombra</span>
                 <input type="range" min="-40" max="40" value="0" data-local-setting="shadow_delta" />
-                <output id="local-shadow_delta-output">0</output>
+                <input class="number-input local-setting-number" type="number" min="-40" max="40" step="1" value="0" data-local-setting-number="shadow_delta" aria-label="Sombra por imagen" />
               </label>
               <label class="local-control-row">
                   <span>Desenfoque</span>
                 <input type="range" min="-40" max="40" value="0" data-local-setting="blur_delta" />
-                <output id="local-blur_delta-output">0</output>
+                <input class="number-input local-setting-number" type="number" min="-40" max="40" step="1" value="0" data-local-setting-number="blur_delta" aria-label="Desenfoque por imagen" />
               </label>
               <div class="local-adjustment__actions">
                 <button type="button" data-action="reset-local-adjustment">Restablecer imagen</button>
@@ -547,9 +530,9 @@
         <section class="app-settings-dialog">
           <header class="app-settings-header">
             <div>
-              <span class="eyebrow">Salida</span>
-              <h2 id="app-settings-title">Formatos de salida</h2>
-              <small id="app-settings-subtitle">Activa una o varias salidas.</small>
+              <span class="eyebrow">Presets</span>
+              <h2 id="app-settings-title">Gestor de salidas</h2>
+              <small id="app-settings-subtitle">Crea y edita valores guardados.</small>
             </div>
             <button type="button" class="icon-button" data-action="close-app-settings" aria-label="Cerrar ajustes">×</button>
           </header>

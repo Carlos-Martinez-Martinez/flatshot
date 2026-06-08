@@ -977,15 +977,12 @@ function sidebarLotSummaryText(counts = batchCounts()) {
     return state.scanStatus || "Leyendo imágenes";
   }
   if (state.batch === "empty") {
-    return counts.ignoredFiles ? `0 listas · ${ignoredImagesText(counts.ignoredFiles)}` : "0 listas";
+    return "0 listas";
   }
   if (!hasBatch()) {
     return "Sin carpeta";
   }
   const parts = [readyImagesText(counts.exportableImages)];
-  if (counts.ignoredFiles) {
-    parts.push(ignoredImagesText(counts.ignoredFiles));
-  }
   if (counts.nonBlockingWarnings) {
     parts.push(`${counts.nonBlockingWarnings} aviso${counts.nonBlockingWarnings === 1 ? "" : "s"}`);
   }
@@ -1597,7 +1594,7 @@ function getVisibleAppState() {
       id: "no_folder",
       tone: "idle",
       title: "Sin lote",
-      subtitle: `PNG o JPG · salida: ${viewerOutputCompactLabel()}`,
+      subtitle: "Selecciona una carpeta para empezar",
       topSummary: compactHeaderStatusText(),
       primaryAction: { label: "Seleccionar carpeta", action: "pick-bridge-folder", enabled: state.bridgeStatus !== "checking" },
       secondaryAction: null,
@@ -2109,6 +2106,9 @@ function applyViewerPanDom() {
   if (!canvas) {
     return;
   }
+  if (!viewerPanState.active) {
+    clampViewerPan();
+  }
   canvas.style.setProperty("--canvas-pan-x", `${Math.round(state.panX)}px`);
   canvas.style.setProperty("--canvas-pan-y", `${Math.round(state.panY)}px`);
 }
@@ -2117,6 +2117,30 @@ function resetViewerPan() {
   state.panX = 0;
   state.panY = 0;
   applyViewerPanDom();
+}
+
+function viewerPanBounds() {
+  const canvas = $("#preview-canvas");
+  const target = canvas?.querySelector(".preview-image, .mock-product");
+  if (!canvas || !target || isAutoViewerMode()) {
+    return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+  }
+  const canvasRect = canvas.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  if (!canvasRect.width || !canvasRect.height || !targetRect.width || !targetRect.height) {
+    return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+  }
+  const minVisibleX = Math.min(96, Math.max(32, Math.min(canvasRect.width, targetRect.width) * 0.25));
+  const minVisibleY = Math.min(96, Math.max(32, Math.min(canvasRect.height, targetRect.height) * 0.25));
+  const maxX = Math.max(0, Math.round((canvasRect.width + targetRect.width) / 2 - minVisibleX));
+  const maxY = Math.max(0, Math.round((canvasRect.height + targetRect.height) / 2 - minVisibleY));
+  return { minX: -maxX, maxX, minY: -maxY, maxY };
+}
+
+function clampViewerPan() {
+  const bounds = viewerPanBounds();
+  state.panX = Math.max(bounds.minX, Math.min(bounds.maxX, state.panX));
+  state.panY = Math.max(bounds.minY, Math.min(bounds.maxY, state.panY));
 }
 
 function isAutoViewerMode(mode = state.fitMode) {
@@ -2163,6 +2187,10 @@ function setViewerZoom(nextZoom, anchorEvent = null) {
   state.zoom = zoom;
   state.statusText = zoom === 100 ? "Zoom 100%" : `Zoom ${zoom}%`;
   render();
+  window.requestAnimationFrame(() => {
+    clampViewerPan();
+    applyViewerPanDom();
+  });
 }
 
 function setViewerMode(mode) {
@@ -3649,14 +3677,9 @@ function renderTop() {
   $("#demo-scenario").value = scenarioLabels[state.scenario] ? state.scenario : "batch-ready";
   $("#app-mode").value = state.bridgeMode;
   $("#bridge-url").value = state.bridgeUrl;
-  $("#active-batch-label").textContent = visible.title;
+  $("#active-batch-label").textContent = "";
   const topStatus = $("#top-status-text");
-  const summaryHtml = topStatusSummaryHtml(counts);
-  if (summaryHtml) {
-    topStatus.innerHTML = summaryHtml;
-  } else {
-    topStatus.textContent = visible.topSummary || compactHeaderStatusText();
-  }
+  topStatus.textContent = visible.topSummary || compactHeaderStatusText();
   topStatus.title = visible.subtitle || visible.topSummary || "";
   $("#status-dot").className = `status-dot ${statusMode()}`;
   const hasBatchDetail = hasBatch() || state.batch === "empty"
@@ -3705,7 +3728,7 @@ function renderTop() {
   }
   const moreMenu = $(".top-more-menu");
   if (moreMenu) {
-    moreMenu.hidden = state.batch === "none" || state.batch === "scanning" || (!hasBatchDetail && state.exportStatus === "running");
+    moreMenu.hidden = true;
   }
 }
 
@@ -4450,12 +4473,7 @@ function renderBatch() {
           status: "empty",
         }];
     $("#batch-count").textContent = "Sin imágenes";
-    setBatchPill(
-      ignored
-        ? `${ignored} ignorado${ignored === 1 ? "" : "s"}`
-        : "Sin imágenes",
-      ignored ? "muted" : "muted"
-    );
+    setBatchPill("Sin imágenes", "muted");
     setGalleryTitle(0, "Lote");
     $("#batch-visible-count").textContent = sidebarLotSummaryText(counts);
     $("#folder-list").innerHTML = emptyFolders.map(folderItemHtml).join("");
@@ -4940,6 +4958,11 @@ function renderFilterButtons() {
     excluded: "Ignoradas",
   };
   const order = { all: 1, valid: 2, warnings: 3, excluded: 4 };
+  const visibleFilters = Object.keys(labels).filter((filter) => galleryFilterVisible(filter, counts));
+  const filterGroup = $(".gallery-filter");
+  if (filterGroup) {
+    filterGroup.hidden = visibleFilters.length <= 1;
+  }
   $$(".batch-filter button").forEach((button) => {
     const filter = button.dataset.filter;
     const count = counts[filter] || 0;
@@ -4949,7 +4972,7 @@ function renderFilterButtons() {
     button.classList.toggle("active", button.dataset.filter === state.filter);
     const empty = filter !== "all" && !count;
     button.classList.toggle("is-empty", empty);
-    button.hidden = !galleryFilterVisible(filter, counts);
+    button.hidden = visibleFilters.length <= 1 || !visibleFilters.includes(filter);
   });
 }
 
@@ -5238,18 +5261,7 @@ function previewModeLabel() {
 }
 
 function previewOutputContextHtml(image) {
-  if (!image || state.batch !== "ready") {
-    return "";
-  }
-  const outputLine = viewerOutputCompactLabel();
-  const modeLine = state.previewMode === "original"
-    ? "Original"
-    : state.previewMode === "compare"
-      ? "Comparar"
-      : "";
-  return `
-    <strong title="${escapeHtml(outputLine)}">${escapeHtml(modeLine ? `${modeLine} · ${outputLine}` : outputLine)}</strong>
-  `;
+  return "";
 }
 
 function outputSizeDisplay() {
@@ -5294,13 +5306,17 @@ function initialStateHtml() {
   ` : "";
   return `
     <div class="empty-state onboarding initial-onboarding">
-      <span class="empty-icon" aria-hidden="true"></span>
+      <span class="empty-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path d="M3 6.75A2.75 2.75 0 0 1 5.75 4h4.08c.73 0 1.42.34 1.86.92l.82 1.08h5.74A2.75 2.75 0 0 1 21 8.75v.75H7.18a2.75 2.75 0 0 0-2.63 1.96L3 16.65Z"></path>
+          <path d="M4.1 18.9A2.75 2.75 0 0 0 6.72 21h10.74a2.75 2.75 0 0 0 2.66-2.05l1.63-6.15A1.75 1.75 0 0 0 20.06 10H7.18c-.79 0-1.48.52-1.69 1.28Z"></path>
+        </svg>
+      </span>
       <strong>Selecciona una carpeta</strong>
-      <span>PNG o JPG</span>
-      <span class="empty-output-chip">${escapeHtml(viewerOutputCompactLabel())}</span>
+      <span>Carga un lote de imágenes PNG o JPG para revisar y exportar.</span>
       <div class="empty-state__actions">
         <button type="button" class="primary" data-action="pick-bridge-folder">Seleccionar carpeta</button>
-        <button type="button" class="ghost-action" data-action="open-app-settings">Cambiar salida</button>
+        <button type="button" class="ghost-action" data-action="open-app-settings">Configurar salidas</button>
       </div>
       ${manualPathHtml}
     </div>
@@ -5359,9 +5375,9 @@ function previewSubtitle(image) {
       return "Vista no disponible";
     }
     if (state.previewStatus === "ready") {
-      return viewerOutputCompactLabel();
+      return "Vista generada";
     }
-    return viewerOutputCompactLabel();
+    return "Vista pendiente";
   }
   if (state.previewStatus === "loading") {
     return "Generando vista";
@@ -5372,7 +5388,7 @@ function previewSubtitle(image) {
   if (state.previewStatus === "error") {
     return "Vista no disponible";
   }
-  return state.previewStatus === "ready" ? viewerOutputCompactLabel() : image.detail;
+  return state.previewStatus === "ready" ? "Vista generada" : image.detail;
 }
 
 function renderSettings() {
@@ -5401,6 +5417,7 @@ function renderSettings() {
   Object.entries(state.settings).forEach(([key, value]) => {
     const input = $(`[data-setting="${key}"]`);
     const output = $(`#${key}-output`);
+    const numberInput = $(`[data-setting-number="${key}"]`);
     if (input) {
       if (input.type === "checkbox") {
         input.checked = Boolean(value);
@@ -5410,6 +5427,9 @@ function renderSettings() {
     }
     if (output) {
       output.textContent = value;
+    }
+    if (numberInput && document.activeElement !== numberInput) {
+      numberInput.value = value;
     }
   });
 
@@ -5422,11 +5442,15 @@ function renderSettings() {
     const value = Number(localOverride[key] || 0);
     const input = $(`[data-local-setting="${key}"]`);
     const output = $(`#local-${key}-output`);
+    const numberInput = $(`[data-local-setting-number="${key}"]`);
     if (input) {
       input.value = value;
     }
     if (output) {
       output.textContent = value > 0 ? `+${value}` : String(value);
+    }
+    if (numberInput && document.activeElement !== numberInput) {
+      numberInput.value = value;
     }
   });
   $("#save-preset").disabled = false;
@@ -5513,7 +5537,7 @@ function reviewPanelHtml() {
       <button type="button" data-action="next-image"${canNavigate ? "" : " disabled"}>Siguiente</button>
       ${issues.length ? '<button type="button" data-action="review-errors">Revisar avisos</button>' : ""}
       <button type="button" data-action="open-app-settings">Cambiar formato</button>
-      ${hasLocal ? '<button type="button" data-action="reset-local-adjustment">Quitar ajuste local</button>' : '<button type="button" data-action="open-advanced">Ajustar imagen</button>'}
+      ${hasLocal ? '<button type="button" data-action="reset-local-adjustment">Quitar ajuste local</button>' : '<button type="button" data-action="open-advanced">Editar ajuste</button>'}
     </div>
   `;
 }
@@ -5688,6 +5712,23 @@ function renderInspector() {
       !visible
     );
   });
+  syncAdvancedInspectorDetails(mode);
+}
+
+function syncAdvancedInspectorDetails(mode) {
+  $$(".settings-panel details.inspector-disclosure[data-inspector-section='advanced']").forEach((details) => {
+    if (mode !== "advanced") {
+      details.open = false;
+      return;
+    }
+    if (
+      details.classList.contains("appearance-section")
+      || details.classList.contains("local-adjustment")
+      || (state.presetEditorOpen && details.classList.contains("preset-section"))
+    ) {
+      details.open = true;
+    }
+  });
 }
 
 function inspectorCardsHtml() {
@@ -5720,7 +5761,7 @@ function inspectorCardsHtml() {
 function lotInspectorCardHtml() {
   const counts = batchCounts();
   const visible = getVisibleAppState();
-  const ignored = ignoredNeutralText(counts.ignoredFiles);
+  const ignored = counts.ignoredFiles ? "Ignorados en detalle" : "";
   const meta = state.batch === "empty"
     ? `0 listas${ignored ? ` · ${ignored}` : ""}`
     : `${readyImagesText(counts.exportableImages)}${ignored ? ` · ${ignored}` : ""}`;
@@ -5733,44 +5774,67 @@ function lotInspectorCardHtml() {
         <small>${escapeHtml(meta)}</small>
       </div>
       <div class="inspector-summary__action">
-        <button type="button" data-action="open-batch-detail">Ver detalle</button>
+        <button type="button" data-action="open-batch-detail">Detalle</button>
       </div>
     </section>
   `;
 }
 
 function outputInspectorCardHtml() {
-  const destination = destinationCompactLabel();
-  const example = namingExample();
-  const output = viewerOutputCompactLabel();
+  const profiles = state.outputProfiles.length ? state.outputProfiles : [currentOutputProfileData()];
+  const activeProfiles = exportOutputProfiles();
+  const exportable = exportableImages().length;
+  const totalFiles = exportable * activeProfiles.length;
+  const dirty = !outputMatchesProfile(activeOutputProfile());
   return `
     <section class="inspector-output-card">
       <div class="inspector-output-card__head">
-        <span>Salida</span>
-        <strong title="${escapeHtml(output)}">${escapeHtml(output)}</strong>
+        <span>Salidas</span>
+        <strong>${escapeHtml(activeProfiles.length ? `${activeProfiles.length} activa${activeProfiles.length === 1 ? "" : "s"}` : "Sin salidas activas")}</strong>
+        <small>${escapeHtml(totalFiles ? `${totalFiles} archivos previstos` : "Pendiente de lote")}</small>
       </div>
-      <div class="inspector-output-card__grid" aria-label="Resumen de salida">
-        <span>
-          <em>Formato</em>
-          <strong>${escapeHtml(state.format)}</strong>
-        </span>
-        <span>
-          <em>Tamaño</em>
-          <strong>${escapeHtml(outputSizeDisplay())}</strong>
-        </span>
-        <span>
-          <em>Fondo</em>
-          <strong>${escapeHtml(backgroundLabel(state.background))}</strong>
-        </span>
+      <div class="active-output-list" aria-label="Salidas del lote">
+        ${profiles.map(outputProfileInlineRowHtml).join("")}
       </div>
-      <div class="inspector-output-card__details">
-        <span title="${escapeHtml(destination)}">${escapeHtml(destination)}</span>
-        <strong title="${escapeHtml(example)}">${escapeHtml(example)}</strong>
-      </div>
+      ${dirty ? outputTemporaryNoticeHtml() : ""}
       <div class="inspector-output-card__actions">
-        <button type="button" data-action="open-app-settings">Editar salida</button>
+        <button type="button" data-action="edit-output">Editar parámetros</button>
+        <button type="button" data-action="open-app-settings">Gestionar presets</button>
       </div>
     </section>
+  `;
+}
+
+function outputProfileInlineRowHtml(profile) {
+  const enabled = Boolean(profile.enabled || profile.id === state.activeOutputProfileId);
+  const active = profile.id === state.activeOutputProfileId;
+  const canToggle = enabledOutputProfiles().length > 1 || !enabled;
+  const summary = outputProfileSummaryLine(profile);
+  return `
+    <div class="active-output-row${active ? " is-primary" : ""}${enabled ? " is-enabled" : " is-disabled"}">
+      <label class="output-toggle" title="${escapeHtml(canToggle ? "Activar o desactivar salida" : "Debe quedar al menos una salida activa")}">
+        <input type="checkbox" data-output-profile-enabled-id="${escapeHtml(profile.id)}" ${enabled ? "checked" : ""} ${canToggle ? "" : "disabled"} />
+        <span></span>
+      </label>
+      <button type="button" class="active-output-row__main" data-action="select-output-profile" data-output-profile-id="${escapeHtml(profile.id)}" title="${escapeHtml(`${profile.name} · ${summary}`)}">
+        <strong>${escapeHtml(profile.name)}</strong>
+        <small>${escapeHtml(summary)}</small>
+      </button>
+      <span class="active-output-row__tag">${escapeHtml(active ? "Principal" : enabled ? "Activa" : "Inactiva")}</span>
+    </div>
+  `;
+}
+
+function outputTemporaryNoticeHtml() {
+  return `
+    <div class="temporary-output-notice">
+      <strong>Cambios temporales en esta salida</strong>
+      <div>
+        <button type="button" data-action="save-output-current-profile">Guardar en preset</button>
+        <button type="button" data-action="save-output-as-new">Guardar como nuevo</button>
+        <button type="button" data-action="discard-output-overrides">Descartar</button>
+      </div>
+    </div>
   `;
 }
 
@@ -5800,7 +5864,7 @@ function selectedImageInspectorCardHtml() {
       </div>
       ${hasLocal
         ? '<button type="button" data-action="reset-local-adjustment">Quitar ajuste</button>'
-        : '<button type="button" data-action="open-advanced">Ajustar imagen</button>'}
+        : '<button type="button" data-action="open-advanced">Editar ajuste</button>'}
     </section>
   `;
 }
@@ -5844,7 +5908,7 @@ function aspectInspectorCardHtml() {
   return `
     <section class="inspector-compact-row inspector-compact-row--quiet">
       <div>
-        <span>Ajuste activo</span>
+        <span>Ajustes de imagen</span>
         <strong>${escapeHtml(state.activePreset)}</strong>
         <small>${escapeHtml(state.presetDirty ? "Modificado" : "Activo")}</small>
       </div>
@@ -6025,15 +6089,17 @@ function renderExport() {
   const warningSummary = outputWarningSummary(issues);
   const editActions = state.outputEditMode ? `
     <div class="inspector-actionbar">
-      <button type="button" class="primary" data-action="apply-output-edit">Aplicar salida</button>
+      <button type="button" class="primary" data-action="apply-output-edit">Aplicar temporal</button>
+      <button type="button" data-action="save-output-current-profile">Guardar en preset</button>
+      <button type="button" data-action="save-output-as-new">Guardar como nuevo</button>
       <button type="button" data-action="cancel-output-edit">Cancelar</button>
-      <button type="button" class="btn-linklike" data-action="open-app-settings">Formatos</button>
+      <button type="button" class="btn-linklike" data-action="open-app-settings">Gestionar presets</button>
     </div>
   ` : "";
   const presetActions = !state.outputEditMode ? `
     <div class="inspector-actionbar">
-      <button type="button" class="primary" data-action="open-app-settings">Cambiar formato</button>
-      <button type="button" data-action="edit-output">Editar campos</button>
+      <button type="button" class="primary" data-action="edit-output">Editar parámetros</button>
+      <button type="button" data-action="open-app-settings">Gestionar presets</button>
     </div>
   ` : "";
   const activeOutputProfiles = exportOutputProfiles();
@@ -6093,6 +6159,7 @@ function renderExport() {
       </div>
     </div>
     ${warningSummary}
+    ${!outputMatchesProfile(activeOutputProfile()) ? outputTemporaryNoticeHtml() : ""}
     ${presetActions}
   `;
 
@@ -7336,6 +7403,62 @@ function cancelOutputEdit() {
   render();
 }
 
+function saveCurrentOutputProfile() {
+  const current = currentOutputProfileData();
+  const index = state.outputProfiles.findIndex((profile) => profile.id === state.activeOutputProfileId);
+  if (index < 0) {
+    state.outputProfiles.push({ ...current, enabled: true });
+  } else {
+    state.outputProfiles[index] = {
+      ...state.outputProfiles[index],
+      ...current,
+      id: state.activeOutputProfileId,
+      name: state.outputProfiles[index].name || current.name,
+      enabled: true,
+    };
+  }
+  state.outputProfiles = normalizeOutputProfileList(state.outputProfiles, state.activeOutputProfileId);
+  state.outputDraft = null;
+  state.outputEditMode = false;
+  state.exportStatus = isExportReady() ? "ready" : "blocked";
+  state.statusText = "Preset de salida guardado";
+  persistOutputProfiles();
+  render();
+}
+
+function saveCurrentOutputAsNewProfile() {
+  const sourceName = activeOutputProfile()?.name || "Salida";
+  const name = window.prompt("Nombre del nuevo preset de salida", `${sourceName} copia`);
+  if (name === null) {
+    return;
+  }
+  const profile = normalizeOutputProfile({
+    ...currentOutputProfileData(),
+    id: uniqueOutputProfileId(name || "salida", Date.now()),
+    name: name.trim() || "Nueva salida",
+    enabled: true,
+  });
+  state.outputProfiles = normalizeOutputProfileList([...state.outputProfiles, profile], profile.id);
+  state.activeOutputProfileId = profile.id;
+  state.outputProfileEditorId = profile.id;
+  state.outputProfileDraft = { ...profile };
+  state.outputDraft = null;
+  state.outputEditMode = false;
+  persistOutputProfiles();
+  state.statusText = `Nuevo preset: ${profile.name}`;
+  render();
+}
+
+function discardOutputOverrides() {
+  const profile = activeOutputProfile();
+  if (!profile) {
+    return;
+  }
+  state.outputDraft = null;
+  state.outputEditMode = false;
+  applyOutputProfile(profile.id, { statusText: "Cambios temporales descartados" });
+}
+
 async function saveCurrentPreset() {
   const presetName = state.activePreset;
   const presetSettings = normalizeSettings(state.settings);
@@ -7827,10 +7950,21 @@ function handleAction(action, target = null) {
     render();
   } else if (action === "edit-output") {
     beginOutputEdit();
+  } else if (action === "select-output-profile") {
+    const profileId = target?.dataset?.outputProfileId;
+    if (profileId) {
+      applyOutputProfile(profileId);
+    }
   } else if (action === "apply-output-edit") {
     applyOutputEdit();
   } else if (action === "cancel-output-edit") {
     cancelOutputEdit();
+  } else if (action === "save-output-current-profile") {
+    saveCurrentOutputProfile();
+  } else if (action === "save-output-as-new") {
+    saveCurrentOutputAsNewProfile();
+  } else if (action === "discard-output-overrides") {
+    discardOutputOverrides();
   } else if (action === "open-app-settings") {
     openAppSettings();
   } else if (action === "close-app-settings") {
@@ -7892,8 +8026,10 @@ function handleAction(action, target = null) {
     stopExport();
   } else if (action === "start-export") {
     startExport();
-  } else if (action === "review-errors") {
+  } else if (action === "review-errors" || action === "review-warnings") {
     reviewWarnings();
+  } else if (action === "review-output") {
+    beginOutputEdit();
   } else if (action === "open-output") {
     openOutputFolder();
   } else if (action === "primary") {
@@ -8134,6 +8270,12 @@ document.addEventListener("input", (event) => {
   if (localKey) {
     setCurrentImageOverrideValue(localKey, event.target.value);
   }
+  if (event.target?.dataset?.settingNumber) {
+    updateSettingFromNumberInput(event.target);
+  }
+  if (event.target?.dataset?.localSettingNumber) {
+    updateLocalOverrideFromNumberInput(event.target);
+  }
   if (event.target.closest?.("#output-profile-form")) {
     updateOutputProfileDraftFromForm();
     renderOutputProfileModalState();
@@ -8141,6 +8283,14 @@ document.addEventListener("input", (event) => {
 });
 
 document.addEventListener("change", (event) => {
+  if (event.target?.dataset?.settingNumber) {
+    updateSettingFromNumberInput(event.target, { commit: true });
+    return;
+  }
+  if (event.target?.dataset?.localSettingNumber) {
+    updateLocalOverrideFromNumberInput(event.target, { commit: true });
+    return;
+  }
   if (event.target.matches?.("[data-output-profile-enabled-id]")) {
     setOutputProfileEnabled(event.target.dataset.outputProfileEnabledId, event.target.checked);
     return;
@@ -8188,6 +8338,67 @@ function settingInputValue(input) {
     return input.value;
   }
   return Number(input.value);
+}
+
+function numericInputValue(input, fallback = 0) {
+  const raw = String(input.value ?? "").trim();
+  if (!raw || raw === "-" || raw === "+") {
+    return { valid: false, value: fallback };
+  }
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) {
+    return { valid: false, value: fallback };
+  }
+  const min = input.min === "" ? -Infinity : Number(input.min);
+  const max = input.max === "" ? Infinity : Number(input.max);
+  const rounded = Math.round(parsed);
+  return {
+    valid: true,
+    value: Math.max(min, Math.min(max, rounded)),
+  };
+}
+
+function updateSettingFromNumberInput(input, options = {}) {
+  const key = input?.dataset?.settingNumber;
+  if (!key || !(key in state.settings)) {
+    return;
+  }
+  const parsed = numericInputValue(input, state.settings[key]);
+  if (!parsed.valid) {
+    return;
+  }
+  if (options.commit) {
+    input.value = parsed.value;
+  }
+  if (state.settings[key] === parsed.value) {
+    return;
+  }
+  state.settings[key] = parsed.value;
+  const range = $(`[data-setting="${key}"]`);
+  if (range && range.type === "range") {
+    range.value = parsed.value;
+  }
+  markPresetDirty();
+}
+
+function updateLocalOverrideFromNumberInput(input, options = {}) {
+  const key = input?.dataset?.localSettingNumber;
+  if (!key || !localOverrideKeys.includes(key)) {
+    return;
+  }
+  const parsed = numericInputValue(input, currentImageOverride()[key] || 0);
+  if (!parsed.valid) {
+    return;
+  }
+  const value = clampLocalOverrideValue(key, parsed.value);
+  if (options.commit) {
+    input.value = value;
+  }
+  const range = $(`[data-local-setting="${key}"]`);
+  if (range) {
+    range.value = value;
+  }
+  setCurrentImageOverrideValue(key, value);
 }
 
 $("#format-select").addEventListener("change", (event) => {
@@ -8354,6 +8565,7 @@ function handleViewerPointerDown(event) {
   if (
     event.button !== 0
     || !isViewerNavigationAvailable()
+    || isAutoViewerMode()
     || event.target.closest("button, input, textarea, select, summary, a")
   ) {
     return;
@@ -8379,6 +8591,7 @@ function handleViewerPointerMove(event) {
   }
   state.panX = viewerPanState.originX + event.clientX - viewerPanState.startX;
   state.panY = viewerPanState.originY + event.clientY - viewerPanState.startY;
+  clampViewerPan();
   applyViewerPanDom();
 }
 

@@ -5680,36 +5680,35 @@ function updateOutputProfileFieldStates(validation, raw) {
 function updateOutputProfileFooterState(validation, dirty) {
   const draft = ensureOutputProfileDraft();
   const isPersisted = state.outputProfiles.some((profile) => profile.id === draft.id);
+  const footerState = outputProfileViewHelpers.outputProfileFooterState({
+    draft,
+    dirty,
+    isPersisted,
+    profileCount: state.outputProfiles.length,
+    validation,
+  });
   const deleteButton = $("[data-action='delete-output-profile']");
   if (deleteButton) {
-    deleteButton.disabled = isPersisted && state.outputProfiles.length <= 1;
-    deleteButton.title = deleteButton.disabled ? "Debe quedar al menos un formato" : "Eliminar formato seleccionado";
+    deleteButton.disabled = footerState.deleteDisabled;
+    deleteButton.title = footerState.deleteTitle;
   }
   const resetButton = $("[data-action='reset-output-profile-draft']");
   if (resetButton) {
-    resetButton.disabled = !dirty;
+    resetButton.disabled = footerState.resetDisabled;
   }
   const saveButton = $("[data-action='save-output-profile']");
   if (saveButton) {
-    saveButton.disabled = validation.errors.length > 0 || !dirty;
+    saveButton.disabled = footerState.saveDisabled;
   }
   const applyButton = $("[data-action='apply-output-profile']");
   if (applyButton) {
-    applyButton.disabled = validation.errors.length > 0;
-    applyButton.textContent = dirty
-      ? "Guardar y aplicar"
-      : draft.enabled
-        ? "Aplicar cambios al lote"
-        : "Activar en este lote";
+    applyButton.disabled = footerState.applyDisabled;
+    applyButton.textContent = footerState.applyLabel;
   }
   const footerNote = $("#output-profile-unsaved");
   if (footerNote) {
-    footerNote.textContent = validation.errors.length
-      ? validation.errors[0]
-      : dirty
-        ? "Cambios sin guardar"
-        : "Sin cambios pendientes";
-    footerNote.className = `settings-footer-note ${validation.errors.length ? "error" : dirty ? "warning" : ""}`;
+    footerNote.textContent = footerState.noteText;
+    footerNote.className = footerState.noteClass;
   }
 }
 

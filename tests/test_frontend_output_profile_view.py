@@ -102,6 +102,74 @@ const name = helpers.outputNameFromTemplate(profile, {{
   index: 7,
 }});
 assert.equal(name, "Lote Junio_007_camisa_PRO.jpg");
+
+assert.deepEqual(helpers.outputProfileFooterState({{
+  draft: {{ enabled: true }},
+  dirty: false,
+  isPersisted: true,
+  profileCount: 1,
+  validation: {{ errors: [] }},
+}}), {{
+  deleteDisabled: true,
+  deleteTitle: "Debe quedar al menos un formato",
+  resetDisabled: true,
+  saveDisabled: true,
+  applyDisabled: false,
+  applyLabel: "Aplicar cambios al lote",
+  noteClass: "settings-footer-note ",
+  noteText: "Sin cambios pendientes",
+}});
+
+assert.deepEqual(helpers.outputProfileFooterState({{
+  draft: {{ enabled: false }},
+  dirty: false,
+  isPersisted: true,
+  profileCount: 2,
+  validation: {{ errors: [] }},
+}}), {{
+  deleteDisabled: false,
+  deleteTitle: "Eliminar formato seleccionado",
+  resetDisabled: true,
+  saveDisabled: true,
+  applyDisabled: false,
+  applyLabel: "Activar en este lote",
+  noteClass: "settings-footer-note ",
+  noteText: "Sin cambios pendientes",
+}});
+
+assert.deepEqual(helpers.outputProfileFooterState({{
+  draft: {{ enabled: true }},
+  dirty: true,
+  isPersisted: false,
+  profileCount: 2,
+  validation: {{ errors: [] }},
+}}), {{
+  deleteDisabled: false,
+  deleteTitle: "Eliminar formato seleccionado",
+  resetDisabled: false,
+  saveDisabled: false,
+  applyDisabled: false,
+  applyLabel: "Guardar y aplicar",
+  noteClass: "settings-footer-note warning",
+  noteText: "Cambios sin guardar",
+}});
+
+assert.deepEqual(helpers.outputProfileFooterState({{
+  draft: {{ enabled: true }},
+  dirty: true,
+  isPersisted: true,
+  profileCount: 2,
+  validation: {{ errors: ["Nombre requerido"] }},
+}}), {{
+  deleteDisabled: false,
+  deleteTitle: "Eliminar formato seleccionado",
+  resetDisabled: false,
+  saveDisabled: true,
+  applyDisabled: true,
+  applyLabel: "Guardar y aplicar",
+  noteClass: "settings-footer-note error",
+  noteText: "Nombre requerido",
+}});
 """
     result = subprocess.run(
         ["node", "-e", script],

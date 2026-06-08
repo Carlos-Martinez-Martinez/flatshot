@@ -142,10 +142,39 @@
     return outputName;
   }
 
+  function outputProfileFooterState(options = {}) {
+    const validation = options.validation || { errors: [] };
+    const errors = Array.isArray(validation.errors) ? validation.errors : [];
+    const dirty = Boolean(options.dirty);
+    const profileCount = Number(options.profileCount) || 0;
+    const draft = options.draft || {};
+    const isPersisted = Boolean(options.isPersisted);
+    const deleteDisabled = isPersisted && profileCount <= 1;
+    return {
+      deleteDisabled,
+      deleteTitle: deleteDisabled ? "Debe quedar al menos un formato" : "Eliminar formato seleccionado",
+      resetDisabled: !dirty,
+      saveDisabled: errors.length > 0 || !dirty,
+      applyDisabled: errors.length > 0,
+      applyLabel: dirty
+        ? "Guardar y aplicar"
+        : draft.enabled
+          ? "Aplicar cambios al lote"
+          : "Activar en este lote",
+      noteClass: `settings-footer-note ${errors.length ? "error" : dirty ? "warning" : ""}`,
+      noteText: errors.length
+        ? errors[0]
+        : dirty
+          ? "Cambios sin guardar"
+          : "Sin cambios pendientes",
+    };
+  }
+
   return {
     escapeHtml,
     outputNameFromTemplate,
     outputProfileEditorHeadingHtml,
+    outputProfileFooterState,
     outputProfileManagerRowHtml,
     outputProfilePreviewHtml,
     outputProfileValidationHtml,

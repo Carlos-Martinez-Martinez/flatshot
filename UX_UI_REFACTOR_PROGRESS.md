@@ -661,6 +661,36 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 29 - Extraccion de estado de footer de perfiles
+
+Estado: completada.
+
+Cambios realizados:
+- `output-profile-view.js` ahora tambien calcula estado puro del footer del gestor de perfiles:
+  - disabled/title de eliminar;
+  - disabled de reset/guardar/aplicar;
+  - label de aplicar;
+  - texto y clase de nota inferior.
+- `app.js` conserva draft activo, persistencia, conteo de perfiles, validacion y escritura en DOM; solo delega calculos de presentacion.
+- Se amplio `tests/test_frontend_output_profile_view.py` para cubrir estados persistido/unico, inactivo, sucio y con error.
+
+Impacto medido:
+- `app.js`: 7.286 -> 7.285 lineas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: sin cambios, 22.
+
+Validaciones ejecutadas:
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_output_profile_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 282 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- `node --check apps/flatshot-desktop/frontend/output-profile-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en Windows.
+- HTTP local en `http://127.0.0.1:4209/`: `index.html`, `output-profile-view.js`, `output-profiles.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

@@ -374,6 +374,37 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 20 - Extraccion de vista contextual del inspector
+
+Estado: completada.
+
+Cambios realizados:
+- Se agrego `apps/flatshot-desktop/frontend/inspector-context-view.js`.
+- Se movio HTML puro fuera de `app.js` para:
+  - encabezado de subvista del inspector;
+  - panel contextual de escaneo;
+  - panel de seleccion inicial de carpeta;
+  - panel de carpeta vacia;
+  - fallback de "Selecciona una imagen".
+- `index.html` carga el helper antes de `app.js`.
+- `app.js` conserva los estados, filas preflight, labels de salida y acciones; solo delega presentacion.
+- Se agrego `tests/test_frontend_inspector_context_view.py` para estados contextuales, encabezado, escaping y orden de carga.
+
+Impacto medido:
+- `app.js`: 7.620 -> 7.589 lineas.
+
+Validaciones ejecutadas:
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_inspector_context_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 274 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- `node --check apps/flatshot-desktop/frontend/inspector-context-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en Windows.
+- HTTP local en `http://127.0.0.1:4200/`: `index.html`, `inspector-context-view.js`, `inspector-review-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

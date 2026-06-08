@@ -93,6 +93,7 @@ const galleryHelpers = window.FlatShotGallery;
 const previewStateHelpers = window.FlatShotPreviewState;
 const inspectorOutputViewHelpers = window.FlatShotInspectorOutputView;
 const inspectorReviewViewHelpers = window.FlatShotInspectorReviewView;
+const inspectorContextViewHelpers = window.FlatShotInspectorContextView;
 const STORAGE_KEYS = {
   bridgeScanPath: "flatshot.bridgeScanPath",
   selectedImagePath: "flatshot.selectedImagePath",
@@ -5168,92 +5169,60 @@ function inspectorSubviewHeaderHtml(mode) {
   const [title, subtitle, detail = ""] = labels[mode] || ["Detalle", ""];
   const backAction = state.outputEditMode ? "cancel-output-edit" : isPresetManager ? "close-preset-editor" : "close-inspector-subview";
   const backLabel = state.outputEditMode ? "Cancelar" : "Volver";
-  const manageAction = mode === "advanced" && !isPresetManager
-    ? '<button type="button" data-action="open-preset-editor">Gestionar ajustes</button>'
-    : "";
-  return `
-    <section class="inspector-subview-head">
-      <div>
-        <span>${escapeHtml(title)}</span>
-        <strong>${escapeHtml(subtitle)}</strong>
-        ${detail ? `<small>${escapeHtml(detail)}</small>` : ""}
-      </div>
-      ${manageAction}
-      <button type="button" data-action="${escapeHtml(backAction)}">${escapeHtml(backLabel)}</button>
-    </section>
-  `;
+  return inspectorContextViewHelpers.inspectorSubviewHeaderHtml({
+    title,
+    subtitle,
+    detail,
+    backAction,
+    backLabel,
+    showManageAction: mode === "advanced" && !isPresetManager,
+  });
 }
 
 function contextualInspectorHtml() {
   if (state.batch === "scanning") {
-    return `
-      <div class="context-panel">
-        <div class="context-header">
-          <span class="eyebrow">Preparación</span>
-          <strong>Escaneando carpeta</strong>
-          <small>${escapeHtml(state.scanStatus || "Leyendo imágenes")}</small>
-        </div>
-        ${progressPanelHtml("Preparando lote")}
-        ${preflightListHtml([
+    return inspectorContextViewHelpers.contextualInspectorHtml({
+      batch: state.batch,
+      scanStatus: state.scanStatus,
+      progressHtml: progressPanelHtml("Preparando lote"),
+      preflightHtml: preflightListHtml([
           { state: "pending", title: "Carpeta seleccionada", detail: "Leyendo origen" },
           { state: "pending", title: "Imágenes listas", detail: "Contando archivos" },
           { state: "pending", title: "Destino", detail: "Se configurará después" },
-        ])}
-      </div>
-    `;
+      ]),
+    });
   }
 
   if (state.batch === "none") {
-    return `
-      <div class="context-panel">
-        <div class="context-header">
-          <span class="eyebrow">Preparación</span>
-          <strong>Seleccionar carpeta</strong>
-          <small>El ajuste activo y la salida se preparan automáticamente.</small>
-        </div>
-        ${preflightListHtml([
+    return inspectorContextViewHelpers.contextualInspectorHtml({
+      batch: state.batch,
+      preflightHtml: preflightListHtml([
           { state: "pending", title: "Carpeta seleccionada", detail: "Pendiente" },
           { state: "pending", title: "Imágenes listas", detail: "Pendiente" },
           { state: "pending", title: "Destino de salida", detail: "Origen / _SALIDA_PRO" },
-        ])}
-        <div class="default-stack">
-          <span>Salida</span>
-          <strong>${escapeHtml(state.format)} · ${escapeHtml(state.size)} · ${escapeHtml(backgroundLabel(state.background))}</strong>
-          <small>Ajuste ${escapeHtml(state.activePreset)}</small>
-        </div>
-        <button type="button" class="primary" data-action="pick-bridge-folder">Seleccionar carpeta</button>
-      </div>
-    `;
+      ]),
+      outputSummary: `${state.format} · ${state.size} · ${backgroundLabel(state.background)}`,
+      activePreset: state.activePreset,
+    });
   }
 
   if (state.batch === "empty") {
-    return `
-      <div class="context-panel warning">
-        <div class="context-header">
-          <span class="eyebrow">Salida</span>
-          <strong>Exportación bloqueada</strong>
-          <small>${escapeHtml(state.scanStatus || "La carpeta no contiene imágenes procesables.")}</small>
-        </div>
-        ${preflightListHtml([
+    return inspectorContextViewHelpers.contextualInspectorHtml({
+      batch: state.batch,
+      scanStatus: state.scanStatus,
+      preflightHtml: preflightListHtml([
           { state: "warning", title: "Carpeta revisada", detail: state.scanDiagnostics.totalFiles ? `${state.scanDiagnostics.totalFiles} archivos encontrados` : "Sin archivos compatibles" },
           { state: "error", title: "Imágenes exportables", detail: "0 imágenes" },
           { state: ignoredOmissions().length ? "pending" : "pending", title: "Ignorados", detail: ignoredSummaryText() },
           { state: "pending", title: "Destino", detail: "Pendiente hasta cargar un lote" },
-        ])}
-        <button type="button" class="primary" data-action="pick-bridge-folder">Elegir otra carpeta</button>
-      </div>
-    `;
+      ]),
+    });
   }
 
-  return `
-    <div class="context-panel">
-      <div class="context-header">
-        <strong>Selecciona una imagen</strong>
-        <small>${escapeHtml(compactHeaderStatusText())}</small>
-      </div>
-      <button type="button" class="primary" data-action="select-first-image">Seleccionar primera imagen</button>
-    </div>
-  `;
+  return inspectorContextViewHelpers.contextualInspectorHtml({
+    batch: state.batch,
+    compactStatus: compactHeaderStatusText(),
+  });
 }
 
 function progressPanelHtml(label, value = null) {

@@ -3457,14 +3457,11 @@ function batchBackgroundLabel(value) {
 
 function batchDestinationLine() {
   const profiles = exportOutputProfiles();
-  if (profiles.length > 1) {
-    const destinations = Array.from(new Set(profiles.map(profileDestinationPreviewLabel)));
-    return destinations.length === 1 ? destinations[0] : `${destinations.length} destinos`;
-  }
-  if (state.destinationMode === "custom") {
-    return state.destinationValue || "Sin destino";
-  }
-  return state.destinationValue ? `Junto al origen · ${state.destinationValue}` : "Junto al origen";
+  return batchViewHelpers.batchDestinationLine({
+    destinationMode: state.destinationMode,
+    destinationValue: state.destinationValue,
+    profileDestinations: profiles.length > 1 ? profiles.map(profileDestinationPreviewLabel) : [],
+  });
 }
 
 function renderBatchDetail() {

@@ -133,6 +133,18 @@
     return "gris claro";
   }
 
+  function batchDestinationLine(options = {}) {
+    const profileDestinations = Array.isArray(options.profileDestinations) ? options.profileDestinations : [];
+    if (profileDestinations.length > 1) {
+      const destinations = Array.from(new Set(profileDestinations));
+      return destinations.length === 1 ? destinations[0] : `${destinations.length} destinos`;
+    }
+    if (options.destinationMode === "custom") {
+      return options.destinationValue || "Sin destino";
+    }
+    return options.destinationValue ? `Junto al origen · ${options.destinationValue}` : "Junto al origen";
+  }
+
   function sourceInputDetail(batch, filesLabel, validLabel) {
     if (batch === "none") {
       return "Pendiente";
@@ -274,6 +286,7 @@
 
   return {
     batchBackgroundLabel,
+    batchDestinationLine,
     batchMetricHtml,
     batchSummaryHtml,
     batchSummaryLabel,

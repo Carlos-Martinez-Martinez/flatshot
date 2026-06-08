@@ -76,6 +76,28 @@ assert.equal(helpers.omissionSummaryText([
 assert.equal(helpers.batchBackgroundLabel("transparent"), "transparente");
 assert.equal(helpers.batchBackgroundLabel("white"), "blanco");
 assert.equal(helpers.batchBackgroundLabel("rgb230"), "gris claro");
+assert.equal(helpers.batchDestinationLine({{
+  destinationMode: "custom",
+  destinationValue: "",
+}}), "Sin destino");
+assert.equal(helpers.batchDestinationLine({{
+  destinationMode: "custom",
+  destinationValue: "C:/Export",
+}}), "C:/Export");
+assert.equal(helpers.batchDestinationLine({{
+  destinationMode: "source",
+  destinationValue: "",
+}}), "Junto al origen");
+assert.equal(helpers.batchDestinationLine({{
+  destinationMode: "source",
+  destinationValue: "_SALIDA_PRO",
+}}), "Junto al origen · _SALIDA_PRO");
+assert.equal(helpers.batchDestinationLine({{
+  profileDestinations: ["WEB", "WEB"],
+}}), "WEB");
+assert.equal(helpers.batchDestinationLine({{
+  profileDestinations: ["WEB", "PNG", "WEB"],
+}}), "2 destinos");
 
 assert.equal(helpers.escapeHtml('<a&b"c>'), '&lt;a&amp;b&quot;c&gt;');
 assert.equal(helpers.sourceInputDetail("none", 3, 2), "Pendiente");

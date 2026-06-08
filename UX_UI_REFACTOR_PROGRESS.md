@@ -311,3 +311,34 @@ Checks manuales:
 
 Salida exportada:
 - Sin cambios esperados. No se toco codigo de procesamiento ni exportacion.
+
+## Fase 13 - Extraccion de vistas de formatos de salida
+
+Estado: completada.
+
+Cambios realizados:
+- Se agrego `apps/flatshot-desktop/frontend/output-profile-view.js`.
+- Se movio HTML puro del editor/gestor de formatos de salida fuera de `app.js`:
+  - encabezado del editor;
+  - preview de nombre/destino;
+  - mensajes de validacion;
+  - fila del gestor de formatos;
+  - naming por plantilla para preview.
+- `index.html` carga el helper antes de `app.js`.
+- `app.js` mantiene la logica de estado, formulario, handlers y persistencia; solo delega renderizado puro.
+- Se agrego `tests/test_frontend_output_profile_view.py` para contrato de HTML, escaping, naming y orden de carga.
+
+Impacto medido:
+- `app.js`: 7.919 -> 7.865 lineas.
+
+Validaciones ejecutadas:
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_output_profile_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 264 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- `node --check apps/flatshot-desktop/frontend/output-profile-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en Windows.
+- HTTP local en `http://127.0.0.1:4193/`: `index.html`, `output-profile-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico pipeline de imagen, bridge Python ni escritura de archivos.

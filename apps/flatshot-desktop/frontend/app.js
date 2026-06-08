@@ -78,6 +78,7 @@ const initialBridgeUrl = urlParams.get("bridge") || defaultBridgeUrl;
 const devMode = urlParams.get("dev") === "1";
 const formatterHelpers = window.FlatShotFormatters;
 const outputProfileHelpers = window.FlatShotOutputProfiles;
+const outputProfileViewHelpers = window.FlatShotOutputProfileView;
 const exportPayloadHelpers = window.FlatShotExportPayload;
 const exportStateHelpers = window.FlatShotExportState;
 const preflightHelpers = window.FlatShotPreflight;
@@ -6015,24 +6016,13 @@ function outputProfileValidation(raw = outputProfileFormRawData()) {
 }
 
 function outputProfileEditorHeadingHtml(profile, validation, dirty) {
-  const active = profile.id === state.activeOutputProfileId;
-  const status = dirty
-    ? "Cambios sin guardar"
-    : active
-      ? "Activo en este lote · Principal"
-      : profile.enabled
-        ? "Salida activa"
-        : "Formato guardado";
-  return `
-    <div class="format-editor-title">
-      <div>
-        <span class="eyebrow">Formato editado</span>
-        <strong>${escapeHtml(profile.name || "Formato sin nombre")}</strong>
-        <small>${escapeHtml(outputProfileSummaryLine(profile))}</small>
-      </div>
-      <span class="status-badge ${validation.errors.length ? "error" : dirty ? "warning" : active ? "ready" : ""}">${escapeHtml(validation.errors.length ? "Revisar campos" : status)}</span>
-    </div>
-  `;
+  return outputProfileViewHelpers.outputProfileEditorHeadingHtml({
+    profile,
+    validation,
+    dirty,
+    active: profile.id === state.activeOutputProfileId,
+    summary: outputProfileSummaryLine(profile),
+  });
 }
 
 function outputProfilePreviewHtml(profile) {
@@ -6043,30 +6033,13 @@ function outputProfilePreviewHtml(profile) {
   const resultPath = destination && destination !== "junto al origen"
     ? `${destination.replace(/[\\/]$/, "")}/${resultName}`
     : resultName;
-  return `
-    <div class="format-preview-heading">
-      <span class="eyebrow">Ejemplo</span>
-      <strong>${escapeHtml(resultName)}</strong>
-    </div>
-    <div class="format-preview-grid">
-      <div>
-        <span>Original</span>
-        <strong title="${escapeHtml(originalName)}">${escapeHtml(originalName)}</strong>
-      </div>
-      <div>
-        <span>Resultado</span>
-        <strong title="${escapeHtml(resultPath)}">${escapeHtml(resultPath)}</strong>
-      </div>
-      <div>
-        <span>Formato</span>
-        <strong>${escapeHtml(outputProfileSummaryLine(profile))}</strong>
-      </div>
-      <div>
-        <span>Destino</span>
-        <strong title="${escapeHtml(destination)}">${escapeHtml(destination)}</strong>
-      </div>
-    </div>
-  `;
+  return outputProfileViewHelpers.outputProfilePreviewHtml({
+    originalName,
+    resultName,
+    destination,
+    resultPath,
+    summary: outputProfileSummaryLine(profile),
+  });
 }
 
 function outputNameForProfile(profile, image = selectedImage(), index = 1) {
@@ -6074,32 +6047,11 @@ function outputNameForProfile(profile, image = selectedImage(), index = 1) {
   const folder = activeFolders().find((item) => item.id === image?.folderId)?.name
     || activeFolders()[0]?.name
     || "lote";
-  let outputName = String(profile.naming || "{original}{suffix}")
-    .replaceAll("{original}", original)
-    .replaceAll("{suffix}", profile.suffix || "")
-    .replaceAll("{folder}", folder);
-  outputName = outputName.replace(/\{index(?::0?(\d+)d)?\}/g, (_match, width) => {
-    const digits = Number(width) || 1;
-    return String(index).padStart(digits, "0");
-  });
-  if (!/\.[a-z0-9]+$/i.test(outputName)) {
-    outputName = `${outputName}.${profile.format.toLowerCase()}`;
-  }
-  return outputName;
+  return outputProfileViewHelpers.outputNameFromTemplate(profile, { original, folder, index });
 }
 
 function outputProfileValidationHtml(validation) {
-  if (!validation.errors.length && !validation.warnings.length) {
-    return "";
-  }
-  const rows = [
-    ...validation.errors.map((message) => ({ tone: "error", message })),
-    ...validation.warnings.map((message) => ({ tone: "warning", message })),
-  ];
-  return `
-    <strong>${validation.errors.length ? "Revisa el formato" : "Aviso"}</strong>
-    ${rows.map((row) => `<span class="${escapeHtml(row.tone)}">${escapeHtml(row.message)}</span>`).join("")}
-  `;
+  return outputProfileViewHelpers.outputProfileValidationHtml(validation);
 }
 
 function renderOutputProfileModalState() {
@@ -6211,22 +6163,16 @@ function renderAppSettings() {
     const enabled = profile.enabled;
     const unsaved = !state.outputProfiles.some((item) => item.id === profile.id);
     const canToggle = !unsaved && (enabledOutputProfiles().length > 1 || !enabled);
-    return `
-      <div class="output-profile-option${selected ? " selected" : ""}${active ? " active" : ""}${enabled ? " enabled" : ""}">
-        <label class="output-profile-toggle" title="${escapeHtml(canToggle ? "Activar esta salida en el lote" : unsaved ? "Guarda el formato para activarlo" : "Debe quedar al menos una salida activa")}">
-          <input type="checkbox" data-output-profile-enabled-id="${escapeHtml(profile.id)}" ${enabled ? "checked" : ""} ${canToggle ? "" : "disabled"} />
-          <span aria-hidden="true"></span>
-        </label>
-        <button type="button" class="output-profile-edit" data-output-profile-id="${escapeHtml(profile.id)}" title="${escapeHtml(`${profile.name} · ${outputProfileSummaryLine(profile)}`)}">
-          <span>
-            <strong>${escapeHtml(profile.name)}</strong>
-            <small>${escapeHtml(outputProfileSummaryLine(profile))}</small>
-            <small>${escapeHtml(profileDestinationLabel(profile))}</small>
-          </span>
-          <em>${escapeHtml(unsaved ? "Sin guardar" : active ? "Principal" : "")}</em>
-        </button>
-      </div>
-    `;
+    return outputProfileViewHelpers.outputProfileManagerRowHtml({
+      profile,
+      selected,
+      active,
+      enabled,
+      unsaved,
+      canToggle,
+      summary: outputProfileSummaryLine(profile),
+      destination: profileDestinationLabel(profile),
+    });
   }).join("");
   setOutputProfileFormValues(draft);
   renderOutputProfileModalState();

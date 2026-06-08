@@ -112,6 +112,99 @@ assert.equal(helpers.preflightStatusClass({{ exportStatus: "running", ready: tru
 assert.equal(helpers.preflightStatusClass({{ ready: false, errors: 0 }}), "error");
 assert.equal(helpers.preflightStatusClass({{ ready: true, warnings: 1 }}), "warning");
 assert.equal(helpers.preflightStatusClass({{ ready: true, warnings: 0 }}), "ready");
+
+assert.equal(helpers.topPrimaryHint({{
+  primaryAction: {{ action: "start-export", label: "Procesar 4 imágenes" }},
+  title: "Listo",
+}}), "Procesar 4 imágenes. Atajo: Ctrl+E");
+assert.equal(helpers.topPrimaryHint({{
+  primaryAction: {{ action: "pick-bridge-folder", label: "Seleccionar carpeta" }},
+}}), "Seleccionar carpeta de entrada");
+assert.equal(helpers.topPrimaryHint({{
+  primaryAction: {{ action: "review-warnings", label: "Revisar" }},
+}}), "Revisar avisos del lote");
+assert.equal(helpers.topPrimaryHint({{
+  primaryAction: {{ action: "open-output", label: "Abrir" }},
+}}), "Abrir carpeta de salida");
+assert.equal(helpers.topPrimaryHint({{
+  primaryAction: {{ label: "Continuar" }},
+  title: "Fallback",
+}}), "Continuar");
+assert.equal(helpers.topPrimaryHint({{
+  primaryAction: {{}},
+  title: "Fallback",
+}}), "Fallback");
+
+assert.equal(helpers.statusBarText({{
+  batch: "none",
+}}), "Sin lote · Elige una carpeta para empezar");
+assert.equal(helpers.statusBarText({{
+  batch: "scanning",
+  scanStatus: "Leyendo carpeta",
+}}), "Escaneando · Leyendo carpeta");
+assert.equal(helpers.statusBarText({{
+  batch: "empty",
+  scanStatus: "",
+}}), "0 imágenes · Cambia de carpeta");
+assert.equal(helpers.statusBarText({{
+  exportStatus: "running",
+  paused: false,
+  processed: 2,
+  plannedTotal: 8,
+  exportableImageCount: 4,
+  statusText: "Procesando 2/8",
+}}), "Exportando 2/8 · Procesando 2/8");
+assert.equal(helpers.statusBarText({{
+  exportStatus: "running",
+  paused: true,
+  processed: 2,
+  plannedTotal: 0,
+  exportableImageCount: 4,
+  statusText: "Pausado",
+}}), "Pausado 2/4 · Pausado");
+assert.equal(helpers.statusBarText({{
+  exportStatus: "completed",
+  exportResultProcessed: 7,
+  exportResultTotal: 8,
+  exportableImageCount: 4,
+}}), "Última exportación completada · 7/8 archivos");
+assert.equal(helpers.statusBarText({{
+  exportStatus: "partial",
+  processed: 5,
+  exportResultTotal: 8,
+  exportableImageCount: 4,
+}}), "Última exportación con avisos · 5/8 archivos");
+assert.equal(helpers.statusBarText({{
+  exportStatus: "failed",
+  firstErrorDetail: "Destino ocupado",
+}}), "Exportación fallida · Destino ocupado");
+assert.equal(helpers.statusBarText({{
+  batch: "ready",
+  counts: {{ exportableImages: 3, nonBlockingWarnings: 1 }},
+  imageCount: 5,
+  selectedIndex: 1,
+  outputCount: 1,
+  destinationMode: "source",
+  destinationValue: "_SALIDA_PRO",
+}}), "3 exportables · Imagen 2/5 · 1 aviso · Salida: origen / _SALIDA_PRO");
+assert.equal(helpers.statusBarText({{
+  batch: "ready",
+  counts: {{ exportableImages: 3, nonBlockingWarnings: 0 }},
+  imageCount: 5,
+  selectedIndex: -1,
+  outputCount: 2,
+  destinationMode: "custom",
+  destinationValue: "C:/Export",
+}}), "3 exportables · Sin selección · Salida: 2 salidas");
+assert.equal(helpers.statusBarText({{
+  batch: "ready",
+  counts: {{ exportableImages: 3, nonBlockingWarnings: 0 }},
+  imageCount: 5,
+  selectedIndex: 0,
+  outputCount: 1,
+  destinationMode: "custom",
+  destinationValue: "",
+}}), "3 exportables · Imagen 1/5 · Salida: sin destino");
 """
     result = subprocess.run(
         ["node", "-e", script],

@@ -778,6 +778,33 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 33 - Extraccion de textos de estado inferior
+
+Estado: completada.
+
+Cambios realizados:
+- `top-status-view.js` ahora tambien calcula:
+  - tooltip/hint de la accion primaria superior;
+  - texto de la barra inferior para estados sin lote, escaneo, lote vacio, listo, exportando, completado, parcial y fallido.
+- `app.js` conserva seleccion, conteos, estado de exportacion, destino y errores; solo delega reglas de microcopy/presentacion.
+- Se amplio `tests/test_frontend_top_status_view.py` para cubrir las ramas de footer y accion primaria.
+
+Impacto medido:
+- `app.js`: 7.231 -> 7.202 lineas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: sin cambios, 22.
+
+Validaciones ejecutadas:
+- `node --check apps/flatshot-desktop/frontend/top-status-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_top_status_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 282 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- HTTP local: `index.html`, `top-status-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

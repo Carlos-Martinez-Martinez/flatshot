@@ -147,11 +147,76 @@
     return "ready";
   }
 
+  function topPrimaryHint(options = {}) {
+    const primaryAction = options.primaryAction || {};
+    const action = primaryAction.action || "";
+    if (action === "start-export") {
+      return `${primaryAction.label}. Atajo: Ctrl+E`;
+    }
+    if (action === "pick-bridge-folder") {
+      return "Seleccionar carpeta de entrada";
+    }
+    if (action === "review-warnings") {
+      return "Revisar avisos del lote";
+    }
+    if (action === "open-output") {
+      return "Abrir carpeta de salida";
+    }
+    return primaryAction.label || options.title;
+  }
+
+  function statusBarText(options = {}) {
+    const exportStatus = options.exportStatus || "idle";
+    const batch = options.batch || "none";
+    const counts = options.counts || {};
+    const imageCount = Number(options.imageCount) || 0;
+    const selectedIndex = Number(options.selectedIndex);
+    const selectedText = selectedIndex >= 0 ? `Imagen ${selectedIndex + 1}/${imageCount}` : "Sin selección";
+    const destination = Number(options.outputCount) > 1
+      ? countLabel(options.outputCount, "salida", "salidas")
+      : options.destinationMode === "custom"
+        ? options.destinationValue || "sin destino"
+        : `origen / ${options.destinationValue}`;
+
+    if (exportStatus === "running") {
+      const total = Number(options.plannedTotal) || Number(options.exportableImageCount) || 0;
+      return `${options.paused ? "Pausado" : "Exportando"} ${Number(options.processed) || 0}/${total} · ${options.statusText || ""}`;
+    }
+    if (exportStatus === "completed") {
+      const total = Number(options.exportResultTotal ?? options.exportableImageCount ?? 0);
+      const processed = Number(options.exportResultProcessed ?? total);
+      return `Última exportación completada · ${processed}/${total} archivos`;
+    }
+    if (exportStatus === "partial") {
+      const total = Number(options.exportResultTotal ?? options.exportableImageCount ?? 0);
+      const processed = Number(options.exportResultProcessed ?? options.processed ?? 0);
+      return `Última exportación con avisos · ${processed}/${total} archivos`;
+    }
+    if (exportStatus === "failed") {
+      return `Exportación fallida · ${options.firstErrorDetail || "Revisa avisos"}`;
+    }
+    if (batch === "none") {
+      return "Sin lote · Elige una carpeta para empezar";
+    }
+    if (batch === "scanning") {
+      return `Escaneando · ${options.scanStatus || ""}`;
+    }
+    if (batch === "empty") {
+      return `0 imágenes · ${options.scanStatus || "Cambia de carpeta"}`;
+    }
+
+    const warnings = Number(counts.nonBlockingWarnings) || 0;
+    const warningText = warnings ? ` · ${countLabel(warnings, "aviso", "avisos")}` : "";
+    return `${Number(counts.exportableImages) || 0} exportables · ${selectedText}${warningText} · Salida: ${destination}`;
+  }
+
   return {
     compactHeaderStatusText,
     escapeHtml,
     preflightStatusClass,
     preflightStatusLabel,
+    statusBarText,
+    topPrimaryHint,
     topStatusSummaryHtml,
     topStatusText,
   };

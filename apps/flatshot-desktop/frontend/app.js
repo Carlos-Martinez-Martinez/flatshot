@@ -6332,20 +6332,7 @@ function renderAccessibilityHints() {
 }
 
 function topPrimaryHint(visible) {
-  const action = visible.primaryAction?.action || "";
-  if (action === "start-export") {
-    return `${visible.primaryAction.label}. Atajo: Ctrl+E`;
-  }
-  if (action === "pick-bridge-folder") {
-    return "Seleccionar carpeta de entrada";
-  }
-  if (action === "review-warnings") {
-    return "Revisar avisos del lote";
-  }
-  if (action === "open-output") {
-    return "Abrir carpeta de salida";
-  }
-  return visible.primaryAction?.label || visible.title;
+  return topStatusViewHelpers.topPrimaryHint(visible);
 }
 
 function setControlHint(target, hint) {
@@ -6401,41 +6388,25 @@ function statusBarText() {
   const images = activeImages();
   const counts = batchCounts();
   const selectedIndex = images.findIndex((image) => image.id === state.selectedImageId);
-  const selectedText = selectedIndex >= 0 ? `Imagen ${selectedIndex + 1}/${images.length}` : "Sin selección";
-  const destination = exportOutputCount() > 1
-    ? outputCountLabel(exportOutputCount())
-    : state.destinationMode === "custom"
-      ? state.destinationValue || "sin destino"
-      : `origen / ${state.destinationValue}`;
-
-  if (state.exportStatus === "running") {
-    const total = plannedExportTotal() || exportableImages().length;
-    return `${state.paused ? "Pausado" : "Exportando"} ${state.processed}/${total} · ${state.statusText}`;
-  }
-  if (state.exportStatus === "completed") {
-    const total = Number(state.exportResult?.total ?? exportableImages().length ?? 0);
-    const processed = Number(state.exportResult?.processed ?? total);
-    return `Última exportación completada · ${processed}/${total} archivos`;
-  }
-  if (state.exportStatus === "partial") {
-    const total = Number(state.exportResult?.total ?? exportableImages().length ?? 0);
-    const processed = Number(state.exportResult?.processed ?? state.processed ?? 0);
-    return `Última exportación con avisos · ${processed}/${total} archivos`;
-  }
-  if (state.exportStatus === "failed") {
-    return `Exportación fallida · ${state.errors[0]?.detail || "Revisa avisos"}`;
-  }
-  if (state.batch === "none") {
-    return "Sin lote · Elige una carpeta para empezar";
-  }
-  if (state.batch === "scanning") {
-    return `Escaneando · ${state.scanStatus}`;
-  }
-  if (state.batch === "empty") {
-    return `0 imágenes · ${state.scanStatus || "Cambia de carpeta"}`;
-  }
-  const warningText = counts.nonBlockingWarnings ? ` · ${countText(counts.nonBlockingWarnings, "aviso", "avisos")}` : "";
-  return `${counts.exportableImages} exportables · ${selectedText}${warningText} · Salida: ${destination}`;
+  return topStatusViewHelpers.statusBarText({
+    batch: state.batch,
+    counts,
+    destinationMode: state.destinationMode,
+    destinationValue: state.destinationValue,
+    exportResultProcessed: state.exportResult?.processed,
+    exportResultTotal: state.exportResult?.total,
+    exportStatus: state.exportStatus,
+    exportableImageCount: exportableImages().length,
+    firstErrorDetail: state.errors[0]?.detail,
+    imageCount: images.length,
+    outputCount: exportOutputCount(),
+    paused: state.paused,
+    plannedTotal: plannedExportTotal(),
+    processed: state.processed,
+    scanStatus: state.scanStatus,
+    selectedIndex,
+    statusText: state.statusText,
+  });
 }
 
 function previewFooterLabel() {

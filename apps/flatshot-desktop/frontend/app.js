@@ -91,6 +91,7 @@ const exportConfirmViewHelpers = window.FlatShotExportConfirmView;
 const emptyStateViewHelpers = window.FlatShotEmptyStateView;
 const batchDetailViewHelpers = window.FlatShotBatchDetailView;
 const galleryHelpers = window.FlatShotGallery;
+const previewViewHelpers = window.FlatShotPreviewView;
 const previewStateHelpers = window.FlatShotPreviewState;
 const inspectorOutputViewHelpers = window.FlatShotInspectorOutputView;
 const inspectorReviewViewHelpers = window.FlatShotInspectorReviewView;
@@ -4453,13 +4454,7 @@ function renderPreview() {
   }
 
   if (state.previewStatus === "loading") {
-    canvas.innerHTML = `
-      <div class="preview-state">
-        <span class="loader" aria-hidden="true"></span>
-        <strong>Generando vista</strong>
-        <span>${escapeHtml(image.name)}</span>
-      </div>
-    `;
+    canvas.innerHTML = previewViewHelpers.previewLoadingHtml(image.name);
     queueFitZoomRefresh();
     return;
   }
@@ -4470,13 +4465,9 @@ function renderPreview() {
     return;
   }
 
-  canvas.innerHTML = `
-    <div class="mock-product" aria-hidden="true">
-      <div class="mock-shadow"></div>
-      <div class="mock-body"></div>
-    </div>
-    ${state.previewStatus === "warning" ? '<div class="preview-warning-card">Render con fallback. Revisa antes de exportar.</div>' : ""}
-  `;
+  canvas.innerHTML = previewViewHelpers.mockPreviewHtml({
+    warning: state.previewStatus === "warning" ? "Render con fallback. Revisa antes de exportar." : "",
+  });
   queueFitZoomRefresh();
 }
 
@@ -4532,13 +4523,7 @@ function calculateFitZoom() {
 
 function realPreviewHtml(image) {
   if (state.previewStatus === "loading") {
-    return `
-      <div class="preview-state">
-        <span class="loader" aria-hidden="true"></span>
-        <strong>Generando vista</strong>
-        <span>${escapeHtml(image.name)}</span>
-      </div>
-    `;
+    return previewViewHelpers.previewLoadingHtml(image.name);
   }
 
   if (state.previewStatus === "error") {
@@ -4546,25 +4531,20 @@ function realPreviewHtml(image) {
   }
 
   if (state.previewData?.src) {
-    const width = Number(state.previewData.width) || 0;
-    const height = Number(state.previewData.height) || 0;
-    const zoomWidth = width ? Math.max(1, Math.round(width * state.zoom / 100)) : "";
-    const zoomHeight = height ? Math.max(1, Math.round(height * state.zoom / 100)) : "";
-    const sizeStyle = zoomWidth && zoomHeight ? ` style="width: ${zoomWidth}px; height: ${zoomHeight}px;" width="${width}" height="${height}"` : "";
-    return `
-      <img class="preview-image" src="${escapeHtml(state.previewData.src)}" alt="Vista previa de ${escapeHtml(image.name)}"${sizeStyle} />
-      ${state.previewData.warning ? `<div class="preview-warning-card">${escapeHtml(state.previewData.warning)}</div>` : ""}
-    `;
+    return previewViewHelpers.realPreviewImageHtml({
+      src: state.previewData.src,
+      imageName: image.name,
+      width: state.previewData.width,
+      height: state.previewData.height,
+      zoom: state.zoom,
+      warning: state.previewData.warning,
+    });
   }
 
-  return `
-    <div class="real-preview-placeholder">
-      <strong>Vista pendiente</strong>
-      <span>Imagen seleccionada: ${escapeHtml(image.name)}</span>
-      <small class="path-line">Ruta: ${escapeHtml(image.path || "Sin ruta")}</small>
-      <small>Genera la vista al seleccionar la imagen.</small>
-    </div>
-  `;
+  return previewViewHelpers.realPreviewPlaceholderHtml({
+    imageName: image.name,
+    imagePath: image.path,
+  });
 }
 
 function bridgePreviewMeta() {
@@ -4640,13 +4620,7 @@ function initialStateHtml() {
 }
 
 function scanningStateHtml() {
-  return `
-    <div class="empty-state inline scanning-state">
-      <span class="loader" aria-hidden="true"></span>
-      <strong>Escaneando carpeta...</strong>
-      <span>${escapeHtml(state.scanStatus || "Leyendo imágenes")}</span>
-    </div>
-  `;
+  return previewViewHelpers.scanningStateHtml(state.scanStatus);
 }
 
 function previewOrientation() {

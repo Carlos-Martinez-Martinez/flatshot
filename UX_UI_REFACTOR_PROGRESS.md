@@ -463,6 +463,39 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 23 - Extraccion de vista del preview
+
+Estado: completada.
+
+Cambios realizados:
+- Se agrego `apps/flatshot-desktop/frontend/preview-view.js`.
+- Se movio HTML puro del canvas de preview fuera de `app.js`:
+  - estado de carga de preview;
+  - estado de escaneo;
+  - imagen real generada con dimensiones de zoom;
+  - placeholder de preview real pendiente;
+  - preview mock y aviso de fallback.
+- `index.html` carga el helper antes de `app.js`.
+- `app.js` conserva seleccion, modo bridge/mock, calculos de zoom, pan, clases del canvas, estado de preview y decisiones de flujo; solo delega presentacion.
+- Se agrego `tests/test_frontend_preview_view.py` para HTML, escaping, warning, dimensiones de zoom y orden de carga.
+
+Impacto medido:
+- `app.js`: 7.530 -> 7.504 lineas.
+- Modulos JS frontend: 20 -> 21.
+- Tests frontend `test_frontend_*.py`: 19 -> 20.
+
+Validaciones ejecutadas:
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_preview_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 278 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- `node --check apps/flatshot-desktop/frontend/preview-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en Windows.
+- HTTP local en `http://127.0.0.1:4203/`: `index.html`, `preview-view.js`, `preview-state.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

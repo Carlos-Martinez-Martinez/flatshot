@@ -3867,14 +3867,10 @@ function mockThumbnailDataUrl(image) {
 }
 
 function thumbnailState(image, src) {
-  if (!src) {
-    return { status: "error", error: "Sin preview" };
-  }
-  const stored = state.thumbnailStatus[image.id];
-  if (stored?.src === src || stored?.sourceSrc === src) {
-    return stored;
-  }
-  return { status: "loading", src, error: "" };
+  return galleryHelpers.thumbnailState({
+    src,
+    stored: state.thumbnailStatus[image.id],
+  });
 }
 
 function thumbnailHtml(image) {

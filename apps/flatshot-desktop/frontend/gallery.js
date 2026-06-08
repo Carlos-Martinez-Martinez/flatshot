@@ -213,6 +213,18 @@
     return "✓";
   }
 
+  function thumbnailState(options = {}) {
+    const src = options.src || "";
+    if (!src) {
+      return { status: "error", error: "Sin preview" };
+    }
+    const stored = options.stored || null;
+    if (stored?.src === src || stored?.sourceSrc === src) {
+      return stored;
+    }
+    return { status: "loading", src, error: "" };
+  }
+
   function thumbnailHtml(image, current = {}, src = "") {
     const status = current.status || "loading";
     const error = current.error || "Sin preview";
@@ -293,6 +305,7 @@
     isExcludedImage,
     isValidImage,
     resolveAvailableFilter,
+    thumbnailState,
     thumbnailHtml,
   };
 });

@@ -127,6 +127,32 @@ assert.equal(helpers.assetStatusIcon("error"), "×");
 assert.equal(helpers.assetStatusIcon("exported"), "✓");
 assert.equal(helpers.assetStatusIcon("adjusted"), "*");
 
+assert.deepEqual(helpers.thumbnailState({{
+  src: "",
+  stored: null,
+}}), {{
+  status: "error",
+  error: "Sin preview",
+}});
+const storedBySrc = {{ status: "loaded", src: "thumb-a", resolvedSrc: "thumb-a" }};
+assert.equal(helpers.thumbnailState({{
+  src: "thumb-a",
+  stored: storedBySrc,
+}}), storedBySrc);
+const storedBySourceSrc = {{ status: "loaded", sourceSrc: "thumb-b", resolvedSrc: "thumb-rendered" }};
+assert.equal(helpers.thumbnailState({{
+  src: "thumb-b",
+  stored: storedBySourceSrc,
+}}), storedBySourceSrc);
+assert.deepEqual(helpers.thumbnailState({{
+  src: "thumb-new",
+  stored: {{ status: "loaded", src: "thumb-old" }},
+}}), {{
+  status: "loading",
+  src: "thumb-new",
+  error: "",
+}});
+
 const thumb = helpers.thumbnailHtml(
   {{ id: "img-1", name: "Camisa <azul>.png" }},
   {{ status: "error", resolvedSrc: "data:image/png,<x>", error: "Sin <preview>" }},

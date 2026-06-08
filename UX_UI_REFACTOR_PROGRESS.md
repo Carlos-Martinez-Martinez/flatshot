@@ -865,6 +865,34 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 36 - Extraccion de estado de miniatura
+
+Estado: completada.
+
+Cambios realizados:
+- `gallery.js` ahora expone `thumbnailState()` para decidir entre:
+  - preview ausente (`Sin preview`);
+  - estado almacenado compatible por `src` o `sourceSrc`;
+  - estado inicial `loading`.
+- `app.js` conserva el acceso al estado real `state.thumbnailStatus` y solo delega la decision pura.
+- Se amplio `tests/test_frontend_gallery.py` para cubrir los tres caminos del estado de miniatura.
+
+Impacto medido:
+- `app.js`: 7.183 -> 7.179 lineas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: sin cambios, 22.
+
+Validaciones ejecutadas:
+- `node --check apps/flatshot-desktop/frontend/gallery.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_gallery.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 282 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- HTTP local: `index.html`, `gallery.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

@@ -75,6 +75,37 @@
     };
   }
 
+  function contextualPreflightRows(options = {}) {
+    if (options.batch === "scanning") {
+      return [
+        { state: "pending", title: "Carpeta seleccionada", detail: "Leyendo origen" },
+        { state: "pending", title: "Imágenes listas", detail: "Contando archivos" },
+        { state: "pending", title: "Destino", detail: "Se configurará después" },
+      ];
+    }
+    if (options.batch === "none") {
+      return [
+        { state: "pending", title: "Carpeta seleccionada", detail: "Pendiente" },
+        { state: "pending", title: "Imágenes listas", detail: "Pendiente" },
+        { state: "pending", title: "Destino de salida", detail: "Origen / _SALIDA_PRO" },
+      ];
+    }
+    if (options.batch === "empty") {
+      const totalFiles = Number(options.totalFiles) || 0;
+      return [
+        {
+          state: "warning",
+          title: "Carpeta revisada",
+          detail: totalFiles ? `${totalFiles} archivos encontrados` : "Sin archivos compatibles",
+        },
+        { state: "error", title: "Imágenes exportables", detail: "0 imágenes" },
+        { state: "pending", title: "Ignorados", detail: options.ignoredSummary || "Sin archivos ignorados" },
+        { state: "pending", title: "Destino", detail: "Pendiente hasta cargar un lote" },
+      ];
+    }
+    return [];
+  }
+
   function contextualInspectorHtml(options = {}) {
     const state = options.batch || "ready";
     const preflightHtml = options.preflightHtml || "";
@@ -138,6 +169,7 @@
 
   return {
     contextualInspectorHtml,
+    contextualPreflightRows,
     escapeHtml,
     inspectorMode,
     inspectorSubviewHeaderState,

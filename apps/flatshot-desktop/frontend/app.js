@@ -4848,22 +4848,18 @@ function contextualInspectorHtml() {
       batch: state.batch,
       scanStatus: state.scanStatus,
       progressHtml: progressPanelHtml("Preparando lote"),
-      preflightHtml: preflightListHtml([
-          { state: "pending", title: "Carpeta seleccionada", detail: "Leyendo origen" },
-          { state: "pending", title: "Imágenes listas", detail: "Contando archivos" },
-          { state: "pending", title: "Destino", detail: "Se configurará después" },
-      ]),
+      preflightHtml: preflightListHtml(inspectorContextViewHelpers.contextualPreflightRows({
+        batch: state.batch,
+      })),
     });
   }
 
   if (state.batch === "none") {
     return inspectorContextViewHelpers.contextualInspectorHtml({
       batch: state.batch,
-      preflightHtml: preflightListHtml([
-          { state: "pending", title: "Carpeta seleccionada", detail: "Pendiente" },
-          { state: "pending", title: "Imágenes listas", detail: "Pendiente" },
-          { state: "pending", title: "Destino de salida", detail: "Origen / _SALIDA_PRO" },
-      ]),
+      preflightHtml: preflightListHtml(inspectorContextViewHelpers.contextualPreflightRows({
+        batch: state.batch,
+      })),
       outputSummary: `${state.format} · ${state.size} · ${backgroundLabel(state.background)}`,
       activePreset: state.activePreset,
     });
@@ -4873,12 +4869,11 @@ function contextualInspectorHtml() {
     return inspectorContextViewHelpers.contextualInspectorHtml({
       batch: state.batch,
       scanStatus: state.scanStatus,
-      preflightHtml: preflightListHtml([
-          { state: "warning", title: "Carpeta revisada", detail: state.scanDiagnostics.totalFiles ? `${state.scanDiagnostics.totalFiles} archivos encontrados` : "Sin archivos compatibles" },
-          { state: "error", title: "Imágenes exportables", detail: "0 imágenes" },
-          { state: ignoredOmissions().length ? "pending" : "pending", title: "Ignorados", detail: ignoredSummaryText() },
-          { state: "pending", title: "Destino", detail: "Pendiente hasta cargar un lote" },
-      ]),
+      preflightHtml: preflightListHtml(inspectorContextViewHelpers.contextualPreflightRows({
+        batch: state.batch,
+        ignoredSummary: ignoredSummaryText(),
+        totalFiles: state.scanDiagnostics.totalFiles,
+      })),
     });
   }
 

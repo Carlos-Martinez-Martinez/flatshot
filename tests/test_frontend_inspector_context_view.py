@@ -94,6 +94,28 @@ assert.deepEqual(helpers.inspectorSubviewHeaderState({{
   showManageAction: false,
 }});
 
+assert.deepEqual(helpers.contextualPreflightRows({{ batch: "scanning" }}), [
+  {{ state: "pending", title: "Carpeta seleccionada", detail: "Leyendo origen" }},
+  {{ state: "pending", title: "Imágenes listas", detail: "Contando archivos" }},
+  {{ state: "pending", title: "Destino", detail: "Se configurará después" }},
+]);
+assert.deepEqual(helpers.contextualPreflightRows({{ batch: "none" }}), [
+  {{ state: "pending", title: "Carpeta seleccionada", detail: "Pendiente" }},
+  {{ state: "pending", title: "Imágenes listas", detail: "Pendiente" }},
+  {{ state: "pending", title: "Destino de salida", detail: "Origen / _SALIDA_PRO" }},
+]);
+assert.deepEqual(helpers.contextualPreflightRows({{
+  batch: "empty",
+  totalFiles: 7,
+  ignoredSummary: "2 archivos ignorados",
+}}), [
+  {{ state: "warning", title: "Carpeta revisada", detail: "7 archivos encontrados" }},
+  {{ state: "error", title: "Imágenes exportables", detail: "0 imágenes" }},
+  {{ state: "pending", title: "Ignorados", detail: "2 archivos ignorados" }},
+  {{ state: "pending", title: "Destino", detail: "Pendiente hasta cargar un lote" }},
+]);
+assert.equal(helpers.contextualPreflightRows({{ batch: "ready" }}).length, 0);
+
 const header = helpers.inspectorSubviewHeaderHtml({{
   title: "Editar <ajuste>",
   subtitle: 'Luz "cenital"',

@@ -35,6 +35,65 @@ assert.equal(helpers.inspectorMode({{ outputEditMode: false, inspectorTab: "warn
 assert.equal(helpers.inspectorMode({{ outputEditMode: false, inspectorTab: "review" }}), "summary");
 assert.equal(helpers.inspectorMode({{ outputEditMode: false, inspectorTab: "unknown" }}), "summary");
 
+assert.deepEqual(helpers.inspectorSubviewHeaderState({{
+  mode: "output",
+  outputEditMode: true,
+  outputLabel: "JPG · 1800×2400",
+}}), {{
+  title: "Salida",
+  subtitle: "Editar salida",
+  detail: "",
+  backAction: "cancel-output-edit",
+  backLabel: "Cancelar",
+  showManageAction: false,
+}});
+assert.deepEqual(helpers.inspectorSubviewHeaderState({{
+  mode: "advanced",
+  activePreset: "Luz cenital",
+  presetSourceLabel: "Global · Modificado",
+}}), {{
+  title: "Editar ajuste",
+  subtitle: "Luz cenital",
+  detail: "Global · Modificado",
+  backAction: "close-inspector-subview",
+  backLabel: "Volver",
+  showManageAction: true,
+}});
+assert.deepEqual(helpers.inspectorSubviewHeaderState({{
+  mode: "advanced",
+  activePreset: "Luz cenital",
+  presetEditorOpen: true,
+  presetSourceLabel: "Global",
+}}), {{
+  title: "Gestionar ajustes",
+  subtitle: "Luz cenital",
+  detail: "Global",
+  backAction: "close-preset-editor",
+  backLabel: "Volver",
+  showManageAction: false,
+}});
+assert.deepEqual(helpers.inspectorSubviewHeaderState({{
+  mode: "warnings",
+  warningCount: 2,
+}}), {{
+  title: "Revisar",
+  subtitle: "2 puntos",
+  detail: "",
+  backAction: "close-inspector-subview",
+  backLabel: "Volver",
+  showManageAction: false,
+}});
+assert.deepEqual(helpers.inspectorSubviewHeaderState({{
+  mode: "unknown",
+}}), {{
+  title: "Detalle",
+  subtitle: "",
+  detail: "",
+  backAction: "close-inspector-subview",
+  backLabel: "Volver",
+  showManageAction: false,
+}});
+
 const header = helpers.inspectorSubviewHeaderHtml({{
   title: "Editar <ajuste>",
   subtitle: 'Luz "cenital"',

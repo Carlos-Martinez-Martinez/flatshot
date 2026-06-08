@@ -44,6 +44,37 @@
     return "summary";
   }
 
+  function inspectorSubviewHeaderState(options = {}) {
+    const mode = options.mode || "summary";
+    const isPresetManager = mode === "advanced" && Boolean(options.presetEditorOpen);
+    const warningCount = Number(options.warningCount) || 0;
+    const labels = {
+      output: ["Salida", options.outputEditMode ? "Editar salida" : options.outputLabel],
+      advanced: [
+        isPresetManager ? "Gestionar ajustes" : "Editar ajuste",
+        options.activePreset,
+        options.presetSourceLabel,
+      ],
+      warnings: [
+        "Revisar",
+        warningCount ? `${warningCount} punto${warningCount === 1 ? "" : "s"}` : "Sin avisos",
+      ],
+    };
+    const [title, subtitle, detail = ""] = labels[mode] || ["Detalle", ""];
+    return {
+      title,
+      subtitle,
+      detail,
+      backAction: options.outputEditMode
+        ? "cancel-output-edit"
+        : isPresetManager
+          ? "close-preset-editor"
+          : "close-inspector-subview",
+      backLabel: options.outputEditMode ? "Cancelar" : "Volver",
+      showManageAction: mode === "advanced" && !isPresetManager,
+    };
+  }
+
   function contextualInspectorHtml(options = {}) {
     const state = options.batch || "ready";
     const preflightHtml = options.preflightHtml || "";
@@ -109,6 +140,7 @@
     contextualInspectorHtml,
     escapeHtml,
     inspectorMode,
+    inspectorSubviewHeaderState,
     inspectorSubviewHeaderHtml,
   };
 });

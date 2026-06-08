@@ -4829,23 +4829,17 @@ function actionableIssueRows() {
 }
 
 function inspectorSubviewHeaderHtml(mode) {
-  const isPresetManager = mode === "advanced" && state.presetEditorOpen;
-  const labels = {
-    output: ["Salida", state.outputEditMode ? "Editar salida" : viewerOutputCompactLabel()],
-    advanced: [isPresetManager ? "Gestionar ajustes" : "Editar ajuste", state.activePreset, presetSourceLabel()],
-    warnings: ["Revisar", actionableIssueRows().length ? `${actionableIssueRows().length} punto${actionableIssueRows().length === 1 ? "" : "s"}` : "Sin avisos"],
-  };
-  const [title, subtitle, detail = ""] = labels[mode] || ["Detalle", ""];
-  const backAction = state.outputEditMode ? "cancel-output-edit" : isPresetManager ? "close-preset-editor" : "close-inspector-subview";
-  const backLabel = state.outputEditMode ? "Cancelar" : "Volver";
-  return inspectorContextViewHelpers.inspectorSubviewHeaderHtml({
-    title,
-    subtitle,
-    detail,
-    backAction,
-    backLabel,
-    showManageAction: mode === "advanced" && !isPresetManager,
-  });
+  return inspectorContextViewHelpers.inspectorSubviewHeaderHtml(
+    inspectorContextViewHelpers.inspectorSubviewHeaderState({
+      activePreset: state.activePreset,
+      mode,
+      outputEditMode: state.outputEditMode,
+      outputLabel: viewerOutputCompactLabel(),
+      presetEditorOpen: state.presetEditorOpen,
+      presetSourceLabel: presetSourceLabel(),
+      warningCount: actionableIssueRows().length,
+    })
+  );
 }
 
 function contextualInspectorHtml() {

@@ -95,10 +95,82 @@
   `;
   }
 
+  function selectedImageInspectorCardHtml(options = {}) {
+    if (!options.hasReadyBatch) {
+      return "";
+    }
+    const image = options.image || null;
+    if (!image) {
+      return `
+      <section class="inspector-compact-row">
+        <div>
+          <span>Imagen</span>
+          <strong>Sin selección</strong>
+        </div>
+        <button type="button" data-action="select-first-image">Seleccionar primera</button>
+      </section>
+    `;
+    }
+    return `
+      <section class="inspector-compact-row">
+        <div>
+          <span>Imagen seleccionada</span>
+          <strong title="${escapeHtml(image.path || image.name)}">${escapeHtml(image.name)}</strong>
+          <small>${escapeHtml(options.detail || "")}</small>
+        </div>
+      ${options.hasLocal ? '<button type="button" data-action="reset-local-adjustment">Quitar ajuste</button>' : ""}
+    </section>
+  `;
+  }
+
+  function issuesInspectorCardHtml(options = {}) {
+    const rows = Array.isArray(options.rows) ? options.rows : [];
+    if (!rows.length) {
+      return "";
+    }
+    const tone = options.blocking ? "error" : "warning";
+    const title = options.blocking ? "Exportación bloqueada" : "Revisar";
+    return `
+    <section class="inspector-alert ${tone}">
+      <div class="inspector-alert__head">
+        <span>${escapeHtml(title)}</span>
+        <strong>${escapeHtml(options.countLabel || "")}</strong>
+      </div>
+      <div class="inspector-alert__list">
+        ${rows.slice(0, 3).map((row) => `
+          <span title="${escapeHtml(row.path || row.detail || row.title)}">${escapeHtml(row.title)}</span>
+        `).join("")}
+      </div>
+      <div class="inspector-alert__actions">
+        <button type="button" data-action="review-errors">Revisar avisos</button>
+      </div>
+    </section>
+  `;
+  }
+
+  function aspectInspectorCardHtml(options = {}) {
+    if (!options.hasReadyBatch) {
+      return "";
+    }
+    return `
+    <section class="inspector-compact-row inspector-compact-row--quiet">
+      <div>
+        <span>Ajuste</span>
+        <strong>${escapeHtml(options.activePreset || "")}</strong>
+        <small>${escapeHtml(options.statusLabel || "Global")}</small>
+      </div>
+      <button type="button" data-action="open-advanced">Editar ajuste</button>
+    </section>
+  `;
+  }
+
   return {
+    aspectInspectorCardHtml,
     escapeHtml,
+    issuesInspectorCardHtml,
     lotInspectorSummaryHtml,
     reviewIssueListHtml,
     reviewPanelHtml,
+    selectedImageInspectorCardHtml,
   };
 });

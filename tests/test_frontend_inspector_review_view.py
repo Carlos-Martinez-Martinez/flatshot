@@ -95,6 +95,49 @@ const localHtml = helpers.reviewPanelHtml({{
 assert.equal(localHtml.includes('data-action="reset-local-adjustment"'), true);
 assert.equal(localHtml.includes('data-action="previous-image" disabled'), true);
 assert.equal(localHtml.includes('data-action="review-errors"'), false);
+
+assert.equal(helpers.selectedImageInspectorCardHtml({{ hasReadyBatch: false }}), "");
+const emptySelected = helpers.selectedImageInspectorCardHtml({{
+  hasReadyBatch: true,
+  image: null,
+}});
+assert.equal(emptySelected.includes("Sin selección"), true);
+assert.equal(emptySelected.includes('data-action="select-first-image"'), true);
+
+const selectedCard = helpers.selectedImageInspectorCardHtml({{
+  hasReadyBatch: true,
+  image: {{ name: "camisa <azul>.png", path: "C:/camisa.png" }},
+  detail: 'Detalle "x"',
+  hasLocal: true,
+}});
+assert.equal(selectedCard.includes("Imagen seleccionada"), true);
+assert.equal(selectedCard.includes("camisa &lt;azul&gt;.png"), true);
+assert.equal(selectedCard.includes("Detalle &quot;x&quot;"), true);
+assert.equal(selectedCard.includes('data-action="reset-local-adjustment"'), true);
+
+const alertHtml = helpers.issuesInspectorCardHtml({{
+  rows: [
+    {{ level: "error", title: "Destino <ocupado>", detail: "Ya existe", path: "C:/out" }},
+    {{ level: "warning", title: "Alpha", detail: "Bajo" }},
+  ],
+  blocking: true,
+  countLabel: "1 bloqueo",
+}});
+assert.equal(alertHtml.includes('class="inspector-alert error"'), true);
+assert.equal(alertHtml.includes("Exportación bloqueada"), true);
+assert.equal(alertHtml.includes("Destino &lt;ocupado&gt;"), true);
+assert.equal(alertHtml.includes('data-action="review-errors"'), true);
+assert.equal(helpers.issuesInspectorCardHtml({{ rows: [] }}), "");
+
+const aspect = helpers.aspectInspectorCardHtml({{
+  hasReadyBatch: true,
+  activePreset: "Luz <cenital>",
+  statusLabel: "Global · Modificado",
+}});
+assert.equal(aspect.includes("Luz &lt;cenital&gt;"), true);
+assert.equal(aspect.includes("Global · Modificado"), true);
+assert.equal(aspect.includes('data-action="open-advanced"'), true);
+assert.equal(helpers.aspectInspectorCardHtml({{ hasReadyBatch: false }}), "");
 """
     result = subprocess.run(
         ["node", "-e", script],

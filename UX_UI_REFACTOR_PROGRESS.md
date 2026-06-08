@@ -374,6 +374,33 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 19 - Extension de vista del inspector para tarjetas compactas
+
+Estado: completada.
+
+Cambios realizados:
+- `inspector-review-view.js` ahora tambien renderiza:
+  - tarjeta compacta de imagen seleccionada;
+  - alerta compacta de issues;
+  - tarjeta compacta de ajuste activo.
+- `app.js` conserva seleccion, deduplicacion de issues, conteos y estado del preset; solo delega presentacion.
+- Se amplio `tests/test_frontend_inspector_review_view.py` para cubrir seleccion vacia, imagen con ajuste local, alertas y tarjeta de ajuste.
+
+Impacto medido:
+- `app.js`: 7.659 -> 7.620 lineas.
+
+Validaciones ejecutadas:
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_inspector_review_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 272 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- `node --check apps/flatshot-desktop/frontend/inspector-review-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en Windows.
+- HTTP local en `http://127.0.0.1:4199/`: `index.html`, `inspector-review-view.js`, `inspector-output-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 18 - Extraccion de vista de salidas del inspector
 
 Estado: completada.

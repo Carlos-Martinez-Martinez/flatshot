@@ -5100,31 +5100,13 @@ function outputTemporaryNoticeHtml() {
 
 function selectedImageInspectorCardHtml() {
   const image = selectedImage();
-  if (!hasBatch() || state.batch !== "ready") {
-    return "";
-  }
-  if (!image) {
-    return `
-      <section class="inspector-compact-row">
-        <div>
-          <span>Imagen</span>
-          <strong>Sin selección</strong>
-        </div>
-        <button type="button" data-action="select-first-image">Seleccionar primera</button>
-      </section>
-    `;
-  }
-  const hasLocal = hasCurrentImageOverride(image) || image.status === "adjusted";
-  return `
-      <section class="inspector-compact-row">
-        <div>
-          <span>Imagen seleccionada</span>
-          <strong title="${escapeHtml(image.path || image.name)}">${escapeHtml(image.name)}</strong>
-          <small>${escapeHtml(image.detail || imageFileType(image))}</small>
-        </div>
-      ${hasLocal ? '<button type="button" data-action="reset-local-adjustment">Quitar ajuste</button>' : ""}
-    </section>
-  `;
+  const hasLocal = image ? hasCurrentImageOverride(image) || image.status === "adjusted" : false;
+  return inspectorReviewViewHelpers.selectedImageInspectorCardHtml({
+    hasReadyBatch: hasBatch() && state.batch === "ready",
+    image,
+    detail: image ? image.detail || imageFileType(image) : "",
+    hasLocal,
+  });
 }
 
 function issuesInspectorCardHtml() {
@@ -5134,45 +5116,24 @@ function issuesInspectorCardHtml() {
   }
   const errors = rows.filter((row) => row.level === "error").length;
   const blocking = preflightCounts().errors > 0;
-  const tone = blocking ? "error" : "warning";
-  const title = blocking ? "Exportación bloqueada" : "Revisar";
   const count = blocking
     ? `${preflightCounts().errors} bloqueo${preflightCounts().errors === 1 ? "" : "s"}`
     : errors
       ? `${errors} error${errors === 1 ? "" : "es"}`
     : `${rows.length} aviso${rows.length === 1 ? "" : "s"}`;
-  return `
-    <section class="inspector-alert ${tone}">
-      <div class="inspector-alert__head">
-        <span>${escapeHtml(title)}</span>
-        <strong>${escapeHtml(count)}</strong>
-      </div>
-      <div class="inspector-alert__list">
-        ${rows.slice(0, 3).map((row) => `
-          <span title="${escapeHtml(row.path || row.detail || row.title)}">${escapeHtml(row.title)}</span>
-        `).join("")}
-      </div>
-      <div class="inspector-alert__actions">
-        <button type="button" data-action="review-errors">Revisar avisos</button>
-      </div>
-    </section>
-  `;
+  return inspectorReviewViewHelpers.issuesInspectorCardHtml({
+    rows,
+    blocking,
+    countLabel: count,
+  });
 }
 
 function aspectInspectorCardHtml() {
-  if (!hasBatch() || state.batch !== "ready") {
-    return "";
-  }
-  return `
-    <section class="inspector-compact-row inspector-compact-row--quiet">
-      <div>
-        <span>Ajuste</span>
-        <strong>${escapeHtml(state.activePreset)}</strong>
-        <small>${escapeHtml(state.presetDirty ? "Global · Modificado" : "Global")}</small>
-      </div>
-      <button type="button" data-action="open-advanced">Editar ajuste</button>
-    </section>
-  `;
+  return inspectorReviewViewHelpers.aspectInspectorCardHtml({
+    hasReadyBatch: hasBatch() && state.batch === "ready",
+    activePreset: state.activePreset,
+    statusLabel: state.presetDirty ? "Global · Modificado" : "Global",
+  });
 }
 
 function actionableIssueRows() {

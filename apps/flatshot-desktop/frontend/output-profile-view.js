@@ -142,6 +142,47 @@
     return outputName;
   }
 
+  function destinationCompactLabel(options = {}) {
+    if (options.destinationMode === "custom") {
+      return options.destinationValue || "Sin destino";
+    }
+    return options.destinationValue || "_SALIDA_PRO";
+  }
+
+  function namingHumanLabel(options = {}) {
+    if (options.naming === "{original}{suffix}") {
+      return options.suffix ? `original + ${options.suffix}` : "original";
+    }
+    return options.naming || "Sin plantilla";
+  }
+
+  function namingExample(options = {}) {
+    if (!String(options.naming || "").trim()) {
+      return "Sin ejemplo";
+    }
+    return outputNameFromTemplate({
+      naming: options.naming,
+      suffix: options.suffix || "_PRO",
+      format: options.format || "JPG",
+    }, {
+      original: options.original || "imagen_001",
+      folder: options.folder || "lote",
+      index: options.index || 1,
+    });
+  }
+
+  function destinationFallbackLabel(options = {}) {
+    const destinations = Array.isArray(options.destinations) ? options.destinations : [];
+    if (destinations.length > 1) {
+      const uniqueDestinations = Array.from(new Set(destinations));
+      return uniqueDestinations.length === 1 ? uniqueDestinations[0] : `${uniqueDestinations.length} destinos`;
+    }
+    if (options.destinationMode === "custom") {
+      return options.destinationValue || "Carpeta de salida sin configurar";
+    }
+    return options.destinationValue || "_SALIDA_PRO";
+  }
+
   function outputProfileFooterState(options = {}) {
     const validation = options.validation || { errors: [] };
     const errors = Array.isArray(validation.errors) ? validation.errors : [];
@@ -171,7 +212,11 @@
   }
 
   return {
+    destinationCompactLabel,
+    destinationFallbackLabel,
     escapeHtml,
+    namingExample,
+    namingHumanLabel,
     outputNameFromTemplate,
     outputProfileEditorHeadingHtml,
     outputProfileFooterState,

@@ -5751,17 +5751,17 @@ function presetSummaryLine() {
 }
 
 function destinationCompactLabel() {
-  if (state.destinationMode === "custom") {
-    return state.destinationValue || "Sin destino";
-  }
-  return state.destinationValue || "_SALIDA_PRO";
+  return outputProfileViewHelpers.destinationCompactLabel({
+    destinationMode: state.destinationMode,
+    destinationValue: state.destinationValue,
+  });
 }
 
 function namingHumanLabel() {
-  if (state.naming === "{original}{suffix}") {
-    return state.suffix ? `original + ${state.suffix}` : "original";
-  }
-  return state.naming || "Sin plantilla";
+  return outputProfileViewHelpers.namingHumanLabel({
+    naming: state.naming,
+    suffix: state.suffix,
+  });
 }
 
 function outputWarningSummary(issues) {
@@ -5867,25 +5867,15 @@ function exportPreflightSummary(issues, exportable, ready) {
 }
 
 function namingExample() {
-  if (!state.naming.trim()) {
-    return "Sin ejemplo";
-  }
   const image = exportableImages()[0] || selectedImage();
   const originalName = image?.name || "imagen_001.png";
-  const original = originalName.replace(/\.[^.]+$/, "");
-  const folder = activeFolders()[0]?.name || "lote";
-  let example = state.naming
-    .replaceAll("{original}", original)
-    .replaceAll("{suffix}", state.suffix || "_PRO")
-    .replaceAll("{folder}", folder);
-  example = example.replace(/\{index(?::0?(\d+)d)?\}/g, (_match, width) => {
-    const digits = Number(width) || 1;
-    return String(1).padStart(digits, "0");
+  return outputProfileViewHelpers.namingExample({
+    folder: activeFolders()[0]?.name || "lote",
+    format: state.format,
+    naming: state.naming,
+    original: originalName.replace(/\.[^.]+$/, ""),
+    suffix: state.suffix,
   });
-  if (!/\.[a-z0-9]+$/i.test(example)) {
-    example = `${example}.${state.format.toLowerCase()}`;
-  }
-  return example;
 }
 
 function renderExportResult() {
@@ -5968,14 +5958,11 @@ function exportResultActionsHtml(issues, destinations) {
 
 function destinationFallbackLabel() {
   const profiles = exportOutputProfiles();
-  if (profiles.length > 1) {
-    const destinations = Array.from(new Set(profiles.map(profileDestinationPreviewLabel)));
-    return destinations.length === 1 ? destinations[0] : `${destinations.length} destinos`;
-  }
-  if (state.destinationMode === "custom") {
-    return state.destinationValue || "Carpeta de salida sin configurar";
-  }
-  return state.destinationValue || "_SALIDA_PRO";
+  return outputProfileViewHelpers.destinationFallbackLabel({
+    destinationMode: state.destinationMode,
+    destinationValue: state.destinationValue,
+    destinations: profiles.length > 1 ? profiles.map(profileDestinationPreviewLabel) : [],
+  });
 }
 
 function beginOutputEdit() {

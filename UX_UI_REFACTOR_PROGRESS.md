@@ -723,6 +723,36 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 31 - Extraccion de labels de destino y naming
+
+Estado: completada.
+
+Cambios realizados:
+- `output-profile-view.js` ahora tambien calcula:
+  - label compacto de destino;
+  - label humano de plantilla de nombre;
+  - ejemplo de nombre final;
+  - fallback de destino para exportacion/resultados.
+- `app.js` conserva seleccion de imagen, carpeta activa, formato actual, perfiles activos y datos de estado; solo delega reglas de presentacion/naming.
+- Se amplio `tests/test_frontend_output_profile_view.py` para cubrir destino custom/source, multi-salida, plantillas vacias, extension explicita e indices.
+
+Impacto medido:
+- `app.js`: 7.264 -> 7.251 lineas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: sin cambios, 22.
+
+Validaciones ejecutadas:
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_output_profile_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 282 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- `node --check apps/flatshot-desktop/frontend/output-profile-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en Windows.
+- HTTP local en `http://127.0.0.1:4211/`: `index.html`, `output-profile-view.js`, `export-summary-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

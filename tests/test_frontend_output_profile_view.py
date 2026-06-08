@@ -103,6 +103,89 @@ const name = helpers.outputNameFromTemplate(profile, {{
 }});
 assert.equal(name, "Lote Junio_007_camisa_PRO.jpg");
 
+assert.equal(helpers.destinationCompactLabel({{
+  destinationMode: "custom",
+  destinationValue: "",
+}}), "Sin destino");
+assert.equal(helpers.destinationCompactLabel({{
+  destinationMode: "custom",
+  destinationValue: "C:/Export",
+}}), "C:/Export");
+assert.equal(helpers.destinationCompactLabel({{
+  destinationMode: "source",
+  destinationValue: "",
+}}), "_SALIDA_PRO");
+assert.equal(helpers.destinationCompactLabel({{
+  destinationMode: "source",
+  destinationValue: "SALIDA",
+}}), "SALIDA");
+
+assert.equal(helpers.namingHumanLabel({{
+  naming: "{{original}}{{suffix}}",
+  suffix: "_PRO",
+}}), "original + _PRO");
+assert.equal(helpers.namingHumanLabel({{
+  naming: "{{original}}{{suffix}}",
+  suffix: "",
+}}), "original");
+assert.equal(helpers.namingHumanLabel({{
+  naming: "{{folder}}_{{index:02d}}",
+  suffix: "_PRO",
+}}), "{{folder}}_{{index:02d}}");
+assert.equal(helpers.namingHumanLabel({{
+  naming: "",
+  suffix: "_PRO",
+}}), "Sin plantilla");
+
+assert.equal(helpers.namingExample({{
+  naming: "",
+  suffix: "_PRO",
+  format: "JPG",
+  original: "camisa",
+  folder: "Lote",
+}}), "Sin ejemplo");
+assert.equal(helpers.namingExample({{
+  naming: "{{folder}}_{{index:02d}}_{{original}}{{suffix}}",
+  suffix: "_PRO",
+  format: "PNG",
+  original: "camisa",
+  folder: "Lote",
+  index: 3,
+}}), "Lote_03_camisa_PRO.png");
+assert.equal(helpers.namingExample({{
+  naming: "{{original}}.webp",
+  suffix: "_PRO",
+  format: "JPG",
+  original: "camisa",
+  folder: "Lote",
+}}), "camisa.webp");
+
+assert.equal(helpers.destinationFallbackLabel({{
+  destinationMode: "custom",
+  destinationValue: "",
+  destinations: [],
+}}), "Carpeta de salida sin configurar");
+assert.equal(helpers.destinationFallbackLabel({{
+  destinationMode: "custom",
+  destinationValue: "C:/Export",
+  destinations: [],
+}}), "C:/Export");
+assert.equal(helpers.destinationFallbackLabel({{
+  destinationMode: "source",
+  destinationValue: "",
+  destinations: [],
+}}), "_SALIDA_PRO");
+assert.equal(helpers.destinationFallbackLabel({{
+  destinationMode: "source",
+  destinationValue: "",
+  destinations: ["_SALIDA_PRO", "_SALIDA_PRO"],
+}}), "_SALIDA_PRO");
+assert.equal(helpers.destinationFallbackLabel({{
+  destinationMode: "source",
+  destinationValue: "",
+  destinations: ["A", "B", "A"],
+}}), "2 destinos");
+
 assert.deepEqual(helpers.outputProfileFooterState({{
   draft: {{ enabled: true }},
   dirty: false,

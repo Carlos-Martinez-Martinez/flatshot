@@ -1160,6 +1160,36 @@ Validaciones ejecutadas:
 Salida exportada:
 - Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
 
+## Fase 46 - Extraccion de nombre por perfil de salida
+
+Estado: completada.
+
+Cambios realizados:
+- `output-profile-view.js` ahora expone `outputNameForProfile()` para calcular el nombre visible desde un perfil de salida concreto.
+- El helper reutiliza la resolucion de carpeta/imagen ya cubierta y conserva el fallback `imagen_original` usado por la vista de previsualizacion de perfil.
+- `app.js` conserva seleccion de imagen, perfil activo y carpetas activas; solo delega el calculo.
+- Se amplio `tests/test_frontend_output_profile_view.py` para cubrir:
+  - perfil con carpeta coincidente por `folderId`;
+  - fallback sin imagen ni carpeta;
+  - sufijo definido por perfil, sin aplicar el fallback `_PRO` del estado global.
+
+Impacto medido:
+- `app.js`: sin cambios netos, 6.559 lineas.
+- Modulos JS frontend: sin cambios, 23.
+- Tests frontend `test_frontend_*.py`: sin cambios, 22.
+
+Validaciones ejecutadas:
+- `node --check apps/flatshot-desktop/frontend/output-profile-view.js`: OK.
+- `node --check apps/flatshot-desktop/frontend/app.js`: OK.
+- `venv\Scripts\python.exe -m pytest tests/test_frontend_output_profile_view.py -q`: 2 passed.
+- `venv\Scripts\python.exe -m pytest -q`: 282 passed.
+- `Get-ChildItem apps/flatshot-desktop/frontend -Filter *.js | ForEach-Object { node --check $_.FullName }`: OK.
+- `git diff --check`: OK; solo avisos Git LF/CRLF en Windows.
+- HTTP local: `index.html`, `output-profile-view.js` y `app.js` respondieron 200.
+
+Salida exportada:
+- Sin cambios esperados. No se modifico `ExportRunner`, bridge Python, motor de imagen ni escritura de archivos.
+
 ## Fase 19 - Extension de vista del inspector para tarjetas compactas
 
 Estado: completada.

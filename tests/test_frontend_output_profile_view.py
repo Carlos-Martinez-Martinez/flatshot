@@ -144,6 +144,22 @@ assert.equal(helpers.outputNameForImage({{
   folders: [],
 }}), "camisa.webp");
 
+assert.equal(helpers.outputNameForProfile(profile, {{
+  image: {{ name: "C:/Fotos/camisa.azul.png", folderId: "folder-b" }},
+  folders: [
+    {{ id: "folder-a", name: "Lote A" }},
+    {{ id: "folder-b", name: "Lote B" }},
+  ],
+  index: 8,
+}}), "Lote B_008_camisa.azul_PRO.jpg");
+assert.equal(helpers.outputNameForProfile({{
+  naming: "{{folder}}_{{original}}{{suffix}}",
+  suffix: "",
+  format: "PNG",
+}}, {{
+  folders: [],
+}}), "lote_imagen_original.png");
+
 assert.equal(helpers.destinationCompactLabel({{
   destinationMode: "custom",
   destinationValue: "",

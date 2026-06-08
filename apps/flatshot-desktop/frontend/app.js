@@ -5566,11 +5566,11 @@ function outputProfilePreviewHtml(profile) {
 }
 
 function outputNameForProfile(profile, image = selectedImage(), index = 1) {
-  const original = imageFileStem(image?.name || "imagen_original.png");
-  const folder = activeFolders().find((item) => item.id === image?.folderId)?.name
-    || activeFolders()[0]?.name
-    || "lote";
-  return outputProfileViewHelpers.outputNameFromTemplate(profile, { original, folder, index });
+  return outputProfileViewHelpers.outputNameForProfile(profile, {
+    folders: activeFolders(),
+    image,
+    index,
+  });
 }
 
 function outputProfileValidationHtml(validation) {

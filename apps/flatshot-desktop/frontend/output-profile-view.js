@@ -173,6 +173,15 @@
     });
   }
 
+  function outputNameForProfile(profile = {}, options = {}) {
+    const image = options.image || {};
+    return outputNameFromTemplate(profile, {
+      original: imageFileStem(image?.name || options.fallbackImageName || "imagen_original.png"),
+      folder: folderNameForImage(image, options.folders),
+      index: options.index || 1,
+    });
+  }
+
   function destinationCompactLabel(options = {}) {
     if (options.destinationMode === "custom") {
       return options.destinationValue || "Sin destino";
@@ -249,6 +258,7 @@
     namingExample,
     namingHumanLabel,
     outputNameForImage,
+    outputNameForProfile,
     outputNameFromTemplate,
     outputProfileEditorHeadingHtml,
     outputProfileFooterState,

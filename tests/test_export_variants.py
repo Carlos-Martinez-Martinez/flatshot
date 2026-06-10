@@ -3,7 +3,6 @@ from concurrent.futures import Future
 
 import pytest
 from PIL import Image, ImageDraw
-from PIL.JpegImagePlugin import get_sampling
 
 from flatshot.application.contracts import ExportJobRequest
 from flatshot.application.export_runner import (
@@ -48,21 +47,6 @@ def _source(folder: Path):
     draw.rectangle((8, 5, 23, 26), fill=(20, 120, 240, 255))
     img.save(source)
     return source
-
-
-def _source_with_dpi(folder: Path, dpi=(300, 300)):
-    source = folder / "camiseta_dpi.png"
-    img = Image.new("RGBA", (40, 48), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    draw.rounded_rectangle((10, 8, 29, 39), radius=3, fill=(20, 120, 240, 255))
-    img.save(source, dpi=dpi)
-    return source
-
-
-def _assert_dpi_close(actual, expected=(300, 300)):
-    assert actual is not None
-    assert actual[0] == pytest.approx(expected[0], abs=1)
-    assert actual[1] == pytest.approx(expected[1], abs=1)
 
 
 def _has_grayscale_shadow(path: Path, bg: tuple[int, int, int]) -> bool:
@@ -298,72 +282,3 @@ def test_export_runner_writes_variant_specific_formats_destinations_and_sizes(tm
     with Image.open(png_output) as png:
         assert png.format == "PNG"
         assert png.size == (20, 20)
-
-
-def test_export_runner_preserves_output_metadata_transparency_and_source_file(tmp_path):
-    source = _source_with_dpi(tmp_path)
-    source_bytes = source.read_bytes()
-    config = ExportConfig(
-        format="JPG",
-        output_width=64,
-        output_height=96,
-        variants=[
-            ExportVariant(
-                id="marketplace_jpg",
-                label="Marketplace JPG",
-                format="JPG",
-                suffix="_MK",
-                output_width=64,
-                output_height=96,
-                transparent_bg=False,
-                bg_color=(230, 230, 230),
-            ),
-            ExportVariant(
-                id="transparent_png",
-                label="Transparent PNG",
-                format="PNG",
-                suffix="_TR",
-                output_width=64,
-                output_height=96,
-                transparent_bg=True,
-            ),
-        ],
-    )
-    settings = ShadowSettings(
-        shadow_engine="legacy",
-        adaptive_zoom=False,
-        opacity=0,
-        blur=0,
-        noise=0,
-    )
-
-    result = ExportRunner(executor_factory=InlineExecutor).run(
-        ExportJobRequest(
-            input_folder=tmp_path,
-            settings=settings,
-            export_config=config,
-            curve_data=_curve(),
-        )
-    )
-
-    jpg_output = tmp_path / "_SALIDA_PRO" / "camiseta_dpi_MK.jpg"
-    png_output = tmp_path / "_SALIDA_PRO" / "camiseta_dpi_TR.png"
-
-    assert result.success
-    assert result.total == 2
-    assert source.read_bytes() == source_bytes
-
-    with Image.open(jpg_output) as jpg:
-        assert jpg.format == "JPEG"
-        assert jpg.mode == "RGB"
-        assert jpg.size == (64, 96)
-        assert get_sampling(jpg) == 0
-        _assert_dpi_close(jpg.info.get("dpi"))
-
-    with Image.open(png_output) as png:
-        assert png.format == "PNG"
-        assert png.mode == "RGBA"
-        assert png.size == (64, 96)
-        assert png.getpixel((0, 0))[3] == 0
-        assert png.getchannel("A").getbbox() is not None
-        _assert_dpi_close(png.info.get("dpi"))

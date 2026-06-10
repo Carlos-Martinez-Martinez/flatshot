@@ -1,7 +1,32 @@
 /* Tanda 1 UX foundation: loaded after the base stylesheet on purpose. */
 :root {
-  /* Aliases owned by this layer and not redefined by the final shell block. */
+  /* Tanda 7 design-system aliases. Keep these role-based names for future UI. */
+  --surface-app: var(--color-bg-app);
+  --surface-panel: var(--color-bg-panel);
+  --surface-muted: var(--color-bg-soft);
+  --surface-stage: var(--color-bg-stage);
+  --border-subtle: var(--color-border);
+  --border-default: var(--color-border);
+  --border-emphasis: var(--color-border-strong);
+  --text-primary: var(--color-text-strong);
+  --text-secondary: var(--color-text);
+  --text-muted: var(--color-text-muted);
+  --text-subtle: var(--color-text-subtle);
+  --semantic-primary: var(--color-accent);
+  --semantic-primary-hover: var(--color-accent-hover);
+  --semantic-primary-soft: var(--color-accent-soft);
+  --semantic-primary-border: var(--color-accent-border);
+  --semantic-selection: #2563eb;
+  --semantic-selection-soft: rgba(37, 99, 235, 0.1);
+  --semantic-selection-border: rgba(37, 99, 235, 0.28);
+  --semantic-success: var(--color-success);
   --semantic-success-soft: var(--color-success-soft);
+  --semantic-warning: var(--color-warning);
+  --semantic-warning-soft: var(--color-warning-soft);
+  --semantic-warning-border: var(--color-warning-border);
+  --semantic-danger: var(--color-error);
+  --semantic-danger-soft: var(--color-error-soft);
+  --semantic-danger-border: var(--color-error-border);
   --semantic-info: #2563eb;
   --semantic-info-soft: rgba(37, 99, 235, 0.1);
   --semantic-info-border: rgba(37, 99, 235, 0.28);

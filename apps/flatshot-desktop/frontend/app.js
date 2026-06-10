@@ -76,28 +76,6 @@ const urlParams = new URLSearchParams(window.location.search);
 const defaultBridgeUrl = "http://127.0.0.1:8765";
 const initialBridgeUrl = urlParams.get("bridge") || defaultBridgeUrl;
 const devMode = urlParams.get("dev") === "1";
-const formatterHelpers = window.FlatShotFormatters;
-const outputProfileHelpers = window.FlatShotOutputProfiles;
-const outputProfileViewHelpers = window.FlatShotOutputProfileView;
-const exportPayloadHelpers = window.FlatShotExportPayload;
-const exportStateHelpers = window.FlatShotExportState;
-const exportSummaryViewHelpers = window.FlatShotExportSummaryView;
-const exportResultViewHelpers = window.FlatShotExportResultView;
-const exportPreflightViewHelpers = window.FlatShotExportPreflightView;
-const topStatusViewHelpers = window.FlatShotTopStatusView;
-const preflightHelpers = window.FlatShotPreflight;
-const batchViewHelpers = window.FlatShotBatchView;
-const scanStateHelpers = window.FlatShotScanState;
-const exportConfirmViewHelpers = window.FlatShotExportConfirmView;
-const emptyStateViewHelpers = window.FlatShotEmptyStateView;
-const batchDetailViewHelpers = window.FlatShotBatchDetailView;
-const galleryHelpers = window.FlatShotGallery;
-const previewViewHelpers = window.FlatShotPreviewView;
-const previewStateHelpers = window.FlatShotPreviewState;
-const settingsViewHelpers = window.FlatShotSettingsView;
-const inspectorOutputViewHelpers = window.FlatShotInspectorOutputView;
-const inspectorReviewViewHelpers = window.FlatShotInspectorReviewView;
-const inspectorContextViewHelpers = window.FlatShotInspectorContextView;
 const STORAGE_KEYS = {
   bridgeScanPath: "flatshot.bridgeScanPath",
   selectedImagePath: "flatshot.selectedImagePath",
@@ -631,7 +609,8 @@ function restoreSessionSnapshot() {
     state.exportStatus = isExportReady() ? "ready" : "blocked";
     if (nextImage?.path) {
       writePersistentValue(STORAGE_KEYS.selectedImagePath, nextImage.path);
-      Object.assign(state, previewStateHelpers.previewLoadingState({ statusText: "Restaurando vista" }));
+      state.previewStatus = "loading";
+      state.statusText = "Restaurando vista";
       setTimer(() => requestBridgePreview(nextImage), 0);
     }
   } else if (state.batch === "empty") {
@@ -677,15 +656,41 @@ function clearTimers() {
 }
 
 function normalizeOutputProfile(profile, index = 0) {
-  return outputProfileHelpers.normalizeOutputProfile(profile, index);
+  const source = profile && typeof profile === "object" ? profile : {};
+  const width = Math.max(1, Number.parseInt(source.width, 10) || 1800);
+  const height = Math.max(1, Number.parseInt(source.height, 10) || 2400);
+  const format = normalizeExportFormat(source.format);
+  const background = ["rgb230", "white", "transparent"].includes(source.background)
+    ? source.background
+    : "rgb230";
+  const destinationMode = source.destinationMode === "custom" ? "custom" : "source";
+  return {
+    id: String(source.id || uniqueOutputProfileId("formato", index)).trim(),
+    name: outputProfileNameForDisplay(String(source.name || `Formato ${index + 1}`).trim()),
+    enabled: typeof source.enabled === "boolean" ? source.enabled : false,
+    format,
+    width,
+    height,
+    background,
+    destinationMode,
+    destinationValue: String(source.destinationValue || (destinationMode === "custom" ? "" : "_SALIDA_PRO")),
+    naming: String(source.naming || "{original}{suffix}"),
+    suffix: source.suffix === undefined || source.suffix === null ? "_PRO" : String(source.suffix),
+  };
 }
 
 function outputProfileNameForDisplay(name) {
-  return outputProfileHelpers.outputProfileNameForDisplay(name);
+  return String(name || "")
+    .replace(/\bRGB\s*230\b/gi, "gris claro")
+    .replace(/\bRGB230\b/gi, "gris claro");
 }
 
 function normalizeExportFormat(value) {
-  return outputProfileHelpers.normalizeExportFormat(value);
+  const text = String(value || "JPG").trim().toUpperCase().replace(/^\./, "");
+  if (text === "JPEG") {
+    return "JPG";
+  }
+  return text === "PNG" ? "PNG" : "JPG";
 }
 
 function readOutputProfiles(activeProfileId = "") {
@@ -696,23 +701,55 @@ function readOutputProfiles(activeProfileId = "") {
 }
 
 function normalizeOutputProfileList(profiles, activeProfileId = "") {
-  return outputProfileHelpers.normalizeOutputProfileList(profiles, activeProfileId);
+  const normalized = Array.isArray(profiles)
+    ? profiles.map(normalizeOutputProfile).filter((profile) => profile.name)
+    : [];
+  const deduped = dedupeOutputProfileIds(normalized);
+  if (!deduped.length) {
+    return [];
+  }
+  if (!deduped.some((profile) => profile.enabled)) {
+    const preferred = deduped.find((profile) => profile.id === activeProfileId) || deduped[0];
+    preferred.enabled = true;
+  }
+  return deduped;
 }
 
 function dedupeOutputProfileIds(profiles) {
-  return outputProfileHelpers.dedupeOutputProfileIds(profiles);
+  const seen = new Set();
+  return profiles.map((profile, index) => {
+    let id = profile.id || uniqueOutputProfileId(profile.name, index);
+    while (seen.has(id)) {
+      id = uniqueOutputProfileId(profile.name, index + seen.size);
+    }
+    seen.add(id);
+    return { ...profile, id };
+  });
 }
 
 function uniqueOutputProfileId(name = "formato", seed = Date.now()) {
-  return outputProfileHelpers.uniqueOutputProfileId(name, seed);
+  const base = String(name)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    || "formato";
+  return `${base}-${String(seed).replace(/\D/g, "").slice(-6) || Date.now()}`;
 }
 
 function outputProfileSize(profile) {
-  return outputProfileHelpers.outputProfileSize(profile);
+  return `${Math.max(1, Number(profile?.width) || 1800)}x${Math.max(1, Number(profile?.height) || 2400)}`;
 }
 
 function parseOutputSize(value) {
-  return outputProfileHelpers.parseOutputSize(value);
+  const match = /^(\d+)\s*[x×]\s*(\d+)$/i.exec(String(value || "").trim());
+  if (!match) {
+    return { width: 1800, height: 2400, normalized: "1800x2400" };
+  }
+  const width = Math.max(1, Number.parseInt(match[1], 10) || 1800);
+  const height = Math.max(1, Number.parseInt(match[2], 10) || 2400);
+  return { width, height, normalized: `${width}x${height}` };
 }
 
 function activeOutputProfile() {
@@ -887,6 +924,10 @@ function activeFolders() {
   return isMockBatch() ? mockFolders : [];
 }
 
+function activePresets() {
+  return activePresetItems().map((preset) => preset.name);
+}
+
 function activePresetItems() {
   if (state.bridgeMode === "bridge" && state.bridgePresets.length) {
     return state.bridgePresets;
@@ -909,19 +950,43 @@ function exportableImages() {
 }
 
 function countText(count, singular, plural = `${singular}s`) {
-  return preflightHelpers.countText(count, singular, plural);
+  const value = Number(count) || 0;
+  return `${value} ${value === 1 ? singular : plural}`;
 }
 
 function readyImagesText(count) {
-  return preflightHelpers.readyImagesText(count);
+  const value = Number(count) || 0;
+  return `${value} ${value === 1 ? "imagen lista" : "imágenes listas"}`;
 }
 
 function ignoredNeutralText(count = batchCounts().ignoredFiles) {
-  return preflightHelpers.ignoredNeutralText(count);
+  const value = Number(count) || 0;
+  if (!value) {
+    return "";
+  }
+  return `${value} ignorado${value === 1 ? "" : "s"} · no afectan`;
 }
 
 function ignoredImagesText(count = batchCounts().ignoredFiles) {
-  return preflightHelpers.ignoredImagesText(count);
+  const value = Number(count) || 0;
+  return `${value} ignorada${value === 1 ? "" : "s"}`;
+}
+
+function sidebarLotSummaryText(counts = batchCounts()) {
+  if (state.batch === "scanning") {
+    return state.scanStatus || "Leyendo imágenes";
+  }
+  if (state.batch === "empty") {
+    return "No hay PNG válidos";
+  }
+  if (!hasBatch()) {
+    return "Sin carpeta";
+  }
+  const parts = [readyImagesText(counts.exportableImages)];
+  if (counts.nonBlockingWarnings) {
+    parts.push(`${counts.nonBlockingWarnings} aviso${counts.nonBlockingWarnings === 1 ? "" : "s"}`);
+  }
+  return parts.join(" · ");
 }
 
 function blockingValidationIssues() {
@@ -933,53 +998,94 @@ function scanOmissions() {
   return Array.isArray(omitted) ? omitted : [];
 }
 
-function omissionReasonOptions() {
-  return {
-    ignoredReasons: IGNORED_OMISSION_REASONS,
-    actionableReasons: ACTIONABLE_OMISSION_REASONS,
-  };
-}
-
 function omissionSeverity(item) {
-  return preflightHelpers.omissionSeverity(item, omissionReasonOptions());
+  const severity = String(item?.severity || "").toLowerCase();
+  if (["ignored", "warning", "error"].includes(severity)) {
+    return severity;
+  }
+  const category = String(item?.category || "").toLowerCase();
+  if (["ignored", "warning", "error"].includes(category)) {
+    return category;
+  }
+  const reason = String(item?.reason || "");
+  if (ACTIONABLE_OMISSION_REASONS.has(reason)) {
+    return "warning";
+  }
+  if (IGNORED_OMISSION_REASONS.has(reason)) {
+    return "ignored";
+  }
+  return "ignored";
 }
 
 function ignoredOmissions() {
-  return preflightHelpers.splitOmissions(scanOmissions(), omissionReasonOptions()).ignored;
+  return scanOmissions().filter((item) => omissionSeverity(item) === "ignored");
 }
 
 function actionableOmissions() {
-  return preflightHelpers.splitOmissions(scanOmissions(), omissionReasonOptions()).actionable;
+  return scanOmissions().filter((item) => omissionSeverity(item) !== "ignored");
 }
 
 function imageWarningCount(images = activeImages()) {
-  return preflightHelpers.imageWarningCount(images);
+  return images.filter((image) => image.status === "warning").length;
 }
 
 function excludedImageCount(images = activeImages()) {
-  return preflightHelpers.excludedImageCount(images, exportItemStatusMap(images));
-}
-
-function exportItemStatusMap(images = activeImages()) {
-  return new Map(images.map((image) => [image.id, exportItemState(image)]));
+  return images.filter((image) =>
+    !image.exportable || image.status === "error" || exportItemState(image)?.status === "error"
+  ).length;
 }
 
 function batchCounts() {
   const images = activeImages();
   const diagnostics = state.scanDiagnostics || emptyScanDiagnostics();
+  const omittedFiles = Number(diagnostics.totalOmitted || 0);
+  const ignoredFiles = ignoredOmissions().length;
+  const warningFiles = actionableOmissions().filter((item) => omissionSeverity(item) === "warning").length;
+  const errorFiles = actionableOmissions().filter((item) => omissionSeverity(item) === "error").length;
+  const filesFound = state.batch === "scanning"
+    ? null
+    : Math.max(
+      Number(diagnostics.totalFiles || 0),
+      Number(diagnostics.totalImages || 0) + omittedFiles,
+      images.length + omittedFiles
+    );
+  const validImages = state.batch === "scanning"
+    ? null
+    : Math.max(Number(diagnostics.totalImages || 0), images.length);
   const exportables = exportableImages();
-  return preflightHelpers.calculateBatchCounts({
-    batch: state.batch,
-    images,
-    exportables,
-    diagnostics,
-    omissions: scanOmissions(),
-    exportItemStatuses: exportItemStatusMap(images),
-    stateErrors: state.errors,
-    exportStatus: state.exportStatus,
-    blockingValidationIssueCount: blockingValidationIssues().length,
-    ...omissionReasonOptions(),
-  });
+  const exportedErrors = new Set(
+    images
+      .filter((image) => exportItemState(image)?.status === "error")
+      .map((image) => image.id)
+  );
+  const exportableWarningImages = imageWarningCount(exportables);
+  const nonExportableImages = images.filter((image) =>
+    !image.exportable || image.status === "error" || exportedErrors.has(image.id)
+  ).length;
+  const warningImages = exportableWarningImages;
+  const readyImages = exportables.filter((image) =>
+    !["warning", "error"].includes(image.status) && !exportedErrors.has(image.id)
+  ).length;
+  const stateErrors = state.errors.filter((issue) => issue.level === "error").length;
+  const stateWarnings = state.errors.length - stateErrors;
+  const blockingErrors = blockingValidationIssues().length + stateErrors + errorFiles + (state.exportStatus === "failed" ? 1 : 0);
+  const reviewIssues = warningImages + nonExportableImages + warningFiles + stateWarnings;
+
+  return {
+    filesFound,
+    validImages,
+    exportableImages: exportables.length,
+    readyImages,
+    warningImages,
+    omittedFiles,
+    ignoredFiles,
+    warningFiles,
+    errorFiles,
+    nonExportableImages,
+    blockingErrors,
+    nonBlockingWarnings: reviewIssues,
+    reviewIssues,
+  };
 }
 
 function exportItemState(image) {
@@ -1006,17 +1112,47 @@ function exportItemState(image) {
 }
 
 function filteredImages() {
-  const images = activeImages();
-  return galleryHelpers.filteredImages(images, {
-    exportItemStatuses: exportItemStatusMap(images),
-    filter: state.filter,
-    filters: BATCH_FILTERS,
-    search: state.search,
+  const term = state.search.trim().toLowerCase();
+  return activeImages().filter((image) => {
+    if (term && !imageSearchText(image).includes(term)) {
+      return false;
+    }
+    if (state.filter === BATCH_FILTERS.valid) {
+      return image.status === "ready" || image.status === "adjusted";
+    }
+    if (state.filter === BATCH_FILTERS.warnings) {
+      return image.status === "warning";
+    }
+    if (state.filter === BATCH_FILTERS.excluded) {
+      return !image.exportable || image.status === "error" || exportItemState(image)?.status === "error";
+    }
+    return true;
   });
 }
 
+function imageSearchText(image) {
+  const name = String(image?.name || "");
+  const stem = imageFileStem(name);
+  const path = String(image?.path || "");
+  const tokens = stem.split(/[^a-z0-9]+/i).filter(Boolean);
+  return [name, stem, path, ...tokens].join(" ").toLowerCase();
+}
+
+function filterDisplayName(filter = state.filter) {
+  const labels = {
+    all: "todas",
+    valid: "listas",
+    warnings: "con aviso",
+    excluded: "excluidas",
+  };
+  return labels[filter] || "imágenes";
+}
+
 function filterStatusText(filter = state.filter) {
-  return galleryHelpers.filterStatusText(filter);
+  if (filter === "all") {
+    return "Mostrando todo";
+  }
+  return `Mostrando ${filterDisplayName(filter)}`;
 }
 
 function validationIssues() {
@@ -1051,22 +1187,50 @@ function validationIssues() {
 }
 
 function preflightIssues() {
+  const issues = [...validationIssues(), ...state.errors];
   const counts = batchCounts();
-  return preflightHelpers.buildPreflightIssues({
-    validationIssues: validationIssues(),
-    stateErrors: state.errors,
-    counts,
-    actionableOmissions: actionableOmissions(),
-    hasBatch: hasBatch(),
-    warningImages: imageWarningCount(),
-    errorImages: excludedImageCount(),
-    exportableCount: exportableImages().length,
-    actionableOmissionSummary: actionableOmissionSummaryText(),
-  });
+  const actionableOmitted = actionableOmissions();
+  const warningImages = imageWarningCount();
+  const errorImages = excludedImageCount();
+
+  if (actionableOmitted.length > 0 && hasBatch()) {
+    issues.push({
+      level: "warning",
+      title: `${actionableOmitted.length} archivo${actionableOmitted.length === 1 ? "" : "s"} a revisar`,
+      detail: actionableOmissionSummaryText(),
+    });
+  }
+  if (warningImages > 0) {
+    issues.push({
+      level: "warning",
+      title: "Imágenes con aviso",
+      detail: `${warningImages} imagen${warningImages === 1 ? "" : "es"} requiere${warningImages === 1 ? "" : "n"} revisión.`,
+    });
+  }
+  if (errorImages > 0 && exportableImages().length > 0) {
+    issues.push({
+      level: "warning",
+      title: "Imágenes excluidas",
+      detail: `${errorImages} imagen${errorImages === 1 ? "" : "es"} quedará${errorImages === 1 ? "" : "n"} fuera de la salida.`,
+    });
+  }
+  if (counts.errorFiles > 0) {
+    issues.push({
+      level: "error",
+      title: "Errores de lectura",
+      detail: actionableOmissionSummaryText(),
+    });
+  }
+
+  return issues;
 }
 
 function preflightCounts() {
-  return preflightHelpers.preflightCounts(preflightIssues());
+  const issues = preflightIssues();
+  return {
+    errors: issues.filter((issue) => issue.level === "error").length,
+    warnings: issues.filter((issue) => issue.level !== "error").length,
+  };
 }
 
 function exportConfirmationRisks() {
@@ -1176,11 +1340,20 @@ function exportConfirmationRisks() {
 }
 
 function dedupeExportRisks(risks) {
-  return preflightHelpers.dedupeExportRisks(risks);
+  const seen = new Set();
+  return risks.filter((risk) => {
+    const key = risk.id || `${risk.title}-${risk.detail}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 }
 
 function issueMentionsExistingOutput(issue) {
-  return preflightHelpers.issueMentionsExistingOutput(issue);
+  const text = `${issue?.title || ""} ${issue?.detail || ""}`.toLowerCase();
+  return /ya existe|existente|existentes|sobrescri|overwrite|already exists|collision|colisi/.test(text);
 }
 
 function hasPreviousExportDestination() {
@@ -1213,11 +1386,9 @@ function lowResolutionImageCount() {
 }
 
 function isExportReady() {
-  return preflightHelpers.isExportReady({
-    validationIssues: validationIssues(),
-    hasBatch: hasBatch(),
-    exportableCount: exportableImages().length,
-  });
+  return validationIssues().filter((issue) => issue.level === "error" || issue.title !== "Sin lote").length === 0
+    && hasBatch()
+    && exportableImages().length > 0;
 }
 
 function uiState() {
@@ -1241,12 +1412,50 @@ function visibleWarningCount() {
   return batchCounts().nonBlockingWarnings;
 }
 
+function warningCountLabel(count = visibleWarningCount()) {
+  return `${count} aviso${count === 1 ? "" : "s"}`;
+}
+
+function imageCountLabel(count) {
+  return `${count} ${count === 1 ? "imagen" : "imágenes"}`;
+}
+
 function exportActionLabel(imageCount = batchCounts().exportableImages) {
-  return batchViewHelpers.exportActionLabel(imageCount, exportOutputCount());
+  const outputCount = exportOutputCount();
+  if (outputCount > 1) {
+    const totalFiles = imageCount * outputCount;
+    return `Exportar ${totalFiles} archivos`;
+  }
+  return `Exportar ${imageCount} imágenes`;
 }
 
 function plannedExportTotal() {
   return exportableImages().length * exportOutputCount();
+}
+
+function outputCountLabel(count = exportOutputCount()) {
+  return `${count} salida${count === 1 ? "" : "s"}`;
+}
+
+function detectedFormatLabel(images = activeImages()) {
+  if (!images.length) {
+    return "PNG";
+  }
+  const suffixes = Array.from(new Set(images.map((image) =>
+    String(image.name || image.suffix || "")
+      .split(".")
+      .pop()
+      ?.toUpperCase()
+      || "PNG"
+  )));
+  if (suffixes.length === 1) {
+    return suffixes[0];
+  }
+  return "PNG/JPG";
+}
+
+function outputPresetLabel() {
+  return state.activePreset || "Salida";
 }
 
 function firstOmittedItem() {
@@ -1292,11 +1501,18 @@ function firstActionableIssue() {
 }
 
 function batchSummaryLabel() {
-  return batchViewHelpers.batchSummaryLabel({
-    batch: state.batch,
-    count: activeImages().length,
-    warnings: visibleWarningCount(),
-  });
+  const count = activeImages().length;
+  if (state.batch === "none") {
+    return "Sin lote";
+  }
+  if (state.batch === "scanning") {
+    return "Escaneando";
+  }
+  if (state.batch === "empty") {
+    return "Sin imágenes";
+  }
+  const warnings = visibleWarningCount();
+  return `${imageCountLabel(count)}${warnings ? ` · ${warningCountLabel(warnings)}` : ""}`;
 }
 
 function firstBlockingIssue() {
@@ -1447,8 +1663,14 @@ function getVisibleAppState() {
 }
 
 function readyBatchSummaryText(counts = batchCounts()) {
-  const readyText = readyImagesText(counts.filesFound > 0 || counts.exportableImages > 0 ? counts.exportableImages : 0);
-  return batchViewHelpers.readyBatchSummaryText(counts, batchViewHelpers.detectedFormatLabel(activeImages()), readyText);
+  const format = detectedFormatLabel(activeImages());
+  if (counts.filesFound === null) {
+    return "Leyendo archivos";
+  }
+  if (counts.filesFound > 0 || counts.exportableImages > 0) {
+    return `${format} · ${counts.filesFound} archivos · ${readyImagesText(counts.exportableImages)}`;
+  }
+  return `${format} · ${readyImagesText(0)}`;
 }
 
 function setScenario(scenario) {
@@ -1722,10 +1944,14 @@ function selectImage(imageId) {
     void requestBridgePreview(image);
     return;
   }
-  Object.assign(state, previewStateHelpers.previewLoadingState());
+  state.previewStatus = "loading";
+  state.previewData = null;
+  state.previewError = "";
+  state.statusText = "Generando vista";
   render();
   setTimer(() => {
-    Object.assign(state, previewStateHelpers.previewImageStatusState(image.status));
+    state.previewStatus = image.status === "error" ? "error" : image.status === "warning" ? "warning" : "ready";
+    state.statusText = state.previewStatus === "error" ? "Vista no disponible" : "Vista lista";
     render();
   }, 380);
 }
@@ -1767,7 +1993,9 @@ function clearPreviewSelection() {
   clearTimers();
   state.selectedImageId = null;
   state.localOverride = false;
-  Object.assign(state, previewStateHelpers.previewEmptyState());
+  state.previewStatus = "empty";
+  state.previewData = null;
+  state.previewError = "";
   state.fitZoom = 100;
   resetViewerPan();
 }
@@ -1916,15 +2144,21 @@ function clampViewerPan() {
 }
 
 function isAutoViewerMode(mode = state.fitMode) {
-  return previewStateHelpers.isAutoViewerMode(mode);
+  return ["fit", "height", "width"].includes(mode);
 }
 
 function viewerModeLabel(mode = state.fitMode) {
-  return previewStateHelpers.viewerModeLabel(mode, VIEW_MODE_LABELS);
+  return VIEW_MODE_LABELS[mode] || VIEW_MODE_LABELS.manual;
 }
 
 function viewerModeClass(mode = state.fitMode) {
-  return previewStateHelpers.viewerModeClass(mode);
+  if (mode === "height") {
+    return "fit-height-mode";
+  }
+  if (mode === "width") {
+    return "fit-width-mode";
+  }
+  return mode === "fit" ? "fit-mode" : "zoom-mode";
 }
 
 function currentViewerZoom() {
@@ -1932,7 +2166,7 @@ function currentViewerZoom() {
 }
 
 function clampViewerZoom(value) {
-  return previewStateHelpers.clampViewerZoom(value);
+  return Math.max(25, Math.min(320, Math.round(value)));
 }
 
 function setViewerZoom(nextZoom, anchorEvent = null) {
@@ -2082,7 +2316,10 @@ function markPresetDirty() {
 
 function refreshPreviewAfterSettingChange() {
   if (selectedImage()?.source === "bridge") {
-    Object.assign(state, previewStateHelpers.previewLoadingState());
+    state.previewStatus = "loading";
+    state.previewData = null;
+    state.previewError = "";
+    state.statusText = "Generando vista";
     render();
     clearTimers();
     setTimer(() => {
@@ -2094,11 +2331,13 @@ function refreshPreviewAfterSettingChange() {
     return;
   }
   if (hasBatch() && state.previewStatus !== "error") {
-    Object.assign(state, previewStateHelpers.previewLoadingState({ clearData: false }));
+    state.previewStatus = "loading";
+    state.statusText = "Generando vista";
     render();
     clearTimers();
     setTimer(() => {
-      Object.assign(state, previewStateHelpers.previewImageStatusState(selectedImage()?.status, { errorAsReady: true }));
+      state.previewStatus = selectedImage()?.status === "warning" ? "warning" : "ready";
+      state.statusText = "Vista lista";
       render();
     }, 420);
   } else {
@@ -2148,17 +2387,44 @@ function startExport(options = {}) {
     return;
   }
 
-  Object.assign(state, exportStateHelpers.exportStartState({
+  Object.assign(state, {
     scenario: options.keepScenario ? "export-running" : state.scenario,
-    resetConfirm: true,
-  }));
+    exportStatus: "running",
+    progress: 0,
+    processed: 0,
+    exportJobId: null,
+    exportDestinations: [],
+    exportMessages: [],
+    exportCompletedItems: [],
+    exportIssues: [],
+    exportResult: null,
+    exportConfirmOpen: false,
+    exportConfirmRisks: [],
+    exportConfirmOptions: null,
+    errors: [],
+    paused: false,
+    statusText: "Preparando exportación",
+  });
   render();
   scheduleExportStep();
 }
 
 async function startBridgeExport() {
   clearBridgeExportPoll();
-  Object.assign(state, exportStateHelpers.exportStartState());
+  Object.assign(state, {
+    exportStatus: "running",
+    progress: 0,
+    processed: 0,
+    exportJobId: null,
+    exportDestinations: [],
+    exportMessages: [],
+    exportCompletedItems: [],
+    exportIssues: [],
+    exportResult: null,
+    errors: [],
+    paused: false,
+    statusText: "Preparando exportación",
+  });
   render();
 
   try {
@@ -2172,29 +2438,81 @@ async function startBridgeExport() {
     scheduleBridgeExportPoll();
   } catch (error) {
     const message = bridgeErrorMessage(error);
-    Object.assign(state, exportStateHelpers.bridgeRunFailureState(message));
+    Object.assign(state, {
+      exportStatus: "failed",
+      progress: 0,
+      processed: 0,
+      exportIssues: [{ level: "error", title: "Exportación fallida", detail: message }],
+      exportResult: null,
+      errors: [{ level: "error", title: "Exportación fallida", detail: message }],
+      statusText: "Exportación fallida",
+    });
     render();
   }
 }
 
 function bridgeExportPayload() {
-  return exportPayloadHelpers.buildBridgeExportPayload({
-    activeOutputProfileId: state.activeOutputProfileId,
-    fallbackProfile: currentOutputProfileData(),
-    imageOverrides: state.imageOverrides,
-    images: exportableImages(),
+  const profiles = exportOutputProfiles();
+  const primary = profiles.find((profile) => profile.id === state.activeOutputProfileId) || profiles[0] || currentOutputProfileData();
+  const seenVariantIds = new Set();
+  return {
+    imagePaths: exportableImages()
+      .filter((image) => image.source === "bridge" && image.path)
+      .map((image) => image.path),
     presetName: state.activePreset,
-    profiles: exportOutputProfiles(),
     settings: bridgePreviewSettings(),
-  });
+    imageOverrides: state.imageOverrides,
+    export: {
+      format: primary.format,
+      size: outputProfileSize(primary),
+      background: primary.background,
+      destinationMode: primary.destinationMode,
+      destinationValue: primary.destinationValue,
+      outputFolderName: primary.destinationMode === "source" ? primary.destinationValue : "_SALIDA_PRO",
+      customOutputPath: primary.destinationMode === "custom" ? primary.destinationValue : "",
+      namingTemplate: primary.naming,
+      suffix: primary.suffix,
+      variants: profiles.map((profile, index) => exportVariantPayloadFromProfile(profile, index, seenVariantIds)),
+    },
+  };
 }
 
 function exportVariantPayloadFromProfile(profile, index, seenVariantIds = new Set()) {
-  return outputProfileHelpers.exportVariantPayloadFromProfile(profile, index, seenVariantIds);
+  const size = parseOutputSize(outputProfileSize(profile));
+  const variantId = exportVariantId(profile, index, seenVariantIds);
+  return {
+    id: variantId,
+    label: profile.name,
+    enabled: true,
+    format: profile.format,
+    transparent_bg: profile.background === "transparent",
+    bg_color: backgroundColorTuple(profile.background),
+    suffix: profile.suffix,
+    naming_template: profile.naming,
+    output_destination: profile.destinationMode === "custom" ? "custom" : "subfolder",
+    output_folder_name: profile.destinationMode === "source" ? profile.destinationValue || "_SALIDA_PRO" : null,
+    custom_output_path: profile.destinationMode === "custom" ? profile.destinationValue : null,
+    output_width: size.width,
+    output_height: size.height,
+  };
 }
 
 function exportVariantId(profile, index, seenVariantIds = new Set()) {
-  return outputProfileHelpers.exportVariantId(profile, index, seenVariantIds);
+  const base = String(profile.id || profile.name || `salida-${index + 1}`)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    || `salida_${index + 1}`;
+  const safeBase = /^[A-Za-z0-9_-]+$/.test(base) ? base : `salida_${index + 1}`;
+  let candidate = safeBase;
+  let suffix = 2;
+  while (seenVariantIds.has(candidate)) {
+    candidate = `${safeBase}_${suffix}`;
+    suffix += 1;
+  }
+  seenVariantIds.add(candidate);
+  return candidate;
 }
 
 function scheduleBridgeExportPoll() {
@@ -2213,7 +2531,12 @@ function scheduleBridgeExportPoll() {
       scheduleBridgeExportPoll();
     } catch (error) {
       const message = bridgeErrorMessage(error);
-      Object.assign(state, exportStateHelpers.bridgeProgressUnavailableState(message));
+      Object.assign(state, {
+        exportStatus: "failed",
+        paused: false,
+        errors: [{ level: "error", title: "Progreso no disponible", detail: message }],
+        statusText: "Progreso no disponible",
+      });
       render();
     }
   }, 450);
@@ -2227,12 +2550,65 @@ function clearBridgeExportPoll() {
 }
 
 function applyBridgeExportStatus(payload) {
-  Object.assign(state, exportStateHelpers.bridgeStatusPatch(payload, state));
-  state.errors = exportStateHelpers.bridgeStatusErrors(payload, state.exportCompletedItems, state.exportIssues);
+  state.exportJobId = payload.jobId || state.exportJobId;
+  state.exportDestinations = Array.isArray(payload.destinations) ? payload.destinations : state.exportDestinations;
+  state.exportMessages = Array.isArray(payload.messages) ? payload.messages : state.exportMessages;
+  state.exportCompletedItems = Array.isArray(payload.completedItems) ? payload.completedItems : state.exportCompletedItems;
+  state.exportIssues = Array.isArray(payload.issues) ? payload.issues.map(normalizeBridgeIssue) : state.exportIssues;
+  state.exportResult = payload.result || state.exportResult;
+  state.progress = Number(payload.progress?.percent) || 0;
+  state.processed = Number(payload.progress?.processed) || 0;
+  state.paused = payload.status === "paused";
+
+  if (payload.status === "completed") {
+    state.exportStatus = "completed";
+    state.progress = 0;
+    state.statusText = `Exportación completada · ${state.processed}/${payload.progress?.total || state.processed}`;
+  } else if (payload.status === "partial") {
+    state.exportStatus = "partial";
+    state.progress = 0;
+    state.statusText = "Exportación con avisos";
+  } else if (payload.status === "failed" || payload.status === "cancelled") {
+    state.exportStatus = "failed";
+    state.progress = 0;
+    state.paused = false;
+    state.statusText = payload.status === "cancelled" ? "Exportación cancelada" : "Exportación fallida";
+  } else if (payload.status === "paused") {
+    state.exportStatus = "running";
+    state.statusText = "Pausado";
+  } else if (payload.status === "cancelling") {
+    state.exportStatus = "running";
+    state.statusText = "Deteniendo...";
+  } else {
+    state.exportStatus = "running";
+    state.statusText = `Procesando ${state.processed}/${payload.progress?.total || "..."}`;
+  }
+
+  const failedItems = state.exportCompletedItems.filter((item) => !item.success);
+  if (["partial", "failed", "cancelled"].includes(payload.status) || failedItems.length || state.exportIssues.length) {
+    const messageItems = (payload.messages || []).slice(-4).map((message) => ({
+      level: payload.status === "partial" ? "warning" : "error",
+      title: "Exportación",
+      detail: message,
+    }));
+    const itemErrors = failedItems.slice(-4).map((item) => ({
+      level: "error",
+      title: item.name || "Imagen",
+      detail: "No se pudo exportar.",
+    }));
+    state.errors = state.exportIssues.length ? state.exportIssues : [...itemErrors, ...messageItems];
+  } else {
+    state.errors = [];
+  }
 }
 
 function normalizeBridgeIssue(issue) {
-  return exportStateHelpers.normalizeBridgeIssue(issue);
+  const source = issue && typeof issue === "object" ? issue : {};
+  return {
+    level: source.level === "error" ? "error" : "warning",
+    title: String(source.title || "Exportación"),
+    detail: String(source.detail || "Revisa el resultado."),
+  };
 }
 
 function scheduleExportStep() {
@@ -2296,7 +2672,12 @@ function stopExport() {
   }
   clearTimers();
   clearBridgeExportPoll();
-  Object.assign(state, exportStateHelpers.stoppedExportState());
+  Object.assign(state, {
+    exportStatus: "failed",
+    paused: false,
+    errors: [{ level: "error", title: "Exportación detenida", detail: "No se generaron más archivos." }],
+    statusText: "Exportación fallida",
+  });
   render();
 }
 
@@ -2318,6 +2699,10 @@ async function controlBridgeExport(action) {
   }
   render();
   scheduleBridgeExportPoll();
+}
+
+function reviewErrors() {
+  reviewWarnings();
 }
 
 function clearFilter() {
@@ -2369,7 +2754,10 @@ async function bridgeRequest(path, options = {}) {
 async function requestBridgePreview(image) {
   const requestId = state.previewRequestId + 1;
   state.previewRequestId = requestId;
-  Object.assign(state, previewStateHelpers.previewLoadingState());
+  state.previewStatus = "loading";
+  state.previewData = null;
+  state.previewError = "";
+  state.statusText = "Generando vista";
   render();
 
   try {
@@ -2388,13 +2776,18 @@ async function requestBridgePreview(image) {
       return;
     }
 
-    Object.assign(state, previewStateHelpers.previewBridgeResultState(previewResponseToData(response), response.warning));
+    state.previewData = previewResponseToData(response);
+    state.previewStatus = response.warning ? "warning" : "ready";
+    state.statusText = response.warning ? "Vista con aviso" : "Vista lista";
   } catch (error) {
     if (isStalePreviewResponse(requestId, image)) {
       return;
     }
     const message = bridgeErrorMessage(error);
-    Object.assign(state, previewStateHelpers.previewErrorState(message));
+    state.previewStatus = "error";
+    state.previewData = null;
+    state.previewError = message;
+    state.statusText = "Vista no disponible";
   }
 
   render();
@@ -2440,7 +2833,10 @@ function previewTargetSize() {
 }
 
 function backgroundColorTuple(value) {
-  return outputProfileHelpers.backgroundColorTuple(value);
+  if (value === "white") {
+    return [255, 255, 255];
+  }
+  return [230, 230, 230];
 }
 
 async function checkBridge() {
@@ -2481,7 +2877,14 @@ async function checkBridge() {
 }
 
 async function pickBridgeFolder() {
-  Object.assign(state, scanStateHelpers.folderPickStartState());
+  state.batchDetailOpen = false;
+  state.exportConfirmOpen = false;
+  state.bridgeMode = "bridge";
+  state.bridgeStatus = "checking";
+  state.bridgeMessage = "Abriendo selector";
+  state.bridgeLastResponse = "Solicitando /folders/pick";
+  state.scanStatus = "Elige una carpeta";
+  state.statusText = "Elige una carpeta";
   render();
 
   try {
@@ -2490,19 +2893,32 @@ async function pickBridgeFolder() {
       body: JSON.stringify({ initialPath: parseFolderInput(state.bridgeScanPath)[0] || "" }),
       timeoutMs: 300000,
     });
+    state.bridgeStatus = "connected";
     if (!selected.selected || !selected.path) {
-      Object.assign(state, scanStateHelpers.folderPickCancelledState());
+      state.bridgeMessage = "Selección cancelada";
+      state.bridgeLastResponse = "folder pick cancelado";
+      state.scanStatus = "Selección cancelada";
+      state.statusText = "Selección cancelada";
       render();
       return;
     }
 
-    Object.assign(state, scanStateHelpers.folderPickSelectedState(selected.path));
+    state.bridgeScanPath = selected.path;
     persistBridgeScanPath();
+    state.bridgeMessage = "Carpeta seleccionada";
+    state.bridgeLastResponse = "folder pick OK";
+    state.scanStatus = "Carpeta seleccionada";
+    state.statusText = "Carpeta seleccionada";
     render();
     await scanBridgeFolder();
   } catch (error) {
     const message = bridgeErrorMessage(error);
-    Object.assign(state, scanStateHelpers.folderPickErrorState(message));
+    state.bridgeStatus = "disconnected";
+    state.bridgeMessage = message;
+    state.bridgeLastResponse = `error: ${message}`;
+    state.scanStatus = "No se pudo seleccionar";
+    state.scanIssues = [{ level: "error", title: "Selector no disponible", detail: message }];
+    state.statusText = "Selector no disponible";
     render();
   }
 }
@@ -2545,7 +2961,11 @@ async function scanBridgeFolder() {
   state.bridgeMode = "bridge";
   const folders = parseFolderInput(state.bridgeScanPath);
   if (!folders.length) {
-    Object.assign(state, scanStateHelpers.emptyScanPathState(state.bridgeStatus === "connected"));
+    state.bridgeStatus = state.bridgeStatus === "connected" ? "connected" : "disconnected";
+    state.bridgeMessage = "Ruta vacía";
+    state.scanStatus = "Ruta vacía";
+    state.scanIssues = [{ level: "warning", title: "Ruta vacía", detail: "Pega una carpeta para escanear." }];
+    state.statusText = "Ruta vacía";
     render();
     return;
   }
@@ -2556,7 +2976,38 @@ async function scanBridgeFolder() {
   thumbnailFallbackQueue.length = 0;
   thumbnailFallbackInFlight.clear();
   clearBridgeExportPoll();
-  Object.assign(state, scanStateHelpers.scanStartState(folders, emptyScanDiagnostics(), DEFAULT_VIEW_MODE));
+  Object.assign(state, {
+    batch: "scanning",
+    batchSource: "bridge",
+    selectedImageId: null,
+    previewStatus: "empty",
+    previewData: null,
+    previewError: "",
+    thumbnailStatus: {},
+    thumbnailErrors: [],
+    exportStatus: "blocked",
+    progress: 0,
+    processed: 0,
+    exportJobId: null,
+    exportDestinations: [],
+    exportMessages: [],
+    exportCompletedItems: [],
+    exportIssues: [],
+    exportResult: null,
+    errors: [],
+    filter: "all",
+    search: "",
+    fitMode: DEFAULT_VIEW_MODE,
+    fitZoom: 100,
+    zoom: 100,
+    panX: 0,
+    panY: 0,
+    scanIssues: [],
+    scanDiagnostics: emptyScanDiagnostics(),
+    scanStatus: folders.length === 1 ? "Escaneando ruta" : `Escaneando ${folders.length} rutas`,
+    statusText: "Escaneando ruta",
+  });
+  state.bridgeLastResponse = "Solicitando /folders/scan";
   render();
 
   try {
@@ -2571,7 +3022,22 @@ async function scanBridgeFolder() {
     applyBridgeScanResult(response);
   } catch (error) {
     const message = bridgeErrorMessage(error);
-    Object.assign(state, scanStateHelpers.scanFailureState(message, emptyScanDiagnostics()));
+    Object.assign(state, {
+      batch: "none",
+      batchSource: "none",
+      selectedImageId: null,
+      previewStatus: "empty",
+      previewData: null,
+      previewError: "",
+      exportStatus: "blocked",
+      scanDiagnostics: emptyScanDiagnostics(),
+      bridgeStatus: "disconnected",
+      bridgeMessage: message,
+      bridgeLastResponse: `error: ${message}`,
+      scanStatus: "Conexión local no disponible",
+      scanIssues: [{ level: "error", title: "Conexión local no disponible", detail: message }],
+      statusText: "No se pudo escanear",
+    });
   }
 
   render();
@@ -2591,7 +3057,7 @@ function applyBridgeScanResult(response) {
   const responseErrors = Array.isArray(response.errors) ? response.errors : [];
   state.bridgeStatus = "connected";
   state.batchSource = "bridge";
-  state.bridgeMessage = batchViewHelpers.bridgeScanMessage(response.totalImages || 0, folderWarnings + responseErrors.length);
+  state.bridgeMessage = bridgeScanMessage(response.totalImages || 0, folderWarnings + responseErrors.length);
   state.bridgeLastResponse = `scan OK · ${response.totalImages || 0} imágenes`;
   state.scanIssues = [
     ...state.realFolders
@@ -2617,19 +3083,35 @@ function applyBridgeScanResult(response) {
       ? state.realImages.find((image) => image.path === rememberedPath)
       : null;
     const selectedImage = rememberedImage || state.realImages[0];
-    Object.assign(state, scanStateHelpers.scanReadyState({
-      defaultViewMode: DEFAULT_VIEW_MODE,
-      imageCount: state.realImages.length,
-      localOverride: hasCurrentImageOverride(selectedImage) || selectedImage.status === "adjusted",
-      scanIssueCount: state.scanIssues.length,
-      selectedImageId: selectedImage.id,
-    }));
+    state.batch = "ready";
+    state.selectedImageId = selectedImage.id;
+    state.localOverride = hasCurrentImageOverride(selectedImage) || selectedImage.status === "adjusted";
     rememberSelectedImage(selectedImage);
+    state.previewStatus = "loading";
+    state.previewData = null;
+    state.previewError = "";
+    state.fitMode = DEFAULT_VIEW_MODE;
+    state.fitZoom = 100;
+    state.zoom = 100;
+    state.panX = 0;
+    state.panY = 0;
+    state.exportStatus = "blocked";
+    state.scanStatus = state.scanIssues.length
+      ? `Escaneo completado con ${state.scanIssues.length} aviso${state.scanIssues.length === 1 ? "" : "s"}`
+      : `${state.realImages.length} imágenes encontradas`;
+    state.statusText = "Generando vista";
     void requestBridgePreview(selectedImage);
     return;
   }
 
-  Object.assign(state, scanStateHelpers.scanEmptyState(state.scanIssues));
+  state.batch = "empty";
+  state.selectedImageId = null;
+  state.previewStatus = "empty";
+  state.previewData = null;
+  state.previewError = "";
+  state.exportStatus = "blocked";
+  state.scanStatus = state.scanIssues.length ? state.scanIssues[0].detail : "No se encontraron PNG válidos";
+  state.statusText = state.scanIssues.length ? "Revisa carpeta" : "No hay imágenes compatibles";
 }
 
 function parseFolderInput(value) {
@@ -2639,16 +3121,72 @@ function parseFolderInput(value) {
     .filter(Boolean);
 }
 
+function bridgeScanMessage(totalImages, warningCount) {
+  if (warningCount) {
+    return `Escaneo completado con ${warningCount} aviso${warningCount === 1 ? "" : "s"}`;
+  }
+  if (totalImages === 0) {
+    return "No se encontraron PNG válidos";
+  }
+  return `${totalImages} imágenes encontradas`;
+}
+
+function omittedSummaryText(diagnostics = state.scanDiagnostics) {
+  if (!diagnostics.totalOmitted) {
+    return "Sin ignorados";
+  }
+  return Object.entries(diagnostics.omittedByReason || {})
+    .map(([reason, count]) => `${count} ${omissionReasonLabel(reason).toLowerCase()}`)
+    .join(" · ") || `${diagnostics.totalOmitted} ignorados`;
+}
+
 function omissionReasonLabel(reason) {
-  return batchViewHelpers.omissionReasonLabel(reason);
+  if (reason === "system_file") {
+    return "Archivo del sistema";
+  }
+  if (reason === "temporary_or_config_file") {
+    return "Archivo temporal o de configuración";
+  }
+  if (reason === "unsupported_extension") {
+    return "Extensión no admitida";
+  }
+  if (reason === "read_error") {
+    return "Error de lectura";
+  }
+  if (reason === "subfolder_not_scanned") {
+    return "Subcarpeta no escaneada";
+  }
+  return "Ignorado";
 }
 
 function actionableOmissionSummaryText() {
-  return batchViewHelpers.omissionSummaryText(actionableOmissions(), "Sin avisos de archivos");
+  const actionable = actionableOmissions();
+  if (!actionable.length) {
+    return "Sin avisos de archivos";
+  }
+  const counts = actionable.reduce((acc, item) => {
+    const label = omissionReasonLabel(item.reason).toLowerCase();
+    acc[label] = (acc[label] || 0) + 1;
+    return acc;
+  }, {});
+  return Object.entries(counts)
+    .map(([label, count]) => `${count} ${label}`)
+    .join(" · ");
 }
 
 function ignoredSummaryText() {
-  return batchViewHelpers.omissionSummaryText(ignoredOmissions(), "Sin archivos ignorados");
+  const ignored = ignoredOmissions();
+  if (!ignored.length) {
+    return "Sin archivos ignorados";
+  }
+  const counts = ignored.reduce((acc, item) => {
+    const label = omissionReasonLabel(item.reason).toLowerCase();
+    acc[label] = (acc[label] || 0) + 1;
+    return acc;
+  }, {});
+  return Object.entries(counts)
+    .map(([label, count]) => `${count} ${label}`)
+    .join(" · ");
 }
 
 function folderActionableOmissionCount(folder) {
@@ -2704,19 +3242,31 @@ function bridgeImageToItem(image, folderIndex, imageIndex) {
 }
 
 function basename(path) {
-  return formatterHelpers.basename(path);
+  return String(path || "").split(/[\\/]/).filter(Boolean).pop() || "";
 }
 
 function imageFileStem(name) {
-  return formatterHelpers.imageFileStem(name);
+  return basename(name).replace(/\.[^.\\/]+$/, "") || basename(name) || "Imagen";
 }
 
 function imageFileType(image) {
-  return formatterHelpers.imageFileType(image, state.format || "Imagen");
+  const fromName = String(image?.name || "").split(".").pop();
+  if (fromName && fromName !== image?.name) {
+    return fromName.toUpperCase();
+  }
+  const fromDetail = String(image?.detail || "").split("·")[0]?.trim();
+  return fromDetail || state.format || "Imagen";
 }
 
 function formatBytes(bytes) {
-  return formatterHelpers.formatBytes(bytes);
+  const value = Number(bytes) || 0;
+  if (value >= 1024 * 1024) {
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  if (value >= 1024) {
+    return `${Math.round(value / 1024)} KB`;
+  }
+  return `${value} B`;
 }
 
 function bridgeErrorMessage(error) {
@@ -2727,7 +3277,23 @@ function bridgeErrorMessage(error) {
 }
 
 function capabilitiesSummary(capabilities) {
-  return formatterHelpers.capabilitiesSummary(capabilities);
+  if (!capabilities) {
+    return "Sin comprobar";
+  }
+  const available = [];
+  if (capabilities.folderScan) {
+    available.push("scan");
+  }
+  if (capabilities.presetsRead) {
+    available.push("presets");
+  }
+  if (capabilities.previewRender) {
+    available.push("preview");
+  }
+  if (capabilities.exportRun) {
+    available.push("export");
+  }
+  return available.length ? available.join(" · ") : "Sin capacidades activas";
 }
 
 function showReviewScenario(scenario) {
@@ -2787,10 +3353,13 @@ function reviewOutput() {
 }
 
 function outputDestinationToOpen() {
-  return exportResultViewHelpers.outputDestinationToOpen({
-    exportDestinations: state.exportDestinations,
-    resultDestinations: state.exportResult?.destinations,
-  });
+  if (state.exportDestinations.length) {
+    return state.exportDestinations[0];
+  }
+  if (Array.isArray(state.exportResult?.destinations) && state.exportResult.destinations.length) {
+    return state.exportResult.destinations[0];
+  }
+  return "";
 }
 
 function openOutputFolder() {
@@ -2806,19 +3375,33 @@ function openOutputFolder() {
 }
 
 function pathToFileUrl(path) {
-  return formatterHelpers.pathToFileUrl(path);
+  const normalized = String(path || "").replaceAll("\\", "/");
+  if (/^[a-z]:\//i.test(normalized)) {
+    return `file:///${encodeURI(normalized)}`;
+  }
+  if (normalized.startsWith("/")) {
+    return `file://${encodeURI(normalized)}`;
+  }
+  return encodeURI(normalized);
 }
 
 function statusMode() {
-  return topStatusViewHelpers.statusMode({
-    batch: state.batch,
-    bridgeMode: state.bridgeMode,
-    bridgeStatus: state.bridgeStatus,
-    exportStatus: state.exportStatus,
-    hasScanError: state.scanIssues.some((issue) => issue.level === "error"),
-    hasValidationIssues: Boolean(validationIssues().length),
-    previewStatus: state.previewStatus,
-  });
+  if (state.batch === "none" && state.bridgeStatus === "idle") {
+    return "";
+  }
+  if (state.exportStatus === "failed" || state.previewStatus === "error" || state.scanIssues.some((issue) => issue.level === "error")) {
+    return "error";
+  }
+  if (state.exportStatus === "running" || state.previewStatus === "loading" || state.batch === "scanning") {
+    return "busy";
+  }
+  if (state.bridgeMode === "bridge" && state.bridgeStatus !== "connected") {
+    return "busy";
+  }
+  if (state.exportStatus === "partial" || state.previewStatus === "warning" || validationIssues().length) {
+    return "busy";
+  }
+  return "ready";
 }
 
 function render() {
@@ -3061,7 +3644,12 @@ function setDebugText(id, value) {
 }
 
 function debugUrlLabel(value) {
-  return formatterHelpers.debugUrlLabel(value);
+  const text = String(value || "");
+  if (text.startsWith("data:")) {
+    const comma = text.indexOf(",");
+    return comma > 0 ? `${text.slice(0, comma)}...` : "data URL";
+  }
+  return text.length > 120 ? `${text.slice(0, 117)}...` : text;
 }
 
 function thumbnailStats() {
@@ -3147,63 +3735,132 @@ function renderTop() {
   }
 }
 
+function topStatusSummaryHtml(counts = batchCounts()) {
+  if (!hasBatch() || state.exportStatus === "running" || ["completed", "partial", "failed"].includes(state.exportStatus)) {
+    return "";
+  }
+  const files = counts.filesFound ?? activeImages().length;
+  const chips = [
+    detectedFormatLabel(activeImages()),
+    `${files} archivos`,
+    readyImagesText(counts.exportableImages),
+  ];
+  if (counts.ignoredFiles) {
+    chips.push(`${counts.ignoredFiles} ignorado${counts.ignoredFiles === 1 ? "" : "s"}`);
+  }
+  if (counts.nonBlockingWarnings) {
+    chips.push(`${counts.nonBlockingWarnings} aviso${counts.nonBlockingWarnings === 1 ? "" : "s"}`);
+  }
+  return `<span class="top-status-chips">${chips.map((chip) => `<span>${escapeHtml(chip)}</span>`).join("")}</span>`;
+}
+
 function compactHeaderStatusText() {
   const counts = batchCounts();
-  const images = activeImages();
-  return topStatusViewHelpers.compactHeaderStatusText({
-    batch: state.batch,
-    exportResultProcessed: state.exportResult?.processed,
-    exportResultTotal: state.exportResult?.total,
-    exportStatus: state.exportStatus,
-    exportableImages: counts.exportableImages,
-    filesFound: counts.filesFound,
-    formatLabel: batchViewHelpers.detectedFormatLabel(images),
-    ignoredFiles: counts.ignoredFiles,
-    imageCount: images.length,
-    nonBlockingWarnings: counts.nonBlockingWarnings,
-    paused: state.paused,
-    plannedTotal: plannedExportTotal(),
-    processed: state.processed,
-    readyLabel: readyImagesText(counts.exportableImages),
-  });
+  if (state.exportStatus === "running") {
+    const total = plannedExportTotal() || counts.exportableImages;
+    return state.paused ? `Pausado · ${state.processed}/${total}` : `Exportando ${state.processed}/${total}`;
+  }
+  if (state.exportStatus === "completed" || state.exportStatus === "partial") {
+    const processed = Number(state.exportResult?.processed ?? state.processed ?? counts.exportableImages);
+    const total = Number(state.exportResult?.total ?? counts.exportableImages);
+    return state.exportStatus === "partial" ? `Exportado con avisos · ${processed}/${total}` : `Exportado · ${processed}/${total}`;
+  }
+  if (state.exportStatus === "failed") {
+    return "Exportación fallida";
+  }
+  if (state.batch === "scanning") {
+    return "Escaneando...";
+  }
+  if (state.batch === "none") {
+    return "Sin lote";
+  }
+  if (state.batch === "empty") {
+    const files = counts.filesFound || 0;
+    const ignored = counts.ignoredFiles || 0;
+    return ignored ? `${files} archivos · no hay PNG válidos · ${ignored} ignorados` : "No hay PNG válidos";
+  }
+  const parts = [
+    detectedFormatLabel(activeImages()),
+    `${counts.filesFound || activeImages().length} archivos`,
+    readyImagesText(counts.exportableImages),
+  ];
+  if (counts.nonBlockingWarnings) {
+    parts.push(`${counts.nonBlockingWarnings} aviso${counts.nonBlockingWarnings === 1 ? "" : "s"}`);
+  }
+  if (counts.ignoredFiles) {
+    parts.push(`${counts.ignoredFiles} ignorado${counts.ignoredFiles === 1 ? "" : "s"}`);
+  }
+  return parts.join(" · ");
 }
 
 function topStatusText() {
-  return topStatusViewHelpers.topStatusText({
-    batch: state.batch,
-    bridgeMode: state.bridgeMode,
-    bridgeStatus: state.bridgeStatus,
-    compactHeaderStatus: compactHeaderStatusText(),
-    exportStatus: state.exportStatus,
-    exportableImages: exportableImages().length,
-    paused: state.paused,
-    plannedTotal: plannedExportTotal(),
-    processed: state.processed,
-    statusText: state.statusText,
-  });
+  const images = activeImages();
+  const warnings = visibleWarningCount();
+  if (state.batch === "scanning") {
+    return "Escaneando carpeta";
+  }
+  if (state.batch === "none") {
+    return "Sin lote";
+  }
+  if (state.batch === "empty") {
+    return "No hay PNG válidos";
+  }
+  if (state.exportStatus === "running") {
+    const total = plannedExportTotal() || exportableImages().length;
+    return state.paused ? `Pausado · ${state.processed}/${total}` : `Exportando ${state.processed}/${total}`;
+  }
+  if (state.batch === "ready") {
+    return compactHeaderStatusText();
+  }
+  if (state.bridgeMode === "bridge" && state.bridgeStatus === "disconnected") {
+    return "Conexión local no disponible";
+  }
+  return state.statusText;
 }
 
 function preflightStatusLabel() {
+  if (state.exportStatus === "running") {
+    return state.paused ? "Salida pausada" : "Exportando";
+  }
+  if (state.exportStatus === "completed") {
+    return "Salida completada";
+  }
+  if (state.exportStatus === "partial") {
+    return "Avisos";
+  }
+  if (state.exportStatus === "failed") {
+    return "Revisar";
+  }
   const ready = isExportReady();
   const counts = preflightCounts();
-  return topStatusViewHelpers.preflightStatusLabel({
-    errors: counts.errors,
-    exportStatus: state.exportStatus,
-    paused: state.paused,
-    ready,
-    warnings: counts.warnings,
-  });
+  if (!ready && counts.errors > 0) {
+    return "Revisar";
+  }
+  if (!ready) {
+    return "Pendiente";
+  }
+  if (counts.warnings > 0) {
+    return `${counts.warnings} aviso${counts.warnings === 1 ? "" : "s"}`;
+  }
+  return "Listo";
 }
 
 function preflightStatusClass() {
+  if (state.exportStatus === "failed") {
+    return "error";
+  }
+  if (state.exportStatus === "running" || state.exportStatus === "partial") {
+    return "warning";
+  }
   const ready = isExportReady();
   const counts = preflightCounts();
-  return topStatusViewHelpers.preflightStatusClass({
-    errors: counts.errors,
-    exportStatus: state.exportStatus,
-    ready,
-    warnings: counts.warnings,
-  });
+  if (!ready || counts.errors > 0) {
+    return "error";
+  }
+  if (counts.warnings > 0) {
+    return "warning";
+  }
+  return "ready";
 }
 
 function renderBridge() {
@@ -3211,82 +3868,108 @@ function renderBridge() {
   const sourcePanel = $("#source-panel");
   const sourceBadge = $("#scan-source-badge");
   const message = $("#bridge-message");
-  const counts = batchCounts();
-  const viewState = scanStateHelpers.sourcePanelViewState({
-    batch: state.batch,
-    bridgeMode: state.bridgeMode,
-    bridgeStatus: state.bridgeStatus,
-    devMode,
-    exportableImages: counts.exportableImages,
-    folders: sourceFoldersForDisplay(),
-    hasBatch: hasBatch(),
-    hasScanError: state.scanIssues.some((issue) => issue.level === "error"),
-    ignoredFiles: counts.ignoredFiles,
-    isBridgeBatch: isBridgeBatch(),
-    isMockBatch: isMockBatch(),
-    persistedFolderName: persistedScanFolderName(),
-    scanStatus: state.scanStatus,
-    scanningFolderName: scanningScanFolderName(),
-  });
 
   chip.className = `bridge-chip ${bridgeStatusClass()}`;
   chip.textContent = bridgeStatusLabel();
-  sourcePanel.className = `source-panel batch-rail__source ${viewState.panelClass}`;
-  sourceBadge.className = `state-chip ${viewState.badgeClass}`;
-  sourceBadge.textContent = viewState.badgeLabel;
-  $("#source-title").textContent = viewState.title;
+  sourcePanel.className = `source-panel batch-rail__source ${sourcePanelClass()}`;
+  sourceBadge.className = `state-chip ${isBridgeBatch() ? "bridge" : isMockBatch() ? "ready" : ""}`;
+  sourceBadge.textContent = sourceLabel();
+  $("#source-title").textContent = hasBatch() || state.batch === "empty" ? "Entrada" : "Seleccionar carpeta";
   const sourceName = $("#source-folder-name");
   if (sourceName) {
-    sourceName.textContent = viewState.folderName;
-    sourceName.title = viewState.folderName;
+    sourceName.textContent = sourceFolderName();
+    sourceName.title = sourceFolderName();
   }
-  $("#scan-status").textContent = viewState.scanStatus;
+  $("#scan-status").textContent = compactScanStatus();
   $("#bridge-scan-path").value = state.bridgeScanPath;
-  $("#bridge-pick-folder").textContent = viewState.pickButtonLabel;
-  $("#bridge-scan-folder").textContent = viewState.scanButtonLabel;
-  $("#bridge-scan-folder").title = viewState.scanButtonTitle;
+  $("#bridge-pick-folder").textContent = hasBatch() || state.batch === "empty" ? "Cambiar" : "Seleccionar carpeta";
+  $("#bridge-scan-folder").textContent = hasBatch() || state.batch === "empty" ? "↻" : "Escanear";
+  $("#bridge-scan-folder").title = hasBatch() || state.batch === "empty" ? "Actualizar lote" : "Escanear carpeta";
   $("#bridge-scan-folder").setAttribute("aria-label", $("#bridge-scan-folder").title);
-  $("#bridge-pick-folder").disabled = viewState.controlsDisabled;
-  $("#bridge-scan-folder").disabled = viewState.controlsDisabled;
+  $("#bridge-pick-folder").disabled = state.bridgeStatus === "checking" || state.batch === "scanning";
+  $("#bridge-scan-folder").disabled = state.bridgeStatus === "checking" || state.batch === "scanning";
   $("#bridge-last-response").textContent = state.bridgeLastResponse;
   $("#bridge-capabilities").textContent = state.bridgeCapabilitiesSummary;
-  message.textContent = viewState.message;
-  message.className = viewState.messageClass;
+  message.textContent = normalBridgeMessage();
+  message.className = `bridge-message ${state.bridgeStatus === "connected" ? "ready" : state.bridgeStatus === "disconnected" ? "error" : ""}`;
   renderBatchSummary();
 }
 
-function sourceFoldersForDisplay() {
+function compactScanStatus() {
+  const counts = batchCounts();
   if (state.batch === "ready") {
-    return activeFolders();
+    return counts.ignoredFiles
+      ? `${counts.exportableImages} exportables · ${countText(counts.ignoredFiles, "ignorado", "ignorados")}`
+      : `${counts.exportableImages} exportables`;
   }
-  if (state.batch === "empty" && isBridgeBatch()) {
-    return state.realFolders;
+  if (state.batch === "empty") {
+    return counts.ignoredFiles ? `0 exportables · ${countText(counts.ignoredFiles, "ignorado", "ignorados")}` : "Sin imágenes compatibles";
   }
-  return [];
-}
-
-function persistedScanFolderName() {
-  const persistedPath = parseFolderInput(state.bridgeScanPath)[0];
-  return persistedPath ? basename(persistedPath) || "Carpeta actual" : "";
-}
-
-function scanningScanFolderName() {
-  return basename(parseFolderInput(state.bridgeScanPath)[0]);
+  if (state.batch === "scanning") {
+    return "Leyendo imágenes";
+  }
+  return state.scanStatus || "Sin lote";
 }
 
 function sourceFolderName() {
   if (state.batch === "scanning") {
-    return scanStateHelpers.sourceFolderName({
-      batch: state.batch,
-      scanningFolderName: scanningScanFolderName(),
-    });
+    return basename(parseFolderInput(state.bridgeScanPath)[0]) || "Carpeta";
   }
-  return scanStateHelpers.sourceFolderName({
-    batch: state.batch,
-    folders: sourceFoldersForDisplay(),
-    hasBatch: hasBatch(),
-    persistedFolderName: persistedScanFolderName(),
-  });
+  const folders = state.batch === "ready"
+    ? activeFolders()
+    : state.batch === "empty" && isBridgeBatch()
+      ? state.realFolders
+      : [];
+  if (folders.length === 1) {
+    return folders[0].name || "Carpeta actual";
+  }
+  if (folders.length > 1) {
+    return `${folders.length} carpetas`;
+  }
+  const persistedPath = parseFolderInput(state.bridgeScanPath)[0];
+  if (persistedPath) {
+    return basename(persistedPath) || "Carpeta actual";
+  }
+  return hasBatch() || state.batch === "empty" ? "Carpeta actual" : "Pendiente";
+}
+
+function normalBridgeMessage() {
+  if (state.bridgeMode !== "bridge") {
+    return devMode ? "Modo revisión activo." : "Elige una carpeta local.";
+  }
+  if (state.bridgeStatus === "connected") {
+    return "Listo.";
+  }
+  if (state.bridgeStatus === "checking") {
+    return "Comprobando conexión.";
+  }
+  if (state.bridgeStatus === "disconnected") {
+    return "Conexión local no disponible.";
+  }
+  return "Elige una carpeta local.";
+}
+
+function sourcePanelClass() {
+  if (state.batch === "scanning") {
+    return "scanning";
+  }
+  if (state.scanIssues.some((issue) => issue.level === "error")) {
+    return "error";
+  }
+  if (isBridgeBatch() || state.bridgeMode === "bridge") {
+    return "bridge";
+  }
+  return "";
+}
+
+function sourceLabel() {
+  if (isBridgeBatch()) {
+    return "Local";
+  }
+  if (isMockBatch()) {
+    return devMode ? "Demo" : "Local";
+  }
+  return state.bridgeMode === "bridge" || !devMode ? "Local" : "Demo";
 }
 
 function emptyScanDiagnostics() {
@@ -3333,62 +4016,178 @@ function renderBatchSummary() {
   const visible = getVisibleAppState();
   const counts = visible.counts;
   const diagnostics = state.scanDiagnostics || emptyScanDiagnostics();
+  const tone = batchSummaryToneFromVisible(visible);
   const sourcePath = state.batch === "ready"
     ? activeFolders()[0]?.path || state.bridgeScanPath
     : state.batch === "empty" && state.realFolders.length
       ? state.realFolders[0]?.path || state.bridgeScanPath
       : state.bridgeScanPath;
+  const filesLabel = counts.filesFound === null ? "Leyendo" : counts.filesFound;
+  const validLabel = counts.validImages === null ? "Leyendo" : counts.validImages;
   const outputLine = batchOutputLine();
   const destinationLine = batchDestinationLine();
   const warningsLabel = counts.nonBlockingWarnings ? countText(counts.nonBlockingWarnings, "aviso", "avisos") : "Sin avisos";
   const ignoredLabel = counts.ignoredFiles ? countText(counts.ignoredFiles, "ignorado", "ignorados") : "Sin ignorados";
 
-  summary.innerHTML = batchViewHelpers.batchSummaryHtml({
-    batch: state.batch,
-    counts,
-    destinationLine,
-    diagnostics,
-    hasScanError: state.scanIssues.some((issue) => issue.level === "error"),
-    ignoredLabel,
-    namingExample: namingExample(),
-    namingLabel: namingHumanLabel(),
-    outputLine,
-    outputProfileName: outputProfileDisplayName(),
-    sourceFolderName: sourceFolderName(),
-    sourcePath,
-    visible,
-    warningsLabel,
-  });
+  summary.innerHTML = `
+    <div class="batch-summary-card ${tone}">
+      <div class="batch-summary-section">
+        <span class="batch-rail__section-title">Entrada</span>
+        <strong title="${escapeHtml(sourcePath || visible.subtitle)}">${escapeHtml(sourceFolderName())}</strong>
+        <small title="${escapeHtml(sourcePath || visible.subtitle)}">${escapeHtml(sourceInputDetail(filesLabel, validLabel))}</small>
+      </div>
+
+      <div class="batch-metric-grid" aria-label="Datos del lote">
+        ${batchMetricHtml("Archivos encontrados", filesLabel)}
+        ${batchMetricHtml("Imágenes listas", counts.readyImages)}
+        ${batchMetricHtml("Excluidas", counts.nonExportableImages)}
+        ${batchMetricHtml("Ignorados", counts.ignoredFiles)}
+      </div>
+
+      <div class="batch-summary-section">
+        <span class="batch-rail__section-title">Estado del lote</span>
+        <strong>${escapeHtml(visible.title)}</strong>
+        <small title="${escapeHtml(visible.subtitle)}">${escapeHtml(visible.subtitle)}</small>
+      </div>
+
+      <div class="batch-summary-lines batch-summary-lines--compact">
+        <div class="batch-summary__line">
+          <span>Listas</span>
+          <strong>${escapeHtml(counts.readyImages)}</strong>
+        </div>
+        <div class="batch-summary__line">
+          <span>Avisos</span>
+          <strong>${escapeHtml(counts.reviewIssues)}</strong>
+        </div>
+        <div class="batch-summary__line">
+          <span>Bloqueos</span>
+          <strong>${escapeHtml(counts.blockingErrors)}</strong>
+        </div>
+      </div>
+
+      <div class="batch-summary-section">
+        <span class="batch-rail__section-title">Salida</span>
+        <strong title="${escapeHtml(outputLine)}">${escapeHtml(outputProfileDisplayName())}</strong>
+        <small title="${escapeHtml(`${outputLine} · ${destinationLine}`)}">${escapeHtml(`${outputLine} · ${destinationLine}`)}</small>
+      </div>
+
+      <div class="batch-summary-lines">
+        <div class="batch-summary__line">
+          <span>Nombre de archivo</span>
+          <strong title="${escapeHtml(namingExample())}">${escapeHtml(namingHumanLabel())}</strong>
+        </div>
+        <div class="batch-summary__line">
+          <span>Avisos</span>
+          <strong>${escapeHtml(warningsLabel)}</strong>
+        </div>
+        <div class="batch-summary__line">
+          <span>Ignorados</span>
+          <strong>${escapeHtml(ignoredLabel)}</strong>
+        </div>
+      </div>
+
+      <div class="batch-next">
+        <span>Siguiente</span>
+        <strong>${escapeHtml(visible.nextStep)}</strong>
+      </div>
+      ${diagnostics.totalOmitted || counts.blockingErrors ? diagnosticsHtml(diagnostics) : `<div class="diagnostic-ok">${counts.nonBlockingWarnings ? "Avisos en la galería" : "Sin avisos"}</div>`}
+    </div>
+  `;
+}
+
+function sourceInputDetail(filesLabel, validLabel) {
+  if (state.batch === "none") {
+    return "Pendiente";
+  }
+  if (state.batch === "scanning") {
+    return "Leyendo imágenes";
+  }
+  return `${filesLabel} archivos encontrados · ${validLabel} imágenes listas`;
+}
+
+function batchSummaryToneFromVisible(visible) {
+  if (visible.tone === "error") {
+    return "is-error";
+  }
+  if (visible.tone === "warning") {
+    return "is-warning";
+  }
+  if (visible.tone === "busy") {
+    return "is-busy";
+  }
+  if (visible.tone === "ready") {
+    return "is-ready";
+  }
+  return "is-idle";
+}
+
+function batchMetricHtml(label, value) {
+  return `
+    <div class="batch-metric">
+      <span>${escapeHtml(label)}</span>
+      <strong title="${escapeHtml(value)}">${escapeHtml(value)}</strong>
+    </div>
+  `;
 }
 
 function batchOutputLine() {
   const profiles = exportOutputProfiles();
-  return batchViewHelpers.batchOutputLine({
-    background: state.background,
-    format: state.format,
-    profileLines: profiles.length > 1
-      ? profiles.map((profile) => `${profile.format} ${outputProfileSize(profile).replace("x", "×")}`)
-      : [],
-    size: state.size,
-  });
+  if (profiles.length > 1) {
+    return profiles.map((profile) => `${profile.format} ${outputProfileSize(profile).replace("x", "×")}`).join(" · ");
+  }
+  return `${state.format} · ${state.size.replace("x", " × ")} · ${batchBackgroundLabel(state.background)}`;
 }
 
 function outputProfilesSummaryLabel(profiles = exportOutputProfiles()) {
-  return batchViewHelpers.outputProfilesSummaryLabel({
-    backgroundLabel: backgroundLabel(state.background),
-    format: state.format,
-    profileLabels: profiles.length > 1 ? profiles.map((profile) => `${profile.name} (${profile.format})`) : [],
-    sizeLabel: outputSizeDisplay(),
-  });
+  if (profiles.length <= 1) {
+    return `${state.format} · ${outputSizeDisplay()} · ${backgroundLabel(state.background)}`;
+  }
+  return profiles.map((profile) => `${profile.name} (${profile.format})`).join(" · ");
+}
+
+function batchBackgroundLabel(value) {
+  if (value === "transparent") {
+    return "transparente";
+  }
+  if (value === "white") {
+    return "blanco";
+  }
+  return "gris claro";
 }
 
 function batchDestinationLine() {
   const profiles = exportOutputProfiles();
-  return batchViewHelpers.batchDestinationLine({
-    destinationMode: state.destinationMode,
-    destinationValue: state.destinationValue,
-    profileDestinations: profiles.length > 1 ? profiles.map(profileDestinationPreviewLabel) : [],
-  });
+  if (profiles.length > 1) {
+    const destinations = Array.from(new Set(profiles.map(profileDestinationPreviewLabel)));
+    return destinations.length === 1 ? destinations[0] : `${destinations.length} destinos`;
+  }
+  if (state.destinationMode === "custom") {
+    return state.destinationValue || "Sin destino";
+  }
+  return state.destinationValue ? `Junto al origen · ${state.destinationValue}` : "Junto al origen";
+}
+
+function diagnosticsHtml(diagnostics) {
+  const open = state.scanIssues.some((issue) => issue.level === "error") ? " open" : "";
+  const reasonRows = Object.entries(diagnostics.omittedByReason || {}).map(([reason, count]) => `
+    <div class="diagnostic-row">
+      <span>${escapeHtml(omissionReasonLabel(reason))}</span>
+      <strong>${escapeHtml(count)}</strong>
+    </div>
+  `).join("");
+  const sampleRows = (diagnostics.omitted || []).slice(0, 5).map((item) => `
+    <li title="${escapeHtml(item.path || item.name)}">
+      <span>${escapeHtml(item.name)}</span>
+      <small>${escapeHtml(item.detail || omissionReasonLabel(item.reason))}</small>
+    </li>
+  `).join("");
+  return `
+    <details class="batch-diagnostics"${open}>
+      <summary>${escapeHtml(diagnostics.totalOmitted ? "Ver diagnóstico" : "Diagnóstico")}</summary>
+      <div class="diagnostic-reasons">${reasonRows}</div>
+      ${sampleRows ? `<ul>${sampleRows}</ul>` : ""}
+    </details>
+  `;
 }
 
 function renderBatchDetail() {
@@ -3423,23 +4222,27 @@ function renderExportConfirm() {
   if (body) {
     body.innerHTML = exportConfirmHtml(risks);
   }
-  const modalState = exportConfirmViewHelpers.exportConfirmModalState({
-    actionText: exportActionLabel(batchCounts().exportableImages),
-    risks,
-  });
   const action = $("#export-confirm-action");
   if (action) {
-    action.textContent = modalState.actionText;
-    action.classList.toggle("danger", modalState.actionDanger);
+    const blocking = risks.some((risk) => risk.blocking);
+    const count = batchCounts().exportableImages;
+    action.textContent = blocking
+      ? "Revisar problemas"
+      : exportActionLabel(count);
+    action.classList.toggle("danger", blocking);
   }
   const subtitle = $("#export-confirm-subtitle");
   if (subtitle) {
-    subtitle.textContent = modalState.subtitle;
+    const blocking = risks.some((risk) => risk.blocking);
+    subtitle.textContent = blocking
+      ? "Hay puntos que impiden exportar."
+      : "Confirma solo los puntos que requieren atención.";
   }
 }
 
 function exportConfirmHtml(risks) {
   const counts = batchCounts();
+  const blocking = risks.some((risk) => risk.blocking);
   const exportable = counts.exportableImages;
   const summaryRows = [
     ["Imágenes", `${exportable} exportable${exportable === 1 ? "" : "s"}`],
@@ -3447,7 +4250,55 @@ function exportConfirmHtml(risks) {
     ["Destino", destinationFallbackLabel()],
     ["Nombre", namingExample()],
   ];
-  return exportConfirmViewHelpers.exportConfirmHtml({ risks, summaryRows });
+  const riskTitle = blocking ? "Bloqueos" : "Avisos";
+  const riskRows = risks.length
+    ? risks.map(exportConfirmRiskHtml).join("")
+    : `
+      <div class="export-confirm-risk ready">
+        <span aria-hidden="true">✓</span>
+        <div>
+          <strong>Sin avisos</strong>
+          <small>El lote se exportará con el formato activo.</small>
+        </div>
+      </div>
+    `;
+  const overwriteNote = risks.some((risk) => risk.id === "previous-export-destination" || risk.id === "existing-output-blocker")
+    ? `
+      <div class="export-confirm-note">
+        <strong>Archivos existentes</strong>
+        <span>FlatShot mantiene la validación segura: no sobrescribe archivos existentes sin soporte explícito del motor local.</span>
+      </div>
+    `
+    : "";
+
+  return `
+    <div class="export-confirm-summary">
+      ${summaryRows.map(([label, value]) => `
+        <div>
+          <span>${escapeHtml(label)}</span>
+          <strong title="${escapeHtml(value)}">${escapeHtml(value)}</strong>
+        </div>
+      `).join("")}
+    </div>
+    <section class="export-confirm-section">
+      <h3>${escapeHtml(riskTitle)}</h3>
+      <div class="export-confirm-risks">${riskRows}</div>
+    </section>
+    ${overwriteNote}
+  `;
+}
+
+function exportConfirmRiskHtml(risk) {
+  const icon = risk.blocking ? "!" : "⚠";
+  return `
+    <div class="export-confirm-risk ${risk.blocking ? "error" : "warning"}">
+      <span aria-hidden="true">${escapeHtml(icon)}</span>
+      <div>
+        <strong>${escapeHtml(risk.title)}</strong>
+        <small>${escapeHtml(risk.detail || "Revisar antes de exportar.")}</small>
+      </div>
+    </div>
+  `;
 }
 
 function batchDetailHtml() {
@@ -3459,60 +4310,130 @@ function batchDetailHtml() {
       : state.bridgeScanPath;
   const files = counts.filesFound === null ? "Leyendo" : counts.filesFound;
   const valid = counts.validImages === null ? "Leyendo" : counts.validImages;
-  const ignoredItems = ignoredOmissions();
-  const ignoredRowsHtml = ignoredItems.slice(0, 8).map((item) => batchDetailViewHelpers.batchDetailProblemHtml({
-    detail: item.detail || omissionReasonLabel(item.reason),
-    title: item.name || "Archivo ignorado",
-    titleAttr: item.path || item.name,
-    tone: "clear",
-  })).join("");
-  const issueRowsHtml = actionableIssueRows().slice(0, 8).map((row) => batchDetailViewHelpers.batchDetailProblemHtml({
-    detail: row.detail || "Revisar",
-    title: row.title,
-    titleAttr: row.path || row.title,
-    tone: row.level === "error" ? "error" : "warning",
-  })).join("");
-  const outputRowsHtml = exportOutputProfiles().map((profile, index) => batchDetailViewHelpers.batchDetailOutputHtml({
-    active: profile.id === state.activeOutputProfileId,
-    destination: profileDestinationPreviewLabel(profile),
-    example: outputNameForProfile(profile),
-    index,
-    name: profile.name,
-    summary: outputProfileSummaryLine(profile),
-  })).join("");
-  const ignoredSectionHtml = batchDetailViewHelpers.batchDetailIgnoredSectionHtml({
-    count: ignoredItems.length,
-    rowsHtml: ignoredRowsHtml,
-  });
+  const ignoredRowsHtml = ignoredOmissions().slice(0, 8).map((item) => `
+    <div class="batch-detail-problem clear">
+      <strong title="${escapeHtml(item.path || item.name)}">${escapeHtml(item.name || "Archivo ignorado")}</strong>
+      <span>${escapeHtml(item.detail || omissionReasonLabel(item.reason))}</span>
+    </div>
+  `).join("");
+  const issueRowsHtml = actionableIssueRows().slice(0, 8).map((row) => `
+    <div class="batch-detail-problem ${row.level === "error" ? "error" : "warning"}">
+      <strong title="${escapeHtml(row.path || row.title)}">${escapeHtml(row.title)}</strong>
+      <span>${escapeHtml(row.detail || "Revisar")}</span>
+    </div>
+  `).join("");
+  const outputRowsHtml = exportOutputProfiles().map((profile, index) => `
+    <div class="batch-detail-output">
+      <div class="batch-detail-output__title">
+        <span>${escapeHtml(`${index + 1}.`)}</span>
+        <strong title="${escapeHtml(profile.name)}">${escapeHtml(profile.name)}</strong>
+        ${profile.id === state.activeOutputProfileId ? '<em>Principal</em>' : ""}
+      </div>
+      <div class="batch-detail-output__meta">${escapeHtml(outputProfileSummaryLine(profile))}</div>
+      <div class="batch-detail-row">
+        <span>Destino</span>
+        <strong title="${escapeHtml(profileDestinationPreviewLabel(profile))}">${escapeHtml(profileDestinationPreviewLabel(profile))}</strong>
+      </div>
+      <div class="batch-detail-row">
+        <span>Ejemplo</span>
+        <strong title="${escapeHtml(outputNameForProfile(profile))}">${escapeHtml(outputNameForProfile(profile))}</strong>
+      </div>
+    </div>
+  `).join("");
+  const ignoredSectionHtml = ignoredRowsHtml ? `
+    <details class="batch-detail-section batch-detail-section--collapsed">
+      <summary>
+        <h3>Ignorados técnicos</h3>
+        <span>${escapeHtml(`${ignoredOmissions().length} archivo${ignoredOmissions().length === 1 ? "" : "s"}`)}</span>
+      </summary>
+      <div class="batch-detail-reasons">
+        ${ignoredRowsHtml}
+      </div>
+    </details>
+  ` : "";
 
-  return batchDetailViewHelpers.batchDetailGridHtml({
-    counts,
-    files,
-    ignoredSectionHtml,
-    issueCount: actionableIssueRows().length,
-    issueRowsHtml,
-    outputRowsHtml,
-    sourceFolderName: sourceFolderName(),
-    sourcePath,
-    stateTitle: getVisibleAppState().title,
-    valid,
-  });
+  return `
+    <div class="batch-detail-grid batch-detail-grid--compact">
+      <section class="batch-detail-section">
+        <h3>Resumen</h3>
+        ${batchDetailRowHtml("Encontrados", files)}
+        ${batchDetailRowHtml("Exportables", counts.exportableImages)}
+        ${batchDetailRowHtml("Ignorados técnicos", counts.ignoredFiles)}
+        ${batchDetailRowHtml("Incidencias", actionableIssueRows().length)}
+      </section>
+
+      <section class="batch-detail-section">
+        <h3>Entrada</h3>
+        ${batchDetailRowHtml("Carpeta", sourceFolderName(), sourcePath)}
+        ${batchDetailRowHtml("Ruta", sourcePath || "Pendiente", sourcePath)}
+        ${batchDetailRowHtml("Imágenes", valid)}
+      </section>
+
+      <section class="batch-detail-section">
+        <h3>Lote</h3>
+        ${batchDetailRowHtml("Archivos", files)}
+        ${batchDetailRowHtml("Exportables", counts.exportableImages)}
+        ${batchDetailRowHtml("Excluidas", counts.nonExportableImages)}
+        ${batchDetailRowHtml("Estado", getVisibleAppState().title)}
+      </section>
+
+      <section class="batch-detail-section">
+        <h3>Salidas activas</h3>
+        ${outputRowsHtml || '<span class="batch-detail-muted">Sin salidas activas.</span>'}
+      </section>
+
+      ${ignoredSectionHtml}
+
+      <section class="batch-detail-section">
+        <h3>Incidencias</h3>
+        ${issueRowsHtml || '<span class="batch-detail-muted">Sin incidencias.</span>'}
+      </section>
+    </div>
+  `;
+}
+
+function batchDetailRowHtml(label, value, title = "") {
+  const text = value === null || value === undefined || value === "" ? "Pendiente" : String(value);
+  return `
+    <div class="batch-detail-row">
+      <span>${escapeHtml(label)}</span>
+      <strong title="${escapeHtml(title || text)}">${escapeHtml(text)}</strong>
+    </div>
+  `;
+}
+
+function pluralizeCount(count, singular) {
+  const value = Number(count) || 0;
+  const irregular = {
+    imagen: "imágenes",
+    correcta: "correctas",
+    lista: "listas",
+  };
+  const plural = irregular[singular] || (singular.endsWith("s") ? singular : `${singular}s`);
+  return `${value} ${value === 1 ? singular : plural}`;
 }
 
 function bridgeStatusClass() {
-  return scanStateHelpers.bridgeStatusClass({
-    bridgeMode: state.bridgeMode,
-    bridgeStatus: state.bridgeStatus,
-    devMode,
-  });
+  if (state.bridgeMode !== "bridge" && devMode) {
+    return "idle";
+  }
+  return state.bridgeStatus;
 }
 
 function bridgeStatusLabel() {
-  return scanStateHelpers.bridgeStatusLabel({
-    bridgeMode: state.bridgeMode,
-    bridgeStatus: state.bridgeStatus,
-    devMode,
-  });
+  if (state.bridgeMode !== "bridge" && devMode) {
+    return "Demo";
+  }
+  if (state.bridgeStatus === "connected") {
+    return "Listo";
+  }
+  if (state.bridgeStatus === "checking") {
+    return "Comprobando";
+  }
+  if (state.bridgeStatus === "disconnected") {
+    return "Sin conexión local";
+  }
+  return "Pendiente";
 }
 
 function renderBatch() {
@@ -3544,20 +4465,12 @@ function renderBatch() {
     return;
   }
 
-  const sidebarSummaryText = batchViewHelpers.sidebarLotSummaryText({
-    batch: state.batch,
-    hasBatch: hasBatch(),
-    nonBlockingWarnings: counts.nonBlockingWarnings,
-    readyLabel: readyImagesText(counts.exportableImages),
-    scanStatus: state.scanStatus,
-  });
-
   if (state.batch === "scanning") {
     $("#batch-count").textContent = "Escaneando";
     setBatchPill("Escaneando", "active");
     setGalleryTitle(0, "Escaneando");
-    $("#batch-visible-count").textContent = sidebarSummaryText;
-    $("#folder-list").innerHTML = batchDetailViewHelpers.folderItemHtml({
+    $("#batch-visible-count").textContent = sidebarLotSummaryText(counts);
+    $("#folder-list").innerHTML = folderItemHtml({
       id: "scan",
       name: isBridgeBatch() || !devMode ? basename(parseFolderInput(state.bridgeScanPath)[0]) || "Ruta" : "Camisetas Mayo",
       path: state.bridgeScanPath,
@@ -3587,8 +4500,8 @@ function renderBatch() {
     $("#batch-count").textContent = "Sin imágenes";
     setBatchPill("Sin imágenes", "muted");
     setGalleryTitle(0, "No hay PNG válidos");
-    $("#batch-visible-count").textContent = sidebarSummaryText;
-    $("#folder-list").innerHTML = emptyFolders.map((folder) => batchDetailViewHelpers.folderItemHtml(folder)).join("");
+    $("#batch-visible-count").textContent = sidebarLotSummaryText(counts);
+    $("#folder-list").innerHTML = emptyFolders.map(folderItemHtml).join("");
     $("#image-list").innerHTML = "";
     $("#batch-empty-note").innerHTML = emptyBatchNoteHtml();
     if (filmstripCount) {
@@ -3600,12 +4513,13 @@ function renderBatch() {
 
   const exportable = exportableImages().length;
   $("#batch-count").textContent = exportable ? readyImagesText(exportable) : "Sin exportables";
-  const batchPillState = batchViewHelpers.batchPillState({
-    adjustedCount: adjusted,
-    issueCount,
-  });
-  setBatchPill(batchPillState.label, batchPillState.tone);
-  $("#folder-list").innerHTML = "";
+  setBatchPill(
+    issueCount
+      ? warningCountLabel(issueCount)
+      : adjusted ? `${pluralizeCount(adjusted, "ajustada")}` : "Listo",
+    issueCount ? "warning" : adjusted ? "active" : "ready"
+  );
+  $("#folder-list").innerHTML = batchFormatHtml(images, ignored);
   ensureGalleryFilterAvailable(images);
   renderFilterButtons();
 
@@ -3648,29 +4562,80 @@ function updateBatchSearchClear() {
 }
 
 function filteredEmptyHtml(total, valid, warnings, errors) {
-  return galleryHelpers.filteredEmptyHtml({
-    errors,
-    filter: state.filter,
-    search: state.search,
-    total,
-    valid,
-    warnings,
-  });
+  if (!total) {
+    return "No hay imágenes en este lote.";
+  }
+  const labels = {
+    valid: "listas",
+    warnings: "con avisos",
+    excluded: "excluidas",
+  };
+  if (state.search.trim()) {
+    const term = state.search.trim();
+    const searchDetail = state.filter === "all"
+      ? `No hay imágenes que coincidan con "${term}".`
+      : `No hay imágenes que coincidan con "${term}" en el filtro actual.`;
+    return `
+      <strong>No hay imágenes que coincidan</strong>
+      <span>${escapeHtml(searchDetail)}</span>
+      <button type="button" data-action="clear-filter">Limpiar búsqueda</button>
+    `;
+  }
+  const counts = { valid, warnings, excluded: errors };
+  const label = labels[state.filter] || "con este filtro";
+  const count = counts[state.filter] || 0;
+  return `
+    <strong>No hay imágenes ${escapeHtml(label)}.</strong>
+    <small>${escapeHtml(total)} imágenes en el lote · ${escapeHtml(count)} en este filtro</small>
+    <button type="button" data-action="clear-filter">Ver todas</button>
+  `;
 }
 
 function filterEmptyDetail() {
-  return galleryHelpers.filterEmptyDetail({
-    filter: state.filter,
-    search: state.search,
-  });
+  if (state.search.trim()) {
+    return `No hay coincidencias para "${state.search.trim()}".`;
+  }
+  if (state.filter === BATCH_FILTERS.warnings) {
+    return "El lote no contiene imágenes con avisos.";
+  }
+  if (state.filter === BATCH_FILTERS.excluded) {
+    return "No hay imágenes excluidas de la exportación.";
+  }
+  if (state.filter === BATCH_FILTERS.valid) {
+    return "No hay imágenes listas en este filtro.";
+  }
+  return "No hay imágenes visibles con el filtro activo.";
 }
 
 function emptyBatchNoteHtml() {
-  return galleryHelpers.emptyBatchNoteHtml({
-    ignored: ignoredOmissions().length,
-    ignoredSummary: ignoredSummaryText(),
-    scanStatus: state.scanStatus,
-  });
+  const ignored = ignoredOmissions().length;
+  const detail = ignored
+    ? `Esta carpeta no contiene PNG válidos. ${ignoredSummaryText()}.`
+    : state.scanStatus || "Esta carpeta no contiene imágenes compatibles.";
+  return `
+    <strong>No se encontraron imágenes compatibles</strong>
+    <span>${escapeHtml(detail)}</span>
+    <button type="button" class="primary" data-action="pick-bridge-folder">Elegir otra carpeta</button>
+  `;
+}
+
+function batchFormatHtml(images, omittedCount = 0) {
+  return "";
+}
+
+function folderItemHtml(folder) {
+  const className = folder.status === "warning" ? "empty" : folder.status === "error" ? "error" : folder.status || "";
+  return `
+    <div class="folder-item ${className}" title="${escapeHtml(folder.path || folder.detail)}">
+      <div>
+        <strong>${escapeHtml(folder.name)}</strong>
+        <small>${escapeHtml(folder.detail)}</small>
+      </div>
+      <span class="state-chip ${folder.status === "warning" ? "warning" : folder.status === "error" ? "error" : ""}">
+        ${escapeHtml(folder.count)}
+      </span>
+    </div>
+  `;
 }
 
 function imageThumbnailSrc(image) {
@@ -3680,14 +4645,59 @@ function imageThumbnailSrc(image) {
   if (image.source === "bridge") {
     return image.path ? bridgeThumbnailUrl(image.path) : "";
   }
-  return galleryHelpers.mockThumbnailDataUrl(image);
+  return mockThumbnailDataUrl(image);
+}
+
+function mockThumbnailDataUrl(image) {
+  const palettes = {
+    "tone-a": ["#f8f1e8", "#b7d6c8", "#34534a"],
+    "tone-b": ["#f8e1dc", "#dfe9ec", "#723d45"],
+    "tone-c": ["#ded8cf", "#8db9ad", "#33423f"],
+    "tone-d": ["#f2e6bd", "#c7d7ea", "#67510f"],
+    "tone-e": ["#e3ecfa", "#b7d2c9", "#294d63"],
+  };
+  const [bgA, bgB, ink] = palettes[image?.tone] || palettes["tone-a"];
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+      <defs>
+        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="${bgA}"/>
+          <stop offset="1" stop-color="${bgB}"/>
+        </linearGradient>
+      </defs>
+      <rect width="96" height="96" rx="8" fill="url(#bg)"/>
+      <path d="M34 18h28l13 12-9 11-6-4v38H36V37l-6 4-9-11 13-12z" fill="#fff" fill-opacity=".86"/>
+      <path d="M34 18h28l13 12-9 11-6-4v38H36V37l-6 4-9-11 13-12z" fill="none" stroke="${ink}" stroke-opacity=".34" stroke-width="2"/>
+    </svg>
+  `;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.trim())}`;
 }
 
 function thumbnailState(image, src) {
-  return galleryHelpers.thumbnailState({
-    src,
-    stored: state.thumbnailStatus[image.id],
-  });
+  if (!src) {
+    return { status: "error", error: "Sin preview" };
+  }
+  const stored = state.thumbnailStatus[image.id];
+  if (stored?.src === src || stored?.sourceSrc === src) {
+    return stored;
+  }
+  return { status: "loading", src, error: "" };
+}
+
+function thumbnailHtml(image) {
+  const src = imageThumbnailSrc(image);
+  const current = thumbnailState(image, src);
+  const status = current.status || "loading";
+  const error = current.error || "Sin preview";
+  const alt = `Miniatura de ${image.name}`;
+  const displaySrc = current.resolvedSrc || current.src || src;
+  return `
+    <span class="thumb is-${escapeHtml(status)}" data-thumb-id="${escapeHtml(image.id)}">
+      ${displaySrc ? `<img class="thumb-image" src="${escapeHtml(displaySrc)}" alt="${escapeHtml(alt)}" loading="eager" data-image-id="${escapeHtml(image.id)}" />` : ""}
+      <span class="thumb-skeleton" aria-hidden="true"></span>
+      <span class="thumb-error">${escapeHtml(error)}</span>
+    </span>
+  `;
 }
 
 function queueThumbnailPreload() {
@@ -3861,56 +4871,136 @@ function applyThumbnailDomStatus(imageId, status, resolvedSrc = "") {
 }
 
 function imageItemHtml(image) {
+  const selected = image.id === state.selectedImageId ? "active" : "";
   const exportState = exportItemState(image);
   const imageStatus = hasCurrentImageOverride(image) ? "adjusted" : image.status;
-  const thumbnailSrc = imageThumbnailSrc(image);
-  return galleryHelpers.imageItemHtml({
-    exportState,
-    fileType: imageFileType(image),
-    image,
-    imageStatus,
-    selected: image.id === state.selectedImageId,
-    statusLabels,
-    thumbState: thumbnailState(image, thumbnailSrc),
-    thumbnailSrc,
-  });
+  const effectiveStatus = exportState?.status || imageStatus;
+  const chipClass = effectiveStatus === "warning" ? "warning" : effectiveStatus === "error" ? "error" : effectiveStatus === "exported" ? "exported" : imageStatus === "adjusted" ? "adjusted" : "ready";
+  const chipLabel = exportState?.label || assetStatusLabel(imageStatus);
+  const title = image.path || image.name;
+  const detail = image.detail === "Lista" ? "" : image.detail;
+  const displayName = imageFileStem(image.name);
+  const fileType = imageFileType(image);
+  const compactDetail = compactImageDetail(detail);
+  const metadata = !compactDetail
+    ? fileType
+    : compactDetail.toUpperCase().startsWith(fileType)
+    ? compactDetail
+    : `${fileType} · ${compactDetail}`;
+  const thumbState = thumbnailState(image, imageThumbnailSrc(image));
+  const previewNote = thumbState.status === "error" ? " · sin preview" : "";
+  const statusText = chipLabel ? ` · ${chipLabel}` : "";
+  const stateIcon = assetStatusIcon(effectiveStatus);
+  const stateBadgeHtml = effectiveStatus === "ready" ? "" : `
+      <span class="asset-state ${chipClass}" role="img" title="${escapeHtml(chipLabel || "Lista")}" aria-label="${escapeHtml(chipLabel || "Lista")}">
+        <span aria-hidden="true">${escapeHtml(stateIcon)}</span>
+        <em>${escapeHtml(chipLabel || "Lista")}</em>
+      </span>
+    `;
+  return `
+    <button type="button" class="image-item asset-row ${selected} ${chipClass}" data-image-id="${escapeHtml(image.id)}" title="${escapeHtml(title)}" aria-pressed="${selected ? "true" : "false"}" aria-label="${escapeHtml(`${image.name}${statusText}`)}">
+      ${thumbnailHtml(image)}
+      <span class="image-copy">
+        <strong>${escapeHtml(displayName)}</strong>
+        <small>${escapeHtml(`${metadata}${previewNote}`)}</small>
+      </span>
+      ${stateBadgeHtml}
+    </button>
+  `;
+}
+
+function compactImageDetail(detail) {
+  return String(detail || "")
+    .replace(/^PNG\s*·\s*/i, "")
+    .replace(/^JPG\s*·\s*/i, "")
+    .replace(/^JPEG\s*·\s*/i, "")
+    .replace(/^Lista$/i, "")
+    .trim();
+}
+
+function assetStatusLabel(status) {
+  if (status === "ready") {
+    return "Lista";
+  }
+  if (status === "adjusted") {
+    return "Ajustada";
+  }
+  return statusLabels[status] || "Lista";
+}
+
+function assetStatusIcon(status) {
+  if (status === "warning") {
+    return "!";
+  }
+  if (status === "error") {
+    return "×";
+  }
+  if (status === "exported") {
+    return "✓";
+  }
+  if (status === "adjusted") {
+    return "*";
+  }
+  return "✓";
 }
 
 function galleryFilterCounts(images = activeImages()) {
-  return galleryHelpers.galleryFilterCounts(images, exportItemStatusMap(images));
+  return {
+    all: images.length,
+    valid: images.filter((image) => image.status === "ready" || image.status === "adjusted").length,
+    warnings: images.filter((image) => image.status === "warning").length,
+    excluded: images.filter((image) => !image.exportable || image.status === "error" || exportItemState(image)?.status === "error").length,
+  };
+}
+
+function galleryFilterVisible(filter, counts = galleryFilterCounts()) {
+  if (filter === "all") {
+    return true;
+  }
+  if (filter === "valid") {
+    return counts.valid > 0 && counts.valid !== counts.all;
+  }
+  if (filter === "warnings") {
+    return counts.warnings > 0;
+  }
+  if (filter === "excluded") {
+    return counts.excluded > 0;
+  }
+  return false;
 }
 
 function ensureGalleryFilterAvailable(images = activeImages()) {
-  const nextFilter = galleryHelpers.resolveAvailableFilter(state.filter, images, exportItemStatusMap(images));
-  if (nextFilter !== state.filter) {
-    state.filter = nextFilter;
+  const counts = galleryFilterCounts(images);
+  if (!galleryFilterVisible(state.filter, counts)) {
+    state.filter = "all";
   }
 }
 
 function renderFilterButtons() {
   const images = activeImages();
   const counts = galleryFilterCounts(images);
-  const buttonStates = galleryHelpers.galleryFilterButtonStates({
-    activeFilter: state.filter,
-    counts,
-  });
-  const visibleCount = buttonStates.filter((item) => !item.hidden).length;
+  const labels = {
+    all: "Todas",
+    valid: "Listas",
+    warnings: "Avisos",
+    excluded: "Excluidas",
+  };
+  const order = { all: 1, valid: 2, warnings: 3, excluded: 4 };
+  const visibleFilters = Object.keys(labels).filter((filter) => galleryFilterVisible(filter, counts));
   const filterGroup = $(".gallery-filter");
   if (filterGroup) {
-    filterGroup.hidden = visibleCount <= 1;
+    filterGroup.hidden = visibleFilters.length <= 1;
   }
   $$(".batch-filter button").forEach((button) => {
     const filter = button.dataset.filter;
-    const buttonState = buttonStates.find((item) => item.filter === filter);
-    if (!buttonState) {
-      return;
-    }
-    button.innerHTML = `${escapeHtml(buttonState.label)} <span>${escapeHtml(buttonState.count)}</span>`;
-    button.title = buttonState.title;
-    button.style.order = String(buttonState.order);
-    button.classList.toggle("active", buttonState.active);
-    button.classList.toggle("is-empty", buttonState.empty);
-    button.hidden = buttonState.hidden;
+    const count = counts[filter] || 0;
+    button.innerHTML = `${escapeHtml(labels[filter])} <span>${escapeHtml(count)}</span>`;
+    button.title = `${labels[filter]} ${count}`;
+    button.style.order = String(order[filter] || 9);
+    button.classList.toggle("active", button.dataset.filter === state.filter);
+    const empty = filter !== "all" && !count;
+    button.classList.toggle("is-empty", empty);
+    button.hidden = visibleFilters.length <= 1 || !visibleFilters.includes(filter);
   });
 }
 
@@ -3953,7 +5043,7 @@ function renderPreview() {
     : image ? state.activePreset : "Sin lote";
   const outputContext = $("#preview-output-context");
   if (outputContext) {
-    outputContext.innerHTML = "";
+    outputContext.innerHTML = previewOutputContextHtml(image);
   }
   $("#canvas-area").className = `canvas-area bg-${state.previewBg === "transparent" ? "transparent" : state.previewBg}`;
   $$(".preview-toolbar [data-preview-mode]").forEach((button) => {
@@ -4056,7 +5146,13 @@ function renderPreview() {
   }
 
   if (state.previewStatus === "loading") {
-    canvas.innerHTML = previewViewHelpers.previewLoadingHtml(image.name);
+    canvas.innerHTML = `
+      <div class="preview-state">
+        <span class="loader" aria-hidden="true"></span>
+        <strong>Generando vista</strong>
+        <span>${escapeHtml(image.name)}</span>
+      </div>
+    `;
     queueFitZoomRefresh();
     return;
   }
@@ -4067,9 +5163,13 @@ function renderPreview() {
     return;
   }
 
-  canvas.innerHTML = previewViewHelpers.mockPreviewHtml({
-    warning: state.previewStatus === "warning" ? "Render con fallback. Revisa antes de exportar." : "",
-  });
+  canvas.innerHTML = `
+    <div class="mock-product" aria-hidden="true">
+      <div class="mock-shadow"></div>
+      <div class="mock-body"></div>
+    </div>
+    ${state.previewStatus === "warning" ? '<div class="preview-warning-card">Render con fallback. Revisa antes de exportar.</div>' : ""}
+  `;
   queueFitZoomRefresh();
 }
 
@@ -4125,7 +5225,13 @@ function calculateFitZoom() {
 
 function realPreviewHtml(image) {
   if (state.previewStatus === "loading") {
-    return previewViewHelpers.previewLoadingHtml(image.name);
+    return `
+      <div class="preview-state">
+        <span class="loader" aria-hidden="true"></span>
+        <strong>Generando vista</strong>
+        <span>${escapeHtml(image.name)}</span>
+      </div>
+    `;
   }
 
   if (state.previewStatus === "error") {
@@ -4133,37 +5239,59 @@ function realPreviewHtml(image) {
   }
 
   if (state.previewData?.src) {
-    return previewViewHelpers.realPreviewImageHtml({
-      src: state.previewData.src,
-      imageName: image.name,
-      width: state.previewData.width,
-      height: state.previewData.height,
-      zoom: state.zoom,
-      warning: state.previewData.warning,
-    });
+    const width = Number(state.previewData.width) || 0;
+    const height = Number(state.previewData.height) || 0;
+    const zoomWidth = width ? Math.max(1, Math.round(width * state.zoom / 100)) : "";
+    const zoomHeight = height ? Math.max(1, Math.round(height * state.zoom / 100)) : "";
+    const sizeStyle = zoomWidth && zoomHeight ? ` style="width: ${zoomWidth}px; height: ${zoomHeight}px;" width="${width}" height="${height}"` : "";
+    return `
+      <img class="preview-image" src="${escapeHtml(state.previewData.src)}" alt="Vista previa de ${escapeHtml(image.name)}"${sizeStyle} />
+      ${state.previewData.warning ? `<div class="preview-warning-card">${escapeHtml(state.previewData.warning)}</div>` : ""}
+    `;
   }
 
-  return previewViewHelpers.realPreviewPlaceholderHtml({
-    imageName: image.name,
-    imagePath: image.path,
-  });
+  return `
+    <div class="real-preview-placeholder">
+      <strong>Vista pendiente</strong>
+      <span>Imagen seleccionada: ${escapeHtml(image.name)}</span>
+      <small class="path-line">Ruta: ${escapeHtml(image.path || "Sin ruta")}</small>
+      <small>Genera la vista al seleccionar la imagen.</small>
+    </div>
+  `;
 }
 
 function bridgePreviewMeta() {
-  return previewStateHelpers.bridgePreviewMeta({
-    activePreset: state.activePreset,
-    previewData: state.previewData,
-    previewError: state.previewError,
-    previewStatus: state.previewStatus,
-  });
+  if (state.previewStatus === "loading") {
+    return "Generando vista";
+  }
+  if (state.previewStatus === "error") {
+    return state.previewError || "Vista no disponible";
+  }
+  if (state.previewData) {
+    return state.previewData.warning ? "Vista con aviso" : state.activePreset;
+  }
+  return "Vista pendiente";
 }
 
 function previewSettingsLabel() {
-  return previewStateHelpers.previewSettingsLabel({
-    activePresetSource: activePresetItem()?.source,
-    bridgeMode: state.bridgeMode,
-    presetDirty: state.presetDirty,
-  });
+  if (state.bridgeMode === "bridge" && activePresetItem()?.source === "bridge") {
+    return state.presetDirty ? "Aspecto modificado" : "Salida";
+  }
+  return state.presetDirty ? "Aspecto modificado" : "Aspecto";
+}
+
+function previewModeLabel() {
+  if (state.previewMode === "original") {
+    return "Original";
+  }
+  if (state.previewMode === "compare") {
+    return "Comparación";
+  }
+  return "Vista";
+}
+
+function previewOutputContextHtml(image) {
+  return "";
 }
 
 function outputSizeDisplay() {
@@ -4172,11 +5300,7 @@ function outputSizeDisplay() {
 }
 
 function viewerOutputCompactLabel() {
-  return previewViewHelpers.viewerOutputCompactLabel({
-    backgroundLabel: backgroundLabel(state.background),
-    format: state.format,
-    sizeLabel: outputSizeDisplay(),
-  });
+  return `${state.format} · ${outputSizeDisplay()} · ${backgroundLabel(state.background)}`;
 }
 
 function previewStateHtml(title, detail) {
@@ -4184,36 +5308,117 @@ function previewStateHtml(title, detail) {
 }
 
 function emptyStateHtml({ variant = "inline", title, detail, actionLabel = "", action = "", meta = "" }) {
-  return emptyStateViewHelpers.emptyStateHtml({ variant, title, detail, actionLabel, action, meta });
+  const actionHtml = actionLabel && action
+    ? `<button type="button" class="primary" data-action="${escapeHtml(action)}">${escapeHtml(actionLabel)}</button>`
+    : "";
+  const metaHtml = meta ? `<small>${escapeHtml(meta)}</small>` : "";
+  return `
+    <div class="empty-state ${escapeHtml(variant)}">
+      <span class="empty-icon" aria-hidden="true"></span>
+      <strong>${escapeHtml(title)}</strong>
+      <span>${escapeHtml(detail)}</span>
+      ${actionHtml}
+      ${metaHtml}
+    </div>
+  `;
 }
 
 function initialStateHtml() {
-  return emptyStateViewHelpers.initialStateHtml({
-    bridgeScanPath: state.bridgeScanPath,
-    devMode,
-  });
+  const manualPathHtml = devMode ? `
+      <details class="manual-path-inline">
+        <summary>Ruta manual</summary>
+        <label class="text-field">
+          <span>Carpeta</span>
+          <input id="onboarding-scan-path" type="text" value="${escapeHtml(state.bridgeScanPath)}" placeholder="C:/ruta/lote" />
+        </label>
+        <button type="button" data-action="scan-bridge-folder">Escanear carpeta</button>
+      </details>
+  ` : "";
+  return `
+    <div class="empty-state onboarding initial-onboarding">
+      <span class="empty-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path d="M3 6.75A2.75 2.75 0 0 1 5.75 4h4.08c.73 0 1.42.34 1.86.92l.82 1.08h5.74A2.75 2.75 0 0 1 21 8.75v.75H7.18a2.75 2.75 0 0 0-2.63 1.96L3 16.65Z"></path>
+          <path d="M4.1 18.9A2.75 2.75 0 0 0 6.72 21h10.74a2.75 2.75 0 0 0 2.66-2.05l1.63-6.15A1.75 1.75 0 0 0 20.06 10H7.18c-.79 0-1.48.52-1.69 1.28Z"></path>
+        </svg>
+      </span>
+      <strong>Selecciona una carpeta</strong>
+      <span>Carga un lote de imágenes PNG o JPG para revisar y exportar.</span>
+      <div class="empty-state__actions">
+        <button type="button" class="primary" data-action="pick-bridge-folder">Seleccionar carpeta</button>
+        <button type="button" class="ghost-action" data-action="open-app-settings">Gestionar salidas</button>
+      </div>
+      ${manualPathHtml}
+    </div>
+  `;
 }
 
 function scanningStateHtml() {
-  return previewViewHelpers.scanningStateHtml(state.scanStatus);
+  return `
+    <div class="empty-state inline scanning-state">
+      <span class="loader" aria-hidden="true"></span>
+      <strong>Escaneando carpeta...</strong>
+      <span>${escapeHtml(state.scanStatus || "Leyendo imágenes")}</span>
+    </div>
+  `;
 }
 
 function previewOrientation() {
-  return previewStateHelpers.previewOrientation(state.previewData);
+  const width = Number(state.previewData?.width || 0);
+  const height = Number(state.previewData?.height || 0);
+  if (!width || !height) {
+    return "portrait";
+  }
+  if (height > width * 1.08) {
+    return "portrait";
+  }
+  if (width > height * 1.08) {
+    return "landscape";
+  }
+  return "square";
 }
 
 function previewSubtitle(image) {
-  const filterIsEmpty = !image && hasBatch() && activeImages().length && !filteredImages().length;
-  return previewStateHelpers.previewSubtitle({
-    batch: state.batch,
-    filterEmptyDetail: filterIsEmpty ? filterEmptyDetail() : "",
-    filterIsEmpty,
-    hasImage: Boolean(image),
-    imageDetail: image?.detail,
-    imageSource: image?.source,
-    previewStatus: state.previewStatus,
-    scanStatus: state.scanStatus,
-  });
+  if (!image) {
+    if (hasBatch() && activeImages().length && !filteredImages().length) {
+      return filterEmptyDetail();
+    }
+    if (state.batch === "none") {
+      return "Sin lote";
+    }
+    if (state.batch === "empty") {
+      return state.scanStatus || "No hay PNG válidos";
+    }
+    if (state.batch === "scanning") {
+      return state.scanStatus || "Escaneando";
+    }
+    return "Sin selección";
+  }
+  if (image.source === "bridge") {
+    if (state.previewStatus === "loading") {
+      return "Generando vista";
+    }
+    if (state.previewStatus === "warning") {
+      return "Vista con aviso";
+    }
+    if (state.previewStatus === "error") {
+      return "Vista no disponible";
+    }
+    if (state.previewStatus === "ready") {
+      return "Vista generada";
+    }
+    return "Vista pendiente";
+  }
+  if (state.previewStatus === "loading") {
+    return "Generando vista";
+  }
+  if (state.previewStatus === "warning") {
+    return "Vista con aviso";
+  }
+  if (state.previewStatus === "error") {
+    return "Vista no disponible";
+  }
+  return state.previewStatus === "ready" ? "Vista generada" : image.detail;
 }
 
 function renderSettings() {
@@ -4223,14 +5428,24 @@ function renderSettings() {
     activePreset.textContent = state.activePreset;
   }
   $("#preset-source").textContent = `${state.activePreset} · ${presetSourceLabel()}`;
-  $("#preset-dirty").textContent = settingsViewHelpers.presetDirtyLabel(state.presetDirty);
+  $("#preset-dirty").textContent = state.presetDirty ? "Sin guardar" : "Sin cambios";
   $("#preset-dirty").classList.toggle("dirty", state.presetDirty);
   const presetItems = activePresetItems();
   const presetCount = $("#preset-count");
   if (presetCount) {
     presetCount.textContent = `${presetItems.length}`;
   }
-  $("#preset-list").innerHTML = settingsViewHelpers.presetListHtml(presetItems, state.activePreset);
+  $("#preset-list").innerHTML = presetItems.length
+    ? presetItems.map((preset) => {
+      const active = preset.name === state.activePreset;
+      return `
+      <button type="button" class="preset-chip${active ? " active" : ""}" data-preset="${escapeHtml(preset.name)}" aria-pressed="${active ? "true" : "false"}" title="${escapeHtml(active ? `${preset.name} activo` : `Cambiar a ${preset.name}`)}">
+        <span class="preset-chip__name">${escapeHtml(preset.name)}</span>
+        <span class="preset-chip__meta">${escapeHtml(active ? "Activo" : preset.category || "Ajuste")}</span>
+      </button>
+    `;
+    }).join("")
+    : '<span class="preset-empty">No hay ajustes guardados</span>';
 
   Object.entries(state.settings).forEach(([key, value]) => {
     const input = $(`[data-setting="${key}"]`);
@@ -4255,7 +5470,7 @@ function renderSettings() {
   const localOverride = currentImageOverride(image);
   const localActive = Object.keys(localOverride).length > 0 || image?.status === "adjusted";
   $("#local-adjustment").classList.toggle("active", localActive);
-  $("#local-adjustment-text").textContent = settingsViewHelpers.localAdjustmentText(localActive);
+  $("#local-adjustment-text").textContent = localActive ? "Ajuste local activo" : "Sin ajuste local";
   localOverrideKeys.forEach((key) => {
     const value = Number(localOverride[key] || 0);
     const input = $(`[data-local-setting="${key}"]`);
@@ -4265,28 +5480,28 @@ function renderSettings() {
       input.value = value;
     }
     if (output) {
-      output.textContent = settingsViewHelpers.localSettingOutputText(value);
+      output.textContent = value > 0 ? `+${value}` : String(value);
     }
     if (numberInput && document.activeElement !== numberInput) {
       numberInput.value = value;
     }
   });
   const savePresetButton = $("#save-preset");
-  const savePresetState = settingsViewHelpers.savePresetButtonState(state.presetDirty);
-  savePresetButton.disabled = savePresetState.disabled;
-  savePresetButton.title = savePresetState.title;
-  savePresetButton.textContent = savePresetState.text;
-  savePresetButton.classList.toggle("primary", savePresetState.primary);
+  savePresetButton.disabled = !state.presetDirty;
+  savePresetButton.title = state.presetDirty ? "Guardar el ajuste activo" : "Sin cambios pendientes";
+  savePresetButton.textContent = "Guardar cambios";
+  savePresetButton.classList.toggle("primary", state.presetDirty);
   const deletePresetButton = $("#delete-preset");
   if (deletePresetButton) {
-    const deletePresetState = settingsViewHelpers.deletePresetButtonState(presetItems.length);
-    deletePresetButton.disabled = deletePresetState.disabled;
-    deletePresetButton.title = deletePresetState.title;
+    const canDeletePreset = presetItems.length > 1;
+    deletePresetButton.disabled = !canDeletePreset;
+    deletePresetButton.title = canDeletePreset ? "Eliminar el ajuste activo" : "Debe quedar al menos un ajuste";
   }
   const advanced = $("#advanced-settings");
   const advancedSummaryTitle = advanced?.querySelector("summary strong");
   if (advancedSummaryTitle) {
-    advancedSummaryTitle.textContent = settingsViewHelpers.advancedSummaryTitle(advancedDirtyCount());
+    const dirtyCount = advancedDirtyCount();
+    advancedSummaryTitle.textContent = dirtyCount ? `Avanzado · ${dirtyCount} cambio${dirtyCount === 1 ? "" : "s"}` : "Avanzado";
   }
 }
 
@@ -4301,16 +5516,16 @@ function renderReviewPanel() {
 function reviewPanelHtml() {
   const image = selectedImage();
   if (!image) {
-    return inspectorReviewViewHelpers.reviewPanelHtml({
-      lotSummaryHtml: lotInspectorSummaryHtml(),
-      emptyStateHtml: emptyStateHtml({
+    return `
+      ${lotInspectorSummaryHtml()}
+      ${emptyStateHtml({
       variant: "inline",
       title: "Selecciona una imagen",
       detail: "Elige una miniatura para revisar la salida.",
       actionLabel: activeImages().length ? "Seleccionar primera imagen" : "",
       action: activeImages().length ? "select-first-image" : "",
-    }),
-    });
+    })}
+    `;
   }
 
   const reviewState = imageReviewState(image);
@@ -4321,18 +5536,45 @@ function reviewPanelHtml() {
   const selectedIndex = images.findIndex((item) => item.id === image.id);
   const canNavigate = images.length > 1;
   const outputDetail = viewerOutputCompactLabel();
+  const issueList = issues.length ? `
+    <div class="review-issue-list">
+      ${issues.map((issue) => `
+        <div class="review-issue ${issue.level === "error" ? "error" : "warning"}">
+          <strong>${escapeHtml(issue.title)}</strong>
+          <span>${escapeHtml(issue.detail)}</span>
+        </div>
+      `).join("")}
+    </div>
+  ` : "";
 
-  return inspectorReviewViewHelpers.reviewPanelHtml({
-    lotSummaryHtml: lotInspectorSummaryHtml(),
-    image,
-    reviewState,
-    issues,
-    outputName,
-    outputDetail,
-    hasLocal,
-    selectedIndexLabel: selectedIndex >= 0 ? `${selectedIndex + 1} de ${images.length}` : "Sin selección",
-    canNavigate,
-  });
+  return `
+    ${lotInspectorSummaryHtml()}
+
+    <div class="review-card review-card--compact ${escapeHtml(reviewState.tone)}">
+      <div class="review-card__header">
+        <div>
+          <strong title="${escapeHtml(image.path || image.name)}">${escapeHtml(image.name)}</strong>
+          <small>${escapeHtml(selectedIndex >= 0 ? `${selectedIndex + 1} de ${images.length}` : "Sin selección")}</small>
+        </div>
+        <span class="status-badge ${escapeHtml(reviewState.tone)}">${escapeHtml(reviewState.label)}</span>
+      </div>
+    </div>
+
+    <div class="review-output-card review-output-card--compact">
+      <strong title="${escapeHtml(outputName)}">${escapeHtml(outputName)}</strong>
+      <small>${escapeHtml(outputDetail)}</small>
+    </div>
+
+    ${issueList}
+
+    <div class="inspector-actionbar review-actions">
+      <button type="button" data-action="previous-image"${canNavigate ? "" : " disabled"}>Anterior</button>
+      <button type="button" data-action="next-image"${canNavigate ? "" : " disabled"}>Siguiente</button>
+      ${issues.length ? '<button type="button" data-action="review-errors">Revisar avisos</button>' : ""}
+      <button type="button" data-action="open-app-settings">Cambiar formato</button>
+      ${hasLocal ? '<button type="button" data-action="reset-local-adjustment">Quitar ajuste local</button>' : '<button type="button" data-action="open-advanced">Editar ajuste</button>'}
+    </div>
+  `;
 }
 
 function lotInspectorSummaryHtml() {
@@ -4342,7 +5584,20 @@ function lotInspectorSummaryHtml() {
     : counts.reviewIssues
       ? `${counts.reviewIssues} aviso${counts.reviewIssues === 1 ? "" : "s"}`
       : "Listo";
-  return inspectorReviewViewHelpers.lotInspectorSummaryHtml({ counts, stateLabel });
+  return `
+    <div class="lot-summary-card">
+      <div class="lot-summary-card__head">
+        <span>Lote</span>
+        <strong>${escapeHtml(stateLabel)}</strong>
+      </div>
+      <div class="lot-summary-card__grid">
+        <span><em>Listas</em><strong>${escapeHtml(counts.readyImages)}</strong></span>
+        <span><em>Exportables</em><strong>${escapeHtml(counts.exportableImages)}</strong></span>
+        <span><em>Excluidas</em><strong>${escapeHtml(counts.nonExportableImages)}</strong></span>
+        <span><em>Ignorados</em><strong>${escapeHtml(counts.ignoredFiles)}</strong></span>
+      </div>
+    </div>
+  `;
 }
 
 function imageReviewState(image) {
@@ -4413,24 +5668,33 @@ function imageReviewIssues(image) {
 }
 
 function outputNameForImage(image, index = 1) {
-  return outputProfileViewHelpers.outputNameForImage({
-    folders: activeFolders(),
-    format: state.format,
-    image,
-    index,
-    naming: state.naming,
-    suffix: state.suffix,
+  if (!state.naming.trim()) {
+    return "Nombre de archivo pendiente";
+  }
+  const original = imageFileStem(image?.name || "imagen_001.png");
+  const folder = activeFolders().find((item) => item.id === image?.folderId)?.name
+    || activeFolders()[0]?.name
+    || "lote";
+  let outputName = state.naming
+    .replaceAll("{original}", original)
+    .replaceAll("{suffix}", state.suffix || "_PRO")
+    .replaceAll("{folder}", folder);
+  outputName = outputName.replace(/\{index(?::0?(\d+)d)?\}/g, (_match, width) => {
+    const digits = Number(width) || 1;
+    return String(index).padStart(digits, "0");
   });
+  if (!/\.[a-z0-9]+$/i.test(outputName)) {
+    outputName = `${outputName}.${state.format.toLowerCase()}`;
+  }
+  return outputName;
 }
 
 function advancedDirtyCount() {
+  if (!state.presetDirty) {
+    return 0;
+  }
   const presetSettings = normalizeSettings(activePresetItem()?.settings || defaultSettings);
-  return settingsViewHelpers.advancedDirtyCount({
-    currentSettings: state.settings,
-    keys: advancedSettingKeys,
-    presetDirty: state.presetDirty,
-    presetSettings,
-  });
+  return advancedSettingKeys.filter((key) => state.settings[key] !== presetSettings[key]).length;
 }
 
 function advancedSettingsDirty() {
@@ -4438,10 +5702,16 @@ function advancedSettingsDirty() {
 }
 
 function inspectorMode() {
-  return inspectorContextViewHelpers.inspectorMode({
-    inspectorTab: state.inspectorTab,
-    outputEditMode: state.outputEditMode,
-  });
+  if (state.outputEditMode || state.inspectorTab === "output") {
+    return "output";
+  }
+  if (state.inspectorTab === "advanced") {
+    return "advanced";
+  }
+  if (state.inspectorTab === "warnings") {
+    return "warnings";
+  }
+  return "summary";
 }
 
 function renderInspector() {
@@ -4513,7 +5783,7 @@ function inspectorCardsHtml() {
           <strong>Escaneando carpeta...</strong>
         </div>
         <small>${escapeHtml(state.scanStatus || "Leyendo imágenes")}</small>
-        ${exportPreflightViewHelpers.progressPanelHtml("Escaneando carpeta")}
+        ${progressPanelHtml("Escaneando carpeta")}
       </section>
     `;
   }
@@ -4539,11 +5809,18 @@ function lotInspectorCardHtml() {
     ? `${readyImagesText(0)}${ignored ? ` · ${ignored}` : ""}`
     : `${readyImagesText(counts.exportableImages)}${ignored ? ` · ${ignored}` : ""}`;
   const tone = counts.blockingErrors ? "error" : counts.nonBlockingWarnings ? "warning" : "";
-  return inspectorReviewViewHelpers.lotInspectorCardHtml({
-    meta,
-    title: visible.title,
-    tone,
-  });
+  return `
+    <section class="inspector-summary ${escapeHtml(tone)}">
+      <div class="inspector-summary__main">
+        <span>Lote</span>
+        <strong>${escapeHtml(visible.title)}</strong>
+        <small>${escapeHtml(meta)}</small>
+      </div>
+      <div class="inspector-summary__action">
+        <button type="button" data-action="open-batch-detail">Ver detalle</button>
+      </div>
+    </section>
+  `;
 }
 
 function outputInspectorCardHtml() {
@@ -4552,47 +5829,85 @@ function outputInspectorCardHtml() {
   const exportable = exportableImages().length;
   const totalFiles = exportable * activeProfiles.length;
   const dirty = !outputMatchesProfile(activeOutputProfile());
-  const rows = profiles.map((profile) => {
-    const enabled = Boolean(profile.enabled || profile.id === state.activeOutputProfileId);
-    return {
-      id: profile.id,
-      name: profile.name,
-      enabled,
-      active: profile.id === state.activeOutputProfileId,
-      canToggle: enabledOutputProfiles().length > 1 || !enabled,
-      summary: outputProfileSummaryLine(profile),
-    };
-  });
-  return inspectorOutputViewHelpers.outputInspectorCardHtml({
-    activeCount: activeProfiles.length,
-    totalFiles,
-    readyLabel: exportable ? readyImagesText(exportable) : "Sin imágenes listas",
-    rows,
-    dirty,
-  });
+  return `
+    <section class="inspector-output-card">
+      <div class="inspector-output-card__head">
+        <span>${escapeHtml(`Salidas activas · ${activeProfiles.length}`)}</span>
+        <strong>${escapeHtml(totalFiles ? `${totalFiles} archivos previstos` : "Pendiente de lote")}</strong>
+        <small>${escapeHtml(exportable ? readyImagesText(exportable) : "Sin imágenes listas")}</small>
+      </div>
+      <div class="active-output-list" aria-label="Salidas del lote">
+        ${profiles.map(outputProfileInlineRowHtml).join("")}
+      </div>
+      ${dirty ? outputTemporaryNoticeHtml() : ""}
+      <div class="inspector-output-card__actions">
+        <button type="button" class="primary" data-action="edit-output">Editar salidas</button>
+        <button type="button" data-action="open-app-settings">Gestionar presets</button>
+      </div>
+    </section>
+  `;
 }
 
 function outputProfileInlineRowHtml(profile) {
   const enabled = Boolean(profile.enabled || profile.id === state.activeOutputProfileId);
-  return inspectorOutputViewHelpers.outputProfileInlineRowHtml({
-    id: profile.id,
-    name: profile.name,
-    enabled,
-    active: profile.id === state.activeOutputProfileId,
-    canToggle: enabledOutputProfiles().length > 1 || !enabled,
-    summary: outputProfileSummaryLine(profile),
-  });
+  const active = profile.id === state.activeOutputProfileId;
+  const canToggle = enabledOutputProfiles().length > 1 || !enabled;
+  const summary = outputProfileSummaryLine(profile);
+  return `
+    <div class="active-output-row${active ? " is-primary" : ""}${enabled ? " is-enabled" : " is-disabled"}">
+      <label class="output-toggle" title="${escapeHtml(canToggle ? "Activar o desactivar salida" : "Debe quedar al menos una salida activa")}">
+        <input type="checkbox" data-output-profile-enabled-id="${escapeHtml(profile.id)}" ${enabled ? "checked" : ""} ${canToggle ? "" : "disabled"} />
+        <span></span>
+      </label>
+      <button type="button" class="active-output-row__main" data-action="select-output-profile" data-output-profile-id="${escapeHtml(profile.id)}" title="${escapeHtml(`${profile.name} · ${summary}`)}">
+        <strong>${escapeHtml(profile.name)}</strong>
+        <small>${escapeHtml(summary)}</small>
+      </button>
+      <span class="active-output-row__tag">${escapeHtml(active ? "Principal" : "")}</span>
+    </div>
+  `;
+}
+
+function outputTemporaryNoticeHtml() {
+  return `
+    <div class="temporary-output-notice">
+      <strong>Cambios temporales en esta salida</strong>
+      <div>
+        <button type="button" data-action="save-output-current-profile">Guardar en preset</button>
+        <button type="button" data-action="save-output-as-new">Guardar como nuevo</button>
+        <button type="button" data-action="discard-output-overrides">Descartar</button>
+      </div>
+    </div>
+  `;
 }
 
 function selectedImageInspectorCardHtml() {
   const image = selectedImage();
-  const hasLocal = image ? hasCurrentImageOverride(image) || image.status === "adjusted" : false;
-  return inspectorReviewViewHelpers.selectedImageInspectorCardHtml({
-    hasReadyBatch: hasBatch() && state.batch === "ready",
-    image,
-    detail: image ? image.detail || imageFileType(image) : "",
-    hasLocal,
-  });
+  if (!hasBatch() || state.batch !== "ready") {
+    return "";
+  }
+  if (!image) {
+    return `
+      <section class="inspector-compact-row">
+        <div>
+          <span>Imagen</span>
+          <strong>Sin selección</strong>
+        </div>
+        <button type="button" data-action="select-first-image">Seleccionar primera</button>
+      </section>
+    `;
+  }
+  const hasLocal = hasCurrentImageOverride(image) || image.status === "adjusted";
+  return `
+      <section class="inspector-compact-row">
+        <div>
+          <span>Imagen seleccionada</span>
+          <strong title="${escapeHtml(image.path || image.name)}">${escapeHtml(image.name)}</strong>
+          <small>${escapeHtml(image.detail || imageFileType(image))}</small>
+        </div>
+      ${hasLocal ? '<button type="button" data-action="reset-local-adjustment">Quitar ajuste</button>' : ""}
+    </section>
+  `;
 }
 
 function issuesInspectorCardHtml() {
@@ -4602,24 +5917,45 @@ function issuesInspectorCardHtml() {
   }
   const errors = rows.filter((row) => row.level === "error").length;
   const blocking = preflightCounts().errors > 0;
+  const tone = blocking ? "error" : "warning";
+  const title = blocking ? "Exportación bloqueada" : "Revisar";
   const count = blocking
     ? `${preflightCounts().errors} bloqueo${preflightCounts().errors === 1 ? "" : "s"}`
     : errors
       ? `${errors} error${errors === 1 ? "" : "es"}`
     : `${rows.length} aviso${rows.length === 1 ? "" : "s"}`;
-  return inspectorReviewViewHelpers.issuesInspectorCardHtml({
-    rows,
-    blocking,
-    countLabel: count,
-  });
+  return `
+    <section class="inspector-alert ${tone}">
+      <div class="inspector-alert__head">
+        <span>${escapeHtml(title)}</span>
+        <strong>${escapeHtml(count)}</strong>
+      </div>
+      <div class="inspector-alert__list">
+        ${rows.slice(0, 3).map((row) => `
+          <span title="${escapeHtml(row.path || row.detail || row.title)}">${escapeHtml(row.title)}</span>
+        `).join("")}
+      </div>
+      <div class="inspector-alert__actions">
+        <button type="button" data-action="review-errors">Revisar avisos</button>
+      </div>
+    </section>
+  `;
 }
 
 function aspectInspectorCardHtml() {
-  return inspectorReviewViewHelpers.aspectInspectorCardHtml({
-    hasReadyBatch: hasBatch() && state.batch === "ready",
-    activePreset: state.activePreset,
-    statusLabel: state.presetDirty ? "Global · Modificado" : "Global",
-  });
+  if (!hasBatch() || state.batch !== "ready") {
+    return "";
+  }
+  return `
+    <section class="inspector-compact-row inspector-compact-row--quiet">
+      <div>
+        <span>Ajuste</span>
+        <strong>${escapeHtml(state.activePreset)}</strong>
+        <small>${escapeHtml(state.presetDirty ? "Global · Modificado" : "Global")}</small>
+      </div>
+      <button type="button" data-action="open-advanced">Editar ajuste</button>
+    </section>
+  `;
 }
 
 function actionableIssueRows() {
@@ -4645,65 +5981,118 @@ function actionableIssueRows() {
 }
 
 function inspectorSubviewHeaderHtml(mode) {
-  return inspectorContextViewHelpers.inspectorSubviewHeaderHtml(
-    inspectorContextViewHelpers.inspectorSubviewHeaderState({
-      activePreset: state.activePreset,
-      mode,
-      outputEditMode: state.outputEditMode,
-      outputLabel: viewerOutputCompactLabel(),
-      presetEditorOpen: state.presetEditorOpen,
-      presetSourceLabel: presetSourceLabel(),
-      warningCount: actionableIssueRows().length,
-    })
-  );
+  const isPresetManager = mode === "advanced" && state.presetEditorOpen;
+  const labels = {
+    output: ["Salida", state.outputEditMode ? "Editar salida" : viewerOutputCompactLabel()],
+    advanced: [isPresetManager ? "Gestionar ajustes" : "Editar ajuste", state.activePreset, presetSourceLabel()],
+    warnings: ["Revisar", actionableIssueRows().length ? `${actionableIssueRows().length} punto${actionableIssueRows().length === 1 ? "" : "s"}` : "Sin avisos"],
+  };
+  const [title, subtitle, detail = ""] = labels[mode] || ["Detalle", ""];
+  const backAction = state.outputEditMode ? "cancel-output-edit" : isPresetManager ? "close-preset-editor" : "close-inspector-subview";
+  const backLabel = state.outputEditMode ? "Cancelar" : "Volver";
+  const manageAction = mode === "advanced" && !isPresetManager
+    ? '<button type="button" data-action="open-preset-editor">Gestionar ajustes</button>'
+    : "";
+  return `
+    <section class="inspector-subview-head">
+      <div>
+        <span>${escapeHtml(title)}</span>
+        <strong>${escapeHtml(subtitle)}</strong>
+        ${detail ? `<small>${escapeHtml(detail)}</small>` : ""}
+      </div>
+      ${manageAction}
+      <button type="button" data-action="${escapeHtml(backAction)}">${escapeHtml(backLabel)}</button>
+    </section>
+  `;
 }
 
 function contextualInspectorHtml() {
   if (state.batch === "scanning") {
-    return inspectorContextViewHelpers.contextualInspectorHtml({
-      batch: state.batch,
-      scanStatus: state.scanStatus,
-      progressHtml: exportPreflightViewHelpers.progressPanelHtml("Preparando lote"),
-      preflightHtml: exportPreflightViewHelpers.preflightListHtml(inspectorContextViewHelpers.contextualPreflightRows({
-        batch: state.batch,
-      })),
-    });
+    return `
+      <div class="context-panel">
+        <div class="context-header">
+          <span class="eyebrow">Preparación</span>
+          <strong>Escaneando carpeta</strong>
+          <small>${escapeHtml(state.scanStatus || "Leyendo imágenes")}</small>
+        </div>
+        ${progressPanelHtml("Preparando lote")}
+        ${preflightListHtml([
+          { state: "pending", title: "Carpeta seleccionada", detail: "Leyendo origen" },
+          { state: "pending", title: "Imágenes listas", detail: "Contando archivos" },
+          { state: "pending", title: "Destino", detail: "Se configurará después" },
+        ])}
+      </div>
+    `;
   }
 
   if (state.batch === "none") {
-    return inspectorContextViewHelpers.contextualInspectorHtml({
-      batch: state.batch,
-      preflightHtml: exportPreflightViewHelpers.preflightListHtml(inspectorContextViewHelpers.contextualPreflightRows({
-        batch: state.batch,
-      })),
-      outputSummary: `${state.format} · ${state.size} · ${backgroundLabel(state.background)}`,
-      activePreset: state.activePreset,
-    });
+    return `
+      <div class="context-panel">
+        <div class="context-header">
+          <span class="eyebrow">Preparación</span>
+          <strong>Seleccionar carpeta</strong>
+          <small>El ajuste activo y la salida se preparan automáticamente.</small>
+        </div>
+        ${preflightListHtml([
+          { state: "pending", title: "Carpeta seleccionada", detail: "Pendiente" },
+          { state: "pending", title: "Imágenes listas", detail: "Pendiente" },
+          { state: "pending", title: "Destino de salida", detail: "Origen / _SALIDA_PRO" },
+        ])}
+        <div class="default-stack">
+          <span>Salida</span>
+          <strong>${escapeHtml(state.format)} · ${escapeHtml(state.size)} · ${escapeHtml(backgroundLabel(state.background))}</strong>
+          <small>Ajuste ${escapeHtml(state.activePreset)}</small>
+        </div>
+        <button type="button" class="primary" data-action="pick-bridge-folder">Seleccionar carpeta</button>
+      </div>
+    `;
   }
 
   if (state.batch === "empty") {
-    return inspectorContextViewHelpers.contextualInspectorHtml({
-      batch: state.batch,
-      scanStatus: state.scanStatus,
-      preflightHtml: exportPreflightViewHelpers.preflightListHtml(inspectorContextViewHelpers.contextualPreflightRows({
-        batch: state.batch,
-        ignoredSummary: ignoredSummaryText(),
-        totalFiles: state.scanDiagnostics.totalFiles,
-      })),
-    });
+    return `
+      <div class="context-panel warning">
+        <div class="context-header">
+          <span class="eyebrow">Salida</span>
+          <strong>Exportación bloqueada</strong>
+          <small>${escapeHtml(state.scanStatus || "La carpeta no contiene imágenes procesables.")}</small>
+        </div>
+        ${preflightListHtml([
+          { state: "warning", title: "Carpeta revisada", detail: state.scanDiagnostics.totalFiles ? `${state.scanDiagnostics.totalFiles} archivos encontrados` : "Sin archivos compatibles" },
+          { state: "error", title: "Imágenes exportables", detail: "0 imágenes" },
+          { state: ignoredOmissions().length ? "pending" : "pending", title: "Ignorados", detail: ignoredSummaryText() },
+          { state: "pending", title: "Destino", detail: "Pendiente hasta cargar un lote" },
+        ])}
+        <button type="button" class="primary" data-action="pick-bridge-folder">Elegir otra carpeta</button>
+      </div>
+    `;
   }
 
-  return inspectorContextViewHelpers.contextualInspectorHtml({
-    batch: state.batch,
-    compactStatus: compactHeaderStatusText(),
-  });
+  return `
+    <div class="context-panel">
+      <div class="context-header">
+        <strong>Selecciona una imagen</strong>
+        <small>${escapeHtml(compactHeaderStatusText())}</small>
+      </div>
+      <button type="button" class="primary" data-action="select-first-image">Seleccionar primera imagen</button>
+    </div>
+  `;
+}
+
+function progressPanelHtml(label, value = null) {
+  const valueHtml = value === null ? "" : `<strong>${escapeHtml(Math.round(value))}%</strong>`;
+  return `
+    <div class="context-progress${value === null ? " is-indeterminate" : ""}">
+      <span>${escapeHtml(label)}</span>
+      ${valueHtml}
+    </div>
+  `;
 }
 
 function presetSourceLabel() {
-  return settingsViewHelpers.presetSourceLabel({
-    bridgePresetWarning: state.bridgePresetWarning,
-    presetDirty: state.presetDirty,
-  });
+  if (state.bridgePresetWarning) {
+    return state.presetDirty ? "Global · Modificado · aviso" : "Global · aviso";
+  }
+  return state.presetDirty ? "Global · Modificado" : "Global";
 }
 
 function renderExport() {
@@ -4736,30 +6125,87 @@ function renderExport() {
 
   const warningSummary = outputWarningSummary(issues);
   const editDirty = !outputMatchesProfile(activeOutputProfile());
+  const editActions = state.outputEditMode ? `
+    <div class="inspector-actionbar output-edit-actions">
+      <button type="button" data-action="cancel-output-edit">Cancelar</button>
+      <button type="button" class="primary" data-action="apply-output-edit">Aplicar temporalmente</button>
+      <button type="button" data-action="save-output-current-profile">Guardar preset</button>
+      <button type="button" data-action="save-output-as-new">Guardar como nuevo</button>
+      <button type="button" class="btn-linklike" data-action="open-app-settings">Gestionar presets</button>
+    </div>
+  ` : "";
+  const presetActions = !state.outputEditMode ? `
+    <div class="inspector-actionbar">
+      <button type="button" class="primary" data-action="edit-output">Editar salidas</button>
+      <button type="button" data-action="open-app-settings">Gestionar presets</button>
+    </div>
+  ` : "";
   const activeOutputProfiles = exportOutputProfiles();
-  const hasMultipleOutputs = activeOutputProfiles.length > 1;
-  $("#export-summary").innerHTML = exportSummaryViewHelpers.exportSummaryHtml({
-    editing: state.outputEditMode,
-    displayName: outputProfileDisplayName(),
-    presetSummary: presetSummaryLine(),
-    editDirty,
-    activeOutputCount: activeOutputProfiles.length,
-    outputCount,
-    profileRows: activeOutputProfiles.map((profile) => ({
-      format: profile.format,
-      name: profile.name,
-      size: outputProfileSize(profile),
-      destinationLabel: profileDestinationLabel(profile),
-    })),
-    formatLabel: hasMultipleOutputs ? batchViewHelpers.outputCountLabel(activeOutputProfiles.length) : state.format,
-    sizeLabel: hasMultipleOutputs ? "Por salida" : state.size.replace("x", " × "),
-    backgroundLabel: hasMultipleOutputs ? "Por salida" : backgroundLabel(state.background),
-    destinationText,
-    namingLabel: hasMultipleOutputs ? "Por salida" : namingHumanLabel(),
-    example: hasMultipleOutputs ? outputNameForProfile(activeOutputProfiles[0]) : namingExample(),
-    warningSummaryHtml: warningSummary,
-    temporaryNoticeHtml: !outputMatchesProfile(activeOutputProfile()) ? inspectorOutputViewHelpers.outputTemporaryNoticeHtml() : "",
-  });
+  const profileRowsHtml = activeOutputProfiles.length > 1
+    ? activeOutputProfiles.slice(0, 4).map((profile) => `
+      <div class="preset-summary-row">
+        <span>${escapeHtml(profile.format)}</span>
+        <strong title="${escapeHtml(`${profile.name} · ${outputProfileSize(profile)} · ${profileDestinationLabel(profile)}`)}">${escapeHtml(`${profile.name} · ${outputProfileSize(profile).replace("x", " × ")}`)}</strong>
+      </div>
+    `).join("")
+    : "";
+  const extraProfilesHtml = activeOutputProfiles.length > 4
+    ? `<div class="preset-summary-row"><span>Más</span><strong>${escapeHtml(`${activeOutputProfiles.length - 4} salidas más`)}</strong></div>`
+    : "";
+
+  $("#export-summary").innerHTML = state.outputEditMode ? `
+    <div class="compact-panel">
+      <div>
+        <span>Salida</span>
+        <strong>${escapeHtml(outputProfileDisplayName())}</strong>
+      </div>
+      <small>${escapeHtml(presetSummaryLine())}</small>
+    </div>
+    ${editDirty ? `
+      <div class="temporary-output-notice temporary-output-notice--compact">
+        <strong>Cambios temporales</strong>
+        <span>Aplica al lote o guarda el preset.</span>
+      </div>
+    ` : ""}
+    ${editActions}
+  ` : `
+    <div class="preset-summary-card">
+      <div class="preset-summary-main">
+        <span>${escapeHtml(activeOutputProfiles.length > 1 ? "Salidas" : "Salida")}</span>
+        <strong>${escapeHtml(outputProfileDisplayName())}</strong>
+        ${activeOutputProfiles.length > 1 ? `<small>${escapeHtml(`${outputCount} archivos previstos`)}</small>` : ""}
+      </div>
+      ${profileRowsHtml}
+      ${extraProfilesHtml}
+      <div class="preset-summary-row">
+        <span>Formato</span>
+        <strong>${escapeHtml(activeOutputProfiles.length > 1 ? outputCountLabel(activeOutputProfiles.length) : state.format)}</strong>
+      </div>
+      <div class="preset-summary-row">
+        <span>Tamaño</span>
+        <strong>${escapeHtml(activeOutputProfiles.length > 1 ? "Por salida" : state.size.replace("x", " × "))}</strong>
+      </div>
+      <div class="preset-summary-row">
+        <span>Fondo</span>
+        <strong>${escapeHtml(activeOutputProfiles.length > 1 ? "Por salida" : backgroundLabel(state.background))}</strong>
+      </div>
+      <div class="preset-summary-row">
+        <span>Destino</span>
+        <strong title="${escapeHtml(destinationText)}">${escapeHtml(destinationText)}</strong>
+      </div>
+      <div class="preset-summary-row">
+        <span>Nombre final</span>
+        <strong>${escapeHtml(activeOutputProfiles.length > 1 ? "Por salida" : namingHumanLabel())}</strong>
+      </div>
+      <div class="preset-summary-row">
+        <span>Ejemplo</span>
+        <strong title="${escapeHtml(activeOutputProfiles.length > 1 ? outputNameForProfile(activeOutputProfiles[0]) : namingExample())}">${escapeHtml(activeOutputProfiles.length > 1 ? outputNameForProfile(activeOutputProfiles[0]) : namingExample())}</strong>
+      </div>
+    </div>
+    ${warningSummary}
+    ${!outputMatchesProfile(activeOutputProfile()) ? outputTemporaryNoticeHtml() : ""}
+    ${presetActions}
+  `;
 
   renderExportResult();
 
@@ -4771,17 +6217,20 @@ function renderOutputProfileSelect() {
   if (!select) {
     return;
   }
-  select.innerHTML = exportSummaryViewHelpers.outputProfileSelectOptionsHtml(
-    state.outputProfiles,
-    { includeCustom: !outputMatchesProfile() }
-  );
+  const customLabel = outputMatchesProfile() ? "" : '<option value="__custom">Personalizado sin guardar</option>';
+  select.innerHTML = `
+    ${state.outputProfiles.map((profile) => `
+      <option value="${escapeHtml(profile.id)}">${escapeHtml(profile.name)}</option>
+    `).join("")}
+    ${customLabel}
+  `;
   select.value = outputMatchesProfile() ? state.activeOutputProfileId : "__custom";
 }
 
 function outputProfileDisplayName() {
   const profiles = exportOutputProfiles();
   if (profiles.length > 1) {
-    return batchViewHelpers.outputCountLabel(profiles.length);
+    return outputCountLabel(profiles.length);
   }
   const profile = activeOutputProfile();
   if (!profile || !outputMatchesProfile(profile)) {
@@ -4806,11 +6255,21 @@ function outputProfileSummaryLine(profile) {
 }
 
 function profileDestinationLabel(profile) {
-  return outputProfileViewHelpers.profileDestinationLabel(profile);
+  if (!profile) {
+    return "Sin destino";
+  }
+  if (profile.destinationMode === "custom") {
+    return profile.destinationValue || "Carpeta personalizada";
+  }
+  return profile.destinationValue || "_SALIDA_PRO";
 }
 
 function profileDestinationPreviewLabel(profile) {
-  return outputProfileViewHelpers.profileDestinationPreviewLabel(profile);
+  const destination = profileDestinationLabel(profile);
+  if (profile?.destinationMode === "custom") {
+    return destination;
+  }
+  return destination ? destination : "junto al origen";
 }
 
 function ensureOutputProfileDraft() {
@@ -5252,6 +6711,21 @@ function outputProfileHasUnsavedChanges() {
   return !sameOutputProfileRaw(saved, raw);
 }
 
+function sameOutputProfile(a, b) {
+  if (!a || !b) {
+    return false;
+  }
+  return a.name === b.name
+    && a.format === b.format
+    && a.width === b.width
+    && a.height === b.height
+    && a.background === b.background
+    && a.destinationMode === b.destinationMode
+    && a.destinationValue === b.destinationValue
+    && a.naming === b.naming
+    && a.suffix === b.suffix;
+}
+
 function sameOutputProfileRaw(profile, raw) {
   if (!profile || !raw) {
     return false;
@@ -5269,17 +6743,86 @@ function sameOutputProfileRaw(profile, raw) {
 }
 
 function outputProfileValidation(raw = outputProfileFormRawData()) {
-  return outputProfileHelpers.outputProfileValidation(raw);
+  const errors = [];
+  const warnings = [];
+  const fields = {};
+  const width = Number.parseInt(raw.width, 10);
+  const height = Number.parseInt(raw.height, 10);
+  const invalidFilenameChars = /[<>:"/\\|?*]/;
+  const addError = (field, message) => {
+    errors.push(message);
+    if (field) {
+      fields[field] = "error";
+    }
+  };
+  const addWarning = (field, message) => {
+    warnings.push(message);
+    if (field && fields[field] !== "error") {
+      fields[field] = "warning";
+    }
+  };
+
+  if (!String(raw.name || "").trim()) {
+    addError("name", "Pon un nombre al formato.");
+  }
+  if (!["JPG", "PNG"].includes(normalizeExportFormat(raw.format))) {
+    addError("format", "Elige JPG o PNG como tipo de archivo.");
+  }
+  if (!["rgb230", "white", "transparent"].includes(raw.background)) {
+    addError("background", "Elige un fondo de salida válido.");
+  }
+  if (!String(raw.width || "").trim() || !Number.isInteger(width) || width <= 0) {
+    addError("width", "La anchura debe ser un número mayor que 0.");
+  }
+  if (!String(raw.height || "").trim() || !Number.isInteger(height) || height <= 0) {
+    addError("height", "La altura debe ser un número mayor que 0.");
+  }
+  if (invalidFilenameChars.test(String(raw.suffix || ""))) {
+    addError("suffix", "El sufijo contiene caracteres no válidos.");
+  }
+  if (!String(raw.naming || "").trim()) {
+    addError("naming", "Define el nombre de archivo.");
+  } else if (invalidFilenameChars.test(String(raw.naming || "").replaceAll("{original}", "").replaceAll("{suffix}", "").replaceAll("{folder}", "").replace(/\{index(?::0?\d+d)?\}/g, ""))) {
+    addError("naming", "El nombre de archivo contiene caracteres no válidos.");
+  } else if (!String(raw.naming || "").includes("{original}")) {
+    addWarning("naming", "Incluye {original} para mantener la referencia del archivo.");
+  }
+  if (raw.destinationMode === "custom") {
+    if (!String(raw.destinationValue || "").trim()) {
+      addError("destinationValue", "Indica una carpeta de salida personalizada.");
+    }
+  } else if (raw.destinationMode !== "source") {
+    addError("destinationMode", "Elige una ubicación de salida válida.");
+  } else {
+    const destination = String(raw.destinationValue || "").trim();
+    if (!destination) {
+      addError("destinationValue", "Indica una subcarpeta de salida.");
+    } else if (destination.includes("..") || /[<>:"|?*]/.test(destination)) {
+      addError("destinationValue", "La subcarpeta de salida contiene caracteres no válidos.");
+    }
+  }
+  return { errors: Array.from(new Set(errors)), warnings: Array.from(new Set(warnings)), fields };
 }
 
 function outputProfileEditorHeadingHtml(profile, validation, dirty) {
-  return outputProfileViewHelpers.outputProfileEditorHeadingHtml({
-    profile,
-    validation,
-    dirty,
-    active: profile.id === state.activeOutputProfileId,
-    summary: outputProfileSummaryLine(profile),
-  });
+  const active = profile.id === state.activeOutputProfileId;
+  const status = dirty
+    ? "Cambios sin guardar"
+    : active
+      ? "Activo en este lote · Principal"
+      : profile.enabled
+        ? "Salida activa"
+        : "Formato guardado";
+  return `
+    <div class="format-editor-title">
+      <div>
+        <span class="eyebrow">Formato editado</span>
+        <strong>${escapeHtml(profile.name || "Formato sin nombre")}</strong>
+        <small>${escapeHtml(outputProfileSummaryLine(profile))}</small>
+      </div>
+      <span class="status-badge ${validation.errors.length ? "error" : dirty ? "warning" : active ? "ready" : ""}">${escapeHtml(validation.errors.length ? "Revisar campos" : status)}</span>
+    </div>
+  `;
 }
 
 function outputProfilePreviewHtml(profile) {
@@ -5290,25 +6833,63 @@ function outputProfilePreviewHtml(profile) {
   const resultPath = destination && destination !== "junto al origen"
     ? `${destination.replace(/[\\/]$/, "")}/${resultName}`
     : resultName;
-  return outputProfileViewHelpers.outputProfilePreviewHtml({
-    originalName,
-    resultName,
-    destination,
-    resultPath,
-    summary: outputProfileSummaryLine(profile),
-  });
+  return `
+    <div class="format-preview-heading">
+      <span class="eyebrow">Ejemplo</span>
+      <strong>${escapeHtml(resultName)}</strong>
+    </div>
+    <div class="format-preview-grid">
+      <div>
+        <span>Original</span>
+        <strong title="${escapeHtml(originalName)}">${escapeHtml(originalName)}</strong>
+      </div>
+      <div>
+        <span>Resultado</span>
+        <strong title="${escapeHtml(resultPath)}">${escapeHtml(resultPath)}</strong>
+      </div>
+      <div>
+        <span>Formato</span>
+        <strong>${escapeHtml(outputProfileSummaryLine(profile))}</strong>
+      </div>
+      <div>
+        <span>Destino</span>
+        <strong title="${escapeHtml(destination)}">${escapeHtml(destination)}</strong>
+      </div>
+    </div>
+  `;
 }
 
 function outputNameForProfile(profile, image = selectedImage(), index = 1) {
-  return outputProfileViewHelpers.outputNameForProfile(profile, {
-    folders: activeFolders(),
-    image,
-    index,
+  const original = imageFileStem(image?.name || "imagen_original.png");
+  const folder = activeFolders().find((item) => item.id === image?.folderId)?.name
+    || activeFolders()[0]?.name
+    || "lote";
+  let outputName = String(profile.naming || "{original}{suffix}")
+    .replaceAll("{original}", original)
+    .replaceAll("{suffix}", profile.suffix || "")
+    .replaceAll("{folder}", folder);
+  outputName = outputName.replace(/\{index(?::0?(\d+)d)?\}/g, (_match, width) => {
+    const digits = Number(width) || 1;
+    return String(index).padStart(digits, "0");
   });
+  if (!/\.[a-z0-9]+$/i.test(outputName)) {
+    outputName = `${outputName}.${profile.format.toLowerCase()}`;
+  }
+  return outputName;
 }
 
 function outputProfileValidationHtml(validation) {
-  return outputProfileViewHelpers.outputProfileValidationHtml(validation);
+  if (!validation.errors.length && !validation.warnings.length) {
+    return "";
+  }
+  const rows = [
+    ...validation.errors.map((message) => ({ tone: "error", message })),
+    ...validation.warnings.map((message) => ({ tone: "warning", message })),
+  ];
+  return `
+    <strong>${validation.errors.length ? "Revisa el formato" : "Aviso"}</strong>
+    ${rows.map((row) => `<span class="${escapeHtml(row.tone)}">${escapeHtml(row.message)}</span>`).join("")}
+  `;
 }
 
 function renderOutputProfileModalState() {
@@ -5368,35 +6949,36 @@ function updateOutputProfileFieldStates(validation, raw) {
 function updateOutputProfileFooterState(validation, dirty) {
   const draft = ensureOutputProfileDraft();
   const isPersisted = state.outputProfiles.some((profile) => profile.id === draft.id);
-  const footerState = outputProfileViewHelpers.outputProfileFooterState({
-    draft,
-    dirty,
-    isPersisted,
-    profileCount: state.outputProfiles.length,
-    validation,
-  });
   const deleteButton = $("[data-action='delete-output-profile']");
   if (deleteButton) {
-    deleteButton.disabled = footerState.deleteDisabled;
-    deleteButton.title = footerState.deleteTitle;
+    deleteButton.disabled = isPersisted && state.outputProfiles.length <= 1;
+    deleteButton.title = deleteButton.disabled ? "Debe quedar al menos un formato" : "Eliminar formato seleccionado";
   }
   const resetButton = $("[data-action='reset-output-profile-draft']");
   if (resetButton) {
-    resetButton.disabled = footerState.resetDisabled;
+    resetButton.disabled = !dirty;
   }
   const saveButton = $("[data-action='save-output-profile']");
   if (saveButton) {
-    saveButton.disabled = footerState.saveDisabled;
+    saveButton.disabled = validation.errors.length > 0 || !dirty;
   }
   const applyButton = $("[data-action='apply-output-profile']");
   if (applyButton) {
-    applyButton.disabled = footerState.applyDisabled;
-    applyButton.textContent = footerState.applyLabel;
+    applyButton.disabled = validation.errors.length > 0;
+    applyButton.textContent = dirty
+      ? "Guardar y aplicar"
+      : draft.enabled
+        ? "Aplicar cambios al lote"
+        : "Activar en este lote";
   }
   const footerNote = $("#output-profile-unsaved");
   if (footerNote) {
-    footerNote.textContent = footerState.noteText;
-    footerNote.className = footerState.noteClass;
+    footerNote.textContent = validation.errors.length
+      ? validation.errors[0]
+      : dirty
+        ? "Cambios sin guardar"
+        : "Sin cambios pendientes";
+    footerNote.className = `settings-footer-note ${validation.errors.length ? "error" : dirty ? "warning" : ""}`;
   }
 }
 
@@ -5419,127 +7001,266 @@ function renderAppSettings() {
     const enabled = profile.enabled;
     const unsaved = !state.outputProfiles.some((item) => item.id === profile.id);
     const canToggle = !unsaved && (enabledOutputProfiles().length > 1 || !enabled);
-    return outputProfileViewHelpers.outputProfileManagerRowHtml({
-      profile,
-      selected,
-      active,
-      enabled,
-      unsaved,
-      canToggle,
-      summary: outputProfileSummaryLine(profile),
-      destination: profileDestinationLabel(profile),
-    });
+    return `
+      <div class="output-profile-option${selected ? " selected" : ""}${active ? " active" : ""}${enabled ? " enabled" : ""}">
+        <label class="output-profile-toggle" title="${escapeHtml(canToggle ? "Activar esta salida en el lote" : unsaved ? "Guarda el formato para activarlo" : "Debe quedar al menos una salida activa")}">
+          <input type="checkbox" data-output-profile-enabled-id="${escapeHtml(profile.id)}" ${enabled ? "checked" : ""} ${canToggle ? "" : "disabled"} />
+          <span aria-hidden="true"></span>
+        </label>
+        <button type="button" class="output-profile-edit" data-output-profile-id="${escapeHtml(profile.id)}" title="${escapeHtml(`${profile.name} · ${outputProfileSummaryLine(profile)}`)}">
+          <span>
+            <strong>${escapeHtml(profile.name)}</strong>
+            <small>${escapeHtml(outputProfileSummaryLine(profile))}</small>
+            <small>${escapeHtml(profileDestinationLabel(profile))}</small>
+          </span>
+          <em>${escapeHtml(unsaved ? "Sin guardar" : active ? "Principal" : "")}</em>
+        </button>
+      </div>
+    `;
   }).join("");
   setOutputProfileFormValues(draft);
   renderOutputProfileModalState();
 }
 
 function presetSummaryLine() {
-  return settingsViewHelpers.presetSummaryLine({
-    background: state.background,
-    format: state.format,
-    size: state.size,
-  });
+  return `${state.format} · ${state.size} · ${backgroundLabel(state.background)}`;
 }
 
 function destinationCompactLabel() {
-  return outputProfileViewHelpers.destinationCompactLabel({
-    destinationMode: state.destinationMode,
-    destinationValue: state.destinationValue,
-  });
+  if (state.destinationMode === "custom") {
+    return state.destinationValue || "Sin destino";
+  }
+  return state.destinationValue || "_SALIDA_PRO";
 }
 
 function namingHumanLabel() {
-  return outputProfileViewHelpers.namingHumanLabel({
-    naming: state.naming,
-    suffix: state.suffix,
-  });
+  if (state.naming === "{original}{suffix}") {
+    return state.suffix ? `original + ${state.suffix}` : "original";
+  }
+  return state.naming || "Sin plantilla";
 }
 
 function outputWarningSummary(issues) {
-  return exportPreflightViewHelpers.outputWarningSummaryHtml({
-    issues,
-    firstIssue: firstActionableIssue(),
-    visibleWarningCount: visibleWarningCount(),
-  });
+  const warnings = issues.filter((issue) => issue.title !== "Sin lote");
+  if (!warnings.length) {
+    return "";
+  }
+  const hasBlocking = warnings.some((issue) => issue.level === "error");
+  if (!hasBlocking) {
+    return "";
+  }
+  const first = firstActionableIssue() || warnings[0];
+  const count = Math.max(warnings.length, visibleWarningCount());
+  const fileLine = first.file ? `<span title="${escapeHtml(first.path || first.file)}">${escapeHtml(first.file)}</span>` : "";
+  const detail = first.file ? `Motivo: ${first.detail}` : `${first.title}${first.detail ? `: ${first.detail}` : ""}`;
+  return `
+    <div class="warning-summary ${warnings.some((issue) => issue.level === "error") ? "error" : ""}">
+      <strong>${count} aviso${count === 1 ? "" : "s"}</strong>
+      ${fileLine}
+      <span>${escapeHtml(detail)}</span>
+      <button type="button" data-action="review-errors">Revisar aviso</button>
+    </div>
+  `;
 }
 
 function issueListHtml() {
-  return exportPreflightViewHelpers.issueListHtml({
-    hasActiveBatch: hasBatch(),
-    batch: state.batch,
-    rows: issueRows(),
-    counts: preflightCounts(),
-    warningCount: visibleWarningCount(),
-  });
+  if (!hasBatch() && state.batch !== "empty") {
+    return "";
+  }
+  const rows = issueRows();
+  const counts = preflightCounts();
+  const warningCount = visibleWarningCount();
+  const onlyIgnored = rows.length > 0 && warningCount === 0 && counts.errors === 0;
+  const footerAction = counts.errors
+      ? '<button type="button" class="primary" data-action="edit-output">Revisar salida</button>'
+      : "";
+  if (!rows.length) {
+    return `
+      <div class="issue-list-summary ready issue-list-summary--compact">
+        <strong>Sin avisos</strong>
+      </div>
+    `;
+  }
+  return `
+    <div class="issue-list-summary ${counts.errors ? "error" : onlyIgnored ? "clear" : "warning"}">
+      <strong>${escapeHtml(counts.errors ? `${counts.errors} bloqueo${counts.errors === 1 ? "" : "s"}` : onlyIgnored ? `${rows.length} ignorado${rows.length === 1 ? "" : "s"}` : `${warningCount || rows.length} aviso${(warningCount || rows.length) === 1 ? "" : "s"}`)}</strong>
+      <span>${escapeHtml(counts.errors ? "Resuelve los bloqueos antes de exportar." : onlyIgnored ? "No afectan a la exportación." : "Puedes revisar sin bloquear la exportación.")}</span>
+    </div>
+    ${rows.slice(0, 8).map(issueItemHtml).join("")}
+    ${footerAction ? `<div class="inspector-actionbar warning-actions">${footerAction}</div>` : ""}
+  `;
 }
 
 function issueRows() {
-  return exportPreflightViewHelpers.issueRows({
-    scanOmissions: scanOmissions().map((item) => ({
-      ...item,
-      reasonLabel: omissionReasonLabel(item.reason),
-      severity: omissionSeverity(item),
-    })),
-    images: activeImages().map((image) => ({
-      ...image,
-      exportStatus: exportItemState(image)?.status,
-    })),
-    errors: state.errors,
-    statusLabels,
+  const rows = [];
+  scanOmissions().slice(0, 4).forEach((item) => {
+    const severity = omissionSeverity(item);
+    rows.push({
+      level: severity === "ignored" ? "info" : severity,
+      title: item.name || (severity === "ignored" ? "Archivo ignorado" : "Archivo a revisar"),
+      detail: `Motivo: ${item.detail || omissionReasonLabel(item.reason)}`,
+      path: item.path || item.folder || "",
+      actionLabel: "",
+    });
   });
+  activeImages()
+    .filter((image) => image.status === "warning" || image.status === "error" || exportItemState(image)?.status === "error")
+    .forEach((image) => {
+      rows.push({
+        level: image.status === "error" || exportItemState(image)?.status === "error" ? "error" : "warning",
+        title: image.name,
+        detail: image.detail || statusLabels[image.status] || "Revisar imagen",
+        path: image.path || "",
+        imageId: image.id,
+        actionLabel: "Ir a imagen",
+      });
+    });
+  state.errors.slice(0, 4).forEach((issue) => {
+    rows.push({
+      level: issue.level,
+      title: issue.title,
+      detail: issue.detail,
+      path: "",
+      actionLabel: "",
+    });
+  });
+  return rows;
+}
+
+function issueItemHtml(row) {
+  const action = row.imageId
+    ? `<button type="button" data-action="select-image-id" data-image-id="${escapeHtml(row.imageId)}">${escapeHtml(row.actionLabel || "Ir a imagen")}</button>`
+    : "";
+  return `
+    <div class="issue-item ${row.level === "error" ? "error" : row.level === "info" || row.level === "ignored" ? "clear" : "warning"}" title="${escapeHtml(row.path || row.detail || row.title)}">
+      <div>
+        <strong>${escapeHtml(row.title)}</strong>
+        <span>${escapeHtml(row.detail || "Revisar")}</span>
+      </div>
+      ${action}
+    </div>
+  `;
 }
 
 function exportStatusClass(ready, issues = preflightIssues()) {
-  return exportPreflightViewHelpers.exportStatusClass({
-    hasActiveBatch: hasBatch(),
-    issues,
-    ready,
-    status: state.exportStatus,
-  });
+  if (state.exportStatus === "failed" || issues.some((issue) => issue.level === "error")) {
+    return "error";
+  }
+  if (state.exportStatus === "running") {
+    return "running";
+  }
+  if (state.exportStatus === "partial" || issues.length || (hasBatch() && !ready)) {
+    return "warning";
+  }
+  return ready ? "ready" : "pending";
 }
 
 function exportPreflightRows(issues, exportable, ready) {
-  return exportPreflightViewHelpers.exportPreflightRows({
-    batch: state.batch,
-    destinationFallback: destinationFallbackLabel(),
-    destinationMissing: state.destinationMode === "custom" && !state.destinationValue.trim(),
-    exportable,
-    ignoredCount: ignoredOmissions().length,
-    ignoredSummary: ignoredSummaryText(),
-    issues,
-    naming: state.naming,
-    namingExample: namingExample(),
-    ready,
-    warningCount: visibleWarningCount(),
-  });
+  if (state.batch === "none") {
+    return [
+      { state: "error", title: "Carpeta de origen", detail: "Elige una carpeta para empezar" },
+      { state: "pending", title: "Imágenes exportables", detail: "Pendiente" },
+      { state: "pending", title: "Carpeta de salida", detail: destinationFallbackLabel() },
+    ];
+  }
+  if (state.batch === "empty") {
+    return [
+      { state: "error", title: "Imágenes exportables", detail: "0 imágenes" },
+      { state: ignoredOmissions().length ? "pending" : "pending", title: "Ignorados", detail: ignoredSummaryText() },
+      { state: "pending", title: "Carpeta de salida", detail: "Pendiente" },
+    ];
+  }
+  const rows = [
+    { state: exportable > 0 ? "ok" : "error", title: "Imágenes exportables", detail: `${exportable} imagen${exportable === 1 ? "" : "es"}` },
+    { state: visibleWarningCount() ? "warning" : "ok", title: "Avisos", detail: visibleWarningCount() ? `${visibleWarningCount()} aviso${visibleWarningCount() === 1 ? "" : "s"}` : "Sin avisos" },
+    { state: ignoredOmissions().length ? "pending" : "ok", title: "Ignorados", detail: ignoredSummaryText() },
+    { state: state.destinationMode === "custom" && !state.destinationValue.trim() ? "error" : "ok", title: "Carpeta de salida", detail: destinationFallbackLabel() },
+    { state: state.naming.trim() ? "ok" : "error", title: "Nombre de archivo", detail: state.naming.trim() ? namingExample() : "Plantilla vacía" },
+  ];
+  issues
+    .filter((issue) => !["Sin lote", "No hay PNG válidos", "Nombre de archivo vacío", "Carpeta de salida sin configurar", "Sin imágenes exportables"].includes(issue.title))
+    .forEach((issue) => {
+      rows.push({ state: issue.level === "error" ? "error" : "warning", title: issue.title, detail: issue.detail });
+    });
+  if (ready && !issues.length) {
+    rows.push({ state: "ok", title: "Estado", detail: "Sin bloqueos ni avisos" });
+  }
+  return rows;
+}
+
+function preflightListHtml(rows) {
+  return `
+    <div class="preflight-list">
+      ${rows.map((row) => `
+        <div class="preflight-item ${escapeHtml(row.state)}">
+          <span aria-hidden="true"></span>
+          <div>
+            <strong>${escapeHtml(row.title)}</strong>
+            <small title="${escapeHtml(row.detail)}">${escapeHtml(row.detail)}</small>
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  `;
 }
 
 function exportPanelStatusLabel(ready, issues = preflightIssues()) {
-  return exportPreflightViewHelpers.exportPanelStatusLabel({
-    status: state.exportStatus,
-    paused: state.paused,
-    batch: state.batch,
-    hasActiveBatch: hasBatch(),
-    ready,
-    issues,
-  });
+  if (state.exportStatus === "running") {
+    return state.paused ? "Pausado" : "Exportando";
+  }
+  if (state.exportStatus === "completed") {
+    return "Exportado";
+  }
+  if (state.exportStatus === "partial") {
+    return "Exportado con avisos";
+  }
+  if (state.exportStatus === "failed") {
+    return "Revisar antes de exportar";
+  }
+  if (issues.some((issue) => issue.level === "error")) {
+    return "Revisar antes de exportar";
+  }
+  if (state.batch === "empty" || (hasBatch() && !ready)) {
+    return "Pendiente";
+  }
+  if (ready && issues.length) {
+    return `${issues.length} aviso${issues.length === 1 ? "" : "s"} antes de exportar`;
+  }
+  return ready ? "Listo para exportar" : "Configura salida";
 }
 
 function exportPreflightSummary(issues, exportable, ready) {
-  return exportPreflightViewHelpers.exportPreflightSummary({ issues, exportable, ready });
+  const errors = issues.filter((issue) => issue.level === "error").length;
+  const warnings = issues.length - errors;
+  if (errors) {
+    return `${errors} bloqueo${errors === 1 ? "" : "s"} · ${exportable} exportables`;
+  }
+  if (warnings) {
+    return `${warnings} aviso${warnings === 1 ? "" : "s"} · ${exportable} exportables`;
+  }
+  return ready ? `${exportable} imágenes listas` : "Pendiente";
 }
 
 function namingExample() {
+  if (!state.naming.trim()) {
+    return "Sin ejemplo";
+  }
   const image = exportableImages()[0] || selectedImage();
   const originalName = image?.name || "imagen_001.png";
-  return outputProfileViewHelpers.namingExample({
-    folder: activeFolders()[0]?.name || "lote",
-    format: state.format,
-    naming: state.naming,
-    original: originalName.replace(/\.[^.]+$/, ""),
-    suffix: state.suffix,
+  const original = originalName.replace(/\.[^.]+$/, "");
+  const folder = activeFolders()[0]?.name || "lote";
+  let example = state.naming
+    .replaceAll("{original}", original)
+    .replaceAll("{suffix}", state.suffix || "_PRO")
+    .replaceAll("{folder}", folder);
+  example = example.replace(/\{index(?::0?(\d+)d)?\}/g, (_match, width) => {
+    const digits = Number(width) || 1;
+    return String(1).padStart(digits, "0");
   });
+  if (!/\.[a-z0-9]+$/i.test(example)) {
+    example = `${example}.${state.format.toLowerCase()}`;
+  }
+  return example;
 }
 
 function renderExportResult() {
@@ -5562,70 +7283,144 @@ function renderExportResult() {
   const issues = state.exportIssues.length ? state.exportIssues : state.errors;
   const items = Array.isArray(state.exportCompletedItems) ? state.exportCompletedItems.slice(-8) : [];
   const title = exportResultTitle();
+  const resultClass = state.exportStatus === "failed"
+    ? "error"
+    : state.exportStatus === "partial"
+      ? "warning"
+      : state.exportStatus === "completed"
+        ? "ready"
+        : "running";
   const meta = exportResultMeta(processed, total, errors);
+
+  const destinationHtml = destinations.length
+    ? destinations.slice(0, 3).map((path) => `
+      <div class="result-path" title="${escapeHtml(path)}">
+        <span>Carpeta</span>
+        <strong>${escapeHtml(path)}</strong>
+      </div>
+    `).join("")
+    : `<div class="result-path muted"><span>Carpeta</span><strong>${escapeHtml(destinationFallbackLabel())}</strong></div>`;
+
+  const currentItemHtml = state.exportStatus === "running" ? `
+    <div class="result-path muted">
+      <span>Actual</span>
+      <strong title="${escapeHtml(currentExportFileLabel())}">${escapeHtml(currentExportFileLabel())}</strong>
+    </div>
+  ` : "";
+
+  const issuesHtml = issues.length ? `
+    <div class="result-issues">
+      <strong>${errors ? `${errors} error${errors === 1 ? "" : "es"}` : `${issues.length} aviso${issues.length === 1 ? "" : "s"}`}</strong>
+      <span>${escapeHtml(exportIssueActionText(issues[0]))}</span>
+    </div>
+  ` : "";
+
+  const itemsHtml = items.length ? `
+    <div class="result-items" aria-label="Archivos procesados">
+      ${items.map((item) => `
+        <span class="result-item ${item.success ? "ready" : "error"}" title="${escapeHtml(item.name || "Archivo")}">
+          ${escapeHtml(item.name || "Archivo")}
+        </span>
+      `).join("")}
+    </div>
+  ` : "";
   const actionsHtml = exportResultActionsHtml(issues, destinations);
 
-  target.innerHTML = exportResultViewHelpers.exportResultHtml({
-    status: state.exportStatus,
-    title,
-    meta,
-    processed,
-    total,
-    errors,
-    destinations,
-    destinationFallback: destinationFallbackLabel(),
-    currentFileLabel: currentExportFileLabel(),
-    issues,
-    issueSummary: exportIssueActionText(issues[0]),
-    items,
-    actionsHtml,
-  });
+  target.innerHTML = `
+    <div class="result-header ${resultClass}">
+      <strong>${escapeHtml(title)}</strong>
+      <span>${escapeHtml(meta)}</span>
+    </div>
+    ${destinationHtml}
+    ${currentItemHtml}
+    ${issuesHtml}
+    ${itemsHtml}
+    ${actionsHtml}
+  `;
 }
 
 function exportResultTitle() {
-  return exportResultViewHelpers.exportResultTitle(state.exportStatus, state.paused);
+  if (state.exportStatus === "running") {
+    return state.paused ? "Exportación pausada" : "Exportando";
+  }
+  if (state.exportStatus === "completed") {
+    return "Exportación completada";
+  }
+  if (state.exportStatus === "partial") {
+    return "Completada con avisos";
+  }
+  if (state.exportStatus === "failed") {
+    return "Exportación fallida";
+  }
+  return "Resultado";
 }
 
 function exportResultMeta(processed, total, errors) {
-  return exportResultViewHelpers.exportResultMeta({
-    status: state.exportStatus,
-    processed,
-    total,
-    errors,
-  });
+  if (state.exportStatus === "running") {
+    return `${processed}/${total} imágenes`;
+  }
+  if (state.exportStatus === "completed") {
+    return `${processed}/${total} exportadas`;
+  }
+  if (state.exportStatus === "partial") {
+    return `${processed}/${total} exportadas · ${errors} error${errors === 1 ? "" : "es"}`;
+  }
+  if (state.exportStatus === "failed") {
+    return errors ? `${errors} error${errors === 1 ? "" : "es"}` : "No completada";
+  }
+  return `${processed}/${total}`;
 }
 
 function currentExportFileLabel() {
-  return exportResultViewHelpers.currentExportFileLabel({
-    images: exportableImages(),
-    processed: state.processed,
-    statusText: state.statusText,
-  });
+  const images = exportableImages();
+  if (!images.length) {
+    return state.statusText || "Preparando";
+  }
+  const index = Math.min(Math.max(Number(state.processed) || 0, 0), images.length - 1);
+  return images[index]?.name || state.statusText || "Preparando";
 }
 
 function exportIssueActionText(issue) {
-  return exportResultViewHelpers.exportIssueActionText(issue, {
-    existingOutput: issueMentionsExistingOutput(issue),
-  });
+  if (!issue) {
+    return "Revisa el resultado.";
+  }
+  if (issueMentionsExistingOutput(issue)) {
+    return "Ya hay archivos en destino. Cambia la carpeta o el nombre final.";
+  }
+  const title = issue.title || "Exportación";
+  const detail = issue.detail || "Revisa el resultado.";
+  return `${title} · ${detail}`;
 }
 
 function exportResultActionsHtml(issues, destinations) {
-  return exportResultViewHelpers.exportResultActionsHtml({
-    status: state.exportStatus,
-    issues,
-    destinations,
-    canOpenOutput: Boolean(outputDestinationToOpen()),
-    canRetry: isExportReady(),
-  });
+  const actions = [];
+  if ((state.exportStatus === "completed" || state.exportStatus === "partial") && outputDestinationToOpen()) {
+    actions.push('<button type="button" data-action="open-output">Abrir carpeta</button>');
+  }
+  if (issues.length || state.exportStatus === "failed" || state.exportStatus === "partial") {
+    actions.push('<button type="button" data-action="review-errors">Revisar avisos</button>');
+  }
+  if (state.exportStatus === "failed" && isExportReady()) {
+    actions.push('<button type="button" class="primary" data-action="start-export">Reintentar</button>');
+  }
+  if (!actions.length || destinations.length > 3) {
+    return destinations.length > 3
+      ? `<div class="result-actions"><span>${escapeHtml(destinations.length - 3)} carpetas más</span>${actions.join("")}</div>`
+      : "";
+  }
+  return `<div class="result-actions">${actions.join("")}</div>`;
 }
 
 function destinationFallbackLabel() {
   const profiles = exportOutputProfiles();
-  return outputProfileViewHelpers.destinationFallbackLabel({
-    destinationMode: state.destinationMode,
-    destinationValue: state.destinationValue,
-    destinations: profiles.length > 1 ? profiles.map(profileDestinationPreviewLabel) : [],
-  });
+  if (profiles.length > 1) {
+    const destinations = Array.from(new Set(profiles.map(profileDestinationPreviewLabel)));
+    return destinations.length === 1 ? destinations[0] : `${destinations.length} destinos`;
+  }
+  if (state.destinationMode === "custom") {
+    return state.destinationValue || "Carpeta de salida sin configurar";
+  }
+  return state.destinationValue || "_SALIDA_PRO";
 }
 
 function beginOutputEdit() {
@@ -5878,15 +7673,29 @@ function closePresetEditor() {
 }
 
 function exportStatusLabel(ready) {
-  return settingsViewHelpers.exportStatusLabel({
-    exportStatus: state.exportStatus,
-    paused: state.paused,
-    ready,
-  });
+  if (state.exportStatus === "running") {
+    return state.paused ? "Pausada" : "Procesando";
+  }
+  if (state.exportStatus === "completed") {
+    return "Completada";
+  }
+  if (state.exportStatus === "partial") {
+    return "Con errores";
+  }
+  if (state.exportStatus === "failed") {
+    return "Fallida";
+  }
+  return ready ? "Lista" : "Configura salida";
 }
 
 function backgroundLabel(value) {
-  return settingsViewHelpers.backgroundLabel(value);
+  if (value === "transparent") {
+    return "transparente";
+  }
+  if (value === "white") {
+    return "blanco";
+  }
+  return "gris claro";
 }
 
 function renderFooter() {
@@ -6001,7 +7810,20 @@ function renderAccessibilityHints() {
 }
 
 function topPrimaryHint(visible) {
-  return topStatusViewHelpers.topPrimaryHint(visible);
+  const action = visible.primaryAction?.action || "";
+  if (action === "start-export") {
+    return `${visible.primaryAction.label}. Atajo: Ctrl+E`;
+  }
+  if (action === "pick-bridge-folder") {
+    return "Seleccionar carpeta de entrada";
+  }
+  if (action === "review-warnings") {
+    return "Revisar avisos del lote";
+  }
+  if (action === "open-output") {
+    return "Abrir carpeta de salida";
+  }
+  return visible.primaryAction?.label || visible.title;
 }
 
 function setControlHint(target, hint) {
@@ -6057,32 +7879,72 @@ function statusBarText() {
   const images = activeImages();
   const counts = batchCounts();
   const selectedIndex = images.findIndex((image) => image.id === state.selectedImageId);
-  return topStatusViewHelpers.statusBarText({
-    batch: state.batch,
-    counts,
-    destinationMode: state.destinationMode,
-    destinationValue: state.destinationValue,
-    exportResultProcessed: state.exportResult?.processed,
-    exportResultTotal: state.exportResult?.total,
-    exportStatus: state.exportStatus,
-    exportableImageCount: exportableImages().length,
-    firstErrorDetail: state.errors[0]?.detail,
-    imageCount: images.length,
-    outputCount: exportOutputCount(),
-    paused: state.paused,
-    plannedTotal: plannedExportTotal(),
-    processed: state.processed,
-    scanStatus: state.scanStatus,
-    selectedIndex,
-    statusText: state.statusText,
-  });
+  const selectedText = selectedIndex >= 0 ? `Imagen ${selectedIndex + 1}/${images.length}` : "Sin selección";
+  const destination = exportOutputCount() > 1
+    ? outputCountLabel(exportOutputCount())
+    : state.destinationMode === "custom"
+      ? state.destinationValue || "sin destino"
+      : `origen / ${state.destinationValue}`;
+
+  if (state.exportStatus === "running") {
+    const total = plannedExportTotal() || exportableImages().length;
+    return `${state.paused ? "Pausado" : "Exportando"} ${state.processed}/${total} · ${state.statusText}`;
+  }
+  if (state.exportStatus === "completed") {
+    const total = Number(state.exportResult?.total ?? exportableImages().length ?? 0);
+    const processed = Number(state.exportResult?.processed ?? total);
+    return `Última exportación completada · ${processed}/${total} archivos`;
+  }
+  if (state.exportStatus === "partial") {
+    const total = Number(state.exportResult?.total ?? exportableImages().length ?? 0);
+    const processed = Number(state.exportResult?.processed ?? state.processed ?? 0);
+    return `Última exportación con avisos · ${processed}/${total} archivos`;
+  }
+  if (state.exportStatus === "failed") {
+    return `Exportación fallida · ${state.errors[0]?.detail || "Revisa avisos"}`;
+  }
+  if (state.batch === "none") {
+    return "Sin lote · Elige una carpeta para empezar";
+  }
+  if (state.batch === "scanning") {
+    return `Escaneando · ${state.scanStatus}`;
+  }
+  if (state.batch === "empty") {
+    return `0 imágenes · ${state.scanStatus || "Cambia de carpeta"}`;
+  }
+  const warningText = counts.nonBlockingWarnings ? ` · ${countText(counts.nonBlockingWarnings, "aviso", "avisos")}` : "";
+  return `${counts.exportableImages} exportables · ${selectedText}${warningText} · Salida: ${destination}`;
 }
 
 function previewFooterLabel() {
-  return previewStateHelpers.previewFooterLabel({
-    previewStatus: state.previewStatus,
-    selectedImageSource: selectedImage()?.source,
-  });
+  if (selectedImage()?.source === "bridge") {
+    if (state.previewStatus === "loading") {
+      return "Generando";
+    }
+    if (state.previewStatus === "warning") {
+      return "Con aviso";
+    }
+    if (state.previewStatus === "error") {
+      return "Error";
+    }
+    if (state.previewStatus === "ready") {
+      return "Real";
+    }
+    return "Pendiente";
+  }
+  if (state.previewStatus === "loading") {
+    return "Generando";
+  }
+  if (state.previewStatus === "warning") {
+    return "Con aviso";
+  }
+  if (state.previewStatus === "error") {
+    return "Error";
+  }
+  if (state.previewStatus === "ready") {
+    return "Lista";
+  }
+  return "Sin imagen";
 }
 
 function handleAction(action, target = null) {

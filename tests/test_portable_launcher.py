@@ -51,6 +51,20 @@ def test_live_reload_script_is_injected_before_body_close():
     assert injected.index(launcher.LIVE_RELOAD_ENDPOINT) < injected.lower().index("</body>")
 
 
+def test_static_handler_disables_cache_without_live_reload(monkeypatch):
+    launcher = load_launcher()
+    sent_headers = []
+    handler = object.__new__(launcher.QuietStaticHandler)
+    handler.live_reload_dir = None
+    handler.send_header = lambda name, value: sent_headers.append((name, value))
+    monkeypatch.setattr(launcher.SimpleHTTPRequestHandler, "end_headers", lambda self: None)
+
+    handler.end_headers()
+
+    assert ("Cache-Control", "no-store, max-age=0") in sent_headers
+    assert ("Pragma", "no-cache") in sent_headers
+
+
 def test_frontend_manifest_hash_changes_with_frontend_file_content(tmp_path):
     launcher = load_launcher()
     index = tmp_path / "index.html"

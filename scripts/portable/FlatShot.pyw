@@ -291,9 +291,8 @@ class QuietStaticHandler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def end_headers(self) -> None:
-        if self.live_reload_dir is not None:
-            self.send_header("Cache-Control", "no-store, max-age=0")
-            self.send_header("Pragma", "no-cache")
+        self.send_header("Cache-Control", "no-store, max-age=0")
+        self.send_header("Pragma", "no-cache")
         super().end_headers()
 
     def log_message(self, format: str, *args) -> None:  # noqa: A002

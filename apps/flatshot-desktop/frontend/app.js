@@ -2158,6 +2158,7 @@ function startExport(options = {}) {
 
 async function startBridgeExport() {
   clearBridgeExportPoll();
+  cancelThumbnailWork();
   Object.assign(state, exportStateHelpers.exportStartState());
   render();
 
@@ -3691,13 +3692,16 @@ function thumbnailState(image, src) {
 }
 
 function queueThumbnailPreload() {
-  if (!hasBatch()) {
+  if (!hasBatch() || state.exportStatus === "running") {
     return;
   }
   window.requestAnimationFrame(() => preloadBatchThumbnails());
 }
 
 function preloadBatchThumbnails() {
+  if (state.exportStatus === "running") {
+    return;
+  }
   activeImages().forEach((image) => {
     const src = imageThumbnailSrc(image);
     const current = state.thumbnailStatus[image.id];
@@ -3718,6 +3722,16 @@ function preloadBatchThumbnails() {
     };
     preloader.src = src;
   });
+}
+
+function cancelThumbnailWork() {
+  thumbnailPreloads.forEach((preloader) => {
+    preloader.onload = null;
+    preloader.onerror = null;
+    preloader.src = "";
+  });
+  thumbnailPreloads.clear();
+  thumbnailFallbackQueue.length = 0;
 }
 
 function markThumbnailLoaded(imageId, sourceSrc, naturalWidth, naturalHeight, resolvedSrc = sourceSrc) {
@@ -3773,6 +3787,9 @@ function commitThumbnailError(imageId, src, detail = "") {
 }
 
 function requestThumbnailFallback(imageId, sourceSrc) {
+  if (state.exportStatus === "running") {
+    return false;
+  }
   const image = activeImages().find((item) => item.id === imageId);
   if (!image || image.source !== "bridge" || !image.path) {
     return false;

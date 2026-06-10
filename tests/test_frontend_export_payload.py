@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -21,6 +22,14 @@ def test_export_payload_helper_loads_after_profiles_and_before_app_script():
     app_index = html.index("app.js")
 
     assert profiles_index < payload_index < app_index
+
+
+def test_frontend_assets_share_export_fix_cache_token():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+    asset_versions = re.findall(r'[<](?:script|link)[^>]+[?]v=([^"&]+)', html)
+
+    assert asset_versions
+    assert set(asset_versions) == {"20260610-export-fix"}
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")

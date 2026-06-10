@@ -1,6 +1,6 @@
-# Auditoria de higiene de codigo - FlatShot
+# Auditoría de higiene de código - FlatShot
 
-## 1. Resumen ejecutivo
+## Resumen ejecutivo
 
 FlatShot esta en un estado tecnicamente mejor que el de una aplicacion heredada tipica: el motor de imagen, los servicios de aplicacion, el bridge HTTP y la interfaz web estan separados en carpetas claras, hay pruebas de arquitectura que impiden recuperar paquetes Qt retirados, y la suite actual cubre dominios importantes como escaneo de carpetas, presets, configuracion de exportacion, runner de exportacion, cache, bridge, CLI y modelos.
 
@@ -10,7 +10,7 @@ El backend mantiene limites de capa razonables: `core` y `application` no import
 
 La recomendacion principal es no reescribir FlatShot ni migrarlo a otro stack. Lo correcto es una limpieza por fases: primero documentar contratos y tests de seguridad, despues extraer helpers puros del frontend, luego normalizar contratos de perfiles/salidas, despues dividir renderizado por dominios, y solo mas tarde consolidar CSS y tocar hotspots Python con pruebas de salida.
 
-## 2. Diagnostico por areas
+## Diagnóstico por áreas
 
 ### Estructura general del proyecto
 
@@ -107,7 +107,7 @@ La suite es una fortaleza del proyecto. Existen 24 archivos de test y la ejecuci
 
 La brecha principal es que no hay validacion frontend automatizada equivalente a la cobertura Python. El frontend se valida con `node --check` y revisiones Playwright/manuales, pero no hay tests unitarios para helpers JS ni snapshots DOM de los flujos criticos. Como no hay Node build/test stack instalado, conviene empezar extrayendo helpers puros que puedan validarse con pruebas ligeras o con checks controlados, sin introducir dependencias salvo que se justifique.
 
-## 3. Problemas detectados
+## Problemas detectados
 
 ### 1. Frontend monolitico con responsabilidades mezcladas
 
@@ -140,7 +140,7 @@ La brecha principal es que no hay validacion frontend automatizada equivalente a
 
 - Descripcion: `styles.css`, `ux-foundation.css` y `ux-refactor.css` suman unas 13.847 lineas, con variables repetidas, selectores repetidos y muchos `!important`.
 - Archivos/carpetas afectados: `apps/flatshot-desktop/frontend/styles.css`, `apps/flatshot-desktop/frontend/ux-foundation.css`, `apps/flatshot-desktop/frontend/ux-refactor.css`, `docs/FLATSHOT_DESIGN_SYSTEM.md`.
-- Gravedad: media-alta.
+- Gravedad: alta.
 - Riesgo de tocarlo: medio-alto; la cascada actual probablemente estabiliza detalles visuales recientes.
 - Impacto en mantenibilidad: alto; dificulta saber que regla domina y aumenta regresiones responsive.
 - Recomendacion concreta: no borrar capas aun. Primero inventariar tokens vivos y componentes `ui-*`; despues consolidar por bloques visuales con screenshots antes/despues.
@@ -217,7 +217,7 @@ La brecha principal es que no hay validacion frontend automatizada equivalente a
 - Impacto en mantenibilidad: medio; nuevos cambios pueden repetir decisiones ya tomadas.
 - Recomendacion concreta: usar este informe como backlog tecnico. Cuando se implemente una fase, actualizar `UX_UI_REFACTOR_PROGRESS.md` o una nota interna con resultados y validaciones.
 
-## 4. Refactors recomendados
+## Refactors recomendados
 
 ### Bajo riesgo
 
@@ -249,7 +249,7 @@ La brecha principal es que no hay validacion frontend automatizada equivalente a
 - Portable: validar live reload, autosync y fallback browser antes de cambiar launchers.
 - CSS global: capturar estados visuales clave con Playwright o revision manual antes de consolidar.
 
-## 5. Plan de implementacion por fases
+## Plan de implementación por fases
 
 ### Fase 0: seguridad, backups, tests y validacion
 
@@ -301,7 +301,7 @@ La brecha principal es que no hay validacion frontend automatizada equivalente a
 - Documentar comandos reales de validacion en README o docs.
 - Registrar en `UX_UI_REFACTOR_PROGRESS.md` que fases quedaron completadas y que no se toco output.
 
-## 6. Criterios de aceptacion
+## Criterios de aceptación
 
 - `app.js` queda dividido o reducido por dominios sin cambiar flujo visible.
 - Las reglas de perfiles de salida tienen tests y un contrato claro frontend/bridge.
@@ -313,7 +313,7 @@ La brecha principal es que no hay validacion frontend automatizada equivalente a
 - La CSS consolidada no introduce overflow, solapamientos, perdida de foco visible ni cambios de layout no buscados.
 - No se introducen dependencias nuevas sin justificacion escrita.
 
-## 7. Comandos de validacion
+## Comandos de validación
 
 Comandos encontrados y resultado en esta auditoria:
 
@@ -362,7 +362,7 @@ flatshot process --input RUTA\DE\ENTRADA --preset "Luz cenital" --dry-run
 
 Valida CLI y plan de procesamiento sin crear salidas en el modo dry run.
 
-## 8. Riesgos y limites
+## Riesgos y límites
 
 - No conviene reescribir la app desde cero. La arquitectura Python ya tiene valor y tests.
 - No conviene migrar a Electron, Tauri, React u otro stack solo por modernizacion. Primero hay que reducir deuda dentro de la app actual.
@@ -374,7 +374,7 @@ Valida CLI y plan de procesamiento sin crear salidas en el modo dry run.
 - No conviene cambiar config/presets sin migracion y tolerancia a archivos malformados.
 - No conviene confiar en el Python del sistema para validacion; el venv local es el entorno que actualmente tiene `pytest`.
 
-## 9. Recomendacion final
+## Recomendación final
 
 El orden exacto recomendado es:
 
@@ -388,7 +388,7 @@ El orden exacto recomendado es:
 
 La prioridad tecnica es clara: mantener intacta la salida de imagen, reducir primero la complejidad del frontend, y despues normalizar contratos de exportacion. La modernizacion visual o de stack deberia quedar fuera hasta que esas bases esten estabilizadas.
 
-## Estado de esta auditoria
+Alcance de esta auditoría:
 
 - Archivos cambiados: solo `CODE_HEALTH_AUDIT.md`.
 - Cambios funcionales: ninguno.

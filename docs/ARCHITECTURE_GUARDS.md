@@ -42,6 +42,10 @@ The previous Qt desktop surface has been retired:
 - Do not route new code through removed compatibility packages.
 - Keep export output behavior stable unless the task explicitly changes it.
 - Keep compatibility for existing presets and the `shadow_engine="legacy"` renderer because those affect user data and output parity.
+- Keep the frontend -> bridge export JSON aligned with `docs/FRONTEND_BRIDGE_EXPORT_CONTRACT.md`.
+- Keep frontend state values aligned with `docs/FRONTEND_STATE_CONTRACT.md`; new states need tests and documentation.
+- Keep low-use model decisions aligned with `docs/LOW_USE_MODELS_AUDIT.md`; do not remove legacy-looking models without a compatibility review.
+- Keep CSS consolidation aligned with `docs/CSS_CASCADE_INVENTORY.md`; do not remove cascade layers or broad `!important` overrides without visual parity checks.
 
 ## Tests
 

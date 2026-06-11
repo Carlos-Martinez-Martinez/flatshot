@@ -73,11 +73,12 @@ const card = helpers.outputInspectorCardHtml({{
 }});
 assert.equal(card.includes("2 formatos activos"), true);
 assert.equal(card.includes("4 imágenes x 2 formatos = 8 archivos"), true);
-assert.equal(card.includes("4 imágenes listas"), true);
 assert.equal(card.includes("active-output-list"), true);
 assert.equal(card.includes("Cambios sin guardar"), true);
 assert.equal(card.includes('data-action="new-output-profile"'), true);
 assert.equal(card.includes('data-action="open-app-settings"'), true);
+assert.equal(card.includes(">Formatos</button>"), true);
+assert.equal(card.includes(">Nuevo</button>"), true);
 
 const pendingCard = helpers.outputInspectorCardHtml({{
   activeCount: 1,

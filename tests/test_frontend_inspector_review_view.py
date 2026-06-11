@@ -47,12 +47,12 @@ const lotCard = helpers.lotInspectorCardHtml({{
   meta: '3 imágenes listas · Ignorados "técnicos"',
   tone: "warning",
 }});
-assert.equal(lotCard.includes('class="inspector-summary warning"'), true);
+assert.equal(lotCard.includes('class="inspector-summary panel-summary-card warning"'), true);
 assert.equal(lotCard.includes("<span>Lote</span>"), true);
 assert.equal(lotCard.includes("Lote &lt;actual&gt;"), true);
 assert.equal(lotCard.includes("Ignorados &quot;técnicos&quot;"), true);
 assert.equal(lotCard.includes('data-action="open-batch-detail"'), true);
-assert.equal(lotCard.includes("Ver detalle"), true);
+assert.equal(lotCard.includes("Detalle"), true);
 
 const noImage = helpers.reviewPanelHtml({{
   lotSummaryHtml: lot,
@@ -125,11 +125,10 @@ const selectedCard = helpers.selectedImageInspectorCardHtml({{
 assert.equal(selectedCard.includes("Imagen seleccionada"), true);
 assert.equal(selectedCard.includes("camisa &lt;azul&gt;.png"), true);
 assert.equal(selectedCard.includes("Detalle &quot;x&quot;"), true);
-assert.equal(selectedCard.includes("Ajuste de esta imagen"), true);
 assert.equal(selectedCard.includes("Personalizado"), true);
 assert.equal(selectedCard.includes('data-action="open-image-adjustment"'), true);
 assert.equal(selectedCard.includes('data-action="reset-local-adjustment"'), true);
-assert.equal(selectedCard.includes("Restablecer al lote"), true);
+assert.equal(selectedCard.includes("Restablecer"), true);
 
 const alertHtml = helpers.issuesInspectorCardHtml({{
   rows: [
@@ -158,10 +157,11 @@ const aspect = helpers.aspectInspectorCardHtml({{
 }});
 assert.equal(aspect.includes("Luz &lt;cenital&gt;"), true);
 assert.equal(aspect.includes("Procesado"), true);
-assert.equal(aspect.includes("Ajuste de imagen"), true);
-assert.equal(aspect.includes("Aplicado a 2 imágenes"), true);
+assert.equal(aspect.includes("Ajuste del lote"), true);
+assert.equal(aspect.includes("2 imágenes"), true);
 assert.equal(aspect.includes('data-action="open-advanced"'), true);
 assert.equal(aspect.includes('data-action="open-preset-editor"'), true);
+assert.equal(aspect.includes(">Ajustes</button>"), true);
 assert.equal(aspect.includes('data-action="apply-global-adjustment-to-overrides"'), true);
 assert.equal(aspect.includes("1 imagen mantiene su ajuste personalizado."), true);
 assert.equal(helpers.aspectInspectorCardHtml({{ hasReadyBatch: false }}), "");

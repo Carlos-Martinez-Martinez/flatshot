@@ -28,7 +28,7 @@
         <strong>${escapeHtml(row.name)}</strong>
         <small>${escapeHtml(summary)}</small>
       </button>
-      <span class="active-output-row__tag">${escapeHtml(active ? "Principal" : "")}</span>
+      ${active ? '<span class="active-output-row__tag">Principal</span>' : ""}
     </div>
   `;
   }
@@ -50,7 +50,6 @@
     const rows = Array.isArray(options.rows) ? options.rows : [];
     const activeCount = Number(options.activeCount) || 0;
     const totalFiles = Number(options.totalFiles) || 0;
-    const readyLabel = options.readyLabel || "Sin imágenes listas";
     const countLabel = activeCount === 1 ? "1 formato activo" : `${activeCount} formatos activos`;
     const totalLabel = totalFiles
       ? `${escapeHtml(options.formulaLabel || `${totalFiles} archivos previstos`)}`
@@ -58,20 +57,21 @@
         ? "Pendiente de lote"
         : "Selecciona al menos un formato";
     return `
-    <section class="inspector-output-card">
+    <section class="inspector-output-card panel-summary-card">
       <div class="inspector-output-card__head">
-        <span>${escapeHtml("Exportación")}</span>
-        <strong>${escapeHtml(countLabel)}</strong>
+        <div>
+          <span>${escapeHtml("Exportación")}</span>
+          <strong>${escapeHtml(countLabel)}</strong>
+        </div>
         <small>${totalLabel}</small>
-        <small>${escapeHtml(readyLabel)}</small>
       </div>
       <div class="active-output-list" aria-label="Formatos activos del lote">
         ${rows.map(outputProfileInlineRowHtml).join("")}
       </div>
       ${options.dirty ? outputTemporaryNoticeHtml() : ""}
       <div class="inspector-output-card__actions">
-        <button type="button" class="primary" data-action="open-app-settings">Gestionar formatos</button>
-        <button type="button" data-action="new-output-profile">Nuevo formato</button>
+        <button type="button" data-action="open-app-settings">Formatos</button>
+        <button type="button" data-action="new-output-profile">Nuevo</button>
       </div>
     </section>
   `;

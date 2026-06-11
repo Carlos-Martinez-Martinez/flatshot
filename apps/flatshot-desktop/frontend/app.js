@@ -4670,9 +4670,9 @@ function inspectorCardsHtml() {
 function lotInspectorCardHtml() {
   const counts = batchCounts();
   const visible = getVisibleAppState();
-  const ignored = counts.ignoredFiles ? "Ignorados técnicos en detalle" : "";
+  const ignored = counts.ignoredFiles ? `${counts.ignoredFiles} ignorado${counts.ignoredFiles === 1 ? "" : "s"}` : "";
   const customCount = imageAdjustmentOverrideCount();
-  const custom = customCount ? `${customCount} imagen${customCount === 1 ? "" : "es"} con ajuste propio` : "";
+  const custom = customCount ? `${customCount} personalizada${customCount === 1 ? "" : "s"}` : "";
   const meta = state.batch === "empty"
     ? `${readyImagesText(0)}${ignored ? ` · ${ignored}` : ""}`
     : `${readyImagesText(counts.exportableImages)}${custom ? ` · ${custom}` : ""}${ignored ? ` · ${ignored}` : ""}`;

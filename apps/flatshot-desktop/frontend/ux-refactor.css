@@ -1379,3 +1379,263 @@ html:not(.dev-mode) .debug-panel {
 .processing-card__notice span {
   font-size: var(--font-size-sm);
 }
+
+/* Direct right-panel pass: compact, operational, aligned with the rest of the app. */
+:root {
+  --fs-viewer-col: minmax(480px, 1fr);
+  --fs-right-col: clamp(500px, 32vw, 620px);
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  white-space: nowrap !important;
+}
+
+.settings-panel {
+  gap: 8px !important;
+  padding: 12px !important;
+}
+
+.panel-summary-card,
+.inspector-output-card.panel-summary-card,
+.inspector-compact-row.panel-summary-card {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 10px !important;
+  border-color: #d8e2ea !important;
+  border-radius: 8px !important;
+  background: var(--color-bg-panel) !important;
+  padding: 12px 14px !important;
+}
+
+.panel-summary-card__head,
+.selected-image-card__head,
+.inspector-output-card__head {
+  min-width: 0;
+  grid-column: 1 / -1;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px 12px;
+}
+
+.panel-summary-card__head > div,
+.selected-image-card__head > div,
+.inspector-output-card__head > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.panel-summary-card__head span,
+.selected-image-card__head span,
+.inspector-output-card__head span {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.panel-summary-card__head strong,
+.selected-image-card__head strong,
+.inspector-output-card__head strong {
+  color: var(--color-text);
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.panel-summary-card__head small,
+.selected-image-card__head small,
+.panel-summary-card__meta,
+.inspector-output-card__head small {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.panel-summary-card__meta {
+  display: block;
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.panel-link-button,
+.panel-summary-card .panel-link-button {
+  min-height: 28px !important;
+  border: 0 !important;
+  background: transparent !important;
+  padding: 0 !important;
+  color: var(--color-accent-hover) !important;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.inspector-processing-card {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.processing-card__controls {
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center;
+  gap: 8px !important;
+}
+
+.processing-card__select {
+  min-width: 0;
+}
+
+.processing-card__select select,
+.processing-card__controls select {
+  min-height: 36px;
+  border-radius: 8px;
+}
+
+.processing-card__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.processing-card__actions button,
+.selected-image-card__actions button,
+.inspector-output-card__actions button {
+  min-height: 32px !important;
+  border-radius: 8px !important;
+  padding: 0 10px !important;
+  white-space: nowrap;
+}
+
+.processing-card__actions button,
+.selected-image-card__actions button,
+.inspector-output-card__actions button {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--color-accent-hover) !important;
+  font-weight: 700;
+}
+
+.processing-card__actions button:hover:not(:disabled),
+.selected-image-card__actions button:hover:not(:disabled),
+.inspector-output-card__actions button:hover:not(:disabled),
+.panel-link-button:hover:not(:disabled) {
+  background: var(--color-accent-soft) !important;
+}
+
+.processing-card__notice {
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px !important;
+  border-color: #ead58c !important;
+  border-radius: 8px !important;
+  padding: 8px 10px !important;
+}
+
+.processing-card__notice button {
+  min-height: 30px;
+  white-space: nowrap;
+}
+
+.inspector-output-card__head {
+  align-items: end;
+}
+
+.inspector-output-card__head small {
+  align-self: end;
+  text-align: right;
+  white-space: normal !important;
+}
+
+.active-output-list {
+  gap: 8px !important;
+}
+
+.active-output-row {
+  grid-template-columns: 24px minmax(0, 1fr) auto !important;
+  min-height: 48px;
+  gap: 8px !important;
+  border-radius: 8px !important;
+  background: var(--color-bg-panel) !important;
+  padding: 8px 10px !important;
+}
+
+.active-output-row__main {
+  width: 100% !important;
+  justify-items: start !important;
+  text-align: left !important;
+}
+
+.active-output-row__main strong,
+.active-output-row__main small {
+  width: 100%;
+  text-align: left !important;
+}
+
+.active-output-row.is-disabled {
+  opacity: 1 !important;
+}
+
+.active-output-row.is-disabled .active-output-row__main {
+  color: var(--color-text-muted);
+}
+
+.active-output-row__main strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.active-output-row__main small {
+  font-size: 12px;
+}
+
+.active-output-row__tag {
+  min-height: 24px !important;
+  align-self: center;
+  padding: 3px 9px !important;
+}
+
+.inspector-output-card__actions {
+  justify-content: flex-start;
+  gap: 8px !important;
+}
+
+.selected-image-card {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.selected-image-card__state {
+  align-self: start;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-soft);
+  padding: 3px 9px;
+  color: var(--color-text-muted) !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+.selected-image-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start !important;
+  gap: 6px;
+}
+
+@media (max-width: 1280px) {
+  :root {
+    --fs-left-col: clamp(260px, 22vw, 320px);
+    --fs-viewer-col: minmax(360px, 1fr);
+    --fs-right-col: clamp(480px, 40vw, 560px);
+  }
+}

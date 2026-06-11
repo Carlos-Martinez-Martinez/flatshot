@@ -35,15 +35,15 @@
   function lotInspectorCardHtml(options = {}) {
     const tone = options.tone || "";
     return `
-    <section class="inspector-summary ${escapeHtml(tone)}">
-      <div class="inspector-summary__main">
-        <span>Lote</span>
-        <strong>${escapeHtml(options.title || "")}</strong>
-        <small>${escapeHtml(options.meta || "")}</small>
-      </div>
-      <div class="inspector-summary__action">
-        <button type="button" data-action="open-batch-detail">Ver detalle</button>
-      </div>
+    <section class="inspector-summary panel-summary-card ${escapeHtml(tone)}">
+      <header class="panel-summary-card__head">
+        <div>
+          <span>Lote</span>
+          <strong>${escapeHtml(options.title || "")}</strong>
+        </div>
+        <button type="button" class="panel-link-button" data-action="open-batch-detail">Detalle</button>
+      </header>
+      ${options.meta ? `<small class="panel-summary-card__meta">${escapeHtml(options.meta)}</small>` : ""}
     </section>
   `;
   }
@@ -129,19 +129,18 @@
     }
     const hasLocal = Boolean(options.hasLocal);
     return `
-      <section class="inspector-compact-row selected-image-card">
-        <div>
-          <span>Imagen seleccionada</span>
-          <strong title="${escapeHtml(image.path || image.name)}">${escapeHtml(image.name)}</strong>
-          <small>${escapeHtml(options.detail || "")}</small>
-        </div>
-        <div class="selected-image-card__adjustment">
-          <span>Ajuste de esta imagen</span>
-          <strong>${escapeHtml(hasLocal ? "Personalizado" : "Igual que el lote")}</strong>
+      <section class="inspector-compact-row selected-image-card panel-summary-card">
+        <header class="panel-summary-card__head selected-image-card__head">
           <div>
-            <button type="button" data-action="open-image-adjustment">${escapeHtml(hasLocal ? "Editar" : "Personalizar")}</button>
-            ${hasLocal ? '<button type="button" data-action="reset-local-adjustment">Restablecer al lote</button>' : ""}
+            <span>Imagen seleccionada</span>
+            <strong title="${escapeHtml(image.path || image.name)}">${escapeHtml(image.name)}</strong>
+            <small>${escapeHtml(options.detail || "")}</small>
           </div>
+          <span class="selected-image-card__state">${escapeHtml(hasLocal ? "Personalizado" : "Lote")}</span>
+        </header>
+        <div class="selected-image-card__actions">
+          <button type="button" data-action="open-image-adjustment">${escapeHtml(hasLocal ? "Editar ajuste" : "Personalizar")}</button>
+          ${hasLocal ? '<button type="button" data-action="reset-local-adjustment">Restablecer</button>' : ""}
         </div>
     </section>
   `;
@@ -189,22 +188,29 @@
     const customizedLabel = customizedCount
       ? `${customizedCount} imagen${customizedCount === 1 ? "" : "es"} mantiene${customizedCount === 1 ? "" : "n"} su ajuste personalizado.`
       : "";
+    const appliedLabel = appliedCount
+      ? `${appliedCount} ${appliedCount === 1 ? "imagen" : "imágenes"}`
+      : options.statusLabel || "Global";
     return `
-    <section class="inspector-compact-row inspector-processing-card">
-      <div>
-        <span>Procesado</span>
-        <strong>Ajuste de imagen</strong>
-        <small>${escapeHtml(appliedCount ? `Aplicado a ${appliedCount} ${appliedCount === 1 ? "imagen" : "imágenes"}` : options.statusLabel || "Global")}</small>
-      </div>
+    <section class="inspector-compact-row inspector-processing-card panel-summary-card">
+      <header class="panel-summary-card__head">
+        <div>
+          <span>Procesado</span>
+          <strong>Ajuste del lote</strong>
+        </div>
+        <small>${escapeHtml(appliedLabel)}</small>
+      </header>
       <div class="processing-card__controls">
-        <label>
-          <span>Ajuste de imagen</span>
+        <label class="processing-card__select">
+          <span class="visually-hidden">Ajuste de imagen</span>
           <select data-image-adjustment-select aria-label="Ajuste de imagen del lote">
             ${optionsHtml}
           </select>
         </label>
-        <button type="button" data-action="open-advanced">Editar</button>
-        <button type="button" data-action="open-preset-editor">Gestionar ajustes</button>
+        <div class="processing-card__actions">
+          <button type="button" data-action="open-advanced">Editar</button>
+          <button type="button" data-action="open-preset-editor">Ajustes</button>
+        </div>
       </div>
       ${customizedLabel ? `
         <div class="processing-card__notice">

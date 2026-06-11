@@ -21,6 +21,23 @@ def test_settings_view_helper_loads_before_app_script():
     assert helper_index < app_index
 
 
+def test_adjustment_editor_actions_use_explicit_scope_labels():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+
+    assert 'data-action="cancel-adjustment-edit"' in html
+    assert 'data-action="apply-global-adjustment"' in html
+    assert "Aplicar al lote sin guardar" in html
+    assert 'data-action="save-preset"' in html
+    assert "Guardar ajuste" in html
+    assert 'data-action="save-preset-as-new"' in html
+    assert "Guardar como nuevo" in html
+    assert 'data-action="apply-local-adjustment"' in html
+    assert "Aplicar sólo a esta imagen" in html
+    assert 'data-action="save-local-adjustment-as-new"' in html
+    assert "Guardar como nuevo ajuste" in html
+    assert "Restablecer al ajuste del lote" in html
+
+
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
 def test_settings_view_renders_preset_and_state_contracts():
     script = f"""

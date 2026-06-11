@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>FlatShot Desktop</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./styles.css?v=20260611-output-flow" />
-    <link rel="stylesheet" href="./ux-foundation.css?v=20260611-output-flow" />
-    <link rel="stylesheet" href="./ux-refactor.css?v=20260611-output-flow" />
+    <link rel="stylesheet" href="./styles.css?v=20260611-adjustment-flow" />
+    <link rel="stylesheet" href="./ux-foundation.css?v=20260611-adjustment-flow" />
+    <link rel="stylesheet" href="./ux-refactor.css?v=20260611-adjustment-flow" />
   </head>
   <body>
     <main class="app-shell" aria-label="FlatShot nueva app">
@@ -283,11 +283,10 @@
                   <span>Gestionar ajuste</span>
                 </div>
                 <div class="button-row preset-actions">
+                  <button type="button" data-action="cancel-adjustment-edit">Cancelar</button>
+                  <button type="button" class="primary" data-action="apply-global-adjustment">Aplicar al lote sin guardar</button>
                   <button type="button" id="save-preset" data-action="save-preset">Guardar ajuste</button>
-                  <button type="button" id="export-presets" data-action="export-presets">Exportar ajustes</button>
-                  <button type="button" id="delete-preset" class="danger-subtle" data-action="delete-preset">Eliminar</button>
-                  <button type="button" data-action="reset-settings">Restaurar</button>
-                  <button type="button" data-action="close-preset-editor">Listo</button>
+                  <button type="button" data-action="save-preset-as-new">Guardar como nuevo</button>
                 </div>
               </div>
             </div>
@@ -408,7 +407,10 @@
                 <input class="number-input local-setting-number" type="number" min="-40" max="40" step="1" value="0" data-local-setting-number="blur_delta" aria-label="Desenfoque por imagen" />
               </label>
               <div class="local-adjustment__actions">
-                <button type="button" data-action="reset-local-adjustment">Restablecer imagen</button>
+                <button type="button" data-action="close-preset-editor">Cancelar</button>
+                <button type="button" class="primary" data-action="apply-local-adjustment">Aplicar sólo a esta imagen</button>
+                <button type="button" data-action="save-local-adjustment-as-new">Guardar como nuevo ajuste</button>
+                <button type="button" data-action="reset-local-adjustment">Restablecer al ajuste del lote</button>
               </div>
             </div>
           </details>
@@ -650,28 +652,28 @@
       </footer>
     </main>
 
-    <script src="./formatters.js?v=20260611-output-flow"></script>
-    <script src="./output-profiles.js?v=20260611-output-flow"></script>
-    <script src="./output-profile-view.js?v=20260611-output-flow"></script>
-    <script src="./export-payload.js?v=20260611-output-flow"></script>
-    <script src="./export-state.js?v=20260611-output-flow"></script>
-    <script src="./export-summary-view.js?v=20260611-output-flow"></script>
-    <script src="./export-result-view.js?v=20260611-output-flow"></script>
-    <script src="./export-preflight-view.js?v=20260611-output-flow"></script>
-    <script src="./top-status-view.js?v=20260611-output-flow"></script>
-    <script src="./preflight.js?v=20260611-output-flow"></script>
-    <script src="./batch-view.js?v=20260611-output-flow"></script>
-    <script src="./scan-state.js?v=20260611-output-flow"></script>
-    <script src="./export-confirm-view.js?v=20260611-output-flow"></script>
-    <script src="./empty-state-view.js?v=20260611-output-flow"></script>
-    <script src="./batch-detail-view.js?v=20260611-output-flow"></script>
-    <script src="./gallery.js?v=20260611-output-flow"></script>
-    <script src="./preview-view.js?v=20260611-output-flow"></script>
-    <script src="./preview-state.js?v=20260611-output-flow"></script>
-    <script src="./settings-view.js?v=20260611-output-flow"></script>
-    <script src="./inspector-output-view.js?v=20260611-output-flow"></script>
-    <script src="./inspector-review-view.js?v=20260611-output-flow"></script>
-    <script src="./inspector-context-view.js?v=20260611-output-flow"></script>
-    <script src="./app.js?v=20260611-output-flow"></script>
+    <script src="./formatters.js?v=20260611-adjustment-flow"></script>
+    <script src="./output-profiles.js?v=20260611-adjustment-flow"></script>
+    <script src="./output-profile-view.js?v=20260611-adjustment-flow"></script>
+    <script src="./export-payload.js?v=20260611-adjustment-flow"></script>
+    <script src="./export-state.js?v=20260611-adjustment-flow"></script>
+    <script src="./export-summary-view.js?v=20260611-adjustment-flow"></script>
+    <script src="./export-result-view.js?v=20260611-adjustment-flow"></script>
+    <script src="./export-preflight-view.js?v=20260611-adjustment-flow"></script>
+    <script src="./top-status-view.js?v=20260611-adjustment-flow"></script>
+    <script src="./preflight.js?v=20260611-adjustment-flow"></script>
+    <script src="./batch-view.js?v=20260611-adjustment-flow"></script>
+    <script src="./scan-state.js?v=20260611-adjustment-flow"></script>
+    <script src="./export-confirm-view.js?v=20260611-adjustment-flow"></script>
+    <script src="./empty-state-view.js?v=20260611-adjustment-flow"></script>
+    <script src="./batch-detail-view.js?v=20260611-adjustment-flow"></script>
+    <script src="./gallery.js?v=20260611-adjustment-flow"></script>
+    <script src="./preview-view.js?v=20260611-adjustment-flow"></script>
+    <script src="./preview-state.js?v=20260611-adjustment-flow"></script>
+    <script src="./settings-view.js?v=20260611-adjustment-flow"></script>
+    <script src="./inspector-output-view.js?v=20260611-adjustment-flow"></script>
+    <script src="./inspector-review-view.js?v=20260611-adjustment-flow"></script>
+    <script src="./inspector-context-view.js?v=20260611-adjustment-flow"></script>
+    <script src="./app.js?v=20260611-adjustment-flow"></script>
   </body>
 </html>

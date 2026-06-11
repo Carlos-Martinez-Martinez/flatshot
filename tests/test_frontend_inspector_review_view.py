@@ -159,7 +159,7 @@ const aspect = helpers.aspectInspectorCardHtml({{
 assert.equal(aspect.includes("Luz &lt;cenital&gt;"), true);
 assert.equal(aspect.includes("Procesado"), true);
 assert.equal(aspect.includes("Ajuste de imagen"), true);
-assert.equal(aspect.includes("Aplicado a 2 imagenes") || aspect.includes("Aplicado a 2 imágenes"), true);
+assert.equal(aspect.includes("Aplicado a 2 imágenes"), true);
 assert.equal(aspect.includes('data-action="open-advanced"'), true);
 assert.equal(aspect.includes('data-action="open-preset-editor"'), true);
 assert.equal(aspect.includes('data-action="apply-global-adjustment-to-overrides"'), true);

@@ -106,7 +106,7 @@
       <button type="button" data-action="next-image"${canNavigate ? "" : " disabled"}>Siguiente</button>
       ${issues.length ? '<button type="button" data-action="review-errors">Revisar avisos</button>' : ""}
       <button type="button" data-action="open-app-settings">Cambiar formato</button>
-      ${hasLocal ? '<button type="button" data-action="reset-local-adjustment">Quitar ajuste local</button>' : '<button type="button" data-action="open-advanced">Editar ajuste</button>'}
+      ${hasLocal ? '<button type="button" data-action="reset-local-adjustment">Restablecer al lote</button>' : '<button type="button" data-action="open-advanced">Editar ajuste</button>'}
     </div>
   `;
   }
@@ -194,7 +194,7 @@
       <div>
         <span>Procesado</span>
         <strong>Ajuste de imagen</strong>
-        <small>${escapeHtml(appliedCount ? `Aplicado a ${appliedCount} imagen${appliedCount === 1 ? "" : "es"}` : options.statusLabel || "Global")}</small>
+        <small>${escapeHtml(appliedCount ? `Aplicado a ${appliedCount} ${appliedCount === 1 ? "imagen" : "imágenes"}` : options.statusLabel || "Global")}</small>
       </div>
       <div class="processing-card__controls">
         <label>

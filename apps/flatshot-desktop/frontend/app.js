@@ -1934,6 +1934,33 @@ function resetCurrentImageOverride() {
   refreshPreviewAfterSettingChange();
 }
 
+function settingsWithLocalOverride(settings = state.settings, override = currentImageOverride()) {
+  const normalizedSettings = normalizeSettings(settings);
+  const local = normalizeLocalOverride(override);
+  const next = { ...normalizedSettings };
+  if (Object.prototype.hasOwnProperty.call(local, "size_delta")) {
+    next.scale_adjustment = Math.max(-30, Math.min(30, Number(next.scale_adjustment || 0) + local.size_delta));
+  }
+  if (Object.prototype.hasOwnProperty.call(local, "shadow_delta")) {
+    next.opacity = Math.max(0, Math.min(100, Number(next.opacity || 0) + local.shadow_delta));
+  }
+  if (Object.prototype.hasOwnProperty.call(local, "blur_delta")) {
+    next.blur = Math.max(0, Math.min(100, Number(next.blur || 0) + local.blur_delta));
+  }
+  return normalizeSettings(next);
+}
+
+function applyLocalAdjustmentOnly() {
+  const image = selectedImage();
+  if (!image) {
+    return;
+  }
+  state.presetEditorOpen = false;
+  state.localOverride = hasImageAdjustmentOverride(image);
+  state.statusText = state.localOverride ? "Ajuste aplicado sólo a esta imagen" : "La imagen usa el ajuste del lote";
+  render();
+}
+
 function isViewerNavigationAvailable() {
   return Boolean(selectedImage()) && !["empty", "error", "loading"].includes(state.previewStatus);
 }
@@ -2135,6 +2162,25 @@ function resetActivePresetSettings() {
   state.presetDirty = false;
   state.presetSource = "Global";
   state.statusText = "Ajuste restaurado";
+  refreshPreviewAfterSettingChange();
+}
+
+function cancelAdjustmentEdit() {
+  const preset = activePresetItem();
+  state.settings = normalizeSettings(preset?.settings || defaultSettings);
+  state.presetDirty = false;
+  state.presetSource = preset?.category || "Global";
+  state.presetEditorOpen = false;
+  state.statusText = "Cambios de ajuste descartados";
+  refreshPreviewAfterSettingChange();
+}
+
+function applyGlobalAdjustmentWithoutSaving() {
+  state.presetEditorOpen = false;
+  state.presetDirty = true;
+  state.presetSource = "Modificado";
+  state.exportStatus = isExportReady() ? "ready" : "blocked";
+  state.statusText = "Ajuste aplicado al lote sin guardar";
   refreshPreviewAfterSettingChange();
 }
 
@@ -5864,6 +5910,65 @@ async function saveCurrentPreset() {
   render();
 }
 
+async function saveAdjustmentAsNew(settings, options = {}) {
+  const fallbackName = options.defaultName || `${state.activePreset || "Ajuste"} copia`;
+  const name = window.prompt("Nombre del nuevo ajuste de imagen", fallbackName);
+  if (name === null) {
+    return;
+  }
+  const presetName = name.trim() || "Nuevo ajuste";
+  const presetSettings = normalizeSettings(settings);
+
+  if (state.bridgeMode === "bridge") {
+    state.statusText = "Guardando nuevo ajuste";
+    render();
+    try {
+      const payload = await bridgeRequest("/presets/save", {
+        method: "POST",
+        body: JSON.stringify({
+          name: presetName,
+          settings: presetSettings,
+        }),
+        timeoutMs: 8000,
+      });
+      applyBridgePresets(payload);
+    } catch (error) {
+      state.statusText = `No se pudo guardar el ajuste: ${bridgeErrorMessage(error)}`;
+      render();
+      return;
+    }
+  }
+
+  updatePresetCache(presetName, presetSettings);
+  state.activePreset = presetName;
+  state.settings = presetSettings;
+  state.presetDirty = false;
+  state.presetSource = "Global";
+  state.presetEditorOpen = false;
+  persistImageAdjustmentSelection();
+  state.exportStatus = isExportReady() ? "ready" : "blocked";
+  state.statusText = options.statusText || `Nuevo ajuste: ${presetName}`;
+  render();
+}
+
+function saveCurrentPresetAsNew() {
+  void saveAdjustmentAsNew(state.settings, {
+    defaultName: `${state.activePreset || "Ajuste"} copia`,
+    statusText: "Ajuste guardado como nuevo",
+  });
+}
+
+function saveCurrentLocalAdjustmentAsNew() {
+  const image = selectedImage();
+  if (!image) {
+    return;
+  }
+  void saveAdjustmentAsNew(settingsWithLocalOverride(state.settings, currentImageOverride(image)), {
+    defaultName: `${state.activePreset || "Ajuste"} personalizado`,
+    statusText: "Ajuste de imagen guardado como nuevo",
+  });
+}
+
 function presetsExportPayload() {
   const categories = {};
   const uncategorized = {};
@@ -6307,8 +6412,18 @@ function handleAction(action, target = null) {
     setViewerZoom(Math.round(currentViewerZoom() / 10) * 10 - 10);
   } else if (action === "reset-settings") {
     resetActivePresetSettings();
+  } else if (action === "cancel-adjustment-edit") {
+    cancelAdjustmentEdit();
+  } else if (action === "apply-global-adjustment") {
+    applyGlobalAdjustmentWithoutSaving();
   } else if (action === "save-preset") {
     void saveCurrentPreset();
+  } else if (action === "save-preset-as-new") {
+    saveCurrentPresetAsNew();
+  } else if (action === "apply-local-adjustment") {
+    applyLocalAdjustmentOnly();
+  } else if (action === "save-local-adjustment-as-new") {
+    saveCurrentLocalAdjustmentAsNew();
   } else if (action === "export-presets") {
     exportPresetCollection();
   } else if (action === "delete-preset") {

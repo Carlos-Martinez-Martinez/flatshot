@@ -94,7 +94,7 @@ assert.equal(helpers.bridgePreviewMeta({{ previewStatus: "ready", previewData: {
 assert.equal(helpers.bridgePreviewMeta({{ previewStatus: "ready", previewData: {{}}, activePreset: "Luz" }}), "Luz");
 assert.equal(helpers.bridgePreviewMeta({{ previewStatus: "empty" }}), "Vista pendiente");
 
-assert.equal(helpers.previewSettingsLabel({{ bridgeMode: "bridge", activePresetSource: "bridge", presetDirty: false }}), "Salida");
+assert.equal(helpers.previewSettingsLabel({{ bridgeMode: "bridge", activePresetSource: "bridge", presetDirty: false }}), "Ajuste");
 assert.equal(helpers.previewSettingsLabel({{ bridgeMode: "bridge", activePresetSource: "bridge", presetDirty: true }}), "Aspecto modificado");
 assert.equal(helpers.previewSettingsLabel({{ bridgeMode: "mock", activePresetSource: "mock", presetDirty: false }}), "Aspecto");
 

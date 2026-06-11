@@ -277,7 +277,7 @@ assert.deepEqual(helpers.outputProfileFooterState({{
   resetDisabled: true,
   saveDisabled: true,
   applyDisabled: false,
-  applyLabel: "Aplicar cambios al lote",
+  applyLabel: "Usar en este lote",
   noteClass: "settings-footer-note ",
   noteText: "Sin cambios pendientes",
 }});
@@ -311,7 +311,7 @@ assert.deepEqual(helpers.outputProfileFooterState({{
   resetDisabled: false,
   saveDisabled: false,
   applyDisabled: false,
-  applyLabel: "Guardar y aplicar",
+  applyLabel: "Guardar y activar",
   noteClass: "settings-footer-note warning",
   noteText: "Cambios sin guardar",
 }});
@@ -328,7 +328,7 @@ assert.deepEqual(helpers.outputProfileFooterState({{
   resetDisabled: false,
   saveDisabled: true,
   applyDisabled: true,
-  applyLabel: "Guardar y aplicar",
+  applyLabel: "Guardar y activar",
   noteClass: "settings-footer-note error",
   noteText: "Nombre requerido",
 }});

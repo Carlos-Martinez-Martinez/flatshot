@@ -20,7 +20,7 @@
     const summary = row.summary || "";
     return `
     <div class="active-output-row${active ? " is-primary" : ""}${enabled ? " is-enabled" : " is-disabled"}">
-      <label class="output-toggle" title="${escapeHtml(canToggle ? "Activar o desactivar salida" : "Debe quedar al menos una salida activa")}">
+      <label class="output-toggle" title="${escapeHtml(canToggle ? "Activar o desactivar formato" : "Guarda el formato para activarlo")}">
         <input type="checkbox" data-output-profile-enabled-id="${escapeHtml(row.id)}" ${enabled ? "checked" : ""} ${canToggle ? "" : "disabled"} />
         <span></span>
       </label>
@@ -36,9 +36,9 @@
   function outputTemporaryNoticeHtml() {
     return `
     <div class="temporary-output-notice">
-      <strong>Cambios temporales en esta salida</strong>
+      <strong>Cambios sin guardar en este formato</strong>
       <div>
-        <button type="button" data-action="save-output-current-profile">Guardar en preset</button>
+        <button type="button" data-action="save-output-current-profile">Guardar formato</button>
         <button type="button" data-action="save-output-as-new">Guardar como nuevo</button>
         <button type="button" data-action="discard-output-overrides">Descartar</button>
       </div>
@@ -51,20 +51,27 @@
     const activeCount = Number(options.activeCount) || 0;
     const totalFiles = Number(options.totalFiles) || 0;
     const readyLabel = options.readyLabel || "Sin imágenes listas";
+    const countLabel = activeCount === 1 ? "1 formato activo" : `${activeCount} formatos activos`;
+    const totalLabel = totalFiles
+      ? `${escapeHtml(options.formulaLabel || `${totalFiles} archivos previstos`)}`
+      : activeCount
+        ? "Pendiente de lote"
+        : "Selecciona al menos un formato";
     return `
     <section class="inspector-output-card">
       <div class="inspector-output-card__head">
-        <span>${escapeHtml(`Salidas activas · ${activeCount}`)}</span>
-        <strong>${escapeHtml(totalFiles ? `${totalFiles} archivos previstos` : "Pendiente de lote")}</strong>
+        <span>${escapeHtml("Exportación")}</span>
+        <strong>${escapeHtml(countLabel)}</strong>
+        <small>${totalLabel}</small>
         <small>${escapeHtml(readyLabel)}</small>
       </div>
-      <div class="active-output-list" aria-label="Salidas del lote">
+      <div class="active-output-list" aria-label="Formatos activos del lote">
         ${rows.map(outputProfileInlineRowHtml).join("")}
       </div>
       ${options.dirty ? outputTemporaryNoticeHtml() : ""}
       <div class="inspector-output-card__actions">
-        <button type="button" class="primary" data-action="edit-output">Editar salidas</button>
-        <button type="button" data-action="open-app-settings">Gestionar presets</button>
+        <button type="button" class="primary" data-action="open-app-settings">Gestionar formatos</button>
+        <button type="button" data-action="new-output-profile">Nuevo formato</button>
       </div>
     </section>
   `;

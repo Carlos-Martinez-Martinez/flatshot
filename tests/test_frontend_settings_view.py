@@ -55,8 +55,8 @@ assert.equal(helpers.presetSourceLabel({{ bridgePresetWarning: "", presetDirty: 
 assert.equal(helpers.presetSourceLabel({{ bridgePresetWarning: "", presetDirty: true }}), "Global · Modificado");
 assert.equal(helpers.presetSourceLabel({{ bridgePresetWarning: "Aviso", presetDirty: false }}), "Global · aviso");
 assert.equal(helpers.presetSourceLabel({{ bridgePresetWarning: "Aviso", presetDirty: true }}), "Global · Modificado · aviso");
-assert.equal(helpers.localAdjustmentText(true), "Ajuste local activo");
-assert.equal(helpers.localAdjustmentText(false), "Sin ajuste local");
+assert.equal(helpers.localAdjustmentText(true), "Personalizado");
+assert.equal(helpers.localAdjustmentText(false), "Igual que el lote");
 assert.equal(helpers.localSettingOutputText(3), "+3");
 assert.equal(helpers.localSettingOutputText(0), "0");
 assert.equal(helpers.localSettingOutputText(-2), "-2");
@@ -64,13 +64,13 @@ assert.equal(helpers.localSettingOutputText(-2), "-2");
 assert.deepEqual(helpers.savePresetButtonState(true), {{
   disabled: false,
   primary: true,
-  text: "Guardar cambios",
+  text: "Guardar ajuste",
   title: "Guardar el ajuste activo",
 }});
 assert.deepEqual(helpers.savePresetButtonState(false), {{
   disabled: true,
   primary: false,
-  text: "Guardar cambios",
+  text: "Guardar ajuste",
   title: "Sin cambios pendientes",
 }});
 assert.deepEqual(helpers.deletePresetButtonState(1), {{
@@ -125,7 +125,7 @@ assert.equal(helpers.exportStatusLabel({{ exportStatus: "completed", ready: true
 assert.equal(helpers.exportStatusLabel({{ exportStatus: "partial", ready: true }}), "Con errores");
 assert.equal(helpers.exportStatusLabel({{ exportStatus: "failed", ready: true }}), "Fallida");
 assert.equal(helpers.exportStatusLabel({{ exportStatus: "idle", ready: true }}), "Lista");
-assert.equal(helpers.exportStatusLabel({{ exportStatus: "idle", ready: false }}), "Configura salida");
+assert.equal(helpers.exportStatusLabel({{ exportStatus: "idle", ready: false }}), "Configura exportación");
 """
     result = subprocess.run(
         ["node", "-e", script],

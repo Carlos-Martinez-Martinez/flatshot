@@ -58,6 +58,7 @@ assert.equal(initial.includes("<strong>Selecciona una carpeta</strong>"), true);
 assert.equal(initial.includes("Carga un lote de imágenes PNG o JPG"), true);
 assert.equal(initial.includes('data-action="pick-bridge-folder"'), true);
 assert.equal(initial.includes('data-action="open-app-settings"'), true);
+assert.equal(initial.includes("Gestionar formatos"), true);
 assert.equal(initial.includes("manual-path-inline"), false);
 assert.equal(initial.includes("<svg"), true);
 

@@ -104,11 +104,29 @@ assert.equal(helpers.isExportReady({{
   validationIssues: [],
   hasBatch: true,
   exportableCount: 1,
+  activeOutputCount: 1,
+  hasImageAdjustment: true,
 }}), true);
 assert.equal(helpers.isExportReady({{
   validationIssues: [{{ level: "warning", title: "No hay PNG válidos" }}],
   hasBatch: true,
   exportableCount: 1,
+  activeOutputCount: 1,
+  hasImageAdjustment: true,
+}}), false);
+assert.equal(helpers.isExportReady({{
+  validationIssues: [],
+  hasBatch: true,
+  exportableCount: 1,
+  activeOutputCount: 0,
+  hasImageAdjustment: true,
+}}), false);
+assert.equal(helpers.isExportReady({{
+  validationIssues: [],
+  hasBatch: true,
+  exportableCount: 1,
+  activeOutputCount: 1,
+  hasImageAdjustment: false,
 }}), false);
 
 assert.equal(helpers.issueMentionsExistingOutput({{ title: "Archivos ya existentes", detail: "" }}), true);

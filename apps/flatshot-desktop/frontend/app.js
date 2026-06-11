@@ -31,7 +31,7 @@ const mockImages = [
     id: "img-002",
     folderId: "camisetas",
     name: "camiseta_002.png",
-    detail: "Ajuste local · 1.2 MB",
+    detail: "Personalizado · 1.2 MB",
     status: "adjusted",
     tone: "tone-b",
     exportable: true,
@@ -101,15 +101,19 @@ const inspectorContextViewHelpers = window.FlatShotInspectorContextView;
 const STORAGE_KEYS = {
   bridgeScanPath: "flatshot.bridgeScanPath",
   selectedImagePath: "flatshot.selectedImagePath",
+  imageAdjustmentPreset: "flatshot.selectedImageAdjustmentPreset",
   outputProfiles: "flatshot.outputProfiles",
   activeOutputProfile: "flatshot.activeOutputProfile",
+  activeOutputFormats: "flatshot.activeOutputFormatIds",
+  lastOutputFolder: "flatshot.lastOutputFolder",
+  exportPreferences: "flatshot.exportPreferences",
   sessionSnapshot: "flatshot.liveReloadSession.v1",
 };
 document.documentElement.classList.toggle("dev-mode", devMode);
 
 const statusLabels = {
   ready: "Lista",
-  adjusted: "Ajustada",
+  adjusted: "Personalizado",
   warning: "Aviso",
   error: "Error",
 };
@@ -281,11 +285,31 @@ const defaultOutputProfiles = [
     suffix: "_PRO",
   },
 ];
+const initialImageAdjustmentPreset = readPersistentValue(STORAGE_KEYS.imageAdjustmentPreset) || "Luz cenital";
 const initialOutputProfileId = readPersistentValue(STORAGE_KEYS.activeOutputProfile);
+const initialExportPreferences = readPersistentJson(STORAGE_KEYS.exportPreferences, {});
 const initialOutputProfiles = readOutputProfiles(initialOutputProfileId);
 const initialOutputProfile = initialOutputProfiles.find((profile) => profile.id === initialOutputProfileId)
   || initialOutputProfiles[0]
   || defaultOutputProfiles[0];
+const initialDestinationMode = initialExportPreferences.destinationMode === "custom"
+  ? "custom"
+  : initialOutputProfile.destinationMode;
+const initialDestinationValue = String(
+  initialExportPreferences.destinationValue
+  || readPersistentValue(STORAGE_KEYS.lastOutputFolder)
+  || initialOutputProfile.destinationValue
+  || (initialDestinationMode === "custom" ? "" : "_SALIDA_PRO")
+);
+const initialFormat = normalizeExportFormat(initialExportPreferences.format || initialOutputProfile.format);
+const initialSize = parseOutputSize(initialExportPreferences.size || outputProfileSize(initialOutputProfile)).normalized;
+const initialBackground = ["rgb230", "white", "transparent"].includes(initialExportPreferences.background)
+  ? initialExportPreferences.background
+  : initialOutputProfile.background;
+const initialNaming = String(initialExportPreferences.naming || initialOutputProfile.naming || "{original}{suffix}");
+const initialSuffix = initialExportPreferences.suffix === undefined || initialExportPreferences.suffix === null
+  ? initialOutputProfile.suffix
+  : String(initialExportPreferences.suffix);
 
 const state = {
   scenario: "initial",
@@ -312,11 +336,11 @@ const state = {
   inspectorCollapsed: false,
   outputEditMode: false,
   presetEditorOpen: false,
-  activePreset: "Luz cenital",
+  activePreset: initialImageAdjustmentPreset,
   presetOutputSettings: {},
   settings: { ...defaultSettings },
   presetDirty: false,
-  presetSource: "Salida",
+  presetSource: "Global",
   localOverride: false,
   exportStatus: "blocked",
   exportJobId: null,
@@ -336,13 +360,13 @@ const state = {
   activeOutputProfileId: initialOutputProfile.id,
   outputProfileEditorId: initialOutputProfile.id,
   outputProfileDraft: null,
-  destinationMode: initialOutputProfile.destinationMode,
-  destinationValue: initialOutputProfile.destinationValue,
-  format: initialOutputProfile.format,
-  size: outputProfileSize(initialOutputProfile),
-  background: initialOutputProfile.background,
-  naming: initialOutputProfile.naming,
-  suffix: initialOutputProfile.suffix,
+  destinationMode: initialDestinationMode,
+  destinationValue: initialDestinationValue,
+  format: initialFormat,
+  size: initialSize,
+  background: initialBackground,
+  naming: initialNaming,
+  suffix: initialSuffix,
   progress: 0,
   processed: 0,
   errors: [],
@@ -566,7 +590,7 @@ function restoreSessionSnapshot() {
     presetOutputSettings: safeObject(restored.presetOutputSettings),
     settings: normalizeSettings(restored.settings),
     presetDirty: Boolean(restored.presetDirty),
-    presetSource: String(restored.presetSource || "Salida"),
+    presetSource: String(restored.presetSource || "Global"),
     localOverride: Boolean(restored.localOverride),
     outputProfiles,
     activeOutputProfileId: outputProfiles.some((profile) => profile.id === restored.activeOutputProfileId)
@@ -627,7 +651,7 @@ function restoreSessionSnapshot() {
       : state.realImages.find((image) => image.id === restored.selectedImageId);
     const nextImage = selected || state.realImages[0];
     state.selectedImageId = nextImage?.id || null;
-    state.localOverride = hasCurrentImageOverride(nextImage) || nextImage?.status === "adjusted";
+    state.localOverride = hasImageAdjustmentOverride(nextImage);
     state.exportStatus = isExportReady() ? "ready" : "blocked";
     if (nextImage?.path) {
       writePersistentValue(STORAGE_KEYS.selectedImagePath, nextImage.path);
@@ -691,7 +715,12 @@ function normalizeExportFormat(value) {
 function readOutputProfiles(activeProfileId = "") {
   const saved = readPersistentJson(STORAGE_KEYS.outputProfiles, null);
   const profiles = Array.isArray(saved) ? saved : defaultOutputProfiles;
-  const normalized = normalizeOutputProfileList(profiles, activeProfileId);
+  const activeFormatIds = readPersistentJson(STORAGE_KEYS.activeOutputFormats, null);
+  const normalized = normalizeOutputProfileList(profiles, activeProfileId).map((profile) => (
+    Array.isArray(activeFormatIds)
+      ? { ...profile, enabled: activeFormatIds.includes(profile.id) }
+      : profile
+  ));
   return normalized.length ? normalized : normalizeOutputProfileList(defaultOutputProfiles, activeProfileId);
 }
 
@@ -739,7 +768,7 @@ function exportOutputProfiles() {
   };
 
   state.outputProfiles.forEach((profile) => {
-    if (!profile.enabled && profile.id !== activeId) {
+    if (!profile.enabled) {
       return;
     }
     if (profile.id === activeId && !outputMatchesProfile(profile)) {
@@ -750,10 +779,6 @@ function exportOutputProfiles() {
       pushProfile(profile);
     }
   });
-
-  if (!profiles.length) {
-    pushProfile(current);
-  }
   return profiles;
 }
 
@@ -766,6 +791,7 @@ function currentOutputProfileData() {
   return normalizeOutputProfile({
     id: state.activeOutputProfileId || uniqueOutputProfileId("actual"),
     name: activeOutputProfile()?.name || "Formato actual",
+    enabled: Boolean(activeOutputProfile()?.enabled),
     format: state.format,
     width: size.width,
     height: size.height,
@@ -795,6 +821,30 @@ function outputMatchesProfile(profile = activeOutputProfile()) {
 function persistOutputProfiles() {
   writePersistentJson(STORAGE_KEYS.outputProfiles, state.outputProfiles);
   writePersistentValue(STORAGE_KEYS.activeOutputProfile, state.activeOutputProfileId);
+  writePersistentJson(STORAGE_KEYS.activeOutputFormats, enabledOutputProfiles().map((profile) => profile.id));
+  persistExportPreferences();
+}
+
+function persistImageAdjustmentSelection() {
+  writePersistentValue(STORAGE_KEYS.imageAdjustmentPreset, state.activePreset);
+}
+
+function persistExportPreferences() {
+  const preferences = {
+    activeOutputProfileId: state.activeOutputProfileId,
+    activeOutputFormatIds: enabledOutputProfiles().map((profile) => profile.id),
+    destinationMode: state.destinationMode,
+    destinationValue: state.destinationValue,
+    format: state.format,
+    size: state.size,
+    background: state.background,
+    naming: state.naming,
+    suffix: state.suffix,
+  };
+  writePersistentJson(STORAGE_KEYS.exportPreferences, preferences);
+  if (String(state.destinationValue || "").trim()) {
+    writePersistentValue(STORAGE_KEYS.lastOutputFolder, state.destinationValue);
+  }
 }
 
 function applyOutputProfile(profileId, options = {}) {
@@ -803,7 +853,9 @@ function applyOutputProfile(profileId, options = {}) {
     return false;
   }
   state.activeOutputProfileId = profile.id;
-  profile.enabled = true;
+  if (options.enable === true) {
+    profile.enabled = true;
+  }
   state.format = profile.format;
   state.size = outputProfileSize(profile);
   state.background = profile.background;
@@ -813,7 +865,7 @@ function applyOutputProfile(profileId, options = {}) {
   state.naming = profile.naming;
   state.suffix = profile.suffix;
   state.exportStatus = isExportReady() ? "ready" : "blocked";
-  state.statusText = options.statusText || `Formato: ${profile.name}`;
+  state.statusText = options.statusText || `Formato principal: ${profile.name}`;
   persistOutputProfiles();
   if (options.render !== false) {
     render();
@@ -826,25 +878,13 @@ function setOutputProfileEnabled(profileId, enabled) {
   if (!profile) {
     return;
   }
-  const currentlyEnabled = profile.enabled;
-  if (!enabled && currentlyEnabled && enabledOutputProfiles().length <= 1) {
-    state.statusText = "Debe quedar al menos una salida activa";
-    render();
-    return;
-  }
-
   profile.enabled = Boolean(enabled);
   if (profile.enabled) {
-    applyOutputProfile(profile.id, { render: false, statusText: `Salida activa: ${profile.name}` });
-  } else if (state.activeOutputProfileId === profile.id) {
-    const next = enabledOutputProfiles()[0];
-    if (next) {
-      applyOutputProfile(next.id, { render: false, statusText: `Salida principal: ${next.name}` });
-    }
+    applyOutputProfile(profile.id, { enable: false, render: false, statusText: `Formato activo: ${profile.name}` });
   }
 
   state.exportStatus = isExportReady() ? "ready" : "blocked";
-  state.statusText = profile.enabled ? `Salida activa: ${profile.name}` : `Salida desactivada: ${profile.name}`;
+  state.statusText = profile.enabled ? `Formato activo: ${profile.name}` : `Formato desactivado: ${profile.name}`;
   persistOutputProfiles();
   render();
 }
@@ -893,7 +933,7 @@ function activePresetItems() {
   }
   return mockPresets.map((name) => ({
     name,
-    category: devMode ? "Demo" : "Ajuste local",
+    category: devMode ? "Demo" : "Ajuste",
     categoryId: devMode ? "mock" : "fallback",
     settings: normalizeSettings(mockPresetSettings[name]),
     source: devMode ? "demo" : "fallback",
@@ -1030,6 +1070,12 @@ function validationIssues() {
   if (exportableImages().length === 0 && state.batch === "ready") {
     issues.push({ level: "error", title: "Sin imágenes exportables", detail: "Revisa los errores." });
   }
+  if (!String(state.activePreset || "").trim()) {
+    issues.push({ level: "error", title: "Sin ajuste de imagen", detail: "Selecciona un ajuste de imagen." });
+  }
+  if (exportOutputProfiles().length === 0) {
+    issues.push({ level: "error", title: "Sin formatos activos", detail: "Selecciona al menos un formato de salida." });
+  }
   if (!state.naming.trim()) {
     issues.push({ level: "error", title: "Nombre de archivo vacío", detail: "Define una plantilla de nombre." });
   }
@@ -1037,12 +1083,11 @@ function validationIssues() {
     issues.push({ level: "error", title: "Carpeta de salida sin configurar", detail: "Elige una carpeta de salida." });
   }
   exportOutputProfiles()
-    .filter((profile) => profile.id !== state.activeOutputProfileId)
     .forEach((profile) => {
       outputProfileValidation(outputProfileRawFromProfile(profile)).errors.forEach((message) => {
         issues.push({
           level: "error",
-          title: "Salida sin configurar",
+          title: "Formato incompleto",
           detail: `${profile.name}: ${message}`,
         });
       });
@@ -1214,6 +1259,8 @@ function lowResolutionImageCount() {
 
 function isExportReady() {
   return preflightHelpers.isExportReady({
+    activeOutputCount: exportOutputCount(),
+    hasImageAdjustment: Boolean(String(state.activePreset || "").trim()),
     validationIssues: validationIssues(),
     hasBatch: hasBatch(),
     exportableCount: exportableImages().length,
@@ -1715,7 +1762,7 @@ function selectImage(imageId) {
   rememberSelectedImage(image);
   clearTimers();
   state.selectedImageId = image.id;
-  state.localOverride = hasCurrentImageOverride(image) || image.status === "adjusted";
+  state.localOverride = hasImageAdjustmentOverride(image);
   state.fitZoom = 100;
   resetViewerPan();
   if (image.source === "bridge") {
@@ -1837,6 +1884,24 @@ function hasCurrentImageOverride(image = selectedImage()) {
   return Object.keys(currentImageOverride(image)).length > 0;
 }
 
+function hasImageAdjustmentOverride(image) {
+  return hasCurrentImageOverride(image) || image?.status === "adjusted";
+}
+
+function imageAdjustmentOverrideCount(images = activeImages()) {
+  return images.filter(hasImageAdjustmentOverride).length;
+}
+
+function resetAllImageOverrides() {
+  state.imageOverrides = {};
+  state.realImages = state.realImages.map((image) =>
+    image.status === "adjusted" ? { ...image, status: "ready" } : image
+  );
+  state.localOverride = false;
+  state.statusText = "Ajuste del lote aplicado a todas las imágenes";
+  refreshPreviewAfterSettingChange();
+}
+
 function setCurrentImageOverrideValue(key, value) {
   const image = selectedImage();
   const overrideKey = imageOverrideKey(image);
@@ -1854,7 +1919,7 @@ function setCurrentImageOverrideValue(key, value) {
     delete state.imageOverrides[overrideKey];
   }
   state.localOverride = Object.keys(normalized).length > 0;
-  state.statusText = state.localOverride ? "Ajuste local activo" : "Ajuste local quitado";
+  state.statusText = state.localOverride ? "Ajuste personalizado" : "Ajuste de imagen restablecido";
   refreshPreviewAfterSettingChange();
 }
 
@@ -1865,7 +1930,7 @@ function resetCurrentImageOverride() {
   }
   delete state.imageOverrides[key];
   state.localOverride = false;
-  state.statusText = "Ajuste local quitado";
+  state.statusText = "Ajuste de imagen restablecido";
   refreshPreviewAfterSettingChange();
 }
 
@@ -2047,16 +2112,15 @@ function applyPresetSettings(name, options = {}) {
   }
   state.activePreset = preset.name;
   state.settings = normalizeSettings(preset.settings);
-  if (state.presetOutputSettings[preset.name]) {
-    Object.assign(state, state.presetOutputSettings[preset.name]);
-  }
   state.presetDirty = false;
-  state.presetSource = preset.category || "Salida";
+  state.presetSource = preset.category || "Global";
+  persistImageAdjustmentSelection();
   const advanced = $("#advanced-settings");
   if (advanced) {
     advanced.open = false;
   }
   state.statusText = options.statusText || `Ajuste: ${preset.name}`;
+  state.exportStatus = isExportReady() ? "ready" : "blocked";
   if (options.refresh !== false) {
     refreshPreviewAfterSettingChange();
   }
@@ -2069,7 +2133,7 @@ function resetActivePresetSettings() {
   }
   state.settings = { ...defaultSettings };
   state.presetDirty = false;
-  state.presetSource = "Salida";
+  state.presetSource = "Global";
   state.statusText = "Ajuste restaurado";
   refreshPreviewAfterSettingChange();
 }
@@ -2113,7 +2177,7 @@ function startExport(options = {}) {
   clearTimers();
   if (!isExportReady()) {
     state.exportStatus = "blocked";
-    state.statusText = validationIssues()[0]?.title || "Configura salida";
+    state.statusText = validationIssues()[0]?.title || "Configura exportación";
     render();
     return;
   }
@@ -2621,7 +2685,7 @@ function applyBridgeScanResult(response) {
     Object.assign(state, scanStateHelpers.scanReadyState({
       defaultViewMode: DEFAULT_VIEW_MODE,
       imageCount: state.realImages.length,
-      localOverride: hasCurrentImageOverride(selectedImage) || selectedImage.status === "adjusted",
+      localOverride: hasImageAdjustmentOverride(selectedImage),
       scanIssueCount: state.scanIssues.length,
       selectedImageId: selectedImage.id,
     }));
@@ -2783,7 +2847,7 @@ function reviewWarnings() {
 
 function reviewOutput() {
   state.inspectorTab = "output";
-  state.statusText = firstBlockingIssue()?.title || "Revisa salida";
+  state.statusText = firstBlockingIssue()?.title || "Revisa exportación";
   render();
 }
 
@@ -3134,7 +3198,7 @@ function renderTop() {
     const showFormat = state.batch !== "none" && state.batch !== "scanning";
     formatButton.hidden = !showFormat;
     formatButton.disabled = !showFormat || state.exportStatus === "running";
-    formatButton.title = "Editar salida";
+    formatButton.title = "Formatos de salida";
   }
   const resetButton = $(".top-reset-action");
   if (resetButton) {
@@ -3364,6 +3428,9 @@ function renderBatchSummary() {
 
 function batchOutputLine() {
   const profiles = exportOutputProfiles();
+  if (!profiles.length) {
+    return "Sin formatos activos";
+  }
   return batchViewHelpers.batchOutputLine({
     background: state.background,
     format: state.format,
@@ -3375,6 +3442,9 @@ function batchOutputLine() {
 }
 
 function outputProfilesSummaryLabel(profiles = exportOutputProfiles()) {
+  if (!profiles.length) {
+    return "Sin formatos activos";
+  }
   return batchViewHelpers.outputProfilesSummaryLabel({
     backgroundLabel: backgroundLabel(state.background),
     format: state.format,
@@ -3385,6 +3455,9 @@ function outputProfilesSummaryLabel(profiles = exportOutputProfiles()) {
 
 function batchDestinationLine() {
   const profiles = exportOutputProfiles();
+  if (!profiles.length) {
+    return "Sin destino activo";
+  }
   return batchViewHelpers.batchDestinationLine({
     destinationMode: state.destinationMode,
     destinationValue: state.destinationValue,
@@ -3444,7 +3517,7 @@ function exportConfirmHtml(risks) {
   const exportable = counts.exportableImages;
   const summaryRows = [
     ["Imágenes", `${exportable} exportable${exportable === 1 ? "" : "s"}`],
-    ["Salidas", outputProfilesSummaryLabel()],
+    ["Formatos", outputProfilesSummaryLabel()],
     ["Destino", destinationFallbackLabel()],
     ["Nombre", namingExample()],
   ];
@@ -3519,8 +3592,8 @@ function bridgeStatusLabel() {
 function renderBatch() {
   const images = activeImages();
   const counts = batchCounts();
-  const adjusted = images.filter((image) => image.status === "adjusted").length;
-  const valid = images.filter((image) => image.status === "ready" || image.status === "adjusted").length;
+  const adjusted = imageAdjustmentOverrideCount(images);
+  const valid = images.filter((image) => image.status === "ready" || hasImageAdjustmentOverride(image)).length;
   const warnings = images.filter((image) => image.status === "warning").length;
   const errors = images.filter((image) => image.status === "error" || exportItemState(image)?.status === "error").length;
   const ignored = counts.ignoredFiles;
@@ -3879,7 +3952,7 @@ function applyThumbnailDomStatus(imageId, status, resolvedSrc = "") {
 
 function imageItemHtml(image) {
   const exportState = exportItemState(image);
-  const imageStatus = hasCurrentImageOverride(image) ? "adjusted" : image.status;
+  const imageStatus = hasImageAdjustmentOverride(image) ? "adjusted" : image.status;
   const thumbnailSrc = imageThumbnailSrc(image);
   return galleryHelpers.imageItemHtml({
     exportState,
@@ -4270,7 +4343,7 @@ function renderSettings() {
 
   const image = selectedImage();
   const localOverride = currentImageOverride(image);
-  const localActive = Object.keys(localOverride).length > 0 || image?.status === "adjusted";
+  const localActive = hasImageAdjustmentOverride(image);
   $("#local-adjustment").classList.toggle("active", localActive);
   $("#local-adjustment-text").textContent = settingsViewHelpers.localAdjustmentText(localActive);
   localOverrideKeys.forEach((key) => {
@@ -4323,7 +4396,7 @@ function reviewPanelHtml() {
       emptyStateHtml: emptyStateHtml({
       variant: "inline",
       title: "Selecciona una imagen",
-      detail: "Elige una miniatura para revisar la salida.",
+      detail: "Elige una miniatura para revisar la imagen.",
       actionLabel: activeImages().length ? "Seleccionar primera imagen" : "",
       action: activeImages().length ? "select-first-image" : "",
     }),
@@ -4333,7 +4406,7 @@ function reviewPanelHtml() {
   const reviewState = imageReviewState(image);
   const issues = imageReviewIssues(image);
   const outputName = outputNameForImage(image);
-  const hasLocal = hasCurrentImageOverride(image) || image.status === "adjusted";
+  const hasLocal = hasImageAdjustmentOverride(image);
   const images = activeImages();
   const selectedIndex = images.findIndex((item) => item.id === image.id);
   const canNavigate = images.length > 1;
@@ -4364,7 +4437,7 @@ function lotInspectorSummaryHtml() {
 
 function imageReviewState(image) {
   const exportState = exportItemState(image);
-  const status = exportState?.status || (hasCurrentImageOverride(image) ? "adjusted" : image.status);
+  const status = exportState?.status || (hasImageAdjustmentOverride(image) ? "adjusted" : image.status);
   if (status === "error") {
     return {
       tone: "error",
@@ -4402,7 +4475,7 @@ function imageReviewIssues(image) {
     issues.push({
       level: "error",
       title: "Imagen no exportable",
-      detail: image.detail || "Esta imagen quedará fuera de la salida.",
+      detail: image.detail || "Esta imagen quedará fuera de la exportación.",
     });
   }
   if (exportState?.status === "error") {
@@ -4541,10 +4614,10 @@ function inspectorCardsHtml() {
 
   return [
     lotInspectorCardHtml(),
+    aspectInspectorCardHtml(),
     outputInspectorCardHtml(),
     selectedImageInspectorCardHtml(),
     issuesInspectorCardHtml(),
-    aspectInspectorCardHtml(),
   ].filter(Boolean).join("");
 }
 
@@ -4552,9 +4625,11 @@ function lotInspectorCardHtml() {
   const counts = batchCounts();
   const visible = getVisibleAppState();
   const ignored = counts.ignoredFiles ? "Ignorados técnicos en detalle" : "";
+  const customCount = imageAdjustmentOverrideCount();
+  const custom = customCount ? `${customCount} imagen${customCount === 1 ? "" : "es"} con ajuste propio` : "";
   const meta = state.batch === "empty"
     ? `${readyImagesText(0)}${ignored ? ` · ${ignored}` : ""}`
-    : `${readyImagesText(counts.exportableImages)}${ignored ? ` · ${ignored}` : ""}`;
+    : `${readyImagesText(counts.exportableImages)}${custom ? ` · ${custom}` : ""}${ignored ? ` · ${ignored}` : ""}`;
   const tone = counts.blockingErrors ? "error" : counts.nonBlockingWarnings ? "warning" : "";
   return inspectorReviewViewHelpers.lotInspectorCardHtml({
     meta,
@@ -4570,18 +4645,19 @@ function outputInspectorCardHtml() {
   const totalFiles = exportable * activeProfiles.length;
   const dirty = !outputMatchesProfile(activeOutputProfile());
   const rows = profiles.map((profile) => {
-    const enabled = Boolean(profile.enabled || profile.id === state.activeOutputProfileId);
+    const enabled = Boolean(profile.enabled);
     return {
       id: profile.id,
       name: profile.name,
       enabled,
       active: profile.id === state.activeOutputProfileId,
-      canToggle: enabledOutputProfiles().length > 1 || !enabled,
+      canToggle: true,
       summary: outputProfileSummaryLine(profile),
     };
   });
   return inspectorOutputViewHelpers.outputInspectorCardHtml({
     activeCount: activeProfiles.length,
+    formulaLabel: `${exportable} ${exportable === 1 ? "imagen" : "imágenes"} x ${activeProfiles.length} ${activeProfiles.length === 1 ? "formato" : "formatos"} = ${totalFiles} archivos`,
     totalFiles,
     readyLabel: exportable ? readyImagesText(exportable) : "Sin imágenes listas",
     rows,
@@ -4590,20 +4666,20 @@ function outputInspectorCardHtml() {
 }
 
 function outputProfileInlineRowHtml(profile) {
-  const enabled = Boolean(profile.enabled || profile.id === state.activeOutputProfileId);
+  const enabled = Boolean(profile.enabled);
   return inspectorOutputViewHelpers.outputProfileInlineRowHtml({
     id: profile.id,
     name: profile.name,
     enabled,
     active: profile.id === state.activeOutputProfileId,
-    canToggle: enabledOutputProfiles().length > 1 || !enabled,
+    canToggle: true,
     summary: outputProfileSummaryLine(profile),
   });
 }
 
 function selectedImageInspectorCardHtml() {
   const image = selectedImage();
-  const hasLocal = image ? hasCurrentImageOverride(image) || image.status === "adjusted" : false;
+  const hasLocal = image ? hasImageAdjustmentOverride(image) : false;
   return inspectorReviewViewHelpers.selectedImageInspectorCardHtml({
     hasReadyBatch: hasBatch() && state.batch === "ready",
     image,
@@ -4632,9 +4708,14 @@ function issuesInspectorCardHtml() {
 }
 
 function aspectInspectorCardHtml() {
+  const images = activeImages();
+  const customizedCount = imageAdjustmentOverrideCount(images);
   return inspectorReviewViewHelpers.aspectInspectorCardHtml({
     hasReadyBatch: hasBatch() && state.batch === "ready",
     activePreset: state.activePreset,
+    adjustments: activePresetItems(),
+    appliedCount: images.length,
+    customizedCount,
     statusLabel: state.presetDirty ? "Global · Modificado" : "Global",
   });
 }
@@ -4739,7 +4820,7 @@ function renderExport() {
   const ready = isExportReady();
   const destinationText = destinationCompactLabel();
   const warningCount = visibleWarningCount();
-  $("#export-readiness").textContent = state.outputEditMode ? "Editar salida" : outputProfileDisplayName();
+  $("#export-readiness").textContent = state.outputEditMode ? "Editar formato" : outputProfileDisplayName();
   $("#export-count").textContent = outputCount ? `${outputCount} archivos` : "Pendiente";
   $("#export-count").classList.toggle("dirty", !ready);
   const warningsReadiness = $("#warnings-readiness");
@@ -4768,12 +4849,14 @@ function renderExport() {
       size: outputProfileSize(profile),
       destinationLabel: profileDestinationLabel(profile),
     })),
-    formatLabel: hasMultipleOutputs ? batchViewHelpers.outputCountLabel(activeOutputProfiles.length) : state.format,
-    sizeLabel: hasMultipleOutputs ? "Por salida" : state.size.replace("x", " × "),
-    backgroundLabel: hasMultipleOutputs ? "Por salida" : backgroundLabel(state.background),
+    formatLabel: activeOutputProfiles.length
+      ? hasMultipleOutputs ? batchViewHelpers.outputCountLabel(activeOutputProfiles.length) : state.format
+      : "Sin formato activo",
+    sizeLabel: activeOutputProfiles.length ? hasMultipleOutputs ? "Por formato" : state.size.replace("x", " × ") : "-",
+    backgroundLabel: activeOutputProfiles.length ? hasMultipleOutputs ? "Por formato" : backgroundLabel(state.background) : "-",
     destinationText,
-    namingLabel: hasMultipleOutputs ? "Por salida" : namingHumanLabel(),
-    example: hasMultipleOutputs ? outputNameForProfile(activeOutputProfiles[0]) : namingExample(),
+    namingLabel: activeOutputProfiles.length ? hasMultipleOutputs ? "Por formato" : namingHumanLabel() : "-",
+    example: activeOutputProfiles.length ? hasMultipleOutputs ? outputNameForProfile(activeOutputProfiles[0]) : namingExample() : "-",
     warningSummaryHtml: warningSummary,
     temporaryNoticeHtml: !outputMatchesProfile(activeOutputProfile()) ? inspectorOutputViewHelpers.outputTemporaryNoticeHtml() : "",
   });
@@ -4797,12 +4880,15 @@ function renderOutputProfileSelect() {
 
 function outputProfileDisplayName() {
   const profiles = exportOutputProfiles();
+  if (!profiles.length) {
+    return "Sin formatos activos";
+  }
   if (profiles.length > 1) {
     return batchViewHelpers.outputCountLabel(profiles.length);
   }
   const profile = activeOutputProfile();
   if (!profile || !outputMatchesProfile(profile)) {
-    return "Salida personalizada";
+    return "Formato personalizado";
   }
   return profile.name;
 }
@@ -4949,7 +5035,7 @@ function newOutputProfile() {
     ...source,
     id,
     name: "Nuevo formato",
-    enabled: true,
+    enabled: false,
   };
   state.appSettingsOpen = true;
   state.statusText = "Nuevo formato de salida";
@@ -4967,7 +5053,7 @@ function duplicateOutputProfile() {
     ...source,
     id,
     name: `${source.name || "Formato"} copia`,
-    enabled: true,
+    enabled: false,
   };
   state.appSettingsOpen = true;
   state.statusText = "Formato duplicado";
@@ -5017,7 +5103,7 @@ function applyManagedOutputProfile() {
     return;
   }
   state.appSettingsOpen = false;
-  applyOutputProfile(saved.id, { statusText: `Salida: ${saved.name}` });
+  applyOutputProfile(saved.id, { enable: true, statusText: `Formato activo: ${saved.name}` });
 }
 
 function deleteManagedOutputProfile() {
@@ -5047,7 +5133,6 @@ function deleteManagedOutputProfile() {
   if (state.activeOutputProfileId === draft.id) {
     const next = state.outputProfiles[0];
     state.activeOutputProfileId = next.id;
-    next.enabled = true;
     state.format = next.format;
     state.size = outputProfileSize(next);
     state.background = next.background;
@@ -5085,13 +5170,13 @@ function openAppSettings() {
     ? activeProfile
     : {
       ...currentOutputProfileData(),
-      id: uniqueOutputProfileId("salida-personalizada", Date.now()),
-      name: "Salida personalizada",
+      id: uniqueOutputProfileId("formato-personalizado", Date.now()),
+      name: "Formato personalizado",
     };
   state.appSettingsOpen = true;
   state.outputProfileEditorId = profile.id;
   state.outputProfileDraft = { ...profile };
-  state.statusText = "Configuración de salida";
+  state.statusText = "Formatos de salida";
   render();
   queueModalFocus("#app-settings-modal", "[data-action='apply-output-profile']");
 }
@@ -5435,7 +5520,7 @@ function renderAppSettings() {
     const active = profile.id === state.activeOutputProfileId;
     const enabled = profile.enabled;
     const unsaved = !state.outputProfiles.some((item) => item.id === profile.id);
-    const canToggle = !unsaved && (enabledOutputProfiles().length > 1 || !enabled);
+    const canToggle = !unsaved;
     return outputProfileViewHelpers.outputProfileManagerRowHtml({
       profile,
       selected,
@@ -5638,6 +5723,9 @@ function exportResultActionsHtml(issues, destinations) {
 
 function destinationFallbackLabel() {
   const profiles = exportOutputProfiles();
+  if (!profiles.length) {
+    return "Sin formato activo";
+  }
   return outputProfileViewHelpers.destinationFallbackLabel({
     destinationMode: state.destinationMode,
     destinationValue: state.destinationValue,
@@ -5658,7 +5746,7 @@ function beginOutputEdit() {
   state.outputEditMode = true;
   state.presetEditorOpen = false;
   state.inspectorTab = "output";
-  state.statusText = "Editando salida";
+  state.statusText = "Editando formato";
   render();
 }
 
@@ -5666,7 +5754,8 @@ function applyOutputEdit() {
   state.outputDraft = null;
   state.outputEditMode = false;
   state.exportStatus = isExportReady() ? "ready" : "blocked";
-  state.statusText = "Salida actualizada";
+  state.statusText = "Formato aplicado al lote";
+  persistExportPreferences();
   render();
 }
 
@@ -5678,6 +5767,7 @@ function cancelOutputEdit() {
   state.outputEditMode = false;
   state.exportStatus = isExportReady() ? "ready" : "blocked";
   state.statusText = "Edición cancelada";
+  persistExportPreferences();
   render();
 }
 
@@ -5692,28 +5782,28 @@ function saveCurrentOutputProfile() {
       ...current,
       id: state.activeOutputProfileId,
       name: state.outputProfiles[index].name || current.name,
-      enabled: true,
+      enabled: Boolean(state.outputProfiles[index].enabled),
     };
   }
   state.outputProfiles = normalizeOutputProfileList(state.outputProfiles, state.activeOutputProfileId);
   state.outputDraft = null;
   state.outputEditMode = false;
   state.exportStatus = isExportReady() ? "ready" : "blocked";
-  state.statusText = "Preset de salida guardado";
+  state.statusText = "Formato de salida guardado";
   persistOutputProfiles();
   render();
 }
 
 function saveCurrentOutputAsNewProfile() {
-  const sourceName = activeOutputProfile()?.name || "Salida";
-  const name = window.prompt("Nombre del nuevo preset de salida", `${sourceName} copia`);
+  const sourceName = activeOutputProfile()?.name || "Formato";
+  const name = window.prompt("Nombre del nuevo formato de salida", `${sourceName} copia`);
   if (name === null) {
     return;
   }
   const profile = normalizeOutputProfile({
     ...currentOutputProfileData(),
-    id: uniqueOutputProfileId(name || "salida", Date.now()),
-    name: name.trim() || "Nueva salida",
+    id: uniqueOutputProfileId(name || "formato", Date.now()),
+    name: name.trim() || "Nuevo formato",
     enabled: true,
   });
   state.outputProfiles = normalizeOutputProfileList([...state.outputProfiles, profile], profile.id);
@@ -5723,7 +5813,7 @@ function saveCurrentOutputAsNewProfile() {
   state.outputDraft = null;
   state.outputEditMode = false;
   persistOutputProfiles();
-  state.statusText = `Nuevo preset: ${profile.name}`;
+  state.statusText = `Nuevo formato: ${profile.name}`;
   render();
 }
 
@@ -5734,22 +5824,12 @@ function discardOutputOverrides() {
   }
   state.outputDraft = null;
   state.outputEditMode = false;
-  applyOutputProfile(profile.id, { statusText: "Cambios temporales descartados" });
+  applyOutputProfile(profile.id, { statusText: "Cambios sin guardar descartados" });
 }
 
 async function saveCurrentPreset() {
   const presetName = state.activePreset;
   const presetSettings = normalizeSettings(state.settings);
-  const outputSettings = {
-    format: state.format,
-    size: state.size,
-    background: state.background,
-    destinationMode: state.destinationMode,
-    destinationValue: state.destinationValue,
-    naming: state.naming,
-    suffix: state.suffix,
-  };
-  state.presetOutputSettings[presetName] = outputSettings;
 
   if (state.bridgeMode === "bridge") {
     state.statusText = "Guardando ajuste";
@@ -5775,7 +5855,8 @@ async function saveCurrentPreset() {
   updatePresetCache(presetName, presetSettings);
 
   state.presetDirty = false;
-  state.presetSource = "Salida";
+  state.presetSource = "Global";
+  persistImageAdjustmentSelection();
   state.outputDraft = null;
   state.outputEditMode = false;
   state.exportStatus = isExportReady() ? "ready" : "blocked";
@@ -5946,7 +6027,7 @@ function renderAccessibilityHints() {
   setControlHint($("#top-primary-action"), topPrimaryHint(visible));
   setControlHint($("#top-secondary-action"), visible.secondaryAction ? `${visible.secondaryAction.label}. Atajo: Ctrl+E si exporta.` : "");
   setControlHint($("[data-action='open-batch-detail']"), "Abrir detalle del lote");
-  setControlHint($("[data-action='open-app-settings']"), "Abrir formatos y salida");
+  setControlHint($("[data-action='open-app-settings']"), "Abrir formatos de salida");
   setControlHint($("[data-action='toggle-inspector']"), "Mostrar u ocultar detalle técnico");
   setControlHint($("#image-search"), "Buscar por nombre, referencia o ruta");
   setControlHint($("#image-search-clear"), "Limpiar búsqueda");
@@ -6155,6 +6236,13 @@ function handleAction(action, target = null) {
     state.inspectorTab = "advanced";
     state.statusText = "Ajustes";
     render();
+  } else if (action === "open-image-adjustment") {
+    state.inspectorTab = "advanced";
+    state.presetEditorOpen = false;
+    state.statusText = "Ajuste de esta imagen";
+    render();
+  } else if (action === "apply-global-adjustment-to-overrides") {
+    resetAllImageOverrides();
   } else if (action === "close-inspector-subview") {
     state.inspectorTab = "review";
     state.statusText = getVisibleAppState().nextStep || state.statusText;
@@ -6227,7 +6315,7 @@ function handleAction(action, target = null) {
     void deleteActivePreset();
   } else if (action === "toggle-local-adjustment") {
     state.localOverride = !state.localOverride;
-    state.statusText = state.localOverride ? "Ajuste local activo" : "Ajuste local quitado";
+    state.statusText = state.localOverride ? "Ajuste personalizado" : "Igual que el lote";
     render();
   } else if (action === "reset-local-adjustment") {
     resetCurrentImageOverride();
@@ -6517,6 +6605,10 @@ document.addEventListener("change", (event) => {
     setOutputProfileEnabled(event.target.dataset.outputProfileEnabledId, event.target.checked);
     return;
   }
+  if (event.target.matches?.("[data-image-adjustment-select]")) {
+    applyPresetSettings(event.target.value);
+    return;
+  }
   if (event.target.closest?.("#output-profile-form")) {
     updateOutputProfileDraftFromForm();
     renderOutputProfileModalState();
@@ -6626,6 +6718,7 @@ function updateLocalOverrideFromNumberInput(input, options = {}) {
 $("#format-select").addEventListener("change", (event) => {
   state.format = normalizeExportFormat(event.target.value);
   state.statusText = `Formato: ${state.format}`;
+  persistExportPreferences();
   render();
 });
 
@@ -6643,6 +6736,7 @@ $("#size-select").addEventListener("input", (event) => {
 $("#size-select").addEventListener("change", (event) => {
   state.size = parseOutputSize(event.target.value).normalized;
   state.statusText = `Tamaño: ${state.size}`;
+  persistExportPreferences();
   const image = selectedImage();
   if (image?.source === "bridge") {
     void requestBridgePreview(image);
@@ -6655,6 +6749,7 @@ $("#background-select").addEventListener("change", (event) => {
   state.background = event.target.value;
   state.previewBg = event.target.value;
   state.statusText = `Fondo: ${backgroundLabel(state.background)}`;
+  persistExportPreferences();
   const image = selectedImage();
   if (image?.source === "bridge") {
     void requestBridgePreview(image);
@@ -6667,7 +6762,8 @@ $("#destination-mode").addEventListener("change", (event) => {
   state.destinationMode = event.target.value;
   state.destinationValue = state.destinationMode === "custom" ? "" : "_SALIDA_PRO";
   state.exportStatus = isExportReady() ? "ready" : "blocked";
-  state.statusText = state.destinationMode === "custom" ? "Carpeta de salida sin configurar" : "Salida junto al origen";
+  state.statusText = state.destinationMode === "custom" ? "Carpeta de salida sin configurar" : "Destino junto al origen";
+  persistExportPreferences();
   render();
 });
 
@@ -6675,6 +6771,7 @@ $("#destination-input").addEventListener("input", (event) => {
   state.destinationValue = event.target.value;
   state.exportStatus = isExportReady() ? "ready" : "blocked";
   state.statusText = state.destinationValue.trim() ? "Carpeta de salida configurada" : "Carpeta de salida sin configurar";
+  persistExportPreferences();
   render();
 });
 
@@ -6682,6 +6779,7 @@ $("#naming-input").addEventListener("input", (event) => {
   state.naming = event.target.value;
   state.exportStatus = isExportReady() ? "ready" : "blocked";
   state.statusText = state.naming.trim() ? "Nombre de archivo actualizado" : "Nombre de archivo vacío";
+  persistExportPreferences();
   render();
 });
 

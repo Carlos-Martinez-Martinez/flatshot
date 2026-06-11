@@ -125,7 +125,11 @@ const selectedCard = helpers.selectedImageInspectorCardHtml({{
 assert.equal(selectedCard.includes("Imagen seleccionada"), true);
 assert.equal(selectedCard.includes("camisa &lt;azul&gt;.png"), true);
 assert.equal(selectedCard.includes("Detalle &quot;x&quot;"), true);
+assert.equal(selectedCard.includes("Ajuste de esta imagen"), true);
+assert.equal(selectedCard.includes("Personalizado"), true);
+assert.equal(selectedCard.includes('data-action="open-image-adjustment"'), true);
 assert.equal(selectedCard.includes('data-action="reset-local-adjustment"'), true);
+assert.equal(selectedCard.includes("Restablecer al lote"), true);
 
 const alertHtml = helpers.issuesInspectorCardHtml({{
   rows: [
@@ -145,10 +149,21 @@ const aspect = helpers.aspectInspectorCardHtml({{
   hasReadyBatch: true,
   activePreset: "Luz <cenital>",
   statusLabel: "Global · Modificado",
+  adjustments: [
+    {{ name: "Luz <cenital>" }},
+    {{ name: "Sin sombra" }},
+  ],
+  appliedCount: 2,
+  customizedCount: 1,
 }});
 assert.equal(aspect.includes("Luz &lt;cenital&gt;"), true);
-assert.equal(aspect.includes("Global · Modificado"), true);
+assert.equal(aspect.includes("Procesado"), true);
+assert.equal(aspect.includes("Ajuste de imagen"), true);
+assert.equal(aspect.includes("Aplicado a 2 imagenes") || aspect.includes("Aplicado a 2 imágenes"), true);
 assert.equal(aspect.includes('data-action="open-advanced"'), true);
+assert.equal(aspect.includes('data-action="open-preset-editor"'), true);
+assert.equal(aspect.includes('data-action="apply-global-adjustment-to-overrides"'), true);
+assert.equal(aspect.includes("1 imagen mantiene su ajuste personalizado."), true);
 assert.equal(helpers.aspectInspectorCardHtml({{ hasReadyBatch: false }}), "");
 """
     result = subprocess.run(

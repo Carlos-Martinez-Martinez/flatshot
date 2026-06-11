@@ -31,10 +31,10 @@ assert.equal(helpers.warningCountLabel(1), "1 aviso");
 assert.equal(helpers.warningCountLabel(2), "2 avisos");
 assert.equal(helpers.imageCountLabel(1), "1 imagen");
 assert.equal(helpers.imageCountLabel(3), "3 imágenes");
-assert.equal(helpers.exportActionLabel(4, 1), "Exportar 4 imágenes");
-assert.equal(helpers.exportActionLabel(4, 2), "Exportar 8 archivos");
-assert.equal(helpers.outputCountLabel(1), "1 salida");
-assert.equal(helpers.outputCountLabel(3), "3 salidas");
+assert.equal(helpers.exportActionLabel(4, 1), "Procesar 4 imágenes");
+assert.equal(helpers.exportActionLabel(4, 2), "Procesar 8 archivos");
+assert.equal(helpers.outputCountLabel(1), "1 formato");
+assert.equal(helpers.outputCountLabel(3), "3 formatos");
 assert.equal(helpers.adjustedCountLabel(1), "1 ajustada");
 assert.equal(helpers.adjustedCountLabel(2), "2 ajustadas");
 assert.deepEqual(helpers.batchPillState({{ issueCount: 2, adjustedCount: 3 }}), {{

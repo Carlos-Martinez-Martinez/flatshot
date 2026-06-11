@@ -1320,3 +1320,62 @@ html:not(.dev-mode) .debug-panel {
   background: var(--color-bg-soft);
   color: var(--color-text-muted);
 }
+
+.inspector-processing-card,
+.selected-image-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 10px;
+}
+
+.processing-card__controls,
+.selected-image-card__adjustment {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.processing-card__controls label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.processing-card__controls label > span,
+.selected-image-card__adjustment > span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.processing-card__controls select {
+  min-width: 0;
+  width: 100%;
+}
+
+.processing-card__controls > button,
+.selected-image-card__adjustment button {
+  min-height: 30px;
+}
+
+.selected-image-card__adjustment > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.processing-card__notice {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid #e2c76f;
+  border-radius: 8px;
+  background: #fff8df;
+  color: var(--color-text);
+}
+
+.processing-card__notice span {
+  font-size: var(--font-size-sm);
+}

@@ -23,13 +23,13 @@
 
   function exportActionLabel(imageCount, outputCount = 1) {
     if (outputCount > 1) {
-      return `Exportar ${imageCount * outputCount} archivos`;
+      return `Procesar ${imageCount * outputCount} archivos`;
     }
-    return `Exportar ${imageCount} imágenes`;
+    return `Procesar ${imageCount} imágenes`;
   }
 
   function outputCountLabel(count) {
-    return `${count} salida${count === 1 ? "" : "s"}`;
+    return `${count} formato${count === 1 ? "" : "s"}`;
   }
 
   function adjustedCountLabel(count) {

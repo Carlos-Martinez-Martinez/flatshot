@@ -99,8 +99,8 @@
       </section>
 
       <section class="batch-detail-section">
-        <h3>Salidas activas</h3>
-        ${options.outputRowsHtml || '<span class="batch-detail-muted">Sin salidas activas.</span>'}
+        <h3>Formatos activos</h3>
+        ${options.outputRowsHtml || '<span class="batch-detail-muted">Sin formatos activos.</span>'}
       </section>
 
       ${options.ignoredSectionHtml || ""}

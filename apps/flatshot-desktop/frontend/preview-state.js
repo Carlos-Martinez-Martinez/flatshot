@@ -98,7 +98,7 @@
   function previewSettingsLabel(options = {}) {
     const dirtyLabel = "Aspecto modificado";
     if (options.bridgeMode === "bridge" && options.activePresetSource === "bridge") {
-      return options.presetDirty ? dirtyLabel : "Salida";
+      return options.presetDirty ? dirtyLabel : "Ajuste";
     }
     return options.presetDirty ? dirtyLabel : "Aspecto";
   }

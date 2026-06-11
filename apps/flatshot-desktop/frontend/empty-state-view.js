@@ -52,7 +52,7 @@
       <span>Carga un lote de imágenes PNG o JPG para revisar y exportar.</span>
       <div class="empty-state__actions">
         <button type="button" class="primary" data-action="pick-bridge-folder">Seleccionar carpeta</button>
-        <button type="button" class="ghost-action" data-action="open-app-settings">Gestionar salidas</button>
+        <button type="button" class="ghost-action" data-action="open-app-settings">Gestionar formatos</button>
       </div>
       ${manualPathHtml}
     </div>

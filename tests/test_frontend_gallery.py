@@ -139,7 +139,7 @@ assert.equal(
 assert.equal(helpers.compactImageDetail("PNG · 14 KB"), "14 KB");
 assert.equal(helpers.compactImageDetail("Lista"), "");
 assert.equal(helpers.assetStatusLabel("ready", {{ warning: "Aviso" }}), "Lista");
-assert.equal(helpers.assetStatusLabel("adjusted", {{ warning: "Aviso" }}), "Ajustada");
+assert.equal(helpers.assetStatusLabel("adjusted", {{ warning: "Aviso" }}), "Personalizado");
 assert.equal(helpers.assetStatusLabel("warning", {{ warning: "Aviso" }}), "Aviso");
 assert.equal(helpers.assetStatusIcon("warning"), "!");
 assert.equal(helpers.assetStatusIcon("error"), "×");

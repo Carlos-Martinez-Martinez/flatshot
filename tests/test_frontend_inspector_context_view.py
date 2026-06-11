@@ -40,8 +40,8 @@ assert.deepEqual(helpers.inspectorSubviewHeaderState({{
   outputEditMode: true,
   outputLabel: "JPG · 1800×2400",
 }}), {{
-  title: "Salida",
-  subtitle: "Editar salida",
+  title: "Exportación",
+  subtitle: "Editar formato de salida",
   detail: "",
   backAction: "cancel-output-edit",
   backLabel: "Cancelar",

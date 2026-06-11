@@ -43,7 +43,7 @@
   }
 
   function localAdjustmentText(localActive) {
-    return localActive ? "Ajuste local activo" : "Sin ajuste local";
+    return localActive ? "Personalizado" : "Igual que el lote";
   }
 
   function localSettingOutputText(value) {
@@ -55,7 +55,7 @@
     return {
       disabled: !presetDirty,
       primary: Boolean(presetDirty),
-      text: "Guardar cambios",
+      text: "Guardar ajuste",
       title: presetDirty ? "Guardar el ajuste activo" : "Sin cambios pendientes",
     };
   }
@@ -111,7 +111,7 @@
     if (exportStatus === "failed") {
       return "Fallida";
     }
-    return options.ready ? "Lista" : "Configura salida";
+    return options.ready ? "Lista" : "Configura exportación";
   }
 
   return {

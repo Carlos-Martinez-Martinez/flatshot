@@ -218,7 +218,7 @@
       return "Lista";
     }
     if (status === "adjusted") {
-      return "Ajustada";
+      return "Personalizado";
     }
     return statusLabels[status] || "Lista";
   }

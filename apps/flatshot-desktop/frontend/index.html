@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>FlatShot Desktop</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./styles.css?v=20260610-export-fix" />
-    <link rel="stylesheet" href="./ux-foundation.css?v=20260610-export-fix" />
-    <link rel="stylesheet" href="./ux-refactor.css?v=20260610-export-fix" />
+    <link rel="stylesheet" href="./styles.css?v=20260611-output-flow" />
+    <link rel="stylesheet" href="./ux-foundation.css?v=20260611-output-flow" />
+    <link rel="stylesheet" href="./ux-refactor.css?v=20260611-output-flow" />
   </head>
   <body>
     <main class="app-shell" aria-label="FlatShot nueva app">
@@ -31,7 +31,7 @@
             <span class="preflight-chip" id="top-preflight-status" hidden>Exportación bloqueada</span>
             <button type="button" class="primary top-export" id="top-primary-action" data-action="primary">Seleccionar carpeta</button>
             <button type="button" class="top-secondary-action" id="top-secondary-action" data-action="secondary-primary" hidden></button>
-            <button type="button" class="top-format-action" data-action="open-app-settings">Salida</button>
+            <button type="button" class="top-format-action" data-action="open-app-settings">Formatos</button>
             <button type="button" class="top-folder-action" data-action="pick-bridge-folder">Carpeta</button>
             <button type="button" class="top-reset-action" data-action="clear-batch">Nuevo lote</button>
             <button type="button" data-action="toggle-inspector">Diagnóstico</button>
@@ -121,7 +121,7 @@
             <ul class="import-requirements" aria-label="Requisitos de importación">
               <li>Carpeta local</li>
               <li>Imágenes PNG</li>
-              <li>Salida configurable después</li>
+              <li>Formatos configurables después</li>
             </ul>
           </section>
 
@@ -283,7 +283,7 @@
                   <span>Gestionar ajuste</span>
                 </div>
                 <div class="button-row preset-actions">
-                  <button type="button" id="save-preset" data-action="save-preset">Guardar cambios</button>
+                  <button type="button" id="save-preset" data-action="save-preset">Guardar ajuste</button>
                   <button type="button" id="export-presets" data-action="export-presets">Exportar ajustes</button>
                   <button type="button" id="delete-preset" class="danger-subtle" data-action="delete-preset">Eliminar</button>
                   <button type="button" data-action="reset-settings">Restaurar</button>
@@ -388,7 +388,7 @@
             <summary>
               <span class="summary-copy">
                 <strong>Ajuste por imagen</strong>
-                <small id="local-adjustment-text">Sin ajuste local</small>
+                <small id="local-adjustment-text">Igual que el lote</small>
               </span>
             </summary>
             <div class="inspector-disclosure__body local-adjustment__body">
@@ -416,15 +416,15 @@
           <section class="settings-section export-section" data-inspector-section="output">
             <div class="section-title">
               <div>
-                <span class="eyebrow">Salida</span>
-                <strong id="export-readiness">Configura salida</strong>
+                <span class="eyebrow">Exportación</span>
+                <strong id="export-readiness">Configura exportación</strong>
               </div>
               <span class="change-chip" id="export-count">0 archivos</span>
             </div>
 
             <div class="output-profile-row">
               <label>
-                <span>Salidas</span>
+                <span>Formatos</span>
                 <select id="output-profile-select"></select>
               </label>
               <button type="button" class="btn-linklike" data-action="open-app-settings">Cambiar</button>
@@ -525,9 +525,9 @@
         <section class="app-settings-dialog">
           <header class="app-settings-header">
             <div>
-              <span class="eyebrow">Presets</span>
-              <h2 id="app-settings-title">Gestor de salidas</h2>
-              <small id="app-settings-subtitle">Crea y edita presets de exportación.</small>
+              <span class="eyebrow">Formatos de salida</span>
+              <h2 id="app-settings-title">Formatos de salida</h2>
+              <small id="app-settings-subtitle">Crea y edita formatos de exportación.</small>
             </div>
             <button type="button" class="icon-button" data-action="close-app-settings" aria-label="Cerrar ajustes">×</button>
           </header>
@@ -535,7 +535,7 @@
           <div class="app-settings-content">
             <aside class="output-format-list" aria-label="Formatos de salida">
               <div class="settings-toolbar">
-                <strong>Salidas guardadas</strong>
+                <strong>Formatos guardados</strong>
                 <div class="settings-toolbar-actions">
                   <button type="button" data-action="new-output-profile">Nuevo</button>
                   <button type="button" data-action="duplicate-output-profile">Duplicar</button>
@@ -650,28 +650,28 @@
       </footer>
     </main>
 
-    <script src="./formatters.js?v=20260610-export-fix"></script>
-    <script src="./output-profiles.js?v=20260610-export-fix"></script>
-    <script src="./output-profile-view.js?v=20260610-export-fix"></script>
-    <script src="./export-payload.js?v=20260610-export-fix"></script>
-    <script src="./export-state.js?v=20260610-export-fix"></script>
-    <script src="./export-summary-view.js?v=20260610-export-fix"></script>
-    <script src="./export-result-view.js?v=20260610-export-fix"></script>
-    <script src="./export-preflight-view.js?v=20260610-export-fix"></script>
-    <script src="./top-status-view.js?v=20260610-export-fix"></script>
-    <script src="./preflight.js?v=20260610-export-fix"></script>
-    <script src="./batch-view.js?v=20260610-export-fix"></script>
-    <script src="./scan-state.js?v=20260610-export-fix"></script>
-    <script src="./export-confirm-view.js?v=20260610-export-fix"></script>
-    <script src="./empty-state-view.js?v=20260610-export-fix"></script>
-    <script src="./batch-detail-view.js?v=20260610-export-fix"></script>
-    <script src="./gallery.js?v=20260610-export-fix"></script>
-    <script src="./preview-view.js?v=20260610-export-fix"></script>
-    <script src="./preview-state.js?v=20260610-export-fix"></script>
-    <script src="./settings-view.js?v=20260610-export-fix"></script>
-    <script src="./inspector-output-view.js?v=20260610-export-fix"></script>
-    <script src="./inspector-review-view.js?v=20260610-export-fix"></script>
-    <script src="./inspector-context-view.js?v=20260610-export-fix"></script>
-    <script src="./app.js?v=20260610-export-fix"></script>
+    <script src="./formatters.js?v=20260611-output-flow"></script>
+    <script src="./output-profiles.js?v=20260611-output-flow"></script>
+    <script src="./output-profile-view.js?v=20260611-output-flow"></script>
+    <script src="./export-payload.js?v=20260611-output-flow"></script>
+    <script src="./export-state.js?v=20260611-output-flow"></script>
+    <script src="./export-summary-view.js?v=20260611-output-flow"></script>
+    <script src="./export-result-view.js?v=20260611-output-flow"></script>
+    <script src="./export-preflight-view.js?v=20260611-output-flow"></script>
+    <script src="./top-status-view.js?v=20260611-output-flow"></script>
+    <script src="./preflight.js?v=20260611-output-flow"></script>
+    <script src="./batch-view.js?v=20260611-output-flow"></script>
+    <script src="./scan-state.js?v=20260611-output-flow"></script>
+    <script src="./export-confirm-view.js?v=20260611-output-flow"></script>
+    <script src="./empty-state-view.js?v=20260611-output-flow"></script>
+    <script src="./batch-detail-view.js?v=20260611-output-flow"></script>
+    <script src="./gallery.js?v=20260611-output-flow"></script>
+    <script src="./preview-view.js?v=20260611-output-flow"></script>
+    <script src="./preview-state.js?v=20260611-output-flow"></script>
+    <script src="./settings-view.js?v=20260611-output-flow"></script>
+    <script src="./inspector-output-view.js?v=20260611-output-flow"></script>
+    <script src="./inspector-review-view.js?v=20260611-output-flow"></script>
+    <script src="./inspector-context-view.js?v=20260611-output-flow"></script>
+    <script src="./app.js?v=20260611-output-flow"></script>
   </body>
 </html>

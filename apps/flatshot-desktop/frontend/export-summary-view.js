@@ -17,10 +17,10 @@
     return `
     <div class="inspector-actionbar output-edit-actions">
       <button type="button" data-action="cancel-output-edit">Cancelar</button>
-      <button type="button" class="primary" data-action="apply-output-edit">Aplicar temporalmente</button>
-      <button type="button" data-action="save-output-current-profile">Guardar preset</button>
+      <button type="button" class="primary" data-action="apply-output-edit">Aplicar al lote sin guardar</button>
+      <button type="button" data-action="save-output-current-profile">Guardar formato</button>
       <button type="button" data-action="save-output-as-new">Guardar como nuevo</button>
-      <button type="button" class="btn-linklike" data-action="open-app-settings">Gestionar presets</button>
+      <button type="button" class="btn-linklike" data-action="open-app-settings">Gestionar formatos</button>
     </div>
   `;
   }
@@ -28,8 +28,8 @@
   function exportPresetActionsHtml() {
     return `
     <div class="inspector-actionbar">
-      <button type="button" class="primary" data-action="edit-output">Editar salidas</button>
-      <button type="button" data-action="open-app-settings">Gestionar presets</button>
+      <button type="button" class="primary" data-action="open-app-settings">Gestionar formatos</button>
+      <button type="button" data-action="new-output-profile">Nuevo formato</button>
     </div>
   `;
   }
@@ -37,8 +37,8 @@
   function outputTemporaryNoticeHtml({ compact = false } = {}) {
     return `
     <div class="temporary-output-notice${compact ? " temporary-output-notice--compact" : ""}">
-      <strong>Cambios temporales</strong>
-      <span>${compact ? "Aplica al lote o guarda el preset." : "La salida actual no coincide con un preset guardado."}</span>
+      <strong>Cambios sin guardar</strong>
+      <span>${compact ? "Aplica al lote o guarda el formato." : "El formato actual no coincide con un formato guardado."}</span>
     </div>
   `;
   }
@@ -55,7 +55,7 @@
     `;
     }).join("");
     const extraRows = totalProfiles > 4
-      ? `<div class="preset-summary-row"><span>Más</span><strong>${escapeHtml(`${totalProfiles - 4} salidas más`)}</strong></div>`
+      ? `<div class="preset-summary-row"><span>Más</span><strong>${escapeHtml(`${totalProfiles - 4} formatos más`)}</strong></div>`
       : "";
     return `${visibleRows}${extraRows}`;
   }
@@ -76,7 +76,7 @@
     return `
     <div class="compact-panel">
       <div>
-        <span>Salida</span>
+        <span>Formato</span>
         <strong>${escapeHtml(options.displayName || "")}</strong>
       </div>
       <small>${escapeHtml(options.presetSummary || "")}</small>
@@ -96,7 +96,7 @@
     return `
     <div class="preset-summary-card">
       <div class="preset-summary-main">
-        <span>${escapeHtml(hasMultipleOutputs ? "Salidas" : "Salida")}</span>
+        <span>${escapeHtml(hasMultipleOutputs ? "Formatos activos" : "Formato activo")}</span>
         <strong>${escapeHtml(options.displayName || "")}</strong>
         ${hasMultipleOutputs ? `<small>${escapeHtml(`${outputCount} archivos previstos`)}</small>` : ""}
       </div>

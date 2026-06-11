@@ -56,13 +56,14 @@ assert.equal(disabledRow.includes("checked"), false);
 assert.equal(disabledRow.includes(' disabled />'), false);
 
 const notice = helpers.outputTemporaryNoticeHtml();
-assert.equal(notice.includes("Cambios temporales en esta salida"), true);
+assert.equal(notice.includes("Cambios sin guardar en este formato"), true);
 assert.equal(notice.includes('data-action="save-output-current-profile"'), true);
 assert.equal(notice.includes('data-action="discard-output-overrides"'), true);
 
 const card = helpers.outputInspectorCardHtml({{
   activeCount: 2,
   totalFiles: 8,
+  formulaLabel: "4 imágenes x 2 formatos = 8 archivos",
   readyLabel: "4 imágenes listas",
   dirty: true,
   rows: [
@@ -70,12 +71,12 @@ const card = helpers.outputInspectorCardHtml({{
     {{ id: "white", name: "Blanco", enabled: true, active: false, canToggle: true, summary: "PNG" }},
   ],
 }});
-assert.equal(card.includes("Salidas activas · 2"), true);
-assert.equal(card.includes("8 archivos previstos"), true);
+assert.equal(card.includes("2 formatos activos"), true);
+assert.equal(card.includes("4 imágenes x 2 formatos = 8 archivos"), true);
 assert.equal(card.includes("4 imágenes listas"), true);
 assert.equal(card.includes("active-output-list"), true);
-assert.equal(card.includes("Cambios temporales"), true);
-assert.equal(card.includes('data-action="edit-output"'), true);
+assert.equal(card.includes("Cambios sin guardar"), true);
+assert.equal(card.includes('data-action="new-output-profile"'), true);
 assert.equal(card.includes('data-action="open-app-settings"'), true);
 
 const pendingCard = helpers.outputInspectorCardHtml({{
@@ -86,7 +87,17 @@ const pendingCard = helpers.outputInspectorCardHtml({{
   rows: [],
 }});
 assert.equal(pendingCard.includes("Pendiente de lote"), true);
-assert.equal(pendingCard.includes("Cambios temporales"), false);
+assert.equal(pendingCard.includes("Cambios sin guardar"), false);
+
+const blockedCard = helpers.outputInspectorCardHtml({{
+  activeCount: 0,
+  totalFiles: 0,
+  readyLabel: "4 imágenes listas",
+  dirty: false,
+  rows: [],
+}});
+assert.equal(blockedCard.includes("0 formatos activos"), true);
+assert.equal(blockedCard.includes("Selecciona al menos un formato"), true);
 """
     result = subprocess.run(
         ["node", "-e", script],

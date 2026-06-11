@@ -49,7 +49,7 @@
     const isPresetManager = mode === "advanced" && Boolean(options.presetEditorOpen);
     const warningCount = Number(options.warningCount) || 0;
     const labels = {
-      output: ["Salida", options.outputEditMode ? "Editar salida" : options.outputLabel],
+      output: ["Exportación", options.outputEditMode ? "Editar formato de salida" : options.outputLabel],
       advanced: [
         isPresetManager ? "Gestionar ajustes" : "Editar ajuste",
         options.activePreset,
@@ -129,11 +129,11 @@
         <div class="context-header">
           <span class="eyebrow">Preparación</span>
           <strong>Seleccionar carpeta</strong>
-          <small>El ajuste activo y la salida se preparan automáticamente.</small>
+          <small>El ajuste de imagen y los formatos se preparan automáticamente.</small>
         </div>
         ${preflightHtml}
         <div class="default-stack">
-          <span>Salida</span>
+          <span>Exportación</span>
           <strong>${escapeHtml(options.outputSummary || "")}</strong>
           <small>Ajuste ${escapeHtml(options.activePreset || "")}</small>
         </div>

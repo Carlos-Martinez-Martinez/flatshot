@@ -98,8 +98,8 @@ assert.equal(helpers.topStatusText({{
   statusText: "Preparando",
 }}), "Preparando");
 
-assert.equal(helpers.preflightStatusLabel({{ exportStatus: "running", paused: true }}), "Salida pausada");
-assert.equal(helpers.preflightStatusLabel({{ exportStatus: "completed" }}), "Salida completada");
+assert.equal(helpers.preflightStatusLabel({{ exportStatus: "running", paused: true }}), "Exportación pausada");
+assert.equal(helpers.preflightStatusLabel({{ exportStatus: "completed" }}), "Exportación completada");
 assert.equal(helpers.preflightStatusLabel({{ exportStatus: "partial" }}), "Avisos");
 assert.equal(helpers.preflightStatusLabel({{ exportStatus: "failed" }}), "Revisar");
 assert.equal(helpers.preflightStatusLabel({{ ready: false, errors: 1 }}), "Revisar");
@@ -267,7 +267,7 @@ assert.equal(helpers.statusBarText({{
   outputCount: 1,
   destinationMode: "source",
   destinationValue: "_SALIDA_PRO",
-}}), "3 exportables · Imagen 2/5 · 1 aviso · Salida: origen / _SALIDA_PRO");
+}}), "3 exportables · Imagen 2/5 · 1 aviso · Formato: origen / _SALIDA_PRO");
 assert.equal(helpers.statusBarText({{
   batch: "ready",
   counts: {{ exportableImages: 3, nonBlockingWarnings: 0 }},
@@ -276,7 +276,7 @@ assert.equal(helpers.statusBarText({{
   outputCount: 2,
   destinationMode: "custom",
   destinationValue: "C:/Export",
-}}), "3 exportables · Sin selección · Salida: 2 salidas");
+}}), "3 exportables · Sin selección · Formato: 2 formatos");
 assert.equal(helpers.statusBarText({{
   batch: "ready",
   counts: {{ exportableImages: 3, nonBlockingWarnings: 0 }},
@@ -285,7 +285,7 @@ assert.equal(helpers.statusBarText({{
   outputCount: 1,
   destinationMode: "custom",
   destinationValue: "",
-}}), "3 exportables · Imagen 1/5 · Salida: sin destino");
+}}), "3 exportables · Imagen 1/5 · Formato: sin destino");
 """
     result = subprocess.run(
         ["node", "-e", script],

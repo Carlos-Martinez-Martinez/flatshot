@@ -71,13 +71,6 @@
       ? profiles.map(normalizeOutputProfile).filter((profile) => profile.name)
       : [];
     const deduped = dedupeOutputProfileIds(normalized);
-    if (!deduped.length) {
-      return [];
-    }
-    if (!deduped.some((profile) => profile.enabled)) {
-      const preferred = deduped.find((profile) => profile.id === activeProfileId) || deduped[0];
-      preferred.enabled = true;
-    }
     return deduped;
   }
 

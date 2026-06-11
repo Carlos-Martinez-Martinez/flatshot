@@ -106,10 +106,10 @@
   function preflightStatusLabel(options = {}) {
     const exportStatus = options.exportStatus || "idle";
     if (exportStatus === "running") {
-      return options.paused ? "Salida pausada" : "Exportando";
+      return options.paused ? "Exportación pausada" : "Exportando";
     }
     if (exportStatus === "completed") {
-      return "Salida completada";
+      return "Exportación completada";
     }
     if (exportStatus === "partial") {
       return "Avisos";
@@ -192,7 +192,7 @@
     const selectedIndex = Number(options.selectedIndex);
     const selectedText = selectedIndex >= 0 ? `Imagen ${selectedIndex + 1}/${imageCount}` : "Sin selección";
     const destination = Number(options.outputCount) > 1
-      ? countLabel(options.outputCount, "salida", "salidas")
+      ? countLabel(options.outputCount, "formato", "formatos")
       : options.destinationMode === "custom"
         ? options.destinationValue || "sin destino"
         : `origen / ${options.destinationValue}`;
@@ -226,7 +226,7 @@
 
     const warnings = Number(counts.nonBlockingWarnings) || 0;
     const warningText = warnings ? ` · ${countLabel(warnings, "aviso", "avisos")}` : "";
-    return `${Number(counts.exportableImages) || 0} exportables · ${selectedText}${warningText} · Salida: ${destination}`;
+    return `${Number(counts.exportableImages) || 0} exportables · ${selectedText}${warningText} · Formato: ${destination}`;
   }
 
   return {

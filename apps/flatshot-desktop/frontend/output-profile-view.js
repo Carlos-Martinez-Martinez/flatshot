@@ -26,7 +26,7 @@
       : active
         ? "Activo en este lote · Principal"
         : enabled
-          ? "Salida activa"
+          ? "Formato activo"
           : "Formato guardado";
 
     return `
@@ -100,10 +100,10 @@
     const summary = options.summary || "";
     const destination = options.destination || "";
     const toggleTitle = canToggle
-      ? "Activar esta salida en el lote"
+      ? "Activar este formato en el lote"
       : unsaved
         ? "Guarda el formato para activarlo"
-        : "Debe quedar al menos una salida activa";
+        : "Activar o desactivar formato";
     const marker = unsaved ? "Sin guardar" : active ? "Principal" : "";
 
     return `
@@ -256,9 +256,9 @@
       saveDisabled: errors.length > 0 || !dirty,
       applyDisabled: errors.length > 0,
       applyLabel: dirty
-        ? "Guardar y aplicar"
+        ? "Guardar y activar"
         : draft.enabled
-          ? "Aplicar cambios al lote"
+          ? "Usar en este lote"
           : "Activar en este lote",
       noteClass: `settings-footer-note ${errors.length ? "error" : dirty ? "warning" : ""}`,
       noteText: errors.length

@@ -75,7 +75,7 @@ const list = helpers.normalizeOutputProfileList([
 assert.equal(list.length, 2);
 assert.equal(list[0].id, "dup");
 assert.notEqual(list[1].id, "dup");
-assert.equal(list[0].enabled, true);
+assert.equal(list[0].enabled, false);
 
 const validation = helpers.outputProfileValidation({{
   name: "Canal",

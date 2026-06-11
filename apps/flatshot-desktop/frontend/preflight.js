@@ -160,7 +160,7 @@
       issues.push({
         level: "warning",
         title: "Imágenes excluidas",
-        detail: `${errorImages} imagen${errorImages === 1 ? "" : "es"} quedará${errorImages === 1 ? "" : "n"} fuera de la salida.`,
+        detail: `${errorImages} imagen${errorImages === 1 ? "" : "es"} quedará${errorImages === 1 ? "" : "n"} fuera de la exportación.`,
       });
     }
     if (Number(counts.errorFiles || 0) > 0) {
@@ -185,7 +185,9 @@
     const issues = Array.isArray(input.validationIssues) ? input.validationIssues : [];
     return issues.filter((issue) => issue.level === "error" || issue.title !== "Sin lote").length === 0
       && Boolean(input.hasBatch)
-      && Number(input.exportableCount || 0) > 0;
+      && Number(input.exportableCount || 0) > 0
+      && Number(input.activeOutputCount || 0) > 0
+      && input.hasImageAdjustment !== false;
   }
 
   function dedupeExportRisks(risks) {

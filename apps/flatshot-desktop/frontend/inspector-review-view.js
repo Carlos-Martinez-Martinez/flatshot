@@ -127,14 +127,22 @@
       </section>
     `;
     }
+    const hasLocal = Boolean(options.hasLocal);
     return `
-      <section class="inspector-compact-row">
+      <section class="inspector-compact-row selected-image-card">
         <div>
           <span>Imagen seleccionada</span>
           <strong title="${escapeHtml(image.path || image.name)}">${escapeHtml(image.name)}</strong>
           <small>${escapeHtml(options.detail || "")}</small>
         </div>
-      ${options.hasLocal ? '<button type="button" data-action="reset-local-adjustment">Quitar ajuste</button>' : ""}
+        <div class="selected-image-card__adjustment">
+          <span>Ajuste de esta imagen</span>
+          <strong>${escapeHtml(hasLocal ? "Personalizado" : "Igual que el lote")}</strong>
+          <div>
+            <button type="button" data-action="open-image-adjustment">${escapeHtml(hasLocal ? "Editar" : "Personalizar")}</button>
+            ${hasLocal ? '<button type="button" data-action="reset-local-adjustment">Restablecer al lote</button>' : ""}
+          </div>
+        </div>
     </section>
   `;
   }
@@ -168,14 +176,42 @@
     if (!options.hasReadyBatch) {
       return "";
     }
+    const adjustments = Array.isArray(options.adjustments) && options.adjustments.length
+      ? options.adjustments
+      : options.activePreset ? [{ name: options.activePreset }] : [];
+    const optionsHtml = adjustments.map((adjustment) => `
+      <option value="${escapeHtml(adjustment.name || "")}"${adjustment.name === options.activePreset ? " selected" : ""}>
+        ${escapeHtml(adjustment.name || "")}
+      </option>
+    `).join("");
+    const customizedCount = Number(options.customizedCount) || 0;
+    const appliedCount = Number(options.appliedCount) || 0;
+    const customizedLabel = customizedCount
+      ? `${customizedCount} imagen${customizedCount === 1 ? "" : "es"} mantiene${customizedCount === 1 ? "" : "n"} su ajuste personalizado.`
+      : "";
     return `
-    <section class="inspector-compact-row inspector-compact-row--quiet">
+    <section class="inspector-compact-row inspector-processing-card">
       <div>
-        <span>Ajuste</span>
-        <strong>${escapeHtml(options.activePreset || "")}</strong>
-        <small>${escapeHtml(options.statusLabel || "Global")}</small>
+        <span>Procesado</span>
+        <strong>Ajuste de imagen</strong>
+        <small>${escapeHtml(appliedCount ? `Aplicado a ${appliedCount} imagen${appliedCount === 1 ? "" : "es"}` : options.statusLabel || "Global")}</small>
       </div>
-      <button type="button" data-action="open-advanced">Editar ajuste</button>
+      <div class="processing-card__controls">
+        <label>
+          <span>Ajuste de imagen</span>
+          <select data-image-adjustment-select aria-label="Ajuste de imagen del lote">
+            ${optionsHtml}
+          </select>
+        </label>
+        <button type="button" data-action="open-advanced">Editar</button>
+        <button type="button" data-action="open-preset-editor">Gestionar ajustes</button>
+      </div>
+      ${customizedLabel ? `
+        <div class="processing-card__notice">
+          <span>${escapeHtml(customizedLabel)}</span>
+          <button type="button" data-action="apply-global-adjustment-to-overrides">Aplicar también a imágenes personalizadas</button>
+        </div>
+      ` : ""}
     </section>
   `;
   }

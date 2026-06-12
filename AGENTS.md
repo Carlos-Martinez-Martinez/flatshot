@@ -190,6 +190,26 @@ Maintain:
 - non-color-only status signals;
 - tooltips for truncated content.
 
+### CSS architecture guard
+
+When editing `apps/flatshot-desktop/frontend/css/`, do not add a new rule by copying an existing selector block. Search first and extend the owning module.
+
+Required before reporting any CSS/frontend change as complete:
+
+```bash
+python scripts/audit_css.py --check
+pytest tests/test_frontend_css_contract.py
+```
+
+The CSS audit must remain clean:
+- zero duplicate selectors in the same cascade context;
+- zero duplicate selector groups in the same cascade context, even if selector order differs;
+- zero duplicated token declarations outside `css/00-settings/tokens.css`;
+- zero legacy shell state classes;
+- `css/99-legacy-compat.css` empty.
+
+If the audit fails, fix the cascade ownership instead of weakening the test or adding `!important`.
+
 ---
 
 ## Processing/output rules

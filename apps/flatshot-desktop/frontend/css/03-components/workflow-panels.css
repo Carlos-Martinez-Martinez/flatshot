@@ -1,0 +1,237 @@
+@layer flatshot {
+/* Components: reusable workflow panels, context blocks and preflight patterns. */
+
+.context-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.context-header {
+  display: grid;
+  gap: 3px;
+}
+
+.context-header strong {
+  color: var(--text-strong);
+  font-size: 16px;
+}
+
+.context-header small, .default-stack small {
+  color: var(--text-muted);
+}
+
+.default-stack {
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-10);
+  background: var(--bg-panel-muted);
+  padding: 12px;
+}
+
+.default-stack span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.default-stack strong {
+  color: var(--text-strong);
+}
+
+.preflight-list {
+  display: grid;
+  gap: 8px;
+}
+
+.preflight-item {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-8);
+  background: var(--bg-panel);
+  padding: 9px 10px;
+}
+
+.preflight-item > span {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--bg-panel-muted);
+}
+
+.preflight-item > span::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: inherit;
+  background: var(--text-subtle);
+}
+
+.preflight-item.ok > span {
+  background: var(--accent-soft);
+}
+
+.preflight-item.ok > span::before {
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+}
+
+.preflight-item strong, .preflight-item small {
+  min-width: 0;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preflight-item strong {
+  color: var(--text-strong);
+  font-size: 13px;
+}
+
+.preflight-item small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+#preview-meta {
+  display: none;
+}
+
+.section-title .eyebrow {
+  display: none;
+}
+
+.panel-heading {
+  flex: 0 0 auto;
+  min-height: 38px;
+}
+
+.panel-heading h1 {
+  font-weight: 780;
+  margin-top: 3px;
+  color: var(--text-strong);
+  font-size: 18px;
+}
+
+#scan-status {
+  display: block;
+}
+
+.summary-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.filmstrip-header {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.filmstrip-header strong {
+  color: var(--text-strong);
+  font-size: 13px;
+}
+
+.filmstrip-header span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.manual-path-inline {
+  width: min(380px, 100%);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-8);
+  background: rgba(255, 255, 255, 0.72);
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.manual-path-inline[open] {
+  display: grid;
+  gap: 8px;
+}
+
+.manual-path-inline summary {
+  text-align: center;
+}
+
+.filmstrip-panel {
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: 26px minmax(0, 1fr);
+  gap: 8px;
+  border-top: 1px solid var(--line-soft);
+  background: #ffffff;
+  padding: 10px 14px 12px;
+  display: none;
+}
+
+#scan-source-badge {
+  display: none;
+}
+
+.manual-path-panel {
+  border-color: var(--line-soft);
+  margin-top: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-soft);
+  padding: var(--space-2);
+}
+
+.compact {
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+}
+
+.section-title {
+  min-height: 28px;
+  align-items: flex-start;
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.section-title strong {
+  display: block;
+  font-size: var(--font-size-md);
+  color: var(--color-text-strong);
+  font-weight: var(--font-weight-semibold);
+}
+
+.section-title small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+}
+
+#progress-fill {
+  width: 0;
+  transition: width 160ms ease;
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-accent);
+}
+}

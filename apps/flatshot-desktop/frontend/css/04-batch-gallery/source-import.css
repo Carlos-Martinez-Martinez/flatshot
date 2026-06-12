@@ -1,0 +1,253 @@
+@layer flatshot {
+/* Batch and gallery: source folder, scan and import affordances. */
+
+.source-panel-heading .state-chip {
+  justify-self: start;
+}
+
+.source-panel-heading > div > span {
+  margin-top: 2px;
+  font-size: var(--text-sm);
+}
+
+.manual-path-panel summary, .review-panel summary, .batch-diagnostics summary, .advanced-block summary {
+  color: var(--text-secondary);
+  font-weight: 750;
+}
+
+.app-shell[data-batch-context="true"] .source-panel .manual-path-panel, .app-shell[data-batch-context="true"] .source-panel .bridge-message {
+  display: none;
+}
+
+.app-shell[data-batch-context="true"] .source-panel {
+  padding: 0 0 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-shell[data-batch-context="true"] .source-panel .button-row .primary {
+  min-width: 0;
+}
+
+.source-panel-heading strong {
+  font-size: 14px;
+}
+
+.source-panel-heading > div > span, .bridge-message {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.import-requirements {
+  display: grid;
+  gap: 6px;
+  margin: 2px 0 0;
+  padding: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  list-style: none;
+}
+
+.import-requirements li {
+  position: relative;
+  padding-left: 17px;
+}
+
+.import-requirements li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.48em;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.app-shell[data-batch-context="true"] .import-requirements {
+  display: none;
+}
+
+#scan-source-badge, #scan-status, .bridge-message, .import-requirements, .batch-summary, .folder-list {
+  display: none;
+}
+
+.app-shell[data-batch-context="true"] .source-panel .button-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.source-panel {
+  flex: 0 0 auto;
+  padding-bottom: var(--space-3);
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  border-bottom: 1px solid var(--line-soft);
+  padding: 0 0 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.source-panel-heading {
+  align-items: start;
+  gap: 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.source-panel .button-row {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.source-panel .button-row button {
+  min-width: 0;
+  background: var(--bg-panel);
+}
+
+.manual-path-panel, .app-shell[data-batch-context="true"] .source-panel .manual-path-panel, .bridge-message, .import-requirements {
+  display: none;
+}
+
+.batch-rail__eyebrow, .batch-rail__section-title, .batch-source__copy > span {
+  display: block;
+  color: var(--rail-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.batch-source__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.batch-source__actions button, .batch-source__toolbar button, .batch-source__refresh {
+  min-height: 26px;
+  border-color: var(--rail-border);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--rail-text);
+  padding-inline: 9px;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.batch-source__actions button:hover:not(:disabled), .batch-source__toolbar button:hover:not(:disabled), .batch-source__refresh:hover:not(:disabled) {
+  border-color: rgba(15, 143, 114, 0.28);
+  background: var(--rail-accent-soft);
+  color: var(--rail-accent);
+}
+
+.batch-rail__header, .source-panel.batch-rail__source, .batch-rail__summary {
+  padding: var(--space-4);
+}
+
+.source-panel.batch-rail__source {
+  box-shadow: none;
+  padding: 12px;
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-panel);
+}
+
+.batch-source__row {
+  align-items: start;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.batch-source__copy {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.batch-source__copy strong, .batch-source__copy small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.batch-source__copy strong {
+  line-height: 1.2;
+  color: var(--color-text-strong);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.batch-source__copy small {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.batch-source__toolbar {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.batch-source__toolbar button {
+  min-height: var(--control-height-sm);
+}
+
+.batch-rail > .batch-rail__header, .batch-rail > .source-panel.batch-rail__source, .batch-rail > .batch-rail__summary {
+  width: 100%;
+  margin: 0;
+  padding: var(--space-4);
+}
+
+.batch-rail > .source-panel.batch-rail__source {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.source-panel.batch-rail__source .source-panel-heading, .source-panel.batch-rail__source .batch-source__row {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-3);
+}
+
+.source-panel.batch-rail__source .batch-source__copy, .source-panel.batch-rail__source .batch-source__toolbar {
+  margin: 0;
+}
+
+.source-panel.batch-rail__source .batch-source__toolbar {
+  justify-self: end;
+}
+
+.batch-source__refresh {
+  color: var(--rail-muted);
+  font-size: 14px;
+  width: 30px;
+  min-width: 30px;
+  padding: 0;
+}
+
+.manual-path-panel summary, .batch-diagnostics summary, .advanced-block summary {
+  color: var(--color-accent);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.bridge-message, .import-requirements {
+  display: none;
+}
+}

@@ -1,0 +1,268 @@
+@layer flatshot {
+/* Inspector/export: right panel shell, disclosure structure and local controls. */
+
+/* Inspector/export: right panel shell and section structure. */
+
+.app-shell.inspector-collapsed .settings-panel {
+  display: none;
+}
+
+.inspector-actionbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  flex-wrap: nowrap;
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
+}
+
+.inspector-actionbar button {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.inspector-actionbar .btn-linklike {
+  margin-left: auto;
+}
+
+.settings-panel details.inspector-disclosure.is-opening .inspector-disclosure__body {
+  border-top-color: var(--color-border);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.settings-panel details.review-background-panel.is-opening .inspector-disclosure__body {
+  padding: var(--space-3);
+}
+
+.settings-panel details.inspector-disclosure:not(.is-hidden) {
+  min-width: 0;
+  flex: 0 0 auto;
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-panel);
+  padding: 0;
+}
+
+.settings-panel details.inspector-disclosure:not([open]) .inspector-disclosure__body {
+  display: none;
+}
+
+.settings-panel details.inspector-disclosure > summary {
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px var(--space-4);
+  color: var(--color-text);
+  cursor: pointer;
+  list-style: none;
+}
+
+.settings-panel details.inspector-disclosure > summary::after {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid var(--color-text-subtle);
+  border-bottom: 2px solid var(--color-text-subtle);
+  transform: rotate(45deg);
+  transition: transform var(--transition-fast);
+}
+
+.settings-panel details.inspector-disclosure[open] > summary::after {
+  transform: translateY(2px) rotate(225deg);
+}
+
+.settings-panel details.inspector-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-panel .inspector-disclosure__body {
+  display: grid;
+  gap: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.settings-panel .review-background-panel .inspector-disclosure__body {
+  padding: var(--space-3);
+}
+
+.inspector-disclosure {
+  min-width: 0;
+  flex: 0 0 auto;
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-panel);
+  padding: 0;
+  box-shadow: none;
+}
+
+.settings-panel .inspector-disclosure:not(.is-hidden) {
+  display: block;
+}
+
+.inspector-disclosure[open] {
+  background: var(--color-bg-panel);
+}
+
+.inspector-disclosure summary {
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text);
+  cursor: pointer;
+  list-style: none;
+}
+
+.inspector-disclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.inspector-disclosure summary::after {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid var(--color-text-subtle);
+  border-bottom: 2px solid var(--color-text-subtle);
+  transform: rotate(45deg);
+  transition: transform var(--transition-fast);
+}
+
+.inspector-disclosure[open] summary::after {
+  transform: translateY(2px) rotate(225deg);
+}
+
+.inspector-disclosure__body {
+  display: grid;
+  gap: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.review-background-panel .inspector-disclosure__body {
+  padding: var(--space-3);
+}
+
+.local-control-row {
+  min-width: 0;
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: minmax(72px, 0.75fr) minmax(150px, 1.4fr) 44px;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.local-control-row > span {
+  overflow: hidden;
+  color: var(--color-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-md);
+}
+
+.local-control-row output {
+  color: var(--color-text-muted);
+  text-align: right;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-line.output-example strong {
+  font-family: var(--font-ui);
+  color: var(--accent-hover);
+}
+
+.settings-panel .inspector-start:not(.is-hidden) {
+  display: block;
+}
+
+.settings-panel:not(.is-editing-preset) [data-inspector-section="adjustments"] {
+  display: none;
+}
+
+.inspector-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inspector-actions button {
+  min-width: 0;
+}
+
+.settings-panel [data-inspector-section="adjustments"]:not(.is-hidden), .settings-panel [data-inspector-section="output"]:not(.is-hidden) {
+  display: grid;
+}
+
+.settings-panel .button-row button.primary, .settings-panel .inspector-actions button.primary:not([data-action="apply-output-edit"]) {
+  border-color: var(--color-border);
+  background: var(--color-bg-panel);
+  color: var(--color-text);
+}
+
+.inspector-start.is-hidden {
+  display: none;
+}
+
+.inspector-tabs.is-hidden {
+  display: none !important;
+}
+
+.settings-section {
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  border-bottom-color: var(--line-soft);
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.settings-panel [data-inspector-section].is-hidden {
+  display: none !important;
+}
+
+.settings-panel [data-inspector-section="adjustments"]:not(.is-hidden), .settings-panel [data-inspector-section="output"]:not(.is-hidden), .settings-panel [data-inspector-section="warnings"]:not(.is-hidden) {
+  display: grid;
+}
+
+.app-shell[data-ui-state="batch_empty"] .settings-panel, .app-shell[data-ui-state="scan_empty"] .settings-panel {
+  display: flex;
+}
+
+.settings-panel input[type="range"]::-moz-range-track {
+  height: 5px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-muted);
+}
+
+.settings-panel input[type="range"]::-moz-range-progress {
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+}
+
+.settings-panel input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-bg-panel);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+}
+}

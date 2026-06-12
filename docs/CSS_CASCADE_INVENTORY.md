@@ -1,207 +1,165 @@
 # Inventario de cascada CSS - FlatShot
 
-Este documento registra el estado actual de la cascada CSS activa antes de
-consolidar tokens, selectores u overrides. Es una fase de inventario: no cambia
-estilos, layout, comportamiento de UI, exportacion ni salida de imagen.
+Este documento registra la cascada CSS activa tras la consolidacion modular de
+junio de 2026. La limpieza no cambia procesamiento, preview/export, naming,
+destinos ni escritura de archivos.
 
 ## Carga activa
 
 `apps/flatshot-desktop/frontend/index.html` carga las hojas en este orden:
 
-1. `styles.css`
-2. `ux-foundation.css`
-3. `ux-refactor.css`
+1. `css/00-settings/tokens.css`
+2. `css/01-base/base.css`
+3. `css/02-layout/shell-workspace.css`
+4. `css/02-layout/topbar.css`
+5. `css/02-layout/footer.css`
+6. `css/03-components/primitives.css`
+7. `css/03-components/workflow-panels.css`
+8. `css/03-components/review-status-panels.css`
+9. `css/03-components/buttons.css`
+10. `css/03-components/forms.css`
+11. `css/03-components/navigation-controls.css`
+12. `css/03-components/status-badges.css`
+13. `css/03-components/cards.css`
+14. `css/03-components/empty-states.css`
+15. `css/03-components/progress-loaders.css`
+16. `css/03-components/dev-debug.css`
+17. `css/04-batch-gallery/batch-rail.css`
+18. `css/04-batch-gallery/source-import.css`
+19. `css/04-batch-gallery/batch-summary.css`
+20. `css/04-batch-gallery/gallery-shell.css`
+21. `css/04-batch-gallery/image-grid.css`
+22. `css/04-batch-gallery/thumbnails.css`
+23. `css/04-batch-gallery/review-devtools.css`
+24. `css/05-viewer/viewer-shell.css`
+25. `css/05-viewer/viewer-toolbar.css`
+26. `css/05-viewer/canvas.css`
+27. `css/05-viewer/viewer-states.css`
+28. `css/06-inspector-export/inspector-shell.css`
+29. `css/06-inspector-export/inspector-navigation.css`
+30. `css/06-inspector-export/inspector-workflow.css`
+31. `css/06-inspector-export/inspector-cards.css`
+32. `css/06-inspector-export/adjustments-presets.css`
+33. `css/06-inspector-export/adjustment-controls.css`
+34. `css/06-inspector-export/advanced-local-overrides.css`
+35. `css/06-inspector-export/export-panel.css`
+36. `css/06-inspector-export/output-profiles.css`
+37. `css/06-inspector-export/review-warnings.css`
+38. `css/07-modals/app-settings.css`
+39. `css/07-modals/batch-detail.css`
+40. `css/07-modals/export-confirm.css`
+41. `css/08-states-responsive/states.css`
+42. `css/08-states-responsive/responsive.css`
+43. `css/99-legacy-compat.css`
 
-Ese orden es parte del comportamiento actual. `ux-refactor.css` gana la cascada
-cuando repite selectores o tokens anteriores.
+No hay build step. El orden de enlaces es el contrato de cascada. Todos los
+modulos activos, salvo `css/99-legacy-compat.css`, estan envueltos en una
+unica capa `@layer flatshot` para dejar un limite explicito de cascada sin
+cambiar la prioridad relativa entre modulos.
 
 ## Metricas actuales
 
-Medicion no destructiva ejecutada sobre los tres CSS activos:
-
-| Archivo | Lineas | `!important` | Tokens declarados | `@media` | `@keyframes` |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| `styles.css` | 9.028 | 122 | 288 | 20 | 3 |
-| `ux-foundation.css` | 3.469 | 102 | 134 | 10 | 1 |
-| `ux-refactor.css` | 1.322 | 113 | 16 | 4 | 0 |
-| Total | 13.819 | 337 | 438 | 34 | 4 |
-
-Resumen de tokens:
-
-- Declaraciones de tokens CSS: 438.
-- Tokens unicos: 223.
-- Nombres de token declarados mas de una vez: 145.
-
-## Duplicados principales
-
-Tokens mas repetidos:
-
-| Token | Declaraciones |
-| --- | ---: |
-| `--column-gallery` | 11 |
-| `--column-inspector` | 11 |
-| `--inspector-w` | 6 |
-| `--topbar-h` | 6 |
-| `--statusbar-h` | 5 |
-| `--viewer-min` | 5 |
-| `--control-h` | 4 |
-| `--control-h-sm` | 4 |
-| `--footer-height` | 4 |
-| `--gallery-width` | 4 |
-| `--lot-rail-width` | 4 |
-| `--app-bg` | 3 |
-| `--border-subtle` | 3 |
-| `--color-bg-muted` | 3 |
-| `--color-bg-soft` | 3 |
-| `--color-border` | 3 |
-| `--color-border-strong` | 3 |
-| `--color-text` | 3 |
-| `--column-lot` | 3 |
-| `--line` | 3 |
-
-Selectores simples con muchas repeticiones aproximadas:
-
-| Selector | Repeticiones |
-| --- | ---: |
-| `.gallery-column` | 131 |
-| `.settings-panel` | 129 |
-| `.app-shell` | 104 |
-| `.preview-canvas` | 48 |
-| `.batch-rail` | 34 |
-| `.canvas-area` | 33 |
-| `.zoom-controls` | 30 |
-| `.empty-state` | 24 |
-| `.image-item` | 24 |
-| `.preview-header` | 24 |
-| `.batch-summary-card` | 23 |
-| `.preset-chip` | 22 |
-| `.gallery-filter` | 20 |
-| `.issue-item` | 20 |
-
-La repeticion de selectores no implica automaticamente codigo muerto. En esta
-base suele mezclar estado responsive, variantes visuales y overrides historicos.
-Por eso la recomendacion es consolidar por dominio visual, no con borrados
-globales por busqueda.
-
-## Riesgos de mantenibilidad
-
-### Riesgo 1: tokens re-declarados por capa
-
-- Archivos afectados: `styles.css`, `ux-foundation.css`, `ux-refactor.css`.
-- Gravedad: media-alta.
-- Riesgo: cambiar un token en la primera capa puede no tener efecto si otra capa
-  lo redefine despues.
-- Impacto: dificulta saber cual es la fuente real de verdad para superficies,
-  texto, radios, columnas, anchos de panel y alturas fijas.
-- Recomendacion: crear una tabla de tokens canonicos antes de mover reglas. Los
-  tokens de layout criticos (`--column-*`, `--*-width`, `--topbar-h`,
-  `--statusbar-h`) deben consolidarse despues de screenshots responsive.
-
-### Riesgo 2: uso alto de `!important`
-
-- Archivos afectados: `styles.css`, `ux-foundation.css`, `ux-refactor.css`.
-- Gravedad: media-alta.
-- Riesgo: un ajuste local puede requerir otro override aun mas especifico.
-- Impacto: aumenta regresiones visuales y hace dificil razonar por especificidad.
-- Recomendacion: reducir `!important` por componente, empezando por controles y
-  estados simples. No retirar varios overrides a la vez sin revisar foco,
-  hover, disabled, responsive y modo modal.
-
-### Riesgo 3: selectores de dominios mezclados
-
-- Archivos afectados: principalmente reglas de `.app-shell`,
-  `.gallery-column`, `.settings-panel`, `.preview-canvas`, `.batch-rail` y
-  `.canvas-area`.
-- Gravedad: media.
-- Riesgo: reglas de estructura, componente y estado conviven en varias capas.
-- Impacto: un cambio visual pequeno puede tocar layout global o provocar saltos.
-- Recomendacion: consolidar por dominios: shell/layout, galeria/lote, preview,
-  inspector, exportacion/modales y componentes `ui-*`.
-
-## Refactor recomendado
-
-### Fase CSS A: contrato y capturas
-
-- Mantener el orden de carga actual.
-- Capturar estados antes/despues para escritorio y movil:
-  - lote vacio;
-  - carpeta con PNGs;
-  - imagen seleccionada;
-  - inspector abierto;
-  - dialogo de exportacion;
-  - exportacion en progreso;
-  - errores/preflight.
-- Registrar viewport, DPI si aplica y fecha de captura.
-
-### Fase CSS B: tokens canonicos
-
-- Declarar una fuente principal para colores, texto, radios, sombras y
-  espaciado.
-- Separar tokens de layout que cambian por responsive de tokens visuales.
-- No eliminar alias antiguos hasta confirmar que no se usan en los tres CSS.
-- Mantener nombres existentes donde la UI ya depende de ellos.
-
-### Fase CSS C: componentes comunes
-
-- Consolidar primero componentes `ui-*`, botones, badges, empty states,
-  progress y modales.
-- Reducir `!important` dentro de un componente a la vez.
-- Verificar foco visible, contraste, overflow y estados disabled/active.
-
-### Fase CSS D: layout de dominios
-
-- Consolidar `app-shell`, topbar/statusbar, galeria, batch rail, preview canvas
-  e inspector por bloques completos.
-- Evitar mover reglas de layout y color en el mismo cambio.
-- Probar viewports estrechos antes de retirar reglas duplicadas.
-
-### Fase CSS E: limpieza de capas
-
-- Solo despues de las fases anteriores, evaluar si `ux-refactor.css` puede
-  reducirse o fusionarse parcialmente.
-- Mantener una capa final de overrides solo si documenta estados temporales
-  claros.
-
-## Criterios de aceptacion para cambios CSS futuros
-
-- El orden de carga se mantiene o se documenta explicitamente el cambio.
-- No hay diferencias inesperadas en preview, batch grid, inspector, modales,
-  topbar, statusbar ni estados de preflight.
-- No aparecen solapamientos, overflow horizontal, saltos de layout ni perdida de
-  foco visible.
-- Cada retirada de `!important` tiene una razon local y una comprobacion visual.
-- La salida exportada permanece sin cambios; CSS no debe afectar el pipeline de
-  imagen ni el comportamiento de archivos.
-
-## Comandos usados para este inventario
+Medicion ejecutada con:
 
 ```powershell
-Get-ChildItem apps/flatshot-desktop/frontend/styles.css,apps/flatshot-desktop/frontend/ux-foundation.css,apps/flatshot-desktop/frontend/ux-refactor.css
+python scripts\audit_css.py --check
 ```
 
-```powershell
-Select-String -Path apps/flatshot-desktop/frontend/styles.css,apps/flatshot-desktop/frontend/ux-foundation.css,apps/flatshot-desktop/frontend/ux-refactor.css -Pattern '!important'
-```
+| Archivo | Lineas | `!important` | `:root` | Tokens |
+| --- | ---: | ---: | ---: | ---: |
+| `css/00-settings/tokens.css` | 293 | 0 | 7 | 255 |
+| `css/01-base/base.css` | 59 | 6 | 0 | 0 |
+| `css/02-layout/shell-workspace.css` | 127 | 0 | 0 | 0 |
+| `css/02-layout/topbar.css` | 357 | 1 | 0 | 0 |
+| `css/02-layout/footer.css` | 87 | 0 | 0 | 0 |
+| `css/03-components/primitives.css` | 233 | 0 | 0 | 0 |
+| `css/03-components/workflow-panels.css` | 238 | 0 | 0 | 0 |
+| `css/03-components/review-status-panels.css` | 162 | 0 | 0 | 0 |
+| `css/03-components/buttons.css` | 118 | 0 | 0 | 0 |
+| `css/03-components/forms.css` | 127 | 0 | 0 | 0 |
+| `css/03-components/navigation-controls.css` | 13 | 0 | 0 | 0 |
+| `css/03-components/status-badges.css` | 59 | 0 | 0 | 0 |
+| `css/03-components/cards.css` | 13 | 0 | 0 | 0 |
+| `css/03-components/empty-states.css` | 140 | 0 | 0 | 0 |
+| `css/03-components/progress-loaders.css` | 63 | 0 | 0 | 0 |
+| `css/03-components/dev-debug.css` | 30 | 1 | 0 | 0 |
+| `css/04-batch-gallery/batch-rail.css` | 293 | 0 | 0 | 0 |
+| `css/04-batch-gallery/source-import.css` | 254 | 0 | 0 | 0 |
+| `css/04-batch-gallery/batch-summary.css` | 255 | 1 | 0 | 0 |
+| `css/04-batch-gallery/gallery-shell.css` | 440 | 1 | 0 | 0 |
+| `css/04-batch-gallery/image-grid.css` | 444 | 1 | 0 | 0 |
+| `css/04-batch-gallery/thumbnails.css` | 291 | 0 | 0 | 0 |
+| `css/04-batch-gallery/review-devtools.css` | 60 | 0 | 0 | 0 |
+| `css/05-viewer/viewer-shell.css` | 75 | 0 | 0 | 0 |
+| `css/05-viewer/viewer-toolbar.css` | 335 | 0 | 0 | 0 |
+| `css/05-viewer/canvas.css` | 333 | 0 | 0 | 0 |
+| `css/05-viewer/viewer-states.css` | 134 | 0 | 0 | 0 |
+| `css/06-inspector-export/inspector-shell.css` | 269 | 2 | 0 | 0 |
+| `css/06-inspector-export/inspector-navigation.css` | 180 | 0 | 0 | 0 |
+| `css/06-inspector-export/inspector-workflow.css` | 187 | 0 | 0 | 0 |
+| `css/06-inspector-export/inspector-cards.css` | 350 | 0 | 0 | 0 |
+| `css/06-inspector-export/adjustments-presets.css` | 220 | 0 | 0 | 0 |
+| `css/06-inspector-export/adjustment-controls.css` | 219 | 0 | 0 | 0 |
+| `css/06-inspector-export/advanced-local-overrides.css` | 129 | 0 | 0 | 0 |
+| `css/06-inspector-export/export-panel.css` | 287 | 0 | 0 | 0 |
+| `css/06-inspector-export/output-profiles.css` | 467 | 0 | 0 | 0 |
+| `css/06-inspector-export/review-warnings.css` | 197 | 0 | 0 | 0 |
+| `css/07-modals/app-settings.css` | 161 | 0 | 0 | 0 |
+| `css/07-modals/batch-detail.css` | 214 | 0 | 0 | 0 |
+| `css/07-modals/export-confirm.css` | 137 | 0 | 0 | 0 |
+| `css/08-states-responsive/states.css` | 316 | 3 | 0 | 0 |
+| `css/08-states-responsive/responsive.css` | 390 | 0 | 0 | 0 |
+| `css/99-legacy-compat.css` | 2 | 0 | 0 | 0 |
+| **Total** | **8.758** | **16** | **7** | **255** |
 
-```powershell
-Select-String -Path apps/flatshot-desktop/frontend/styles.css,apps/flatshot-desktop/frontend/ux-foundation.css,apps/flatshot-desktop/frontend/ux-refactor.css -Pattern '^\s*(--[A-Za-z0-9-]+)\s*:'
-```
+Resumen:
 
-## Primer ajuste aplicado
+- Tokens unicos activos: 223.
+- Tokens duplicados entre archivos activos: 0.
+- `!important` activos: 16, limitados a ocultacion/accesibilidad y guards de estado existentes.
+- Selectores duplicados dentro del mismo contexto de cascada: 0.
+- Listas de selectores duplicadas dentro del mismo contexto, normalizadas por orden: 0.
+- Selectores con clases legacy de estado detectados: 0. Los estados visuales usan `data-ui-state`, `data-batch-context`, `data-status-footer` y `data-output-editing`.
+- Mayor modulo activo: `css/06-inspector-export/output-profiles.css`, 467 lineas. El contrato evita pasar de 500 lineas por archivo.
+- Todos los modulos enlazados tienen reglas activas; solo `css/99-legacy-compat.css` puede quedar vacio.
+- `css/99-legacy-compat.css` esta intencionadamente vacio salvo comentario.
 
-Se retiraron 25 aliases tempranos de `ux-foundation.css` que estaban
-redefinidos por el bloque final de la misma hoja. Se conservaron los aliases que
-esta capa sigue poseyendo, como `--semantic-success-soft`, `--semantic-info-*`,
-`--z-*` y `--ui-*`.
+## Propiedad por modulo
 
-Este ajuste no cambia selectores, `!important`, orden de carga, layout ni valores
-finales esperados de tokens.
+- `00-settings/`: tokens canonicos, aliases legacy y overrides responsive de tokens. Es el unico propietario de `:root`.
+- `01-base/`: reset, documento, tipografia base, foco y comportamiento primitivo de controles.
+- `02-layout/`: shell, topbar, workspace y footer.
+- `03-components/`: primitivas reutilizables, patrones de flujo, resultados/revision, botones, controles, chips, badges, cards, progress, estados vacios y dev/debug.
+- `04-batch-gallery/`: importacion, lote, fuente, resumen, filtros, galeria, grid y miniaturas.
+- `05-viewer/`: cabecera de preview, toolbar, canvas, zoom, fondos y estados de imagen.
+- `06-inspector-export/`: panel derecho, navegacion, tarjetas, workflows de edicion, presets, ajustes, exportacion, warnings y formatos activos.
+- `07-modals/`: ajustes de formatos, detalle de lote y confirmacion de exportacion.
+- `08-states-responsive/`: `data-ui-state`, clases `is-*`, responsive y guards finales.
+- `99-legacy-compat.css`: no debe recibir reglas nuevas salvo excepcion temporal documentada y con test.
 
-## Estado de esta fase
+## Contratos
 
-- Archivos CSS modificados: `apps/flatshot-desktop/frontend/ux-foundation.css`.
-- Cambios funcionales: ninguno esperado; limpieza de aliases CSS redundantes.
-- Checks manuales UI: no se ejecuto flujo visual completo; se verifico carga
-  estatica local de HTML/CSS/JS por HTTP.
-- Salida exportada: sin cambios; no se modifico procesamiento, preview,
-  exportacion ni escritura de archivos.
+- `index.html` debe enlazar solo los modulos anteriores y en ese orden.
+- Los antiguos `styles.css`, `ux-foundation.css` y `ux-refactor.css` no forman parte del runtime y no deben existir en la raiz del frontend.
+- No se declaran tokens fuera de `css/00-settings/tokens.css`; los cambios de estado deben expresarse como reglas, no como nuevos duenios de tokens.
+- Mantener una unica capa `@layer flatshot` en todos los modulos activos salvo `99-legacy-compat.css`. No dividir en multiples capas sin una fase especifica de QA, porque cambiaria la semantica de cascada.
+- Mantener `!important` por debajo de 25. Cualquier nuevo uso requiere razon local.
+- Mantener cada modulo CSS por debajo de 500 lineas. Si un archivo crece, dividir por subdominio antes de ampliar excepciones.
+- Mantener cero selectores duplicados y cero listas de selectores duplicadas dentro del mismo contexto de cascada; responsive y `@supports` son contextos distintos y se auditan por separado.
+- Mantener cero selectores con clases legacy de estado; nuevas pantallas y transiciones deben usar `data-ui-state` o atributos `data-*` derivados.
+- No reintroducir decoracion visual por runtime como `renderDesignSystemComponents()`; las reglas deben apuntar a clases reales del markup o templates.
+- No meter logica de negocio ni procesamiento en CSS/JS visual.
+
+## Validacion ejecutada en esta consolidacion
+
+- `python scripts\audit_css.py --check`: 43 CSS activos, capa `flatshot`, 8.758 lineas, 16 `!important`, 0 tokens duplicados entre archivos, 0 selectores duplicados y 0 listas de selectores duplicadas dentro del mismo contexto, maximo 467 lineas por modulo, 0 selectores legacy de estado.
+- `pytest tests\test_frontend_css_contract.py tests\test_frontend_export_payload.py`: 9 passed.
+- `pytest`: 292 passed.
+- Smoke Playwright en `?dev=1`: estados `initial`, `batch-ready`, `empty-folder`, `preview-error`, `export-ready` y `export-running`.
+- Viewports 1920x1080, 1440x900, 1366x768, 1080x844 y 390x844 en la revision posterior: sin overflow horizontal, sin solape topbar/workspace, sin errores JS de consola, 43 stylesheets cargados y capa `flatshot` visible en CSSOM.
+
+## Salida exportada
+
+Sin cambios esperados. La migracion solo toca CSS, `index.html`, documentacion,
+tests de contrato y auditoria; no modifica core, bridge, preview service,
+export runner, naming ni configuracion de salida.

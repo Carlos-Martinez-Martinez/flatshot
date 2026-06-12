@@ -1,0 +1,443 @@
+@layer flatshot {
+/* Batch and gallery: image grid/list items and text layout. */
+
+.brand-copy strong, .brand-copy span, .source-panel-heading strong, .source-panel-heading span, .folder-item strong, .folder-item small, .image-copy strong, .image-copy small, .text-field span, .form-grid span, .advanced-grid span, .demo-switcher span, .mode-switcher span {
+  display: block;
+}
+
+.folder-item small, .image-copy small {
+  color: var(--text-secondary);
+}
+
+.image-list:empty {
+  display: none;
+}
+
+.image-item.exported {
+  box-shadow: inset 0 0 0 1px rgba(8, 125, 105, 0.32);
+}
+
+.app-shell[data-ui-state="no_folder"] .search-field, .app-shell[data-ui-state="no_folder"] .folder-list, .app-shell[data-ui-state="no_folder"] .batch-filter, .app-shell[data-ui-state="no_folder"] .image-list, .app-shell[data-ui-state="no_folder"] .empty-note {
+  display: none;
+}
+
+.image-list {
+  flex: 1 1 auto;
+  overscroll-behavior: contain;
+  margin-top: 12px;
+  padding-right: 4px;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: none;
+  align-content: stretch;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  grid-auto-flow: column;
+  grid-auto-columns: 104px;
+  margin: 0;
+  padding: 0 2px 4px;
+  scroll-snap-type: x proximity;
+}
+
+.image-item {
+  position: relative;
+  text-align: left;
+  align-items: center;
+  cursor: pointer;
+  width: 104px;
+  min-height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-8);
+  background: transparent;
+  padding: 7px;
+  grid-template-rows: 72px minmax(0, auto);
+  align-content: start;
+  scroll-snap-align: start;
+  transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.image-item:hover:not(:disabled) {
+  border-color: var(--line);
+  background: var(--bg-panel-muted);
+}
+
+.image-item.active {
+  border-color: var(--accent);
+  background: var(--accent-muted);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.image-item.warning {
+  box-shadow: inset 0 0 0 1px rgba(183, 121, 31, 0.34);
+  border-color: var(--warning-line);
+}
+
+.image-item.error {
+  box-shadow: inset 0 0 0 1px rgba(180, 35, 24, 0.36);
+  border-color: var(--danger-line);
+}
+
+.image-copy {
+  gap: 2px;
+  min-width: 0;
+  display: grid;
+}
+
+.image-copy strong {
+  color: var(--text-strong);
+  font-weight: 700;
+  font-size: 12px;
+  text-align: center;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-copy small {
+  color: var(--text-muted);
+  font-size: 11px;
+  display: none;
+}
+
+.image-item .state-chip {
+  font-size: var(--text-2xs);
+  min-height: 20px;
+  padding: 1px 7px;
+  align-self: start;
+  position: absolute;
+  top: 5px;
+  right: 5px;
+}
+
+.batch-panel .image-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-auto-flow: row;
+  grid-auto-columns: initial;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 7px;
+  margin-top: 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px 2px 10px;
+  scroll-snap-type: none;
+}
+
+.batch-panel .image-item {
+  position: relative;
+  width: 100%;
+  min-height: 68px;
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  grid-template-rows: none;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  padding: 6px 8px;
+  scroll-snap-align: none;
+  text-align: left;
+}
+
+.batch-panel .image-item:hover:not(:disabled) {
+  border-color: var(--line-soft);
+  background: #f7faf8;
+}
+
+.batch-panel .image-item.active {
+  border-color: var(--accent);
+  background: var(--accent-muted);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.batch-panel .image-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.batch-panel .image-copy strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-strong);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.batch-panel .image-copy small {
+  display: block;
+  overflow: hidden;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.batch-panel .image-item .state-chip {
+  position: static;
+  align-self: start;
+  max-width: 76px;
+}
+
+.batch-rail .image-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-auto-flow: row;
+  grid-auto-columns: initial;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 3px;
+  margin: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 8px 8px 12px;
+  scroll-snap-type: none;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(15, 23, 42, 0.18) transparent;
+}
+
+.batch-rail .image-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.batch-rail .image-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.batch-rail .image-list::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.18);
+  background-clip: padding-box;
+}
+
+.batch-rail .image-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.batch-rail .image-copy strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--rail-text);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 780;
+}
+
+.batch-rail .image-copy small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--rail-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.image-item:focus-visible {
+  outline: 2px solid var(--color-accent);
+  box-shadow: none;
+  outline-offset: 2px;
+}
+
+.gallery-column .image-item.warning:not(.active) {
+  border-color: var(--color-warning-border);
+  background: var(--color-warning-soft);
+}
+
+.gallery-column .image-item.error:not(.active) {
+  border-color: var(--color-error-border);
+  background: var(--color-error-soft);
+}
+
+.gallery-column .image-copy strong, .gallery-column .image-copy small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gallery-column[data-gallery-view="list"] .image-copy {
+  align-content: center;
+}
+
+.gallery-column[data-gallery-view="list"] .image-item.active::after {
+  left: 8px;
+  top: 8px;
+  max-width: 48px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gallery-column .image-item.active::after, .gallery-column[data-gallery-view="list"] .image-item.active::after {
+  content: none;
+  display: none;
+}
+
+.gallery-column .image-item:hover:not(:disabled) {
+  border-color: rgba(11, 23, 34, 0.08);
+  background: rgba(255, 255, 255, 0.78);
+  transform: translateY(-1px);
+}
+
+.gallery-column .image-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.gallery-column .image-copy strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.gallery-column .image-copy small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.78;
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 400;
+}
+
+.gallery-column[data-gallery-view="thumbs"] .image-copy strong {
+  text-align: left;
+}
+
+.gallery-column .image-list {
+  grid-auto-flow: row;
+  grid-auto-columns: initial;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(15, 23, 42, 0.18) transparent;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-auto-rows: max-content;
+  align-content: start;
+  margin: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.gallery-column .image-item {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  border: 1px solid transparent;
+  text-align: left;
+  min-height: 128px;
+  grid-template-rows: auto minmax(28px, auto);
+  gap: var(--space-1);
+  padding: 8px;
+  display: grid;
+  background: transparent;
+  border-color: transparent;
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  border-radius: var(--radius-sm);
+}
+
+.gallery-column[data-gallery-view="list"] .image-item {
+  grid-template-rows: 1fr;
+  border-radius: var(--radius-md);
+  min-height: 64px;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  align-items: center;
+  padding: var(--space-2);
+  gap: var(--space-3);
+}
+
+.gallery-column[data-gallery-view="list"] .image-item.active {
+  box-shadow: inset 3px 0 0 var(--color-primary), inset 0 0 0 1px var(--color-accent-border);
+}
+
+.gallery-column[data-gallery-view="list"] .image-copy strong, .gallery-column[data-gallery-view="list"] .image-copy small {
+  text-align: left;
+}
+
+.gallery-column[data-gallery-view="list"] .image-list {
+  gap: var(--space-2);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.gallery-column .image-item, .gallery-column[data-gallery-view="thumbs"] .image-item {
+  min-height: 158px;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  box-shadow: none;
+}
+
+.gallery-column[data-gallery-view="thumbs"] .image-copy small, .gallery-filter[hidden] {
+  display: none !important;
+}
+
+.gallery-column[data-gallery-view="thumbs"] .image-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+
+.gallery-column[data-gallery-view="thumbs"] .image-item {
+  padding: 10px;
+  min-height: 148px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.gallery-column .image-item.active {
+  border-color: var(--color-accent-border);
+  background: var(--color-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--color-accent-border);
+}
+
+.gallery-column .image-item.active::after {
+  position: absolute;
+  left: var(--space-3);
+  top: var(--space-3);
+  z-index: 2;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  padding: 2px var(--space-2);
+  color: #fff;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.2;
+  content: none;
+  display: none;
+}
+
+.gallery-column[data-gallery-view="thumbs"] .image-copy small {
+  display: none;
+}
+}

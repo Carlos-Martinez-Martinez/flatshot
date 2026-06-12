@@ -45,7 +45,7 @@ The previous Qt desktop surface has been retired:
 - Keep the frontend -> bridge export JSON aligned with `docs/FRONTEND_BRIDGE_EXPORT_CONTRACT.md`.
 - Keep frontend state values aligned with `docs/FRONTEND_STATE_CONTRACT.md`; new states need tests and documentation.
 - Keep low-use model decisions aligned with `docs/LOW_USE_MODELS_AUDIT.md`; do not remove legacy-looking models without a compatibility review.
-- Keep CSS consolidation aligned with `docs/CSS_CASCADE_INVENTORY.md`; do not remove cascade layers or broad `!important` overrides without visual parity checks.
+- Keep CSS consolidation aligned with `docs/CSS_CASCADE_INVENTORY.md`; the active frontend CSS is modular under `apps/flatshot-desktop/frontend/css/` and must keep its audited load order, single `@layer flatshot` boundary, token ownership, zero same-context duplicate selectors or selector groups, zero legacy shell state classes, no runtime design-system class injection, file-size limit and `!important` limits.
 
 ## Tests
 

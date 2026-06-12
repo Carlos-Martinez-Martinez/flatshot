@@ -1,0 +1,128 @@
+@layer flatshot {
+/* Inspector/export: advanced local override rows and edit-mode guards. */
+
+.advanced-controls {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.settings-panel .advanced-controls {
+  gap: var(--space-2);
+}
+
+.settings-panel .advanced-controls .control-row {
+  grid-template-columns: minmax(86px, 0.9fr) minmax(150px, 1.4fr) 44px;
+}
+
+.control-row--toggle, .control-row--select {
+  grid-template-columns: minmax(86px, 0.9fr) minmax(0, 1.4fr) 44px;
+}
+
+.control-row--select select {
+  grid-column: 2 / 4;
+  width: 100%;
+  height: 34px;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-panel);
+  padding: 0 var(--space-3);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+
+.settings-panel .preset-section, .settings-panel .appearance-section, .settings-panel .review-background-panel, .settings-panel .advanced-block, .settings-panel .local-adjustment {
+  margin: 0;
+}
+
+.settings-panel [data-inspector-section="advanced"] .preset-action-panel {
+  border-top: 1px solid var(--ui-border);
+  padding-top: var(--space-3);
+}
+
+.preset-section, .appearance-section, .review-background-panel, .advanced-block, .local-adjustment {
+  border-radius: var(--radius-sm);
+}
+
+.settings-panel.is-inspector-subview .local-adjustment[open] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  overflow: visible;
+}
+
+.settings-panel.is-inspector-subview .local-adjustment[open] > summary {
+  position: static;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  min-height: 0;
+  grid-column: 1;
+  padding: var(--space-3) var(--space-4);
+}
+
+.settings-panel.is-inspector-subview .local-adjustment[open] .local-adjustment__body {
+  position: static;
+  display: grid;
+  grid-column: 1;
+  gap: var(--space-2);
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.settings-panel.is-inspector-subview .local-adjustment[open] .local-control-row {
+  grid-template-columns: minmax(76px, 0.7fr) minmax(90px, 1fr) 64px;
+}
+
+.settings-panel.is-inspector-subview .local-adjustment[open] .local-control-row > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.control-row, .local-control-row {
+  min-width: 0;
+  display: grid;
+  align-items: center;
+  gap: var(--space-2);
+  grid-template-columns: minmax(84px, 0.75fr) minmax(110px, 1fr) 72px;
+}
+
+.number-input, .setting-number, .local-setting-number {
+  width: 72px;
+  min-width: 64px;
+  justify-self: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-panel.is-editing-preset .control-row, .settings-panel.is-editing-preset .local-control-row {
+  grid-template-columns: 96px minmax(82px, 1fr) 56px;
+  gap: var(--space-2);
+}
+
+.settings-panel.is-editing-preset .number-input, .settings-panel.is-editing-preset .setting-number, .settings-panel.is-editing-preset .local-setting-number {
+  width: 56px;
+  min-width: 56px;
+}
+
+.settings-panel.is-editing-preset .control-row > span, .settings-panel.is-editing-preset .local-control-row > span {
+  overflow: visible;
+  font-size: var(--font-size-sm);
+}
+
+.advanced-block:not([open]) .inspector-disclosure__body {
+  display: none;
+}
+
+.preset-section > summary .summary-copy, .appearance-section > summary .summary-copy, .advanced-block > summary .summary-copy, .local-adjustment > summary .summary-copy {
+  gap: 2px;
+}
+
+.preset-actions #save-preset.primary:disabled {
+  border-color: var(--color-border);
+  background: var(--color-bg-soft);
+  color: var(--color-text-muted);
+}
+}

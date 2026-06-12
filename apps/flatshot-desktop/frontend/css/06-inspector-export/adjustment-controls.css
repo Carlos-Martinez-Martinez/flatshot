@@ -1,0 +1,218 @@
+@layer flatshot {
+/* Inspector/export: adjustment controls, advanced controls and preset action list. */
+
+.control-stack {
+  display: grid;
+  gap: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-panel);
+  padding: var(--space-3);
+}
+
+.control-row {
+  display: grid;
+  align-items: center;
+  color: var(--color-text);
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  grid-template-columns: minmax(86px, 0.9fr) minmax(150px, 1.4fr) 44px;
+  gap: var(--space-3);
+  min-height: 34px;
+}
+
+.control-row > span {
+  overflow: hidden;
+  color: var(--color-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-md);
+}
+
+.control-row output {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-md);
+}
+
+.advanced-block {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-soft);
+  padding: 0;
+  overflow: hidden;
+  overflow-anchor: none;
+}
+
+.advanced-block summary {
+  padding: 0 var(--space-4);
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  color: var(--color-accent-hover);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  padding: 0 var(--space-4) var(--space-4);
+  margin-top: 0;
+}
+
+.advanced-grid label {
+  min-width: 0;
+}
+
+.advanced-grid input, .advanced-grid select {
+  width: 100%;
+  height: 38px;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-panel);
+  padding: 0 var(--space-3);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+}
+
+.advanced-grid input[type="checkbox"] {
+  width: 28px;
+  height: 28px;
+  justify-self: start;
+  padding: 0;
+  accent-color: var(--color-accent);
+}
+
+.advanced-grid .advanced-wide {
+  grid-column: 1 / -1;
+}
+
+.preset-group-heading {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.preset-group-heading strong {
+  min-width: 24px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-soft);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.preset-list {
+  flex-wrap: wrap;
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.preset-chip {
+  border-color: var(--line-soft);
+  min-height: 48px;
+  background: var(--color-bg-panel);
+  padding: var(--space-2) var(--space-3);
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  justify-content: stretch;
+  gap: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  text-align: left;
+  box-shadow: var(--shadow-xs);
+}
+
+.preset-chip::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-pill);
+  background: var(--color-text-subtle);
+  display: none;
+}
+
+.preset-chip:hover:not(:disabled) {
+  border-color: var(--color-accent-border);
+  background: var(--color-bg-soft);
+  color: var(--color-text-strong);
+}
+
+.preset-chip.active {
+  color: var(--color-accent-hover);
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent-border);
+  box-shadow: inset 0 0 0 1px var(--color-accent-border);
+}
+
+.preset-chip__name, .preset-chip__meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preset-chip__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.preset-chip__meta {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.preset-action-panel {
+  display: grid;
+  gap: var(--space-2);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
+}
+
+.preset-actions {
+  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.preset-actions button {
+  padding-inline: var(--space-3);
+  min-width: 0;
+  min-height: 34px;
+  overflow: hidden;
+  padding: 0 var(--space-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preset-actions [data-action="close-preset-editor"] {
+  margin-left: 0;
+}
+}

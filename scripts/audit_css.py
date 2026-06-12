@@ -1,0 +1,367 @@
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from collections import defaultdict
+from pathlib import Path
+
+
+CSS_MODULE_ORDER = [
+    "css/00-settings/tokens.css",
+    "css/01-base/base.css",
+    "css/02-layout/shell-workspace.css",
+    "css/02-layout/topbar.css",
+    "css/02-layout/footer.css",
+    "css/03-components/primitives.css",
+    "css/03-components/workflow-panels.css",
+    "css/03-components/review-status-panels.css",
+    "css/03-components/buttons.css",
+    "css/03-components/forms.css",
+    "css/03-components/navigation-controls.css",
+    "css/03-components/status-badges.css",
+    "css/03-components/cards.css",
+    "css/03-components/empty-states.css",
+    "css/03-components/progress-loaders.css",
+    "css/03-components/dev-debug.css",
+    "css/04-batch-gallery/batch-rail.css",
+    "css/04-batch-gallery/source-import.css",
+    "css/04-batch-gallery/batch-summary.css",
+    "css/04-batch-gallery/gallery-shell.css",
+    "css/04-batch-gallery/image-grid.css",
+    "css/04-batch-gallery/thumbnails.css",
+    "css/04-batch-gallery/review-devtools.css",
+    "css/05-viewer/viewer-shell.css",
+    "css/05-viewer/viewer-toolbar.css",
+    "css/05-viewer/canvas.css",
+    "css/05-viewer/viewer-states.css",
+    "css/06-inspector-export/inspector-shell.css",
+    "css/06-inspector-export/inspector-navigation.css",
+    "css/06-inspector-export/inspector-workflow.css",
+    "css/06-inspector-export/inspector-cards.css",
+    "css/06-inspector-export/adjustments-presets.css",
+    "css/06-inspector-export/adjustment-controls.css",
+    "css/06-inspector-export/advanced-local-overrides.css",
+    "css/06-inspector-export/export-panel.css",
+    "css/06-inspector-export/output-profiles.css",
+    "css/06-inspector-export/review-warnings.css",
+    "css/07-modals/app-settings.css",
+    "css/07-modals/batch-detail.css",
+    "css/07-modals/export-confirm.css",
+    "css/08-states-responsive/states.css",
+    "css/08-states-responsive/responsive.css",
+    "css/99-legacy-compat.css",
+]
+
+LEGACY_STYLESHEETS = {
+    "styles.css",
+    "ux-foundation.css",
+    "ux-refactor.css",
+}
+
+COMMENT_RE = re.compile(r"/\*.*?\*/", re.S)
+LINK_RE = re.compile(r"<link\b[^>]*\brel=[\"']stylesheet[\"'][^>]*\bhref=[\"']([^\"']+)[\"']", re.I)
+TOKEN_RE = re.compile(r"(?m)^\s*(--[A-Za-z0-9_-]+)\s*:")
+ROOT_RE = re.compile(r"(?m)^\s*:root\s*\{")
+LEGACY_STATE_CLASS_RE = re.compile(
+    r"\.app-shell\.(?:no-batch|empty-batch|has-batch|has-status-footer|is-exporting|is-scanning|is-output-editing)"
+)
+CSS_LAYER_NAME = "flatshot"
+CSS_TOTAL_LINE_LIMIT = 9_000
+CSS_IMPORTANT_LIMIT = 25
+CSS_FILE_LINE_LIMIT = 500
+
+
+def strip_comments(text: str) -> str:
+    return COMMENT_RE.sub("", text)
+
+
+def normalize_asset_path(href: str) -> str:
+    return href.split("?", 1)[0].lstrip("./")
+
+
+def linked_stylesheets(index_path: Path) -> list[str]:
+    html = index_path.read_text(encoding="utf-8")
+    return [normalize_asset_path(match) for match in LINK_RE.findall(html)]
+
+
+def active_css_paths(frontend_dir: Path) -> list[Path]:
+    return [frontend_dir / href for href in linked_stylesheets(frontend_dir / "index.html")]
+
+
+def css_display_name(path: Path) -> str:
+    parts = path.parts
+    if "css" in parts:
+        css_index = parts.index("css")
+        return Path(*parts[css_index:]).as_posix()
+    return path.name
+
+
+def stylesheet_versions(index_path: Path) -> set[str]:
+    html = index_path.read_text(encoding="utf-8")
+    return set(re.findall(r"[<](?:script|link)[^>]+[?]v=([^\"&]+)", html))
+
+
+def legacy_compat_payload(path: Path) -> str:
+    return strip_comments(path.read_text(encoding="utf-8")).strip()
+
+
+def css_layer_payload(path: Path) -> tuple[str | None, str]:
+    text = strip_comments(path.read_text(encoding="utf-8")).strip()
+    if not text:
+        return None, ""
+    prefix = f"@layer {CSS_LAYER_NAME}"
+    if not text.startswith(prefix):
+        return None, text
+    start = text.find("{")
+    if start == -1 or not text.endswith("}"):
+        return CSS_LAYER_NAME, text
+    return CSS_LAYER_NAME, text[start + 1 : -1].strip()
+
+
+def duplicated_selectors_same_context(paths: list[Path]) -> dict[str, dict[str, object]]:
+    selector_locations: dict[tuple[str, str], list[str]] = defaultdict(list)
+
+    for path in paths:
+        name = css_display_name(path)
+        css_without_comments = strip_comments(path.read_text(encoding="utf-8"))
+        context_stack: list[str] = []
+        for line_number, raw_line in enumerate(css_without_comments.splitlines(), start=1):
+            line = raw_line.strip()
+            if not line:
+                continue
+            if line.endswith("{") and line.startswith("@"):
+                context_stack.append(" ".join(line[:-1].strip().split()))
+                continue
+            if line.endswith("{") and not line.startswith("@"):
+                selector = " ".join(line[:-1].strip().split())
+                if selector and selector != ":root" and not selector.startswith(("from", "to")) and "%" not in selector:
+                    context = " / ".join(
+                        context for context in context_stack if not context.startswith("@layer")
+                    ) or "root"
+                    selector_locations[(context, selector)].append(f"{name}:{line_number}")
+                context_stack.append("{rule}")
+                continue
+            if line == "}" and context_stack:
+                context_stack.pop()
+
+    return {
+        f"{context} :: {selector}": {
+            "count": len(locations),
+            "locations": locations,
+        }
+        for (context, selector), locations in sorted(selector_locations.items())
+        if len(locations) > 1
+    }
+
+
+def split_selector_list(selector: str) -> list[str]:
+    selectors = []
+    current = []
+    depth = 0
+    for char in selector:
+        if char in "([":
+            depth += 1
+        elif char in ")]" and depth:
+            depth -= 1
+        if char == "," and depth == 0:
+            selectors.append("".join(current).strip())
+            current = []
+            continue
+        current.append(char)
+    selectors.append("".join(current).strip())
+    return [item for item in selectors if item]
+
+
+def normalize_selector_group(selector: str) -> str | None:
+    selectors = [" ".join(item.split()) for item in split_selector_list(selector)]
+    if len(selectors) < 2:
+        return None
+    return ", ".join(sorted(selectors))
+
+
+def duplicated_selector_groups_same_context(paths: list[Path]) -> dict[str, dict[str, object]]:
+    group_locations: dict[tuple[str, str], list[str]] = defaultdict(list)
+
+    for path in paths:
+        name = css_display_name(path)
+        css_without_comments = strip_comments(path.read_text(encoding="utf-8"))
+        context_stack: list[str] = []
+        for line_number, raw_line in enumerate(css_without_comments.splitlines(), start=1):
+            line = raw_line.strip()
+            if not line:
+                continue
+            if line.endswith("{") and line.startswith("@"):
+                context_stack.append(" ".join(line[:-1].strip().split()))
+                continue
+            if line.endswith("{") and not line.startswith("@"):
+                selector = " ".join(line[:-1].strip().split())
+                normalized_group = normalize_selector_group(selector)
+                if (
+                    normalized_group
+                    and selector != ":root"
+                    and not selector.startswith(("from", "to"))
+                    and "%" not in selector
+                ):
+                    context = " / ".join(
+                        context for context in context_stack if not context.startswith("@layer")
+                    ) or "root"
+                    group_locations[(context, normalized_group)].append(f"{name}:{line_number}")
+                context_stack.append("{rule}")
+                continue
+            if line == "}" and context_stack:
+                context_stack.pop()
+
+    return {
+        f"{context} :: {selector_group}": {
+            "count": len(locations),
+            "locations": locations,
+        }
+        for (context, selector_group), locations in sorted(group_locations.items())
+        if len(locations) > 1
+    }
+
+
+def css_metrics(paths: list[Path]) -> dict[str, object]:
+    files = []
+    token_locations: dict[str, list[str]] = {}
+    important_total = 0
+    line_total = 0
+    root_total = 0
+    legacy_state_class_total = 0
+
+    for path in paths:
+        name = css_display_name(path)
+        text = path.read_text(encoding="utf-8")
+        css_without_comments = strip_comments(text)
+        lines = text.count("\n") + 1
+        important = text.count("!important")
+        roots = len(ROOT_RE.findall(text))
+        tokens = TOKEN_RE.findall(text)
+        legacy_state_class_total += len(LEGACY_STATE_CLASS_RE.findall(css_without_comments))
+        line_total += lines
+        important_total += important
+        root_total += roots
+        for token in tokens:
+            token_locations.setdefault(token, []).append(name)
+        files.append(
+            {
+                "name": name,
+                "lines": lines,
+                "important": important,
+                "root_blocks": roots,
+                "token_declarations": len(tokens),
+                "unique_tokens": len(set(tokens)),
+            }
+        )
+
+    duplicated_tokens = {
+        token: sorted(set(locations))
+        for token, locations in token_locations.items()
+        if len(set(locations)) > 1
+    }
+
+    return {
+        "files": files,
+        "total_lines": line_total,
+        "total_important": important_total,
+        "total_root_blocks": root_total,
+        "legacy_state_class_selectors": legacy_state_class_total,
+        "unique_tokens": len(token_locations),
+        "duplicated_tokens_across_files": duplicated_tokens,
+        "duplicated_selectors_same_context": duplicated_selectors_same_context(paths),
+        "duplicated_selector_groups_same_context": duplicated_selector_groups_same_context(paths),
+    }
+
+
+def build_payload(project_root: Path) -> dict[str, object]:
+    frontend_dir = project_root / "apps" / "flatshot-desktop" / "frontend"
+    paths = active_css_paths(frontend_dir)
+    return {
+        "linked_stylesheets": linked_stylesheets(frontend_dir / "index.html"),
+        "versions": sorted(stylesheet_versions(frontend_dir / "index.html")),
+        "metrics": css_metrics(paths),
+        "layer": CSS_LAYER_NAME,
+        "legacy_compat_empty": legacy_compat_payload(frontend_dir / "css" / "99-legacy-compat.css") == "",
+    }
+
+
+def css_contract_failures(project_root: Path, payload: dict[str, object]) -> list[str]:
+    frontend_dir = project_root / "apps" / "flatshot-desktop" / "frontend"
+    paths = active_css_paths(frontend_dir)
+    metrics = payload["metrics"]
+    assert isinstance(metrics, dict)
+
+    failures: list[str] = []
+    linked = payload["linked_stylesheets"]
+    if linked != CSS_MODULE_ORDER:
+        failures.append("CSS links must match CSS_MODULE_ORDER exactly.")
+
+    linked_names = {Path(str(link)).name for link in linked}
+    if linked_names & LEGACY_STYLESHEETS:
+        failures.append("Legacy stylesheets must not be linked.")
+    for legacy_stylesheet in LEGACY_STYLESHEETS:
+        if (frontend_dir / legacy_stylesheet).exists():
+            failures.append(f"Legacy stylesheet still exists: {legacy_stylesheet}.")
+
+    if metrics["total_lines"] > CSS_TOTAL_LINE_LIMIT:
+        failures.append(f"CSS line count exceeds {CSS_TOTAL_LINE_LIMIT}.")
+    if metrics["total_important"] > CSS_IMPORTANT_LIMIT:
+        failures.append(f"!important count exceeds {CSS_IMPORTANT_LIMIT}.")
+    if metrics["legacy_state_class_selectors"] != 0:
+        failures.append("Legacy shell state selectors are not allowed.")
+    if metrics["duplicated_tokens_across_files"]:
+        failures.append("Token declarations must not be duplicated across files.")
+    if metrics["duplicated_selectors_same_context"]:
+        failures.append("Duplicate selectors in the same cascade context are not allowed.")
+    if metrics["duplicated_selector_groups_same_context"]:
+        failures.append("Duplicate selector groups in the same cascade context are not allowed.")
+    if not payload["legacy_compat_empty"]:
+        failures.append("css/99-legacy-compat.css must stay empty.")
+
+    file_metrics = metrics["files"]
+    assert isinstance(file_metrics, list)
+    too_large = [
+        str(item["name"])
+        for item in file_metrics
+        if isinstance(item, dict) and item["lines"] > CSS_FILE_LINE_LIMIT
+    ]
+    if too_large:
+        failures.append(f"CSS modules exceed {CSS_FILE_LINE_LIMIT} lines: {', '.join(too_large)}.")
+
+    for path in paths:
+        if path.name == "99-legacy-compat.css":
+            continue
+        layer, payload_text = css_layer_payload(path)
+        if layer != CSS_LAYER_NAME:
+            failures.append(f"{css_display_name(path)} must stay in @layer {CSS_LAYER_NAME}.")
+        if "{" not in payload_text:
+            failures.append(f"{css_display_name(path)} is linked but has no active rules.")
+
+    return failures
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Audit FlatShot frontend CSS cascade contract.")
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Exit with a non-zero status when the CSS cascade contract is violated.",
+    )
+    args = parser.parse_args()
+
+    project_root = Path(__file__).resolve().parents[1]
+    payload = build_payload(project_root)
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    if args.check:
+        failures = css_contract_failures(project_root, payload)
+        if failures:
+            print("\nCSS audit failed:", file=sys.stderr)
+            for failure in failures:
+                print(f"- {failure}", file=sys.stderr)
+            raise SystemExit(1)
+
+
+if __name__ == "__main__":
+    main()

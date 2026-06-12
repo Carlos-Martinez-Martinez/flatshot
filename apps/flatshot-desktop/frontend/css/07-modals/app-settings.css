@@ -1,0 +1,160 @@
+@layer flatshot {
+/* Modals: output format settings dialog. */
+
+.app-settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+  background: rgba(15, 23, 42, 0.32);
+}
+
+.app-settings-dialog {
+  width: min(1040px, calc(100vw - 48px));
+  max-height: min(780px, calc(100vh - 48px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-panel);
+  box-shadow: var(--shadow-md);
+}
+
+.app-settings-header, .app-settings-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+}
+
+.app-settings-header {
+  justify-content: space-between;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.app-settings-header h2 {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-strong);
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-tight);
+}
+
+.app-settings-header small {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.app-settings-footer {
+  justify-content: flex-end;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-soft);
+}
+
+.app-settings-footer .settings-footer-note {
+  min-width: 0;
+  margin-right: auto;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+}
+
+.app-settings-footer .settings-footer-note.warning {
+  color: #9a5b00;
+  font-weight: var(--font-weight-semibold);
+}
+
+.app-settings-footer .settings-footer-note.error {
+  color: var(--color-error);
+  font-weight: var(--font-weight-semibold);
+}
+
+.app-settings-content {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.output-format-list, .output-format-form {
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-5);
+}
+
+.output-format-list {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  overflow: hidden;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-bg-soft);
+}
+
+.output-format-form {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  overflow-y: auto;
+}
+
+.output-format-form .form-grid {
+  gap: var(--space-3);
+}
+
+.output-format-form input, .output-format-form select {
+  height: 36px;
+}
+
+.output-format-form input.is-invalid, .output-format-form select.is-invalid {
+  border-color: var(--color-error-border);
+  background: var(--color-error-soft);
+  box-shadow: 0 0 0 1px var(--color-error-border);
+}
+
+.output-format-form input.has-warning, .output-format-form select.has-warning {
+  border-color: var(--color-warning-border);
+  background: var(--color-warning-soft);
+}
+
+.app-settings-footer .primary.danger {
+  border-color: var(--color-error-border);
+  background: var(--color-error);
+}
+
+#app-settings-modal .output-format-list, #app-settings-modal .output-format-form {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.top-actions button, .inspector-actionbar button, .settings-toolbar-actions button, .app-settings-footer button {
+  min-height: 36px;
+  border-radius: var(--radius-sm);
+}
+
+#app-settings-modal .app-settings-dialog {
+  max-width: none;
+  height: calc(100vh - 32px);
+  max-height: none;
+  margin: 16px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  width: min(1080px, calc(100vw - 32px));
+}
+
+#app-settings-modal .app-settings-content {
+  min-height: 0;
+  display: grid;
+  gap: var(--space-4);
+  overflow: hidden;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(440px, 1.1fr);
+}
+}

@@ -1,0 +1,196 @@
+@layer flatshot {
+/* Inspector/export: review summary, warnings and issue cards. */
+
+.issue-list:empty {
+  display: none;
+}
+
+.issue-item span {
+  color: var(--text-muted);
+}
+
+.settings-panel .warning-summary {
+  border-color: rgba(15, 23, 42, 0.08);
+  background: #ffffff;
+  padding: 9px 10px;
+}
+
+.settings-panel .issue-list {
+  gap: 6px;
+}
+
+.settings-panel .issue-item {
+  border-color: rgba(245, 158, 11, 0.28);
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.08);
+  padding: 7px 9px;
+  color: var(--rail-warning);
+}
+
+.settings-panel .issue-item strong {
+  font-size: 12px;
+}
+
+.settings-panel .issue-item span {
+  font-size: 11px;
+}
+
+.issue-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.issue-item {
+  display: grid;
+  gap: var(--space-1);
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+  padding: var(--space-3);
+}
+
+.issue-item.error {
+  background: var(--color-error-soft);
+  color: var(--color-error);
+  border-color: var(--color-error-border);
+}
+
+.issue-item.clear {
+  border-color: var(--color-border);
+  background: var(--color-bg-soft);
+  color: var(--color-text-muted);
+}
+
+.issue-item strong, .issue-item span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-section {
+  gap: var(--space-3);
+}
+
+.review-card, .review-output-card, .issue-list-summary {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--color-bg-panel);
+  padding: var(--space-4);
+  box-shadow: var(--ui-shadow-card);
+}
+
+.review-card.ready, .issue-list-summary.ready {
+  border-color: rgba(15, 143, 114, 0.24);
+  background: linear-gradient(180deg, var(--color-bg-panel), var(--color-success-soft));
+}
+
+.review-card.warning, .issue-list-summary.warning {
+  border-color: var(--color-warning-border);
+  background: linear-gradient(180deg, var(--color-bg-panel), var(--color-warning-soft));
+}
+
+.review-card.error, .issue-list-summary.error {
+  border-color: var(--color-error-border);
+  background: linear-gradient(180deg, var(--color-bg-panel), var(--color-error-soft));
+}
+
+.review-card__header strong, .review-output-card strong, .issue-list-summary strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+}
+
+.review-card__header small, .review-output-card small, .issue-list-summary span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+}
+
+.review-issue, .issue-item {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-panel);
+  padding: var(--space-3);
+}
+
+.review-issue.warning, .issue-item.warning {
+  border-color: var(--color-warning-border);
+  background: var(--color-warning-soft);
+}
+
+.review-issue.error, .issue-item.error {
+  border-color: var(--color-error-border);
+  background: var(--color-error-soft);
+}
+
+.review-issue strong, .review-issue span, .issue-item strong, .issue-item span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.review-issue strong, .issue-item strong {
+  color: var(--color-text-strong);
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+}
+
+.review-issue span, .issue-item span {
+  color: var(--color-text-muted);
+  white-space: normal;
+  font-size: var(--font-size-sm);
+}
+
+.issue-item button {
+  min-height: 28px;
+  padding-inline: var(--space-2);
+}
+
+.issue-list-summary--compact {
+  padding: var(--space-3);
+}
+
+.issue-list-summary--compact span {
+  display: none;
+}
+
+.issue-list-summary.clear, .issue-item.clear {
+  border-color: var(--border-default);
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+}
+
+.issue-item.clear strong {
+  color: var(--text-primary);
+}
+
+.issue-item.clear span {
+  color: var(--text-secondary);
+}
+
+.warning-summary button, .issue-item button {
+  cursor: pointer;
+}
+
+.inspector-card.warning {
+  border-color: var(--semantic-warning-border);
+  background: var(--semantic-warning-soft);
+}
+}

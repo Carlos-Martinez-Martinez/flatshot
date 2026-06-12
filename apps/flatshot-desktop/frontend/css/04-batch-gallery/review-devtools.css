@@ -1,0 +1,59 @@
+@layer flatshot {
+/* Batch and gallery: review/debug scenario controls. */
+
+.review-panel summary {
+  padding: 7px 0;
+  color: var(--text-tertiary);
+}
+
+.review-panel[open] {
+  border-color: var(--border-subtle);
+  background: var(--surface);
+  padding: 0 var(--space-2) var(--space-2);
+}
+
+.review-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 0 0 var(--space-2);
+}
+
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.review-grid button, .review-actions button {
+  min-height: 28px;
+  padding: 0 7px;
+  font-size: var(--text-sm);
+}
+
+.review-panel p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.review-panel {
+  flex: 0 0 auto;
+  margin-top: var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  display: none;
+}
+
+html.dev-mode .review-panel {
+  display: block;
+}
+
+.batch-rail .review-panel {
+  flex: 0 0 auto;
+  margin: 0 14px 10px;
+}
+}

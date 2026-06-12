@@ -1,0 +1,139 @@
+@layer flatshot {
+/* Components: empty state patterns. */
+
+.empty-note:empty {
+  display: none;
+}
+
+.empty-note strong, .empty-note span, .empty-note small {
+  display: block;
+}
+
+.empty-note {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  color: var(--text-secondary);
+  text-align: center;
+  min-height: 118px;
+  background: var(--bg-panel);
+  border-color: var(--line);
+}
+
+.empty-state {
+  width: min(520px, 92%);
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.empty-state strong {
+  color: var(--text-strong);
+  font-size: 18px;
+  line-height: var(--line-tight);
+}
+
+.empty-state span:not(.empty-icon), .empty-state small {
+  max-width: 420px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.filmstrip-panel .empty-note {
+  min-height: 0;
+  margin: 0;
+  align-self: stretch;
+}
+
+.empty-state.initial-onboarding {
+  width: min(540px, calc(100% - 48px));
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.empty-note, .empty-state {
+  color: var(--text-secondary);
+}
+
+.empty-state.onboarding strong {
+  color: var(--color-text);
+  font-size: 18px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.empty-state__actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.empty-state.onboarding .empty-icon {
+  position: relative;
+  border-style: solid;
+  background: var(--color-primary-soft);
+  width: 72px;
+  height: 72px;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-md);
+  display: grid;
+  place-items: center;
+}
+
+.empty-state.onboarding .empty-icon::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: -12px;
+  width: 36px;
+  height: 18px;
+  border: 2px solid var(--color-border-strong);
+  border-bottom: 0;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: var(--color-bg-soft);
+  display: none;
+}
+
+.empty-state.onboarding .empty-icon svg {
+  width: 38px;
+  height: 38px;
+  fill: none;
+  stroke: var(--color-primary-hover);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.empty-state.onboarding {
+  margin: auto;
+  max-width: min(520px, calc(100% - 48px));
+  gap: var(--space-3);
+  background: rgba(255, 255, 255, 0.62);
+  justify-items: center;
+  align-content: center;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: none;
+  width: min(500px, calc(100% - 40px));
+  min-height: 320px;
+  border-style: solid;
+}
+
+.empty-state.onboarding .ghost-action {
+  border-color: var(--color-border);
+  background: var(--color-bg-panel);
+  color: var(--color-text);
+}
+}

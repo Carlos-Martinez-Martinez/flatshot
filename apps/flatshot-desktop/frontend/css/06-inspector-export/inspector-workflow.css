@@ -1,0 +1,186 @@
+@layer flatshot {
+/* Inspector/export: start, summary, alert and editing workflow states. */
+
+.inspector-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 0 var(--space-4);
+}
+
+.inspector-summary__main {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.inspector-summary__main strong {
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  font-weight: 700;
+}
+
+.inspector-summary__main small {
+  overflow: hidden;
+  color: var(--color-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+}
+
+.inspector-alert {
+  display: grid;
+  gap: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-warning-soft);
+  padding: var(--space-3);
+}
+
+.inspector-alert.error {
+  background: var(--color-error-soft);
+}
+
+.inspector-alert__head {
+  display: grid;
+  gap: 2px;
+}
+
+.inspector-alert__head strong {
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+}
+
+.inspector-alert__list {
+  display: grid;
+  gap: 3px;
+}
+
+.inspector-alert__list span {
+  overflow: hidden;
+  color: var(--color-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-xs);
+}
+
+.inspector-card, .inspector-subview-head {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+  border: 1px solid var(--border-default);
+  background: var(--surface-panel);
+  padding: var(--card-pad);
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+}
+
+.inspector-card__head {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.inspector-card__actions button {
+  min-height: 34px;
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.inspector-card__actions button:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-soft);
+}
+
+.settings-panel.is-editing-output {
+  overflow-x: hidden;
+}
+
+.settings-panel.is-editing-output .output-edit-actions button {
+  max-width: 100%;
+  white-space: nowrap;
+}
+
+.settings-panel input[type="range"] {
+  width: 100%;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+  min-width: 110px;
+}
+
+.settings-panel.is-editing-output .output-edit-actions {
+  position: sticky;
+  bottom: calc(var(--space-3) * -1);
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) 0 0;
+  background: linear-gradient(to top, var(--color-bg-panel) 85%, rgba(255, 255, 255, 0));
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.settings-panel.is-editing-output .output-edit-actions [data-action="apply-output-edit"] {
+  order: 1;
+}
+
+.settings-panel.is-editing-output .output-edit-actions [data-action="save-output-current-profile"], .settings-panel.is-editing-output .output-edit-actions [data-action="save-output-as-new"] {
+  order: 2;
+}
+
+.settings-panel.is-editing-output .output-edit-actions [data-action="cancel-output-edit"] {
+  order: 0;
+}
+
+.settings-panel.is-editing-preset .inspector-subview-head > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-panel.is-editing-preset .inspector-subview-head span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.inspector-subview-head {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.inspector-subview-head small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-panel {
+  overscroll-behavior: contain;
+  border-left-color: var(--line-soft);
+  flex-direction: column;
+  overflow-anchor: none;
+  scrollbar-gutter: stable;
+  border-left: 0;
+  display: grid;
+  align-content: start;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--color-bg-panel);
+  grid-column: 3;
+  grid-row: 1 / 3;
+  min-width: 0;
+  gap: 8px;
+  padding: 12px;
+}
+
+.inspector-processing-card {
+  grid-template-columns: minmax(0, 1fr);
+}
+}

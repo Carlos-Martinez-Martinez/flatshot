@@ -1,0 +1,126 @@
+@layer flatshot {
+/* Layout: app shell and workspace grid. */
+
+.app-shell[data-ui-state="scanning"] #batch-visible-count, .app-shell[data-ui-state="no_folder"] #batch-visible-count, .app-shell[data-ui-state="batch_empty"] #batch-visible-count, .app-shell[data-ui-state="scan_empty"] #batch-visible-count {
+  display: none;
+}
+
+.dev-status-strip {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+  padding: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.dev-status-strip span {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.dev-status-strip strong {
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.dev-status-strip em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-style: normal;
+}
+
+.bridge-meta {
+  display: grid;
+  gap: 5px;
+}
+
+.bridge-meta div {
+  display: grid;
+  grid-template-columns: 108px minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+.bridge-meta span {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.bridge-meta strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+}
+
+.app-shell[data-ui-state="no_folder"], .app-shell[data-ui-state="batch_empty"], .app-shell[data-ui-state="scan_empty"] {
+  grid-template-rows: var(--topbar-h) minmax(0, 1fr) 0;
+}
+
+.app-shell[data-ui-state="no_folder"] #top-primary-action, .app-shell[data-ui-state="batch_empty"] #top-primary-action, .app-shell[data-ui-state="scan_empty"] #top-primary-action {
+  display: inline-flex;
+}
+
+.top-summary {
+  justify-content: flex-start;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  min-width: 0;
+  gap: var(--space-3);
+}
+
+.app-shell[data-status-footer="true"] {
+  grid-template-rows: var(--header-height) minmax(0, 1fr) 34px;
+}
+
+.app-shell {
+  width: 100%;
+  height: 100dvh;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  overflow: hidden;
+  background: var(--color-bg-app);
+  user-select: none;
+  color: var(--color-text);
+  grid-template-rows: var(--header-height) minmax(0, 1fr) var(--footer-height);
+}
+
+.workspace {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  background: var(--color-border);
+  grid-template-columns: var(--fs-left-col) var(--fs-viewer-col) var(--fs-right-col);
+  overflow: hidden;
+  gap: 1px;
+  grid-template-rows: var(--fs-left-top-row) minmax(0, 1fr);
+}
+
+.app-shell[data-ui-state="no_folder"] .workspace, .app-shell[data-ui-state="scanning"] .workspace {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.app-shell[data-ui-state="batch_empty"] .workspace, .app-shell[data-ui-state="scan_empty"] .workspace {
+  grid-template-columns: minmax(0, 1fr) var(--column-inspector);
+}
+
+.app-shell[data-output-editing="true"] .workspace {
+  grid-template-columns: var(--fs-left-col) minmax(560px, 1fr) var(--fs-output-edit-col);
+}
+
+.app-shell[data-ui-state="scanning"] #top-primary-action {
+  border-color: var(--color-border);
+  background: var(--color-bg-soft);
+  color: var(--color-text-muted);
+  cursor: default;
+}
+}

@@ -2947,7 +2947,6 @@ function render() {
   renderInspector();
   renderFooter();
   renderAccessibilityHints();
-  renderDesignSystemComponents();
   syncOpenInspectorDisclosureHeights();
   keepActiveThumbnailVisible();
   if (sessionSnapshotPersistenceEnabled) {
@@ -3106,20 +3105,16 @@ function renderShell() {
     || state.exportStatus === "partial"
     || state.exportStatus === "failed";
   shell.classList.toggle("dev-mode", devMode);
-  shell.classList.toggle("no-batch", state.batch === "none");
-  shell.classList.toggle("empty-batch", state.batch === "empty");
-  shell.classList.toggle("has-batch", derived.hasBatchContext);
   shell.classList.toggle("has-selected-image", derived.hasSelectedImage);
   shell.classList.toggle("no-selected-image", !derived.hasSelectedImage);
   shell.classList.toggle("can-export", derived.canExport);
-  shell.classList.toggle("is-exporting", derived.isExporting);
-  shell.classList.toggle("is-scanning", state.batch === "scanning");
-  shell.classList.toggle("is-output-editing", state.outputEditMode);
   shell.classList.toggle("is-settings-open", state.appSettingsOpen);
-  shell.classList.toggle("has-status-footer", hasStatusFooter);
   shell.classList.toggle("export-completed", ["completed", "partial", "failed"].includes(state.exportStatus));
   shell.classList.toggle("inspector-collapsed", state.inspectorCollapsed);
   shell.dataset.uiState = visible.id;
+  shell.dataset.batchContext = derived.hasBatchContext ? "true" : "false";
+  shell.dataset.statusFooter = hasStatusFooter ? "true" : "false";
+  shell.dataset.outputEditing = state.outputEditMode ? "true" : "false";
   if (gallery) {
     gallery.dataset.galleryView = state.galleryView;
     gallery.dataset.outputBg = activeOutputProfile()?.background || state.background || "rgb230";
@@ -6215,45 +6210,6 @@ function setControlHint(target, hint) {
   if (!target.getAttribute("aria-label") && target.textContent.trim().length <= 2) {
     target.setAttribute("aria-label", hint.replace(/\s*\. Atajo:.*$/, ""));
   }
-}
-
-function renderDesignSystemComponents() {
-  $$("button").forEach((button) => {
-    button.classList.add("ui-button");
-    const isIcon = button.classList.contains("icon-button")
-      || (button.textContent.trim().length <= 2 && Boolean(button.getAttribute("aria-label")));
-    const isPrimary = button.classList.contains("primary");
-    const isDanger = button.classList.contains("danger-subtle") || button.classList.contains("danger");
-    const isGhost = button.classList.contains("btn-linklike");
-    button.classList.toggle("ui-button--icon", isIcon);
-    button.classList.toggle("ui-button--primary", isPrimary);
-    button.classList.toggle("ui-button--danger", isDanger);
-    button.classList.toggle("ui-button--ghost", isGhost);
-    button.classList.toggle("ui-button--secondary", !isPrimary && !isDanger && !isGhost && !isIcon);
-  });
-
-  addComponentClass(".top-bar", "ui-top-bar");
-  addComponentClass(".workspace", "ui-app-workspace");
-  addComponentClass(".gallery-column", "ui-gallery-panel");
-  addComponentClass(".preview-panel", "ui-viewer-panel");
-  addComponentClass(".settings-panel", "ui-inspector-panel");
-  addComponentClass(".bottom-bar", "ui-status-bar");
-  addComponentClass(".preview-toolbar, .gallery-toolbar, .settings-toolbar, .top-actions, .inspector-actionbar, .warning-actions, .result-actions", "ui-toolbar");
-  addComponentClass(".segmented", "ui-segmented-control");
-  addComponentClass(".inspector-tabs", "ui-tabs");
-  addComponentClass(".state-chip, .status-badge, .preflight-chip, .batch-rail__badge, .asset-state", "ui-status-badge");
-  addComponentClass(".batch-summary-card, .preset-summary-card, .compact-panel, .review-card, .format-preview-card, .format-validation-card, .export-confirm-summary, .inspector-output-card, .inspector-summary, .inspector-compact-row, .active-output-row, .output-profile-option", "ui-summary-card");
-  addComponentClass(".image-item", "ui-thumbnail-card");
-  addComponentClass(".settings-section, .batch-detail-section, .export-confirm-section, .context-panel", "ui-inspector-section");
-  addComponentClass(".app-settings-dialog", "ui-modal-shell");
-  addComponentClass(".app-settings-backdrop", "ui-modal-backdrop");
-  addComponentClass(".empty-state", "ui-empty-state");
-  addComponentClass(".progress-track, .context-progress", "ui-progress-state");
-  addComponentClass(".issue-item, .export-confirm-risk, .batch-detail-problem", "ui-problem-card");
-}
-
-function addComponentClass(selector, className) {
-  $$(selector).forEach((element) => element.classList.add(className));
 }
 
 function statusBarText() {

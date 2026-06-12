@@ -1,0 +1,62 @@
+@layer flatshot {
+/* Components: progress tracks, fills and loader animations. */
+
+.loader {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid #cad4d0;
+  border-top-color: var(--accent);
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+  transform: rotate(360deg);
+  }
+}
+
+@keyframes thumb-loading {
+  from {
+  background-position: 100% 0;
+  }
+  to {
+  background-position: -100% 0;
+  }
+}
+
+.progress-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-muted);
+}
+
+.progress-track, .context-progress {
+  border-radius: var(--radius-pill);
+}
+
+.context-progress {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  color: var(--text-muted);
+  position: relative;
+  min-height: 30px;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-soft);
+  padding: 0 var(--space-3);
+}
+
+@keyframes flatshot-indeterminate {
+  0% {
+  transform: translateX(-80%);
+  }
+  100% {
+  transform: translateX(80%);
+  }
+}
+}

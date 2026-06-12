@@ -1,0 +1,286 @@
+@layer flatshot {
+/* Inspector/export: export form, readiness, preflight and results. */
+
+.bridge-chip.connected, .bridge-chip.ready, .preflight-chip.ready, .state-chip.ready, .state-chip.bridge, .state-chip.exported, .pill.ready, .change-chip.ready {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+}
+
+.export-result {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.export-result:empty {
+  display: none;
+}
+
+.advanced-block, .local-adjustment, .export-summary {
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  border-radius: var(--radius-10);
+  border-color: var(--line-soft);
+}
+
+.export-summary {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  order: -1;
+}
+
+.export-state-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-12);
+  background: var(--bg-panel-muted);
+  padding: 12px;
+}
+
+.export-state-card span, .export-state-card em {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.export-state-card strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-strong);
+  font-size: 16px;
+}
+
+.export-state-card.ready {
+  border-color: var(--accent-border);
+  background: var(--accent-muted);
+}
+
+.export-state-card.warning, .export-state-card.running {
+  border-color: var(--warning-line);
+  background: var(--warning-soft);
+}
+
+.export-state-card.error {
+  border-color: var(--danger-line);
+  background: var(--danger-soft);
+}
+
+.export-config-list {
+  display: grid;
+  gap: 7px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-10);
+  background: var(--bg-panel);
+  padding: 10px 12px;
+}
+
+.export-config-list div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.export-config-list span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.export-config-list strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-strong);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.settings-panel:not(.is-editing-output) .export-section .form-grid, .settings-panel:not(.is-editing-output) .export-section > .text-field {
+  display: none;
+}
+
+.settings-panel.is-editing-output .export-summary {
+  order: 10;
+}
+
+.export-section {
+  min-height: 0;
+  border-bottom: 0;
+}
+
+.export-section .section-title {
+  order: -2;
+}
+
+.export-state-card, .export-config-list, .preflight-list {
+  display: none;
+}
+
+.settings-panel.is-editing-output .export-state-card, .settings-panel.is-editing-output .export-config-list, .settings-panel.is-editing-output .preflight-list {
+  display: grid;
+}
+
+.export-section .section-title .eyebrow, .export-section .section-title small, #preset-source, .change-chip {
+  display: none;
+}
+
+.review-background-panel, .preset-summary-card, .compact-panel, .warning-summary, .context-panel, .export-result, .issue-list {
+  min-width: 0;
+}
+
+.preset-summary-row, .preset-summary-main, .result-path, .result-header {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.preset-summary-main span, .preset-summary-row span, .result-path span, .compact-panel span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.preset-summary-main strong, .preset-summary-row strong, .result-path strong, .compact-panel strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.settings-panel.is-inspector-subview .export-section, .settings-panel.is-inspector-subview .warning-section {
+  gap: var(--card-gap);
+}
+
+.settings-panel.is-editing-output .export-section {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  overflow: visible;
+}
+
+.settings-panel.is-editing-output .export-section label, .settings-panel.is-editing-output .export-section input, .settings-panel.is-editing-output .export-section select {
+  min-width: 0;
+}
+
+.settings-panel.is-editing-output #export-summary {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.settings-panel.is-editing-output .export-section .form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.processing-card__controls, .selected-image-card__adjustment {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.processing-card__controls label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.processing-card__controls label > span, .selected-image-card__adjustment > span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.processing-card__controls select {
+  min-width: 0;
+  width: 100%;
+}
+
+.processing-card__controls > button, .selected-image-card__adjustment button {
+  min-height: 30px;
+}
+
+.processing-card__notice span {
+  font-size: var(--font-size-sm);
+}
+
+.processing-card__controls {
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.processing-card__select {
+  min-width: 0;
+}
+
+.processing-card__select select, .processing-card__controls select {
+  min-height: 36px;
+  border-radius: 8px;
+}
+
+.processing-card__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.processing-card__actions button, .selected-image-card__actions button, .inspector-output-card__actions button {
+  min-height: 32px;
+  border-radius: 8px;
+  padding: 0 10px;
+  white-space: nowrap;
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-accent-hover);
+  font-weight: 700;
+}
+
+.processing-card__actions button:hover:not(:disabled), .selected-image-card__actions button:hover:not(:disabled), .inspector-output-card__actions button:hover:not(:disabled), .panel-link-button:hover:not(:disabled) {
+  background: var(--color-accent-soft);
+}
+
+.processing-card__notice {
+  display: grid;
+  border: 1px solid #e2c76f;
+  background: #fff8df;
+  color: var(--color-text);
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  border-color: #ead58c;
+}
+
+.temporary-output-notice {
+  display: grid;
+  gap: var(--space-2);
+  background: var(--color-warning-soft);
+  border-color: var(--color-warning-border);
+}
+
+.temporary-output-notice > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.processing-card__notice button {
+  min-height: 30px;
+  white-space: nowrap;
+}
+}

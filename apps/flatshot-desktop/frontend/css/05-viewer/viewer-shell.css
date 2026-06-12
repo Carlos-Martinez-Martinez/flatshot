@@ -1,0 +1,74 @@
+@layer flatshot {
+/* Viewer: preview panel shell. */
+
+.batch-panel, .preview-panel, .settings-panel {
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface);
+}
+
+.preview-debug {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 10px;
+}
+
+.preview-debug > strong {
+  font-size: 12px;
+}
+
+.preview-debug .debug-meta {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.preview-debug .debug-meta strong {
+  direction: ltr;
+}
+
+.batch-rail, .gallery-column, .preview-panel, .settings-panel {
+  min-width: 0;
+  min-height: 0;
+}
+
+.batch-panel, .gallery-column, .preview-panel, .settings-panel {
+  min-width: 0;
+  min-height: 0;
+  background: var(--color-bg-panel);
+}
+
+.app-shell[data-ui-state="no_folder"] .preview-panel, .app-shell[data-ui-state="scanning"] .preview-panel, .app-shell[data-ui-state="batch_empty"] .preview-panel, .app-shell[data-ui-state="scan_empty"] .preview-panel {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.preview-mode-switch {
+  display: inline-grid;
+}
+
+.preview-mode-switch [data-preview-mode="processed"] {
+  display: none;
+}
+
+.app-shell[data-ui-state="no_folder"] .preview-panel {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.preview-panel {
+  min-height: 0;
+  border-left: 0;
+  display: grid;
+  overflow: hidden;
+  grid-template-rows: auto minmax(0, 1fr) 0;
+  min-width: 0;
+  background: var(--color-bg);
+  border-right: 1px solid var(--color-border);
+  grid-column: 2;
+  grid-row: 1 / 3;
+}
+
+.app-shell[data-ui-state="scanning"] .preview-panel {
+  grid-column: 1;
+  grid-row: 1;
+}
+}

@@ -1,0 +1,117 @@
+@layer flatshot {
+/* Components: buttons and button variants. */
+
+.empty-note button {
+  margin-top: var(--space-1);
+}
+
+.button-row {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.button-row button:not(.primary) {
+  min-width: 0;
+}
+
+.btn-linklike {
+  min-height: 32px;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent-hover);
+  font-weight: var(--font-weight-semibold);
+  box-shadow: none;
+}
+
+.primary {
+  min-width: 150px;
+  font-weight: 750;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  box-shadow: var(--shadow-xs);
+}
+
+.initial-onboarding .primary {
+  min-width: 170px;
+}
+
+button, summary {
+  user-select: none;
+}
+
+button:not(.image-item):not(.preset-chip) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  line-height: 1;
+}
+
+button, .status-dot, .asset-state, .preflight-chip, .change-chip, .state-chip, .empty-output-chip {
+  user-select: none;
+}
+
+button.primary {
+  border-color: var(--semantic-primary);
+  background: var(--semantic-primary);
+  color: var(--color-text-inverse);
+  font-weight: var(--font-weight-semibold);
+}
+
+.segmented button {
+  border-radius: var(--radius-6);
+  font-size: 12px;
+  min-height: var(--control-height-sm);
+  border-color: transparent;
+  background: transparent;
+  padding: 0 var(--space-3);
+  color: var(--color-text-muted);
+}
+
+.danger-subtle {
+  border-color: rgba(180, 35, 24, 0.18);
+  color: var(--color-error);
+}
+
+.ghost-action {
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-primary);
+}
+
+button:not(.primary):not(.danger):not(.danger-subtle):not(.btn-linklike):not(.ghost-action):not(.icon-button):not(.image-item):not(.preset-chip) {
+  border-color: var(--border-default);
+  background: var(--surface-panel);
+  color: var(--text-secondary);
+}
+
+.btn-linklike, .ghost-action {
+  border-color: transparent;
+  background: transparent;
+  color: var(--semantic-primary);
+}
+
+.danger, .danger-subtle {
+  border-color: var(--semantic-danger-border);
+  background: var(--semantic-danger-soft);
+  color: var(--semantic-danger);
+}
+
+.icon-button {
+  min-width: var(--control-height);
+  padding-inline: var(--space-2);
+}
+
+.top-more-menu__content button {
+  width: 100%;
+  justify-content: flex-start;
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-text);
+}
+
+.empty-state.onboarding .primary {
+  display: inline-flex;
+}
+}

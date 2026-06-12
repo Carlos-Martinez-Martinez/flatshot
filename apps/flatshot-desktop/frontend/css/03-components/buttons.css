@@ -40,7 +40,7 @@ button, summary {
   user-select: none;
 }
 
-button:not(.image-item):not(.preset-chip) {
+button:not(.image-item):not(.preset-chip):not(.output-profile-edit) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -80,7 +80,7 @@ button.primary {
   color: var(--color-primary);
 }
 
-button:not(.primary):not(.danger):not(.danger-subtle):not(.btn-linklike):not(.ghost-action):not(.icon-button):not(.image-item):not(.preset-chip) {
+button:not(.primary):not(.danger):not(.danger-subtle):not(.btn-linklike):not(.ghost-action):not(.icon-button):not(.image-item):not(.preset-chip):not(.output-profile-edit) {
   border-color: var(--border-default);
   background: var(--surface-panel);
   color: var(--text-secondary);

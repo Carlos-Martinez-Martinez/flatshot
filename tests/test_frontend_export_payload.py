@@ -29,7 +29,7 @@ def test_frontend_assets_share_output_flow_cache_token():
     asset_versions = re.findall(r'[<](?:script|link)[^>]+[?]v=([^"&]+)', html)
 
     assert asset_versions
-    assert set(asset_versions) == {"20260611-css-modules"}
+    assert set(asset_versions) == {"20260612-gallery-rail"}
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
@@ -52,7 +52,7 @@ const profiles = [
     format: "JPG",
     background: "rgb230",
     destinationMode: "source",
-    destinationValue: "_SALIDA_PRO",
+    destinationValue: "Salida",
     naming: "{{original}}{{suffix}}",
     suffix: "_PRO",
     width: 1800,
@@ -99,8 +99,8 @@ assert.deepEqual(payload, {{
     size: "1800x2400",
     background: "rgb230",
     destinationMode: "source",
-    destinationValue: "_SALIDA_PRO",
-    outputFolderName: "_SALIDA_PRO",
+    destinationValue: "Salida",
+    outputFolderName: "Salida",
     customOutputPath: "",
     namingTemplate: "{{original}}{{suffix}}",
     suffix: "_PRO",
@@ -115,7 +115,7 @@ assert.deepEqual(payload, {{
         suffix: "_PRO",
         naming_template: "{{original}}{{suffix}}",
         output_destination: "subfolder",
-        output_folder_name: "_SALIDA_PRO",
+        output_folder_name: "Salida",
         custom_output_path: null,
         output_width: 1800,
         output_height: 2400,

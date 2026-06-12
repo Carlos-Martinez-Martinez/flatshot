@@ -19,16 +19,18 @@
     const canToggle = Boolean(row.canToggle);
     const summary = row.summary || "";
     return `
-    <div class="active-output-row${active ? " is-primary" : ""}${enabled ? " is-enabled" : " is-disabled"}">
+    <div class="active-output-row${active ? " is-current" : ""}${enabled ? " is-enabled" : " is-disabled"}">
       <label class="output-toggle" title="${escapeHtml(canToggle ? "Activar o desactivar formato" : "Guarda el formato para activarlo")}">
         <input type="checkbox" data-output-profile-enabled-id="${escapeHtml(row.id)}" ${enabled ? "checked" : ""} ${canToggle ? "" : "disabled"} />
         <span></span>
       </label>
-      <button type="button" class="active-output-row__main" data-action="select-output-profile" data-output-profile-id="${escapeHtml(row.id)}" title="${escapeHtml(`${row.name} · ${summary}`)}">
-        <strong>${escapeHtml(row.name)}</strong>
+      <div class="active-output-row__main" title="${escapeHtml(`${row.name} · ${summary}`)}">
+        <span class="active-output-row__title">
+          <strong>${escapeHtml(row.name)}</strong>
+        </span>
         <small>${escapeHtml(summary)}</small>
-      </button>
-      ${active ? '<span class="active-output-row__tag">Principal</span>' : ""}
+      </div>
+      <button type="button" class="active-output-row__edit" data-action="select-output-profile" data-output-profile-id="${escapeHtml(row.id)}">Editar</button>
     </div>
   `;
   }
@@ -51,27 +53,27 @@
     const activeCount = Number(options.activeCount) || 0;
     const totalFiles = Number(options.totalFiles) || 0;
     const countLabel = activeCount === 1 ? "1 formato activo" : `${activeCount} formatos activos`;
-    const totalLabel = totalFiles
-      ? `${escapeHtml(options.formulaLabel || `${totalFiles} archivos previstos`)}`
+    const noteLabel = totalFiles
+      ? ""
       : activeCount
         ? "Pendiente de lote"
         : "Selecciona al menos un formato";
     return `
     <section class="inspector-output-card panel-summary-card">
-      <div class="inspector-output-card__head">
+      <header class="inspector-output-card__head">
         <div>
           <span>${escapeHtml("Exportación")}</span>
           <strong>${escapeHtml(countLabel)}</strong>
         </div>
-        <small>${totalLabel}</small>
-      </div>
+        ${noteLabel ? `<em class="inspector-output-card__note">${escapeHtml(noteLabel)}</em>` : ""}
+      </header>
       <div class="active-output-list" aria-label="Formatos activos del lote">
         ${rows.map(outputProfileInlineRowHtml).join("")}
       </div>
       ${options.dirty ? outputTemporaryNoticeHtml() : ""}
       <div class="inspector-output-card__actions">
-        <button type="button" data-action="open-app-settings">Formatos</button>
-        <button type="button" data-action="new-output-profile">Nuevo</button>
+        <button type="button" data-action="open-app-settings">Gestionar formatos</button>
+        <button type="button" data-action="new-output-profile">Nuevo formato</button>
       </div>
     </section>
   `;

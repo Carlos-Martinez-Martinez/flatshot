@@ -17,26 +17,22 @@
     const profile = options.profile || {};
     const validation = options.validation || { errors: [] };
     const errors = Array.isArray(validation.errors) ? validation.errors : [];
-    const dirty = Boolean(options.dirty);
-    const active = Boolean(options.active);
-    const enabled = Boolean(profile.enabled);
-    const summary = options.summary || "";
-    const status = dirty
-      ? "Cambios sin guardar"
-      : active
-        ? "Activo en este lote · Principal"
-        : enabled
-          ? "Formato activo"
-          : "Formato guardado";
+    const enabled = Boolean(options.enabled);
 
     return `
     <div class="format-editor-title">
       <div>
-        <span class="eyebrow">Formato editado</span>
+        <span class="eyebrow">Formato seleccionado</span>
         <strong>${escapeHtml(profile.name || "Formato sin nombre")}</strong>
-        <small>${escapeHtml(summary)}</small>
       </div>
-      <span class="status-badge ${errors.length ? "error" : dirty ? "warning" : active ? "ready" : ""}">${escapeHtml(errors.length ? "Revisar campos" : status)}</span>
+      <div class="format-editor-controls">
+        ${errors.length ? `<span class="status-badge error">${escapeHtml("Revisar campos")}</span>` : ""}
+        <label class="output-profile-toggle format-editor-toggle" title="${escapeHtml("Usar este formato en el lote")}">
+          <span class="switch-label">Usar en este lote</span>
+          <input type="checkbox" data-output-profile-draft-enabled ${enabled ? "checked" : ""} />
+          <span class="switch-track" aria-hidden="true"></span>
+        </label>
+      </div>
     </div>
   `;
   }
@@ -44,32 +40,16 @@
   function outputProfilePreviewHtml(options = {}) {
     const resultName = options.resultName || "imagen_original.jpg";
     const originalName = options.originalName || "imagen_original.png";
-    const destination = options.destination || "junto al origen";
-    const summary = options.summary || "";
     const resultPath = options.resultPath || resultName;
 
     return `
     <div class="format-preview-heading">
-      <span class="eyebrow">Ejemplo</span>
-      <strong>${escapeHtml(resultName)}</strong>
+      <span class="eyebrow">Ejemplo de salida</span>
     </div>
-    <div class="format-preview-grid">
-      <div>
-        <span>Original</span>
-        <strong title="${escapeHtml(originalName)}">${escapeHtml(originalName)}</strong>
-      </div>
-      <div>
-        <span>Resultado</span>
-        <strong title="${escapeHtml(resultPath)}">${escapeHtml(resultPath)}</strong>
-      </div>
-      <div>
-        <span>Formato</span>
-        <strong>${escapeHtml(summary)}</strong>
-      </div>
-      <div>
-        <span>Destino</span>
-        <strong title="${escapeHtml(destination)}">${escapeHtml(destination)}</strong>
-      </div>
+    <div class="format-preview-flow">
+      <strong title="${escapeHtml(originalName)}" aria-label="Original: ${escapeHtml(originalName)}">${escapeHtml(originalName)}</strong>
+      <span class="format-preview-arrow" aria-hidden="true">→</span>
+      <code title="${escapeHtml(resultPath)}" aria-label="Resultado: ${escapeHtml(resultPath)}">${escapeHtml(resultPath)}</code>
     </div>
   `;
   }
@@ -93,34 +73,21 @@
   function outputProfileManagerRowHtml(options = {}) {
     const profile = options.profile || {};
     const selected = Boolean(options.selected);
-    const active = Boolean(options.active);
     const enabled = Boolean(options.enabled);
-    const unsaved = Boolean(options.unsaved);
-    const canToggle = Boolean(options.canToggle);
-    const summary = options.summary || "";
-    const destination = options.destination || "";
-    const toggleTitle = canToggle
-      ? "Activar este formato en el lote"
-      : unsaved
-        ? "Guarda el formato para activarlo"
-        : "Activar o desactivar formato";
-    const marker = unsaved ? "Sin guardar" : active ? "Principal" : "";
+    const dirty = Boolean(options.dirty);
+    const title = dirty ? `${profile.name || "Formato"} · Cambios sin guardar` : profile.name || "Formato";
 
     return `
-      <div class="output-profile-option${selected ? " selected" : ""}${active ? " active" : ""}${enabled ? " enabled" : ""}">
-        <label class="output-profile-toggle" title="${escapeHtml(toggleTitle)}">
-          <input type="checkbox" data-output-profile-enabled-id="${escapeHtml(profile.id)}" ${enabled ? "checked" : ""} ${canToggle ? "" : "disabled"} />
-          <span aria-hidden="true"></span>
-        </label>
-        <button type="button" class="output-profile-edit" data-output-profile-id="${escapeHtml(profile.id)}" title="${escapeHtml(`${profile.name} · ${summary}`)}">
-          <span>
-            <strong>${escapeHtml(profile.name)}</strong>
-            <small>${escapeHtml(summary)}</small>
-            <small>${escapeHtml(destination)}</small>
+      <article class="output-profile-option${selected ? " selected" : ""}${enabled ? " enabled" : ""}${dirty ? " is-unsaved" : ""}">
+        <button type="button" class="output-profile-edit" data-output-profile-id="${escapeHtml(profile.id)}" title="${escapeHtml(title)}">
+          <span class="output-profile-text">
+            <span class="output-profile-mainline">
+              <strong>${escapeHtml(profile.name)}</strong>
+            </span>
+            ${dirty ? '<span class="visually-hidden">Cambios sin guardar</span>' : ""}
           </span>
-          <em>${escapeHtml(marker)}</em>
         </button>
-      </div>
+      </article>
     `;
   }
 
@@ -189,7 +156,7 @@
     if (profile.destinationMode === "custom") {
       return profile.destinationValue || "Carpeta personalizada";
     }
-    return profile.destinationValue || "_SALIDA_PRO";
+    return profile.destinationValue || "Salida";
   }
 
   function profileDestinationPreviewLabel(profile) {
@@ -204,7 +171,7 @@
     if (options.destinationMode === "custom") {
       return options.destinationValue || "Sin destino";
     }
-    return options.destinationValue || "_SALIDA_PRO";
+    return options.destinationValue || "Salida";
   }
 
   function namingHumanLabel(options = {}) {
@@ -238,34 +205,42 @@
     if (options.destinationMode === "custom") {
       return options.destinationValue || "Carpeta de salida sin configurar";
     }
-    return options.destinationValue || "_SALIDA_PRO";
+    return options.destinationValue || "Salida";
   }
 
   function outputProfileFooterState(options = {}) {
     const validation = options.validation || { errors: [] };
     const errors = Array.isArray(validation.errors) ? validation.errors : [];
     const dirty = Boolean(options.dirty);
+    const changeCount = Math.max(1, Number(options.changeCount) || 1);
     const profileCount = Number(options.profileCount) || 0;
-    const draft = options.draft || {};
     const isPersisted = Boolean(options.isPersisted);
+    const isNew = !isPersisted;
+    const noticeText = options.noticeText || "";
     const deleteDisabled = isPersisted && profileCount <= 1;
+    const canSave = (dirty || isNew) && errors.length === 0;
     return {
+      closeAction: isNew ? "cancel-output-profile-draft" : "close-app-settings",
+      closeLabel: isNew ? "Cancelar" : "Cerrar",
+      closeHidden: !isNew,
       deleteDisabled,
-      deleteTitle: deleteDisabled ? "Debe quedar al menos un formato" : "Eliminar formato seleccionado",
-      resetDisabled: !dirty,
-      saveDisabled: errors.length > 0 || !dirty,
-      applyDisabled: errors.length > 0,
-      applyLabel: dirty
-        ? "Guardar y activar"
-        : draft.enabled
-          ? "Usar en este lote"
-          : "Activar en este lote",
-      noteClass: `settings-footer-note ${errors.length ? "error" : dirty ? "warning" : ""}`,
+      deleteTitle: deleteDisabled ? "Debe quedar al menos un formato" : isPersisted ? "Eliminar formato seleccionado" : "Descartar formato nuevo",
+      resetDisabled: !dirty || isNew,
+      resetHidden: !dirty || isNew,
+      resetLabel: "Descartar",
+      saveDisabled: !canSave,
+      saveHidden: !dirty && !isNew,
+      saveLabel: "Guardar cambios",
+      noteClass: `settings-footer-note ${errors.length ? "error" : dirty || isNew ? "warning" : ""}`,
       noteText: errors.length
         ? errors[0]
-        : dirty
-          ? "Cambios sin guardar"
-          : "Sin cambios pendientes",
+        : noticeText
+          ? noticeText
+          : isNew
+          ? "Formato nuevo sin guardar"
+          : dirty
+            ? `${changeCount} ${changeCount === 1 ? "cambio sin guardar" : "cambios sin guardar"}`
+            : "Cambios guardados",
     };
   }
 

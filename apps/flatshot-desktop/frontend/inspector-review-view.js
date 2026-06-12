@@ -41,7 +41,7 @@
           <span>Lote</span>
           <strong>${escapeHtml(options.title || "")}</strong>
         </div>
-        <button type="button" class="panel-link-button" data-action="open-batch-detail">Detalle</button>
+        <button type="button" class="panel-link-button" data-action="open-batch-detail">Ver lote</button>
       </header>
       ${options.meta ? `<small class="panel-summary-card__meta">${escapeHtml(options.meta)}</small>` : ""}
     </section>
@@ -136,7 +136,7 @@
             <strong title="${escapeHtml(image.path || image.name)}">${escapeHtml(image.name)}</strong>
             <small>${escapeHtml(options.detail || "")}</small>
           </div>
-          <span class="selected-image-card__state">${escapeHtml(hasLocal ? "Personalizado" : "Lote")}</span>
+          <small class="selected-image-card__state">${escapeHtml(hasLocal ? "Ajuste personalizado" : "Ajuste del lote")}</small>
         </header>
         <div class="selected-image-card__actions">
           <button type="button" data-action="open-image-adjustment">${escapeHtml(hasLocal ? "Editar ajuste" : "Personalizar")}</button>
@@ -184,13 +184,9 @@
       </option>
     `).join("");
     const customizedCount = Number(options.customizedCount) || 0;
-    const appliedCount = Number(options.appliedCount) || 0;
     const customizedLabel = customizedCount
       ? `${customizedCount} imagen${customizedCount === 1 ? "" : "es"} mantiene${customizedCount === 1 ? "" : "n"} su ajuste personalizado.`
       : "";
-    const appliedLabel = appliedCount
-      ? `${appliedCount} ${appliedCount === 1 ? "imagen" : "imágenes"}`
-      : options.statusLabel || "Global";
     return `
     <section class="inspector-compact-row inspector-processing-card panel-summary-card">
       <header class="panel-summary-card__head">
@@ -198,7 +194,6 @@
           <span>Procesado</span>
           <strong>Ajuste del lote</strong>
         </div>
-        <small>${escapeHtml(appliedLabel)}</small>
       </header>
       <div class="processing-card__controls">
         <label class="processing-card__select">

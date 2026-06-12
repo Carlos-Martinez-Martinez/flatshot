@@ -71,7 +71,7 @@ assert.equal(output.includes('class="batch-detail-output"'), true);
 assert.equal(output.includes("<span>2.</span>"), true);
 assert.equal(output.includes('title="Web &lt;gris&gt;"'), true);
 assert.equal(output.includes("Web &lt;gris&gt;"), true);
-assert.equal(output.includes("<em>Principal</em>"), true);
+assert.equal(output.includes("<em>Principal</em>"), false);
 assert.equal(output.includes("JPG · 1800 × 2400"), true);
 assert.equal(output.includes('<span>Destino</span>'), true);
 assert.equal(output.includes('title="C:/Salida/&quot;web&quot;"'), true);
@@ -82,7 +82,7 @@ const secondaryOutput = helpers.batchDetailOutputHtml({{
   name: "PNG",
   active: false,
   summary: "PNG",
-  destination: "_SALIDA_PRO",
+  destination: "Salida",
   example: "camisa.png",
 }});
 assert.equal(secondaryOutput.includes("<span>1.</span>"), true);

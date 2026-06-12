@@ -237,7 +237,7 @@
   gap: 6px;
 }
 
-.processing-card__actions button, .selected-image-card__actions button, .inspector-output-card__actions button {
+.processing-card__actions button, .selected-image-card__actions button {
   min-height: 32px;
   border-radius: 8px;
   padding: 0 10px;
@@ -248,7 +248,7 @@
   font-weight: 700;
 }
 
-.processing-card__actions button:hover:not(:disabled), .selected-image-card__actions button:hover:not(:disabled), .inspector-output-card__actions button:hover:not(:disabled), .panel-link-button:hover:not(:disabled) {
+.processing-card__actions button:hover:not(:disabled), .selected-image-card__actions button:hover:not(:disabled), .panel-link-button:hover:not(:disabled) {
   background: var(--color-accent-soft);
 }
 
@@ -257,12 +257,12 @@
   border: 1px solid #e2c76f;
   background: #fff8df;
   color: var(--color-text);
-  gap: 8px;
+  gap: 6px;
   padding: 8px 10px;
   border-radius: 8px;
   grid-column: 1 / -1;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
   border-color: #ead58c;
 }
 
@@ -282,5 +282,6 @@
 .processing-card__notice button {
   min-height: 30px;
   white-space: nowrap;
+  justify-self: start;
 }
 }

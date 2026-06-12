@@ -57,13 +57,21 @@
 }
 
 .local-adjustment__actions {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: var(--space-1);
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(96px, 0.8fr) minmax(0, 1.4fr);
+  gap: var(--space-2);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
 }
 
 .local-adjustment__actions button {
+  min-width: 0;
   min-height: 32px;
+  overflow: hidden;
+  padding-inline: var(--space-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .advanced-grid label, .form-grid label, .text-field {
@@ -71,7 +79,7 @@
   gap: 6px;
 }
 
-.local-adjustment span {
+.local-adjustment__body span {
   display: block;
   color: var(--text-secondary);
 }

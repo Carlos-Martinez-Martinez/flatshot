@@ -87,7 +87,7 @@
       return [
         { state: "pending", title: "Carpeta seleccionada", detail: "Pendiente" },
         { state: "pending", title: "Imágenes listas", detail: "Pendiente" },
-        { state: "pending", title: "Destino de salida", detail: "Origen / _SALIDA_PRO" },
+        { state: "pending", title: "Destino de salida", detail: "Origen / Salida" },
       ];
     }
     if (options.batch === "empty") {

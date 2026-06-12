@@ -37,16 +37,20 @@
     const width = Number(options.width) || 0;
     const height = Number(options.height) || 0;
     const zoom = Number(options.zoom) || 100;
+    const inlineSize = options.inlineSize !== false;
     const zoomWidth = width ? Math.max(1, Math.round(width * zoom / 100)) : "";
     const zoomHeight = height ? Math.max(1, Math.round(height * zoom / 100)) : "";
-    const sizeStyle = zoomWidth && zoomHeight
-      ? ` style="width: ${zoomWidth}px; height: ${zoomHeight}px;" width="${width}" height="${height}"`
+    const sizeStyle = inlineSize && zoomWidth && zoomHeight
+      ? ` style="width: ${zoomWidth}px; height: ${zoomHeight}px;"`
+      : "";
+    const dimensionAttrs = width && height
+      ? ` width="${width}" height="${height}"`
       : "";
     const warning = options.warning
       ? `<div class="preview-warning-card">${escapeHtml(options.warning)}</div>`
       : "";
     return `
-      <img class="preview-image" src="${escapeHtml(options.src || "")}" alt="Vista previa de ${escapeHtml(options.imageName || "")}"${sizeStyle} />
+      <img class="preview-image" src="${escapeHtml(options.src || "")}" alt="Vista previa de ${escapeHtml(options.imageName || "")}"${sizeStyle}${dimensionAttrs} />
       ${warning}
     `;
   }

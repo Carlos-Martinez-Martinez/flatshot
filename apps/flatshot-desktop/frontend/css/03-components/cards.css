@@ -1,11 +1,11 @@
 @layer flatshot {
 /* Components: shared card primitives. */
 
-.batch-summary-card, .preset-summary-card, .compact-panel, .review-card, .format-preview-card, .format-validation-card, .export-confirm-summary, .inspector-output-card, .inspector-summary, .inspector-compact-row, .active-output-row, .output-profile-option, .settings-section, .batch-detail-section, .export-confirm-section, .context-panel, .issue-item, .export-confirm-risk, .batch-detail-problem {
+.batch-summary-card, .preset-summary-card, .compact-panel, .review-card, .format-validation-card, .export-confirm-summary, .inspector-output-card, .inspector-summary, .inspector-compact-row, .active-output-row, .output-profile-option, .settings-section, .batch-detail-section, .export-confirm-section, .context-panel, .issue-item, .export-confirm-risk, .batch-detail-problem {
   border-radius: var(--radius-sm);
 }
 
-.batch-summary-card, .preset-summary-card, .compact-panel, .review-card, .format-preview-card, .format-validation-card, .export-confirm-summary, .inspector-output-card, .inspector-summary, .inspector-compact-row, .active-output-row, .output-profile-option, .app-settings-dialog {
+.batch-summary-card, .preset-summary-card, .compact-panel, .review-card, .format-validation-card, .export-confirm-summary, .inspector-output-card, .inspector-summary, .inspector-compact-row, .active-output-row, .output-profile-option, .app-settings-dialog {
   box-shadow: var(--shadow-xs);
 }
 

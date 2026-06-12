@@ -185,7 +185,8 @@
 }
 
 .settings-panel .inspector-start:not(.is-hidden) {
-  display: block;
+  display: grid;
+  gap: 10px;
 }
 
 .settings-panel:not(.is-editing-preset) [data-inspector-section="adjustments"] {
@@ -246,14 +247,14 @@
 }
 
 .settings-panel input[type="range"]::-moz-range-track {
-  height: 5px;
-  border: 1px solid var(--color-border-strong);
+  height: 6px;
+  border: 1px solid color-mix(in srgb, var(--color-accent-border) 45%, var(--color-border));
   border-radius: var(--radius-pill);
   background: var(--color-bg-muted);
 }
 
 .settings-panel input[type="range"]::-moz-range-progress {
-  height: 5px;
+  height: 6px;
   border-radius: var(--radius-pill);
   background: var(--color-accent);
 }
@@ -264,5 +265,6 @@
   border: 2px solid var(--color-bg-panel);
   border-radius: var(--radius-pill);
   background: var(--color-accent);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
 }
 }

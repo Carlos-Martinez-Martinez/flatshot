@@ -22,7 +22,7 @@ def test_frontend_loads_only_modular_css_in_contract_order():
 
 
 def test_frontend_assets_share_css_module_cache_token():
-    assert audit_css.stylesheet_versions(FRONTEND_DIR / "index.html") == {"20260611-css-modules"}
+    assert audit_css.stylesheet_versions(FRONTEND_DIR / "index.html") == {"20260612-gallery-rail"}
 
 
 def test_css_modules_keep_cascade_contract():
@@ -69,6 +69,45 @@ def test_frontend_css_uses_data_state_contract_instead_of_legacy_shell_classes()
         text = path.read_text(encoding="utf-8")
         for class_name in legacy_state_classes:
             assert class_name not in text, f"{class_name} returned in {path}"
+
+
+def test_css_audit_detects_multiline_duplicate_selector_groups(tmp_path):
+    first = tmp_path / "first.css"
+    second = tmp_path / "second.css"
+    first.write_text(
+        """
+@layer flatshot {
+.alpha,
+.beta {
+  color: red;
+}
+
+@media (max-width: 720px) {
+  .alpha,
+  .beta {
+    color: blue;
+  }
+}
+}
+""",
+        encoding="utf-8",
+    )
+    second.write_text(
+        """
+@layer flatshot {
+.beta,
+.alpha {
+  color: green;
+}
+}
+""",
+        encoding="utf-8",
+    )
+
+    groups = audit_css.duplicated_selector_groups_same_context([first, second])
+
+    assert set(groups) == {"root :: .alpha, .beta"}
+    assert groups["root :: .alpha, .beta"]["count"] == 2
 
 
 def test_root_tokens_are_owned_by_tokens_module():

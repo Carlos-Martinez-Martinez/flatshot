@@ -32,10 +32,10 @@ def test_adjustment_editor_actions_use_explicit_scope_labels():
     assert 'data-action="save-preset-as-new"' in html
     assert "Guardar como nuevo" in html
     assert 'data-action="apply-local-adjustment"' in html
-    assert "Aplicar sólo a esta imagen" in html
+    assert "Aplicar a esta imagen" in html
     assert 'data-action="save-local-adjustment-as-new"' in html
-    assert "Guardar como nuevo ajuste" in html
-    assert "Restablecer al ajuste del lote" in html
+    assert "Guardar nuevo" in html
+    assert "Restablecer lote" in html
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
@@ -123,6 +123,7 @@ assert.equal(helpers.advancedDirtyCount({{
 assert.equal(helpers.backgroundLabel("transparent"), "transparente");
 assert.equal(helpers.backgroundLabel("white"), "blanco");
 assert.equal(helpers.backgroundLabel("rgb230"), "gris claro");
+assert.equal(helpers.backgroundLabel("rgb:245,246,247"), "RGB 245, 246, 247");
 assert.equal(helpers.backgroundLabel("unknown"), "gris claro");
 
 assert.equal(helpers.presetSummaryLine({{

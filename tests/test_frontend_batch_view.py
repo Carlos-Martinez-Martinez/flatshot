@@ -112,6 +112,7 @@ assert.equal(helpers.omissionSummaryText([
 assert.equal(helpers.batchBackgroundLabel("transparent"), "transparente");
 assert.equal(helpers.batchBackgroundLabel("white"), "blanco");
 assert.equal(helpers.batchBackgroundLabel("rgb230"), "gris claro");
+assert.equal(helpers.batchBackgroundLabel("rgb:245,246,247"), "RGB 245, 246, 247");
 assert.equal(helpers.batchDestinationLine({{
   destinationMode: "custom",
   destinationValue: "",
@@ -126,8 +127,8 @@ assert.equal(helpers.batchDestinationLine({{
 }}), "Junto al origen");
 assert.equal(helpers.batchDestinationLine({{
   destinationMode: "source",
-  destinationValue: "_SALIDA_PRO",
-}}), "Junto al origen · _SALIDA_PRO");
+  destinationValue: "Salida",
+}}), "Junto al origen · Salida");
 assert.equal(helpers.batchDestinationLine({{
   profileDestinations: ["WEB", "WEB"],
 }}), "WEB");
@@ -206,7 +207,7 @@ const summary = helpers.batchSummaryHtml({{
   sourcePath: 'C:/Lote/"uno"',
   sourceFolderName: "Lote uno",
   outputLine: "JPG 1800×2400",
-  destinationLine: "_SALIDA_PRO",
+  destinationLine: "Salida",
   outputProfileName: "Marketplace",
   namingExample: 'camisa <azul>.jpg',
   namingLabel: "original + _PRO",
@@ -217,7 +218,7 @@ assert.equal(summary.includes("batch-summary-card is-warning"), true);
 assert.equal(summary.includes("Lote &lt;actual&gt;"), true);
 assert.equal(summary.includes('title="C:/Lote/&quot;uno&quot;"'), true);
 assert.equal(summary.includes("6 archivos encontrados · 4 imágenes listas"), true);
-assert.equal(summary.includes("JPG 1800×2400 · _SALIDA_PRO"), true);
+assert.equal(summary.includes("JPG 1800×2400 · Salida"), true);
 assert.equal(summary.includes("camisa &lt;azul&gt;.jpg"), true);
 assert.equal(summary.includes("Avisos en la galería"), true);
 

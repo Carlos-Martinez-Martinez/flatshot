@@ -19,6 +19,60 @@
     return text === "PNG" ? "PNG" : "JPG";
   }
 
+  function clampRgbChannel(value) {
+    const channel = Number.parseInt(String(value).trim(), 10);
+    if (!Number.isInteger(channel) || channel < 0 || channel > 255) {
+      return null;
+    }
+    return channel;
+  }
+
+  function rgbBackgroundValue(red, green, blue) {
+    const channels = [red, green, blue].map(clampRgbChannel);
+    return channels.every((channel) => channel !== null)
+      ? `rgb:${channels.join(",")}`
+      : "";
+  }
+
+  function parseRgbBackground(value) {
+    const match = /^rgb\s*:\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})$/i.exec(String(value || "").trim());
+    if (!match) {
+      return null;
+    }
+    const channels = match.slice(1).map(clampRgbChannel);
+    return channels.every((channel) => channel !== null) ? channels : null;
+  }
+
+  function customRgbBackgroundValue(value) {
+    const text = String(value || "").trim();
+    const prefixed = parseRgbBackground(text);
+    if (prefixed) {
+      return `rgb:${prefixed.join(",")}`;
+    }
+    const channels = text.split(/[,\s]+/).filter(Boolean);
+    return channels.length === 3 ? rgbBackgroundValue(channels[0], channels[1], channels[2]) : "";
+  }
+
+  function isValidBackgroundValue(value) {
+    return ["rgb230", "white", "transparent"].includes(value) || Boolean(parseRgbBackground(value));
+  }
+
+  function normalizeBackgroundValue(value, fallback = "rgb230") {
+    if (["rgb230", "white", "transparent"].includes(value)) {
+      return value;
+    }
+    const custom = parseRgbBackground(value);
+    if (custom) {
+      return `rgb:${custom.join(",")}`;
+    }
+    return isValidBackgroundValue(fallback) ? normalizeBackgroundValue(fallback, "rgb230") : "rgb230";
+  }
+
+  function backgroundCustomText(value) {
+    const custom = parseRgbBackground(value);
+    return custom ? custom.join(", ") : "";
+  }
+
   function uniqueOutputProfileId(name = "formato", seed = Date.now()) {
     const base = String(name)
       .normalize("NFD")
@@ -35,9 +89,7 @@
     const width = Math.max(1, Number.parseInt(source.width, 10) || 1800);
     const height = Math.max(1, Number.parseInt(source.height, 10) || 2400);
     const format = normalizeExportFormat(source.format);
-    const background = ["rgb230", "white", "transparent"].includes(source.background)
-      ? source.background
-      : "rgb230";
+    const background = normalizeBackgroundValue(source.background);
     const destinationMode = source.destinationMode === "custom" ? "custom" : "source";
     return {
       id: String(source.id || uniqueOutputProfileId("formato", index)).trim(),
@@ -48,7 +100,7 @@
       height,
       background,
       destinationMode,
-      destinationValue: String(source.destinationValue || (destinationMode === "custom" ? "" : "_SALIDA_PRO")),
+      destinationValue: String(source.destinationValue || (destinationMode === "custom" ? "" : "Salida")),
       naming: String(source.naming || "{original}{suffix}"),
       suffix: source.suffix === undefined || source.suffix === null ? "_PRO" : String(source.suffix),
     };
@@ -89,6 +141,10 @@
   }
 
   function backgroundColorTuple(value) {
+    const custom = parseRgbBackground(value);
+    if (custom) {
+      return custom;
+    }
     if (value === "white") {
       return [255, 255, 255];
     }
@@ -126,7 +182,7 @@
       suffix: profile.suffix,
       naming_template: profile.naming,
       output_destination: profile.destinationMode === "custom" ? "custom" : "subfolder",
-      output_folder_name: profile.destinationMode === "source" ? profile.destinationValue || "_SALIDA_PRO" : null,
+      output_folder_name: profile.destinationMode === "source" ? profile.destinationValue || "Salida" : null,
       custom_output_path: profile.destinationMode === "custom" ? profile.destinationValue : null,
       output_width: size.width,
       output_height: size.height,
@@ -137,13 +193,22 @@
     const errors = [];
     const warnings = [];
     const fields = {};
+    const fieldMessages = {};
     const width = Number.parseInt(raw.width, 10);
     const height = Number.parseInt(raw.height, 10);
     const invalidFilenameChars = /[<>:"/\\|?*]/;
+    const rememberFieldMessage = (field, message) => {
+      if (!field) {
+        return;
+      }
+      fieldMessages[field] = fieldMessages[field] || [];
+      fieldMessages[field].push(message);
+    };
     const addError = (field, message) => {
       errors.push(message);
       if (field) {
         fields[field] = "error";
+        rememberFieldMessage(field, message);
       }
     };
     const addWarning = (field, message) => {
@@ -151,6 +216,7 @@
       if (field && fields[field] !== "error") {
         fields[field] = "warning";
       }
+      rememberFieldMessage(field, message);
     };
 
     if (!String(raw.name || "").trim()) {
@@ -159,8 +225,11 @@
     if (!["JPG", "PNG"].includes(normalizeExportFormat(raw.format))) {
       addError("format", "Elige JPG o PNG como tipo de archivo.");
     }
-    if (!["rgb230", "white", "transparent"].includes(raw.background)) {
-      addError("background", "Elige un fondo de salida válido.");
+    if (!isValidBackgroundValue(raw.background)) {
+      addError(raw.backgroundMode === "custom" ? "backgroundCustom" : "background", "Indica un RGB válido entre 0 y 255.");
+    }
+    if (normalizeExportFormat(raw.format) === "JPG" && raw.background === "transparent") {
+      addError("background", "JPG no admite transparencia. Selecciona fondo blanco, gris claro o cambia el tipo a PNG.");
     }
     if (!String(raw.width || "").trim() || !Number.isInteger(width) || width <= 0) {
       addError("width", "La anchura debe ser un número mayor que 0.");
@@ -176,7 +245,7 @@
     } else if (invalidFilenameChars.test(String(raw.naming || "").replaceAll("{original}", "").replaceAll("{suffix}", "").replaceAll("{folder}", "").replace(/\{index(?::0?\d+d)?\}/g, ""))) {
       addError("naming", "El nombre de archivo contiene caracteres no válidos.");
     } else if (!String(raw.naming || "").includes("{original}")) {
-      addWarning("naming", "Incluye {original} para mantener la referencia del archivo.");
+      addWarning("naming", "La plantilla debería incluir {original} para mantener la referencia del archivo.");
     }
     if (raw.destinationMode === "custom") {
       if (!String(raw.destinationValue || "").trim()) {
@@ -192,14 +261,21 @@
         addError("destinationValue", "La subcarpeta de salida contiene caracteres no válidos.");
       }
     }
-    return { errors: Array.from(new Set(errors)), warnings: Array.from(new Set(warnings)), fields };
+    Object.keys(fieldMessages).forEach((field) => {
+      fieldMessages[field] = Array.from(new Set(fieldMessages[field]));
+    });
+    return { errors: Array.from(new Set(errors)), warnings: Array.from(new Set(warnings)), fields, fieldMessages };
   }
 
   return {
+    backgroundCustomText,
     backgroundColorTuple,
+    customRgbBackgroundValue,
     dedupeOutputProfileIds,
     exportVariantId,
     exportVariantPayloadFromProfile,
+    isValidBackgroundValue,
+    normalizeBackgroundValue,
     normalizeExportFormat,
     normalizeOutputProfile,
     normalizeOutputProfileList,
@@ -207,6 +283,8 @@
     outputProfileSize,
     outputProfileValidation,
     parseOutputSize,
+    parseRgbBackground,
+    rgbBackgroundValue,
     uniqueOutputProfileId,
   };
 });

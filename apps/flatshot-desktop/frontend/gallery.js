@@ -248,7 +248,14 @@
     if (stored?.src === src || stored?.sourceSrc === src) {
       return stored;
     }
-    return { status: "loading", src, error: "" };
+    const state = { status: "loading", src, error: "" };
+    if (options.displaySrc !== undefined) {
+      state.displaySrc = options.displaySrc || "";
+    }
+    if (options.renderedOnly) {
+      state.renderedOnly = true;
+    }
+    return state;
   }
 
   function mockThumbnailDataUrl(image) {
@@ -280,7 +287,8 @@
     const status = current.status || "loading";
     const error = current.error || "Sin preview";
     const alt = `Miniatura de ${image.name}`;
-    const displaySrc = current.resolvedSrc || current.src || src;
+    const fallbackSrc = current.renderedOnly ? "" : current.src || src;
+    const displaySrc = current.resolvedSrc || current.displaySrc || fallbackSrc;
     return `
     <span class="thumb is-${escapeHtml(status)}" data-thumb-id="${escapeHtml(image.id)}">
       ${displaySrc ? `<img class="thumb-image" src="${escapeHtml(displaySrc)}" alt="${escapeHtml(alt)}" loading="eager" data-image-id="${escapeHtml(image.id)}" />` : ""}
@@ -317,6 +325,8 @@
     const thumbState = options.thumbState || {};
     const previewNote = thumbState.status === "error" ? " · sin preview" : "";
     const statusText = chipLabel ? ` · ${chipLabel}` : "";
+    const outputLabel = String(options.outputLabel || "").trim();
+    const outputText = outputLabel ? ` · ${outputLabel}` : "";
     const stateIcon = assetStatusIcon(effectiveStatus);
     const stateBadgeHtml = effectiveStatus === "ready" ? "" : `
       <span class="asset-state ${chipClass}" role="img" title="${escapeHtml(chipLabel || "Lista")}" aria-label="${escapeHtml(chipLabel || "Lista")}">
@@ -325,11 +335,12 @@
       </span>
     `;
     return `
-    <button type="button" class="image-item asset-row ${selected} ${chipClass}" data-image-id="${escapeHtml(image.id)}" title="${escapeHtml(title)}" aria-pressed="${selected ? "true" : "false"}" aria-label="${escapeHtml(`${image.name}${statusText}`)}">
+    <button type="button" class="image-item asset-row ${selected} ${chipClass}" data-image-id="${escapeHtml(image.id)}" title="${escapeHtml(title)}" aria-pressed="${selected ? "true" : "false"}" aria-label="${escapeHtml(`${image.name}${statusText}${outputText}`)}">
       ${thumbnailHtml(image, thumbState, options.thumbnailSrc || "")}
       <span class="image-copy">
         <strong>${escapeHtml(displayName)}</strong>
         <small>${escapeHtml(`${metadata}${previewNote}`)}</small>
+        ${outputLabel ? `<span class="image-output-label">${escapeHtml(outputLabel)}</span>` : ""}
       </span>
       ${stateBadgeHtml}
     </button>

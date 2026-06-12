@@ -68,59 +68,59 @@ python scripts\audit_css.py --check
 | Archivo | Lineas | `!important` | `:root` | Tokens |
 | --- | ---: | ---: | ---: | ---: |
 | `css/00-settings/tokens.css` | 293 | 0 | 7 | 255 |
-| `css/01-base/base.css` | 59 | 6 | 0 | 0 |
+| `css/01-base/base.css` | 61 | 7 | 0 | 0 |
 | `css/02-layout/shell-workspace.css` | 127 | 0 | 0 | 0 |
-| `css/02-layout/topbar.css` | 357 | 1 | 0 | 0 |
+| `css/02-layout/topbar.css` | 361 | 1 | 0 | 0 |
 | `css/02-layout/footer.css` | 87 | 0 | 0 | 0 |
 | `css/03-components/primitives.css` | 233 | 0 | 0 | 0 |
 | `css/03-components/workflow-panels.css` | 238 | 0 | 0 | 0 |
 | `css/03-components/review-status-panels.css` | 162 | 0 | 0 | 0 |
 | `css/03-components/buttons.css` | 118 | 0 | 0 | 0 |
-| `css/03-components/forms.css` | 127 | 0 | 0 | 0 |
+| `css/03-components/forms.css` | 149 | 0 | 0 | 0 |
 | `css/03-components/navigation-controls.css` | 13 | 0 | 0 | 0 |
 | `css/03-components/status-badges.css` | 59 | 0 | 0 | 0 |
 | `css/03-components/cards.css` | 13 | 0 | 0 | 0 |
 | `css/03-components/empty-states.css` | 140 | 0 | 0 | 0 |
 | `css/03-components/progress-loaders.css` | 63 | 0 | 0 | 0 |
-| `css/03-components/dev-debug.css` | 30 | 1 | 0 | 0 |
+| `css/03-components/dev-debug.css` | 34 | 1 | 0 | 0 |
 | `css/04-batch-gallery/batch-rail.css` | 293 | 0 | 0 | 0 |
 | `css/04-batch-gallery/source-import.css` | 254 | 0 | 0 | 0 |
 | `css/04-batch-gallery/batch-summary.css` | 255 | 1 | 0 | 0 |
-| `css/04-batch-gallery/gallery-shell.css` | 440 | 1 | 0 | 0 |
-| `css/04-batch-gallery/image-grid.css` | 444 | 1 | 0 | 0 |
+| `css/04-batch-gallery/gallery-shell.css` | 484 | 2 | 0 | 0 |
+| `css/04-batch-gallery/image-grid.css` | 468 | 1 | 0 | 0 |
 | `css/04-batch-gallery/thumbnails.css` | 291 | 0 | 0 | 0 |
 | `css/04-batch-gallery/review-devtools.css` | 60 | 0 | 0 | 0 |
 | `css/05-viewer/viewer-shell.css` | 75 | 0 | 0 | 0 |
 | `css/05-viewer/viewer-toolbar.css` | 335 | 0 | 0 | 0 |
 | `css/05-viewer/canvas.css` | 333 | 0 | 0 | 0 |
 | `css/05-viewer/viewer-states.css` | 134 | 0 | 0 | 0 |
-| `css/06-inspector-export/inspector-shell.css` | 269 | 2 | 0 | 0 |
+| `css/06-inspector-export/inspector-shell.css` | 271 | 2 | 0 | 0 |
 | `css/06-inspector-export/inspector-navigation.css` | 180 | 0 | 0 | 0 |
 | `css/06-inspector-export/inspector-workflow.css` | 187 | 0 | 0 | 0 |
-| `css/06-inspector-export/inspector-cards.css` | 350 | 0 | 0 | 0 |
-| `css/06-inspector-export/adjustments-presets.css` | 220 | 0 | 0 | 0 |
+| `css/06-inspector-export/inspector-cards.css` | 361 | 0 | 0 | 0 |
+| `css/06-inspector-export/adjustments-presets.css` | 228 | 0 | 0 | 0 |
 | `css/06-inspector-export/adjustment-controls.css` | 219 | 0 | 0 | 0 |
-| `css/06-inspector-export/advanced-local-overrides.css` | 129 | 0 | 0 | 0 |
-| `css/06-inspector-export/export-panel.css` | 287 | 0 | 0 | 0 |
-| `css/06-inspector-export/output-profiles.css` | 467 | 0 | 0 | 0 |
+| `css/06-inspector-export/advanced-local-overrides.css` | 151 | 0 | 0 | 0 |
+| `css/06-inspector-export/export-panel.css` | 288 | 0 | 0 | 0 |
+| `css/06-inspector-export/output-profiles.css` | 482 | 0 | 0 | 0 |
 | `css/06-inspector-export/review-warnings.css` | 197 | 0 | 0 | 0 |
 | `css/07-modals/app-settings.css` | 161 | 0 | 0 | 0 |
 | `css/07-modals/batch-detail.css` | 214 | 0 | 0 | 0 |
 | `css/07-modals/export-confirm.css` | 137 | 0 | 0 | 0 |
 | `css/08-states-responsive/states.css` | 316 | 3 | 0 | 0 |
-| `css/08-states-responsive/responsive.css` | 390 | 0 | 0 | 0 |
+| `css/08-states-responsive/responsive.css` | 471 | 0 | 0 | 0 |
 | `css/99-legacy-compat.css` | 2 | 0 | 0 | 0 |
-| **Total** | **8.758** | **16** | **7** | **255** |
+| **Total** | **8.998** | **18** | **7** | **255** |
 
 Resumen:
 
 - Tokens unicos activos: 223.
 - Tokens duplicados entre archivos activos: 0.
-- `!important` activos: 16, limitados a ocultacion/accesibilidad y guards de estado existentes.
+- `!important` activos: 18, limitados a ocultacion/accesibilidad y guards de estado existentes.
 - Selectores duplicados dentro del mismo contexto de cascada: 0.
 - Listas de selectores duplicadas dentro del mismo contexto, normalizadas por orden: 0.
 - Selectores con clases legacy de estado detectados: 0. Los estados visuales usan `data-ui-state`, `data-batch-context`, `data-status-footer` y `data-output-editing`.
-- Mayor modulo activo: `css/06-inspector-export/output-profiles.css`, 467 lineas. El contrato evita pasar de 500 lineas por archivo.
+- Mayor modulo activo: `css/04-batch-gallery/gallery-shell.css`, 484 lineas. El contrato evita pasar de 500 lineas por archivo.
 - Todos los modulos enlazados tienen reglas activas; solo `css/99-legacy-compat.css` puede quedar vacio.
 - `css/99-legacy-compat.css` esta intencionadamente vacio salvo comentario.
 
@@ -152,11 +152,12 @@ Resumen:
 
 ## Validacion ejecutada en esta consolidacion
 
-- `python scripts\audit_css.py --check`: 43 CSS activos, capa `flatshot`, 8.758 lineas, 16 `!important`, 0 tokens duplicados entre archivos, 0 selectores duplicados y 0 listas de selectores duplicadas dentro del mismo contexto, maximo 467 lineas por modulo, 0 selectores legacy de estado.
-- `pytest tests\test_frontend_css_contract.py tests\test_frontend_export_payload.py`: 9 passed.
-- `pytest`: 292 passed.
-- Smoke Playwright en `?dev=1`: estados `initial`, `batch-ready`, `empty-folder`, `preview-error`, `export-ready` y `export-running`.
-- Viewports 1920x1080, 1440x900, 1366x768, 1080x844 y 390x844 en la revision posterior: sin overflow horizontal, sin solape topbar/workspace, sin errores JS de consola, 43 stylesheets cargados y capa `flatshot` visible en CSSOM.
+- `python scripts\audit_css.py --check`: 43 CSS activos, capa `flatshot`, 8.998 lineas, 18 `!important`, 0 tokens duplicados entre archivos, 0 selectores duplicados y 0 listas de selectores duplicadas dentro del mismo contexto, maximo 484 lineas por modulo, 0 selectores legacy de estado.
+- `pytest tests\test_frontend_css_contract.py`: 8 passed.
+- `pytest`: 294 passed.
+- Smoke Playwright adicional en `1440x900` con `batch-ready` y salida `PNG transparente 1800x2400`: topbar sin resumen de lote ni punto suelto, selector de salida visible en galeria, miniaturas con etiqueta `PNG · transparente`, fondo transparente sincronizado con el viewer y sin overflow horizontal.
+- Smoke Playwright en `?dev=1`: matriz de escritorio `1920x1080`, `1440x900`, `1366x768` y `1080x844` en estados `batch-ready`, `output-edit`, `export-running`, `formats-modal`, `batch-detail-modal` y `export-confirm-modal`; sin overflow horizontal, sin solape topbar/workspace, sin toolbar fuera del header de preview y sin errores JS de consola.
+- Smoke Playwright responsive minimo `390x844`: `export-running` sin recorte de footer ni overflow horizontal.
 
 ## Salida exportada
 

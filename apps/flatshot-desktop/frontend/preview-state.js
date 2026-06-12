@@ -6,7 +6,7 @@
   root.FlatShotPreviewState = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   const DEFAULT_VIEW_MODE_LABELS = {
-    fit: "Encajar",
+    fit: "Completa",
     height: "Alto",
     width: "Ancho",
     manual: "Manual",
@@ -32,6 +32,31 @@
 
   function clampViewerZoom(value) {
     return Math.max(25, Math.min(320, Math.round(value)));
+  }
+
+  function viewerFitLayout(options = {}) {
+    const mode = options.mode || "fit";
+    const canvasWidth = Number(options.canvasWidth || 0);
+    const canvasHeight = Number(options.canvasHeight || 0);
+    const naturalWidth = Number(options.naturalWidth || 0);
+    const naturalHeight = Number(options.naturalHeight || 0);
+    if (!canvasWidth || !canvasHeight || !naturalWidth || !naturalHeight) {
+      return { width: 0, height: 0, zoom: 100 };
+    }
+    const modePadding = mode === "fit" ? 72 : 12;
+    const availableWidth = Math.max(1, canvasWidth - modePadding);
+    const availableHeight = Math.max(1, canvasHeight - modePadding);
+    const widthFit = availableWidth / naturalWidth;
+    const heightFit = availableHeight / naturalHeight;
+    const rawFit = mode === "width"
+      ? widthFit
+      : mode === "height" ? heightFit : Math.min(widthFit, heightFit);
+    const fit = Math.max(0.01, Math.min(3.2, rawFit));
+    return {
+      width: Math.max(1, Math.round(naturalWidth * fit)),
+      height: Math.max(1, Math.round(naturalHeight * fit)),
+      zoom: Math.max(1, Math.min(320, Math.round(fit * 100))),
+    };
   }
 
   function previewLoadingState(options = {}) {
@@ -203,6 +228,7 @@
     previewOrientation,
     previewSettingsLabel,
     previewSubtitle,
+    viewerFitLayout,
     viewerModeClass,
     viewerModeLabel,
   };

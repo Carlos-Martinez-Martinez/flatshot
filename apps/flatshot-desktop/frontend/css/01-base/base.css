@@ -5,6 +5,8 @@ summary {
   cursor: pointer;
 }
 
+[hidden] { display: none !important; }
+
 button, input, select, summary {
   color: inherit;
   transition: background-color var(--duration-fast) ease, border-color var(--duration-fast) ease, color var(--duration-fast) ease, box-shadow var(--duration-fast) ease, transform 120ms ease;

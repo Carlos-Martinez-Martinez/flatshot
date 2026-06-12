@@ -10,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
 HELPER_PATH = FRONTEND_DIR / "output-profile-view.js"
 INDEX_PATH = FRONTEND_DIR / "index.html"
+APP_PATH = FRONTEND_DIR / "app.js"
 
 
 def test_output_profile_view_helper_loads_before_app_script():
@@ -19,6 +20,87 @@ def test_output_profile_view_helper_loads_before_app_script():
     app_index = html.index("app.js")
 
     assert helper_index < app_index
+
+
+def test_output_profile_delete_uses_in_app_confirmation():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+    app_js = APP_PATH.read_text(encoding="utf-8")
+
+    delete_start = app_js.index("function deleteManagedOutputProfile()")
+    delete_end = app_js.index("function resetOutputProfileDraft()", delete_start)
+    delete_block = app_js[delete_start:delete_end]
+
+    assert 'id="output-delete-confirm"' in html
+    assert 'data-action="confirm-output-delete"' in html
+    assert 'data-action="cancel-output-delete"' in html
+    assert "is-confirming-delete" in app_js
+    assert "function confirmDeleteManagedOutputProfile()" in delete_block
+    assert "window.confirm" not in delete_block
+
+
+def test_background_preset_editor_stays_with_background_controls():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+    app_js = APP_PATH.read_text(encoding="utf-8")
+
+    image_section_index = html.index('class="format-form-section format-section-image"')
+    editor_index = html.index('id="background-preset-editor"')
+    preview_index = html.index('id="output-profile-preview"')
+    footer_index = html.index('<footer class="app-settings-footer">', preview_index)
+    form_end_index = html.index("</form>")
+
+    assert image_section_index < preview_index < form_end_index < footer_index < editor_index
+    assert "format-footer-workbench" not in html
+    assert "<span>Nombre</span>" in html
+    assert "Nombre del fondo" not in html
+    assert 'id="background-preset-swatch"' in html
+    assert 'class="background-preset-editor-fields"' in html
+    assert "summary.hidden = Boolean(editorState)" not in app_js
+    assert "preview.hidden = Boolean(editorState)" not in app_js
+    assert "workbench.classList.toggle(\"is-editing-background\"" not in app_js
+    assert "function positionBackgroundPresetEditor()" in app_js
+    assert "editor.style.left" in app_js
+    assert "editor.classList.toggle(\"is-transparent\"" in app_js
+    assert "editorFields" not in app_js
+    assert "swatch.classList.toggle(\"is-transparent\"" in app_js
+    assert "Muestra del fondo RGB" in app_js
+
+
+def test_transparent_background_switches_output_type_before_validation():
+    app_js = APP_PATH.read_text(encoding="utf-8")
+
+    update_start = app_js.index("function updateOutputProfileDraftFromForm()")
+    update_end = app_js.index("function setOutputProfileDraftEnabled", update_start)
+    update_block = app_js[update_start:update_end]
+
+    assert "function syncTransparentBackgroundFormat()" in update_block
+    assert update_block.index("syncTransparentBackgroundFormat();") < update_block.index("outputProfileDraftFromForm();")
+    assert 'formatInput.value = "PNG";' in update_block
+
+
+def test_destination_mode_clears_custom_path_before_validation():
+    app_js = APP_PATH.read_text(encoding="utf-8")
+
+    update_start = app_js.index("function updateOutputProfileDraftFromForm()")
+    update_end = app_js.index("function setOutputProfileDraftEnabled", update_start)
+    update_block = app_js[update_start:update_end]
+
+    assert "function syncOutputProfileDestinationMode()" in update_block
+    assert update_block.index("syncOutputProfileDestinationMode();") < update_block.index("outputProfileDraftFromForm();")
+    assert "function looksLikeAbsoluteOutputPath" in update_block
+    assert 'destinationInput.value = "Salida";' in update_block
+    assert "readPersistentValue(STORAGE_KEYS.lastOutputFolder)" in update_block
+
+
+def test_custom_destination_can_pick_folder_from_bridge():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+    app_js = APP_PATH.read_text(encoding="utf-8")
+
+    assert 'id="profile-destination-value-label"' in html
+    assert 'data-action="pick-output-profile-destination"' in html
+    assert "function pickOutputProfileDestination()" in app_js
+    assert 'bridgeRequest("/folders/pick"' in app_js
+    assert 'modeInput.value = "custom";' in app_js
+    assert 'destinationLabel.textContent = raw.destinationMode === "custom" ? "Carpeta" : "Subcarpeta";' in app_js
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
@@ -42,19 +124,33 @@ const heading = helpers.outputProfileEditorHeadingHtml({{
   profile,
   validation: {{ errors: [] }},
   dirty: false,
-  active: true,
+  enabled: true,
+  isPersisted: true,
   summary: "JPG · 1800x2400",
 }});
-assert.equal(heading.includes("Formato editado"), true);
+assert.equal(heading.includes("Formato seleccionado"), true);
 assert.equal(heading.includes("Web &lt;gris&gt;"), true);
-assert.equal(heading.includes("Activo en este lote · Principal"), true);
-assert.equal(heading.includes('status-badge ready'), true);
+assert.equal(heading.includes("Usar en este lote"), true);
+assert.equal(heading.includes("data-output-profile-draft-enabled"), true);
+assert.equal(heading.includes("En lote"), false);
+assert.equal(heading.includes("Principal"), false);
+assert.equal(heading.includes("Editado"), false);
+assert.equal(heading.includes("Activo en este lote"), false);
+assert.equal(heading.includes('status-badge ready'), false);
+assert.equal(helpers.outputProfileEditorHeadingHtml({{
+  profile: {{ name: "Nuevo formato" }},
+  validation: {{ errors: [] }},
+  enabled: false,
+  isPersisted: false,
+  new: true,
+}}).includes("Formato nuevo"), false);
 
 const invalidHeading = helpers.outputProfileEditorHeadingHtml({{
   profile,
   validation: {{ errors: ["Destino requerido"] }},
   dirty: true,
-  active: false,
+  enabled: false,
+  isPersisted: true,
   summary: "PNG",
 }});
 assert.equal(invalidHeading.includes("Revisar campos"), true);
@@ -69,6 +165,8 @@ const preview = helpers.outputProfilePreviewHtml({{
 }});
 assert.equal(preview.includes("camisa &quot;azul&quot;.png"), true);
 assert.equal(preview.includes("C:/Export/Lote_007_camisa_PRO.jpg"), true);
+assert.equal(preview.includes("Resultado"), true);
+assert.equal(preview.includes("<code"), true);
 
 const validationHtml = helpers.outputProfileValidationHtml({{
   errors: ["Formato invalido"],
@@ -84,17 +182,37 @@ assert.equal(emptyValidation, "");
 const row = helpers.outputProfileManagerRowHtml({{
   profile,
   selected: true,
-  active: true,
   enabled: true,
+  dirty: false,
+  new: false,
   unsaved: false,
   canToggle: false,
   summary: "JPG · 1800x2400",
-  destination: "_SALIDA_PRO",
+  destination: "Salida",
 }});
-assert.equal(row.includes("output-profile-option selected active enabled"), true);
-assert.equal(row.includes("disabled"), true);
-assert.equal(row.includes("Principal"), true);
+assert.equal(row.includes("output-profile-option selected enabled"), true);
+assert.equal(row.includes("output-profile-status-badge"), false);
+assert.equal(row.includes("data-output-profile-enabled-id"), false);
+assert.equal(row.includes("disabled"), false);
+assert.equal(row.includes("Usar"), false);
+assert.equal(row.includes("Usar en este lote"), false);
+assert.equal(row.includes("En lote"), false);
+assert.equal(row.includes("Principal"), false);
+assert.equal(row.includes("Activo"), false);
+assert.equal(row.includes("Editado"), false);
+assert.equal(row.includes("Nuevo"), false);
 assert.equal(row.includes("Web &lt;gris&gt;"), true);
+
+const dirtyRow = helpers.outputProfileManagerRowHtml({{
+  profile,
+  selected: true,
+  enabled: true,
+  dirty: true,
+}});
+assert.equal(dirtyRow.includes("output-profile-option selected enabled is-unsaved"), true);
+assert.equal(dirtyRow.includes("output-profile-unsaved-dot"), false);
+assert.equal(dirtyRow.includes("Cambios sin guardar"), true);
+assert.equal(dirtyRow.includes("Editado"), false);
 
 const name = helpers.outputNameFromTemplate(profile, {{
   original: "camisa",
@@ -171,7 +289,7 @@ assert.equal(helpers.destinationCompactLabel({{
 assert.equal(helpers.destinationCompactLabel({{
   destinationMode: "source",
   destinationValue: "",
-}}), "_SALIDA_PRO");
+}}), "Salida");
 assert.equal(helpers.destinationCompactLabel({{
   destinationMode: "source",
   destinationValue: "SALIDA",
@@ -189,7 +307,7 @@ assert.equal(helpers.profileDestinationLabel({{
 assert.equal(helpers.profileDestinationLabel({{
   destinationMode: "source",
   destinationValue: "",
-}}), "_SALIDA_PRO");
+}}), "Salida");
 assert.equal(helpers.profileDestinationPreviewLabel({{
   destinationMode: "custom",
   destinationValue: "",
@@ -253,12 +371,12 @@ assert.equal(helpers.destinationFallbackLabel({{
   destinationMode: "source",
   destinationValue: "",
   destinations: [],
-}}), "_SALIDA_PRO");
+}}), "Salida");
 assert.equal(helpers.destinationFallbackLabel({{
   destinationMode: "source",
   destinationValue: "",
-  destinations: ["_SALIDA_PRO", "_SALIDA_PRO"],
-}}), "_SALIDA_PRO");
+  destinations: ["Salida", "Salida"],
+}}), "Salida");
 assert.equal(helpers.destinationFallbackLabel({{
   destinationMode: "source",
   destinationValue: "",
@@ -272,14 +390,19 @@ assert.deepEqual(helpers.outputProfileFooterState({{
   profileCount: 1,
   validation: {{ errors: [] }},
 }}), {{
+  closeAction: "close-app-settings",
+  closeLabel: "Cerrar",
+  closeHidden: true,
   deleteDisabled: true,
   deleteTitle: "Debe quedar al menos un formato",
   resetDisabled: true,
+  resetHidden: true,
+  resetLabel: "Descartar",
   saveDisabled: true,
-  applyDisabled: false,
-  applyLabel: "Usar en este lote",
+  saveHidden: true,
+  saveLabel: "Guardar cambios",
   noteClass: "settings-footer-note ",
-  noteText: "Sin cambios pendientes",
+  noteText: "Cambios guardados",
 }});
 
 assert.deepEqual(helpers.outputProfileFooterState({{
@@ -289,14 +412,19 @@ assert.deepEqual(helpers.outputProfileFooterState({{
   profileCount: 2,
   validation: {{ errors: [] }},
 }}), {{
+  closeAction: "close-app-settings",
+  closeLabel: "Cerrar",
+  closeHidden: true,
   deleteDisabled: false,
   deleteTitle: "Eliminar formato seleccionado",
   resetDisabled: true,
+  resetHidden: true,
+  resetLabel: "Descartar",
   saveDisabled: true,
-  applyDisabled: false,
-  applyLabel: "Activar en este lote",
+  saveHidden: true,
+  saveLabel: "Guardar cambios",
   noteClass: "settings-footer-note ",
-  noteText: "Sin cambios pendientes",
+  noteText: "Cambios guardados",
 }});
 
 assert.deepEqual(helpers.outputProfileFooterState({{
@@ -306,14 +434,42 @@ assert.deepEqual(helpers.outputProfileFooterState({{
   profileCount: 2,
   validation: {{ errors: [] }},
 }}), {{
+  closeAction: "cancel-output-profile-draft",
+  closeLabel: "Cancelar",
+  closeHidden: false,
+  deleteDisabled: false,
+  deleteTitle: "Descartar formato nuevo",
+  resetDisabled: true,
+  resetHidden: true,
+  resetLabel: "Descartar",
+  saveDisabled: false,
+  saveHidden: false,
+  saveLabel: "Guardar cambios",
+  noteClass: "settings-footer-note warning",
+  noteText: "Formato nuevo sin guardar",
+}});
+
+assert.deepEqual(helpers.outputProfileFooterState({{
+  draft: {{ enabled: true }},
+  dirty: true,
+  isPersisted: true,
+  noticeText: "Guarda o descarta los cambios antes de cambiar de formato.",
+  profileCount: 2,
+  validation: {{ errors: [] }},
+}}), {{
+  closeAction: "close-app-settings",
+  closeLabel: "Cerrar",
+  closeHidden: true,
   deleteDisabled: false,
   deleteTitle: "Eliminar formato seleccionado",
   resetDisabled: false,
+  resetHidden: false,
+  resetLabel: "Descartar",
   saveDisabled: false,
-  applyDisabled: false,
-  applyLabel: "Guardar y activar",
+  saveHidden: false,
+  saveLabel: "Guardar cambios",
   noteClass: "settings-footer-note warning",
-  noteText: "Cambios sin guardar",
+  noteText: "Guarda o descarta los cambios antes de cambiar de formato.",
 }});
 
 assert.deepEqual(helpers.outputProfileFooterState({{
@@ -323,12 +479,17 @@ assert.deepEqual(helpers.outputProfileFooterState({{
   profileCount: 2,
   validation: {{ errors: ["Nombre requerido"] }},
 }}), {{
+  closeAction: "close-app-settings",
+  closeLabel: "Cerrar",
+  closeHidden: true,
   deleteDisabled: false,
   deleteTitle: "Eliminar formato seleccionado",
   resetDisabled: false,
+  resetHidden: false,
+  resetLabel: "Descartar",
   saveDisabled: true,
-  applyDisabled: true,
-  applyLabel: "Guardar y activar",
+  saveHidden: false,
+  saveLabel: "Guardar cambios",
   noteClass: "settings-footer-note error",
   noteText: "Nombre requerido",
 }});

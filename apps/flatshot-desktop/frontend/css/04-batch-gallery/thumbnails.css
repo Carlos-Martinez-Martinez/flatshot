@@ -108,9 +108,12 @@
 }
 
 .gallery-column .thumb-image {
-  width: 100%;
-  height: 100%;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
+  object-position: center;
   display: block;
 }
 
@@ -198,6 +201,9 @@ button, .status-dot, .asset-state, .preflight-chip, .change-chip, .state-chip {
   width: 52px;
   height: 52px;
   aspect-ratio: 1;
+  align-self: center;
+  justify-self: center;
+  padding: 0;
 }
 
 .gallery-column[data-gallery-view="thumbs"] .asset-state, .gallery-column .asset-state {
@@ -254,9 +260,22 @@ button, .status-dot, .asset-state, .preflight-chip, .change-chip, .state-chip {
   background: #e6e6e6;
 }
 
+.gallery-column[data-gallery-view="list"] .thumb-image {
+  width: 40px;
+  height: 40px;
+  max-width: 40px;
+  max-height: 40px;
+  object-fit: contain;
+  object-position: center;
+  align-self: center;
+  justify-self: center;
+}
+
 .gallery-column[data-output-bg="white"] .thumb {
   background: #fff;
 }
+
+.gallery-column[data-output-bg="custom"] .thumb { background: var(--custom-output-bg, #e6e6e6); }
 
 .gallery-column[data-output-bg="transparent"] .thumb {
   background: linear-gradient(45deg, rgba(15, 23, 42, 0.08) 25%, transparent 25%), linear-gradient(-45deg, rgba(15, 23, 42, 0.08) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, rgba(15, 23, 42, 0.08) 75%), linear-gradient(-45deg, transparent 75%, rgba(15, 23, 42, 0.08) 75%), #fff;

@@ -120,31 +120,60 @@ def css_layer_payload(path: Path) -> tuple[str | None, str]:
     return CSS_LAYER_NAME, text[start + 1 : -1].strip()
 
 
-def duplicated_selectors_same_context(paths: list[Path]) -> dict[str, dict[str, object]]:
-    selector_locations: dict[tuple[str, str], list[str]] = defaultdict(list)
-
+def iter_rule_selectors(paths: list[Path]):
     for path in paths:
         name = css_display_name(path)
         css_without_comments = strip_comments(path.read_text(encoding="utf-8"))
         context_stack: list[str] = []
+        pending_selector_lines: list[str] = []
+        pending_line_number: int | None = None
+
         for line_number, raw_line in enumerate(css_without_comments.splitlines(), start=1):
             line = raw_line.strip()
             if not line:
                 continue
-            if line.endswith("{") and line.startswith("@"):
-                context_stack.append(" ".join(line[:-1].strip().split()))
+
+            if line == "}":
+                pending_selector_lines = []
+                pending_line_number = None
+                if context_stack:
+                    context_stack.pop()
                 continue
-            if line.endswith("{") and not line.startswith("@"):
-                selector = " ".join(line[:-1].strip().split())
+
+            if line.endswith("{"):
+                prelude = line[:-1].strip()
+                selector_start_line = pending_line_number or line_number
+                if pending_selector_lines:
+                    prelude = " ".join([*pending_selector_lines, prelude])
+                    pending_selector_lines = []
+                    pending_line_number = None
+                prelude = " ".join(prelude.split())
+
+                if prelude.startswith("@"):
+                    context_stack.append(prelude)
+                    continue
+
+                selector = prelude
                 if selector and selector != ":root" and not selector.startswith(("from", "to")) and "%" not in selector:
                     context = " / ".join(
                         context for context in context_stack if not context.startswith("@layer")
                     ) or "root"
-                    selector_locations[(context, selector)].append(f"{name}:{line_number}")
+                    yield context, selector, f"{name}:{selector_start_line}"
                 context_stack.append("{rule}")
                 continue
-            if line == "}" and context_stack:
-                context_stack.pop()
+
+            in_rule = bool(context_stack and context_stack[-1] == "{rule}")
+            if not in_rule and not line.startswith("@"):
+                if pending_line_number is None:
+                    pending_line_number = line_number
+                pending_selector_lines.append(line)
+
+
+def duplicated_selectors_same_context(paths: list[Path]) -> dict[str, dict[str, object]]:
+    selector_locations: dict[tuple[str, str], list[str]] = defaultdict(list)
+
+    for context, selector, location in iter_rule_selectors(paths):
+        selector_locations[(context, selector)].append(location)
 
     return {
         f"{context} :: {selector}": {
@@ -184,34 +213,10 @@ def normalize_selector_group(selector: str) -> str | None:
 def duplicated_selector_groups_same_context(paths: list[Path]) -> dict[str, dict[str, object]]:
     group_locations: dict[tuple[str, str], list[str]] = defaultdict(list)
 
-    for path in paths:
-        name = css_display_name(path)
-        css_without_comments = strip_comments(path.read_text(encoding="utf-8"))
-        context_stack: list[str] = []
-        for line_number, raw_line in enumerate(css_without_comments.splitlines(), start=1):
-            line = raw_line.strip()
-            if not line:
-                continue
-            if line.endswith("{") and line.startswith("@"):
-                context_stack.append(" ".join(line[:-1].strip().split()))
-                continue
-            if line.endswith("{") and not line.startswith("@"):
-                selector = " ".join(line[:-1].strip().split())
-                normalized_group = normalize_selector_group(selector)
-                if (
-                    normalized_group
-                    and selector != ":root"
-                    and not selector.startswith(("from", "to"))
-                    and "%" not in selector
-                ):
-                    context = " / ".join(
-                        context for context in context_stack if not context.startswith("@layer")
-                    ) or "root"
-                    group_locations[(context, normalized_group)].append(f"{name}:{line_number}")
-                context_stack.append("{rule}")
-                continue
-            if line == "}" and context_stack:
-                context_stack.pop()
+    for context, selector, location in iter_rule_selectors(paths):
+        normalized_group = normalize_selector_group(selector)
+        if normalized_group:
+            group_locations[(context, normalized_group)].append(location)
 
     return {
         f"{context} :: {selector_group}": {

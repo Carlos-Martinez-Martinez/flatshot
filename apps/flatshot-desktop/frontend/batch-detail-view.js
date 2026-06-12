@@ -37,13 +37,11 @@
 
   function batchDetailOutputHtml(options = {}) {
     const indexLabel = `${Number(options.index) + 1 || 1}.`;
-    const activeMarker = options.active ? "<em>Principal</em>" : "";
     return `
     <div class="batch-detail-output">
       <div class="batch-detail-output__title">
         <span>${escapeHtml(indexLabel)}</span>
         <strong title="${escapeHtml(options.name || "")}">${escapeHtml(options.name || "")}</strong>
-        ${activeMarker}
       </div>
       <div class="batch-detail-output__meta">${escapeHtml(options.summary || "")}</div>
       ${batchDetailRowHtml("Destino", options.destination || "", options.destination || "")}

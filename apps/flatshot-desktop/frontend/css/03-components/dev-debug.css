@@ -17,6 +17,10 @@
   max-width: min(760px, calc(100vw - 32px));
 }
 
+.debug-panel:not([open]) .debug-content {
+  display: none;
+}
+
 html:not(.dev-mode) .debug-panel,
 html:not(.dev-mode) .review-panel,
 html:not(.dev-mode) .preview-debug,

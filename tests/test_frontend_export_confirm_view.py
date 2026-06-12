@@ -34,7 +34,7 @@ const readyHtml = helpers.exportConfirmHtml({{
   summaryRows: [
     ["Imágenes", "2 exportables"],
     ["Salidas", "Web <gris>"],
-    ["Destino", "_SALIDA_PRO"],
+    ["Destino", "Salida"],
     ["Nombre", "foto_PRO.jpg"],
   ],
 }});

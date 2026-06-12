@@ -266,8 +266,8 @@ assert.equal(helpers.statusBarText({{
   selectedIndex: 1,
   outputCount: 1,
   destinationMode: "source",
-  destinationValue: "_SALIDA_PRO",
-}}), "3 exportables · Imagen 2/5 · 1 aviso · Formato: origen / _SALIDA_PRO");
+  destinationValue: "Salida",
+}}), "3 exportables · Imagen 2/5 · 1 aviso · Formato: origen / Salida");
 assert.equal(helpers.statusBarText({{
   batch: "ready",
   counts: {{ exportableImages: 3, nonBlockingWarnings: 0 }},

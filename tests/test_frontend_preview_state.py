@@ -32,7 +32,7 @@ assert.equal(helpers.isAutoViewerMode("height"), true);
 assert.equal(helpers.isAutoViewerMode("width"), true);
 assert.equal(helpers.isAutoViewerMode("manual"), false);
 
-const labels = {{ fit: "Encajar", height: "Alto", width: "Ancho", manual: "Manual" }};
+const labels = {{ fit: "Completa", height: "Alto", width: "Ancho", manual: "Manual" }};
 assert.equal(helpers.viewerModeLabel("height", labels), "Alto");
 assert.equal(helpers.viewerModeLabel("unknown", labels), "Manual");
 assert.equal(helpers.viewerModeClass("fit"), "fit-mode");
@@ -43,6 +43,29 @@ assert.equal(helpers.viewerModeClass("manual"), "zoom-mode");
 assert.equal(helpers.clampViewerZoom(12), 25);
 assert.equal(helpers.clampViewerZoom(101.6), 102);
 assert.equal(helpers.clampViewerZoom(500), 320);
+
+assert.deepEqual(helpers.viewerFitLayout({{
+  mode: "fit",
+  canvasWidth: 1200,
+  canvasHeight: 600,
+  naturalWidth: 900,
+  naturalHeight: 900,
+}}), {{ width: 528, height: 528, zoom: 59 }});
+assert.deepEqual(helpers.viewerFitLayout({{
+  mode: "height",
+  canvasWidth: 1200,
+  canvasHeight: 600,
+  naturalWidth: 900,
+  naturalHeight: 900,
+}}), {{ width: 588, height: 588, zoom: 65 }});
+assert.deepEqual(helpers.viewerFitLayout({{
+  mode: "width",
+  canvasWidth: 1200,
+  canvasHeight: 600,
+  naturalWidth: 900,
+  naturalHeight: 900,
+}}), {{ width: 1188, height: 1188, zoom: 132 }});
+assert.deepEqual(helpers.viewerFitLayout({{}}), {{ width: 0, height: 0, zoom: 100 }});
 
 assert.deepEqual(helpers.previewLoadingState(), {{
   previewStatus: "loading",

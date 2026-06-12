@@ -40,6 +40,12 @@ assert.deepEqual(helpers.parseOutputSize("bad"), {{
   height: 2400,
   normalized: "1800x2400",
 }});
+assert.equal(helpers.customRgbBackgroundValue("245, 246, 247"), "rgb:245,246,247");
+assert.equal(helpers.customRgbBackgroundValue("rgb:1,2,3"), "rgb:1,2,3");
+assert.equal(helpers.customRgbBackgroundValue("256, 2, 3"), "");
+assert.deepEqual(helpers.parseRgbBackground("rgb:12,34,56"), [12, 34, 56]);
+assert.equal(helpers.normalizeBackgroundValue("rgb:12,34,56"), "rgb:12,34,56");
+assert.equal(helpers.backgroundCustomText("rgb:12,34,56"), "12, 34, 56");
 
 const normalized = helpers.normalizeOutputProfile({{
   id: "main",
@@ -63,7 +69,7 @@ assert.deepEqual(normalized, {{
   height: 2500,
   background: "rgb230",
   destinationMode: "source",
-  destinationValue: "_SALIDA_PRO",
+  destinationValue: "Salida",
   naming: "{{original}}{{suffix}}",
   suffix: "_PRO",
 }});
@@ -89,8 +95,52 @@ const validation = helpers.outputProfileValidation({{
   destinationValue: "_WEB",
 }});
 assert.deepEqual(validation.errors, []);
-assert.deepEqual(validation.warnings, ["Incluye {{original}} para mantener la referencia del archivo."]);
+assert.deepEqual(validation.warnings, ["La plantilla debería incluir {{original}} para mantener la referencia del archivo."]);
 assert.equal(validation.fields.naming, "warning");
+assert.deepEqual(validation.fieldMessages.naming, ["La plantilla debería incluir {{original}} para mantener la referencia del archivo."]);
+
+const incompatible = helpers.outputProfileValidation({{
+  name: "Canal",
+  format: "JPG",
+  background: "transparent",
+  width: "1800",
+  height: "2400",
+  suffix: "_WEB",
+  naming: "{{original}}{{suffix}}",
+  destinationMode: "source",
+  destinationValue: "_WEB",
+}});
+assert.equal(incompatible.errors.includes("JPG no admite transparencia. Selecciona fondo blanco, gris claro o cambia el tipo a PNG."), true);
+assert.equal(incompatible.fields.background, "error");
+
+const customBackground = helpers.outputProfileValidation({{
+  name: "Canal",
+  format: "JPG",
+  background: "rgb:245,246,247",
+  backgroundMode: "custom",
+  width: "1800",
+  height: "2400",
+  suffix: "_WEB",
+  naming: "{{original}}{{suffix}}",
+  destinationMode: "source",
+  destinationValue: "_WEB",
+}});
+assert.deepEqual(customBackground.errors, []);
+assert.deepEqual(helpers.backgroundColorTuple("rgb:245,246,247"), [245, 246, 247]);
+
+const invalidCustomBackground = helpers.outputProfileValidation({{
+  name: "Canal",
+  format: "JPG",
+  background: "rgb:300",
+  backgroundMode: "custom",
+  width: "1800",
+  height: "2400",
+  suffix: "_WEB",
+  naming: "{{original}}{{suffix}}",
+  destinationMode: "source",
+  destinationValue: "_WEB",
+}});
+assert.equal(invalidCustomBackground.fields.backgroundCustom, "error");
 
 const seen = new Set();
 const primary = helpers.exportVariantPayloadFromProfile({{
@@ -99,7 +149,7 @@ const primary = helpers.exportVariantPayloadFromProfile({{
   format: "JPG",
   background: "rgb230",
   destinationMode: "source",
-  destinationValue: "_SALIDA_PRO",
+  destinationValue: "Salida",
   naming: "{{original}}{{suffix}}",
   suffix: "_PRO",
   width: 1800,
@@ -117,6 +167,18 @@ const duplicate = helpers.exportVariantPayloadFromProfile({{
   width: 1000,
   height: 1200,
 }}, 1, seen);
+const custom = helpers.exportVariantPayloadFromProfile({{
+  id: "custom_rgb",
+  name: "RGB custom",
+  format: "JPG",
+  background: "rgb:245,246,247",
+  destinationMode: "source",
+  destinationValue: "Salida",
+  naming: "{{original}}{{suffix}}",
+  suffix: "_RGB",
+  width: 1800,
+  height: 2400,
+}}, 2, seen);
 
 assert.deepEqual(primary, {{
   id: "web_rgb230",
@@ -128,7 +190,7 @@ assert.deepEqual(primary, {{
   suffix: "_PRO",
   naming_template: "{{original}}{{suffix}}",
   output_destination: "subfolder",
-  output_folder_name: "_SALIDA_PRO",
+  output_folder_name: "Salida",
   custom_output_path: null,
   output_width: 1800,
   output_height: 2400,
@@ -138,6 +200,8 @@ assert.equal(duplicate.output_destination, "custom");
 assert.equal(duplicate.custom_output_path, "C:/salida");
 assert.equal(duplicate.transparent_bg, true);
 assert.deepEqual(duplicate.bg_color, [230, 230, 230]);
+assert.deepEqual(custom.bg_color, [245, 246, 247]);
+assert.equal(custom.transparent_bg, false);
 """
     result = subprocess.run(
         ["node", "-e", script],

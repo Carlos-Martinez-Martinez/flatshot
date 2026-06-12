@@ -33,6 +33,7 @@ from flatshot.bridge.serialization import (
 )
 from flatshot.core.models import ExportConfig, SHADOW_ENGINE_DEFAULT, normalize_shadow_settings
 from flatshot.core.overrides import apply_image_override, normalize_image_override
+from flatshot.core.scaling import find_subject_bbox
 
 
 MAX_PREVIEW_SIDE = 1200
@@ -258,8 +259,7 @@ class FlatShotBridgeService:
 
         try:
             with Image.open(image_path) as opened:
-                thumbnail = opened.convert("RGBA")
-                thumbnail.thumbnail((size, size), Image.Resampling.LANCZOS)
+                thumbnail = _thumbnail_canvas(opened.convert("RGBA"), size)
         except BridgeError:
             raise
         except Exception as exc:
@@ -588,3 +588,27 @@ def backgroundColorTuple(value: str) -> tuple[int, int, int]:
     if value == "white":
         return (255, 255, 255)
     return (230, 230, 230)
+
+
+def _thumbnail_subject(image: Image.Image) -> Image.Image:
+    bbox = find_subject_bbox(image)
+    if not bbox:
+        return image
+
+    left, top, right, bottom = bbox
+    if right <= left or bottom <= top:
+        return image
+    if (left, top, right, bottom) == (0, 0, image.width, image.height):
+        return image
+    return image.crop(bbox)
+
+
+def _thumbnail_canvas(image: Image.Image, size: int) -> Image.Image:
+    subject = _thumbnail_subject(image)
+    subject.thumbnail((size, size), Image.Resampling.LANCZOS)
+
+    thumbnail = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    left = (size - subject.width) // 2
+    top = (size - subject.height) // 2
+    thumbnail.alpha_composite(subject, (left, top))
+    return thumbnail

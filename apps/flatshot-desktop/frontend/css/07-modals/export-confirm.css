@@ -1,7 +1,7 @@
 @layer flatshot {
 /* Modals: export confirmation dialog. */
 
-.batch-detail-row strong, .result-path strong, .format-preview-card strong, .export-confirm-summary strong {
+.batch-detail-row strong, .result-path strong, .format-section-preview strong, .export-confirm-summary strong {
   user-select: text;
 }
 
@@ -130,7 +130,7 @@
   padding: var(--space-3);
 }
 
-.path-line, .batch-detail-row strong, .result-path strong, .format-preview-card strong, .export-confirm-summary strong {
+.path-line, .batch-detail-row strong, .result-path strong, .format-section-preview strong, .export-confirm-summary strong {
   user-select: text;
 }
 }

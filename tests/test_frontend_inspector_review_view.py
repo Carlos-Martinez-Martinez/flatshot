@@ -52,7 +52,7 @@ assert.equal(lotCard.includes("<span>Lote</span>"), true);
 assert.equal(lotCard.includes("Lote &lt;actual&gt;"), true);
 assert.equal(lotCard.includes("Ignorados &quot;técnicos&quot;"), true);
 assert.equal(lotCard.includes('data-action="open-batch-detail"'), true);
-assert.equal(lotCard.includes("Detalle"), true);
+assert.equal(lotCard.includes("Ver lote"), true);
 
 const noImage = helpers.reviewPanelHtml({{
   lotSummaryHtml: lot,
@@ -125,7 +125,7 @@ const selectedCard = helpers.selectedImageInspectorCardHtml({{
 assert.equal(selectedCard.includes("Imagen seleccionada"), true);
 assert.equal(selectedCard.includes("camisa &lt;azul&gt;.png"), true);
 assert.equal(selectedCard.includes("Detalle &quot;x&quot;"), true);
-assert.equal(selectedCard.includes("Personalizado"), true);
+assert.equal(selectedCard.includes("Ajuste personalizado"), true);
 assert.equal(selectedCard.includes('data-action="open-image-adjustment"'), true);
 assert.equal(selectedCard.includes('data-action="reset-local-adjustment"'), true);
 assert.equal(selectedCard.includes("Restablecer"), true);
@@ -158,7 +158,7 @@ const aspect = helpers.aspectInspectorCardHtml({{
 assert.equal(aspect.includes("Luz &lt;cenital&gt;"), true);
 assert.equal(aspect.includes("Procesado"), true);
 assert.equal(aspect.includes("Ajuste del lote"), true);
-assert.equal(aspect.includes("2 imágenes"), true);
+assert.equal(aspect.includes("2 imágenes"), false);
 assert.equal(aspect.includes('data-action="open-advanced"'), true);
 assert.equal(aspect.includes('data-action="open-preset-editor"'), true);
 assert.equal(aspect.includes(">Ajustes</button>"), true);

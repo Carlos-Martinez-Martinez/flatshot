@@ -29,7 +29,7 @@ const helpers = require({json.dumps(str(HELPER_PATH))});
 
 assert.equal(helpers.escapeHtml('<a&b"c>'), '&lt;a&amp;b&quot;c&gt;');
 
-const primaryRow = helpers.outputProfileInlineRowHtml({{
+const currentRow = helpers.outputProfileInlineRowHtml({{
   id: "web_rgb230",
   name: "Web <gris>",
   enabled: true,
@@ -37,11 +37,13 @@ const primaryRow = helpers.outputProfileInlineRowHtml({{
   canToggle: false,
   summary: 'JPG · 1800x2400 · "RGB230"',
 }});
-assert.equal(primaryRow.includes("active-output-row is-primary is-enabled"), true);
-assert.equal(primaryRow.includes("Web &lt;gris&gt;"), true);
-assert.equal(primaryRow.includes("&quot;RGB230&quot;"), true);
-assert.equal(primaryRow.includes("Principal"), true);
-assert.equal(primaryRow.includes("disabled"), true);
+assert.equal(currentRow.includes("active-output-row is-current is-enabled"), true);
+assert.equal(currentRow.includes("Web &lt;gris&gt;"), true);
+assert.equal(currentRow.includes("&quot;RGB230&quot;"), true);
+assert.equal(currentRow.includes("active-output-row__edit"), true);
+assert.equal(currentRow.includes(">Editar</button>"), true);
+assert.equal(currentRow.includes("Principal"), false);
+assert.equal(currentRow.includes("disabled"), true);
 
 const disabledRow = helpers.outputProfileInlineRowHtml({{
   id: "archive_png",
@@ -72,13 +74,14 @@ const card = helpers.outputInspectorCardHtml({{
   ],
 }});
 assert.equal(card.includes("2 formatos activos"), true);
-assert.equal(card.includes("4 imágenes x 2 formatos = 8 archivos"), true);
+assert.equal(card.includes("4 imágenes listas"), false);
+assert.equal(card.includes("4 imágenes x 2 formatos = 8 archivos"), false);
 assert.equal(card.includes("active-output-list"), true);
 assert.equal(card.includes("Cambios sin guardar"), true);
 assert.equal(card.includes('data-action="new-output-profile"'), true);
 assert.equal(card.includes('data-action="open-app-settings"'), true);
-assert.equal(card.includes(">Formatos</button>"), true);
-assert.equal(card.includes(">Nuevo</button>"), true);
+assert.equal(card.includes(">Gestionar formatos</button>"), true);
+assert.equal(card.includes(">Nuevo formato</button>"), true);
 
 const pendingCard = helpers.outputInspectorCardHtml({{
   activeCount: 1,
@@ -88,6 +91,7 @@ const pendingCard = helpers.outputInspectorCardHtml({{
   rows: [],
 }});
 assert.equal(pendingCard.includes("Pendiente de lote"), true);
+assert.equal(pendingCard.includes("Sin imágenes listas"), false);
 assert.equal(pendingCard.includes("Cambios sin guardar"), false);
 
 const blockedCard = helpers.outputInspectorCardHtml({{
@@ -98,6 +102,7 @@ const blockedCard = helpers.outputInspectorCardHtml({{
   rows: [],
 }});
 assert.equal(blockedCard.includes("0 formatos activos"), true);
+assert.equal(blockedCard.includes("4 imágenes listas"), false);
 assert.equal(blockedCard.includes("Selecciona al menos un formato"), true);
 """
     result = subprocess.run(

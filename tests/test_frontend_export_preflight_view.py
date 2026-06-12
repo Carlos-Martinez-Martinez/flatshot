@@ -258,11 +258,11 @@ assert.equal(helpers.exportStatusClass({{
 
 assert.deepEqual(helpers.exportPreflightRows({{
   batch: "none",
-  destinationFallback: "_SALIDA_PRO",
+  destinationFallback: "Salida",
 }}), [
   {{ state: "error", title: "Carpeta de origen", detail: "Elige una carpeta para empezar" }},
   {{ state: "pending", title: "Imágenes exportables", detail: "Pendiente" }},
-  {{ state: "pending", title: "Carpeta de salida", detail: "_SALIDA_PRO" }},
+  {{ state: "pending", title: "Carpeta de salida", detail: "Salida" }},
 ]);
 
 assert.deepEqual(helpers.exportPreflightRows({{
@@ -327,7 +327,7 @@ const allReadyRows = helpers.exportPreflightRows({{
   warningCount: 0,
   ignoredCount: 0,
   ignoredSummary: "Sin ignorados",
-  destinationFallback: "_SALIDA_PRO",
+  destinationFallback: "Salida",
   destinationMissing: false,
   naming: "{{original}}",
   namingExample: "camisa.jpg",

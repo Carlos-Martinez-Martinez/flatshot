@@ -10,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
 HELPER_PATH = FRONTEND_DIR / "preview-view.js"
 INDEX_PATH = FRONTEND_DIR / "index.html"
+APP_PATH = FRONTEND_DIR / "app.js"
 
 
 def test_preview_view_helper_loads_before_app_script():
@@ -19,6 +20,30 @@ def test_preview_view_helper_loads_before_app_script():
     app_index = html.index("app.js")
 
     assert helper_index < app_index
+
+
+def test_preview_toolbar_keeps_compact_context_labels():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+    app_js = APP_PATH.read_text(encoding="utf-8")
+
+    for label in ("Fondo", "Imagen", "Encajar", "Zoom"):
+        assert f'class="viewer-control-label">{label}</span>' in html
+    assert 'data-preview-bg="soft-black"' in html
+    assert 'data-preview-bg="custom"' in html
+    assert 'data-preview-bg-channel="r"' in html
+    assert 'data-preview-bg-channel="g"' in html
+    assert 'data-preview-bg-channel="b"' in html
+    assert "customFields.classList.toggle(\"active\"" in app_js
+    assert ">Gris</button>" not in html
+    assert ">Blanco</button>" not in html
+    assert ">Transparente</button>" not in html
+    assert "function normalizePreviewBackgroundValue" in app_js
+    assert "function previewCustomBackgroundValue" in app_js
+    assert 'bgTarget.dataset.previewBg === "custom" ? previewCustomBackgroundValue()' in app_js
+    assert 'data-action="zoom-fit"' not in html
+    assert 'data-action="zoom-fit" title="Encajar' not in html
+    assert 'data-action="zoom-100"' not in html
+    assert ">1:1</button>" not in html
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
@@ -62,6 +87,17 @@ const imageWithoutSize = helpers.realPreviewImageHtml({{
 }});
 assert.equal(imageWithoutSize.includes('style="width:'), false);
 assert.equal(imageWithoutSize.includes('preview-warning-card'), false);
+
+const imageAutoSize = helpers.realPreviewImageHtml({{
+  src: 'data:image/png;base64,abc',
+  imageName: 'auto.png',
+  width: 1200,
+  height: 800,
+  zoom: 80,
+  inlineSize: false,
+}});
+assert.equal(imageAutoSize.includes('style="width:'), false);
+assert.equal(imageAutoSize.includes('width="1200" height="800"'), true);
 
 const placeholder = helpers.realPreviewPlaceholderHtml({{
   imageName: 'pendiente <uno>.png',

@@ -76,6 +76,8 @@ const urlParams = new URLSearchParams(window.location.search);
 const defaultBridgeUrl = "http://127.0.0.1:8765";
 const initialBridgeUrl = urlParams.get("bridge") || defaultBridgeUrl;
 const devMode = urlParams.get("dev") === "1";
+const SOFT_BLACK_PREVIEW_BG = "soft-black";
+const DEFAULT_PREVIEW_CUSTOM_RGB = [230, 230, 230];
 const formatterHelpers = window.FlatShotFormatters;
 const outputProfileHelpers = window.FlatShotOutputProfiles;
 const outputProfileViewHelpers = window.FlatShotOutputProfileView;
@@ -103,6 +105,7 @@ const STORAGE_KEYS = {
   selectedImagePath: "flatshot.selectedImagePath",
   imageAdjustmentPreset: "flatshot.selectedImageAdjustmentPreset",
   outputProfiles: "flatshot.outputProfiles",
+  backgroundPresets: "flatshot.backgroundPresets",
   activeOutputProfile: "flatshot.activeOutputProfile",
   activeOutputFormats: "flatshot.activeOutputFormatIds",
   lastOutputFolder: "flatshot.lastOutputFolder",
@@ -136,9 +139,8 @@ const ACTIONABLE_OMISSION_REASONS = new Set([
 
 const DEFAULT_VIEW_MODE = "height";
 const VIEW_MODE_LABELS = {
-  fit: "Encajar",
-  height: "Altura",
-  width: "Anchura",
+  height: "Alto",
+  width: "Ancho",
   manual: "Manual",
 };
 
@@ -254,7 +256,7 @@ const defaultOutputProfiles = [
     height: 2400,
     background: "rgb230",
     destinationMode: "source",
-    destinationValue: "_SALIDA_PRO",
+    destinationValue: "Salida",
     naming: "{original}{suffix}",
     suffix: "_PRO",
   },
@@ -267,7 +269,7 @@ const defaultOutputProfiles = [
     height: 2400,
     background: "transparent",
     destinationMode: "source",
-    destinationValue: "_SALIDA_PRO",
+    destinationValue: "Salida",
     naming: "{original}{suffix}",
     suffix: "_PRO",
   },
@@ -280,16 +282,25 @@ const defaultOutputProfiles = [
     height: 2000,
     background: "white",
     destinationMode: "source",
-    destinationValue: "_SALIDA_PRO",
+    destinationValue: "Salida",
     naming: "{original}{suffix}",
     suffix: "_PRO",
   },
 ];
+const defaultBackgroundPresets = [
+  { id: "rgb230", name: "Gris claro", kind: "rgb", rgb: [230, 230, 230] },
+  { id: "white", name: "Blanco", kind: "rgb", rgb: [255, 255, 255] },
+  { id: "transparent", name: "Transparente", kind: "transparent", rgb: [230, 230, 230] },
+];
 const initialImageAdjustmentPreset = readPersistentValue(STORAGE_KEYS.imageAdjustmentPreset) || "Luz cenital";
 const initialOutputProfileId = readPersistentValue(STORAGE_KEYS.activeOutputProfile);
 const initialExportPreferences = readPersistentJson(STORAGE_KEYS.exportPreferences, {});
+const initialBackgroundPresets = readBackgroundPresets();
 const initialOutputProfiles = readOutputProfiles(initialOutputProfileId);
-const initialOutputProfile = initialOutputProfiles.find((profile) => profile.id === initialOutputProfileId)
+const initialEnabledOutputProfiles = initialOutputProfiles.filter((profile) => profile.enabled);
+const initialOutputProfile = initialEnabledOutputProfiles.find((profile) => profile.id === initialOutputProfileId)
+  || initialEnabledOutputProfiles[0]
+  || initialOutputProfiles.find((profile) => profile.id === initialOutputProfileId)
   || initialOutputProfiles[0]
   || defaultOutputProfiles[0];
 const initialDestinationMode = initialExportPreferences.destinationMode === "custom"
@@ -299,13 +310,11 @@ const initialDestinationValue = String(
   initialExportPreferences.destinationValue
   || readPersistentValue(STORAGE_KEYS.lastOutputFolder)
   || initialOutputProfile.destinationValue
-  || (initialDestinationMode === "custom" ? "" : "_SALIDA_PRO")
+  || (initialDestinationMode === "custom" ? "" : "Salida")
 );
 const initialFormat = normalizeExportFormat(initialExportPreferences.format || initialOutputProfile.format);
 const initialSize = parseOutputSize(initialExportPreferences.size || outputProfileSize(initialOutputProfile)).normalized;
-const initialBackground = ["rgb230", "white", "transparent"].includes(initialExportPreferences.background)
-  ? initialExportPreferences.background
-  : initialOutputProfile.background;
+const initialBackground = normalizeBackgroundValue(initialExportPreferences.background, initialOutputProfile.background);
 const initialNaming = String(initialExportPreferences.naming || initialOutputProfile.naming || "{original}{suffix}");
 const initialSuffix = initialExportPreferences.suffix === undefined || initialExportPreferences.suffix === null
   ? initialOutputProfile.suffix
@@ -323,7 +332,7 @@ const state = {
   thumbnailStatus: {},
   thumbnailErrors: [],
   previewMode: "processed",
-  previewBg: "rgb230",
+  previewBg: initialBackground,
   zoom: 100,
   fitZoom: 100,
   fitMode: DEFAULT_VIEW_MODE,
@@ -357,8 +366,12 @@ const state = {
   exportConfirmRisks: [],
   exportConfirmOptions: null,
   outputProfiles: initialOutputProfiles,
-  activeOutputProfileId: initialOutputProfile.id,
-  outputProfileEditorId: initialOutputProfile.id,
+  backgroundPresets: initialBackgroundPresets,
+  backgroundPresetEditor: null,
+  outputProfileNotice: "",
+  outputDeleteConfirmId: "",
+  activeOutputProfileId: initialEnabledOutputProfiles.length ? initialOutputProfile.id : "",
+  outputProfileEditorId: initialOutputProfiles.length ? initialOutputProfile.id : "",
   outputProfileDraft: null,
   destinationMode: initialDestinationMode,
   destinationValue: initialDestinationValue,
@@ -519,6 +532,7 @@ function buildSessionSnapshot() {
       presetSource: state.presetSource,
       localOverride: state.localOverride,
       outputProfiles: state.outputProfiles,
+      backgroundPresets: state.backgroundPresets,
       activeOutputProfileId: state.activeOutputProfileId,
       outputProfileEditorId: state.outputProfileEditorId,
       outputProfileDraft: state.outputProfileDraft,
@@ -559,9 +573,13 @@ function restoreSessionSnapshot() {
   }
 
   const restored = snapshot.state;
+  const restoredBackgroundPresets = normalizeBackgroundPresetList(restored.backgroundPresets || state.backgroundPresets);
   const outputProfiles = Array.isArray(restored.outputProfiles)
     ? normalizeOutputProfileList(restored.outputProfiles, restored.activeOutputProfileId)
     : state.outputProfiles;
+  const restoredActiveOutputProfile = outputProfiles.find((profile) => profile.id === restored.activeOutputProfileId && profile.enabled)
+    || outputProfiles.find((profile) => profile.enabled)
+    || null;
   const selectedPath = String(restored.selectedImagePath || "");
   const realFolders = Array.isArray(restored.realFolders) ? restored.realFolders : [];
   const realImages = Array.isArray(restored.realImages) ? restored.realImages : [];
@@ -575,7 +593,7 @@ function restoreSessionSnapshot() {
     previewData: null,
     previewError: "",
     previewMode: ["processed", "original", "compare"].includes(restored.previewMode) ? restored.previewMode : "processed",
-    previewBg: restored.previewBg || state.previewBg,
+    previewBg: normalizePreviewBackgroundValue(restored.previewBg || state.previewBg),
     zoom: clampNumber(restored.zoom, 25, 400, 100),
     fitZoom: clampNumber(restored.fitZoom, 25, 400, 100),
     fitMode: VIEW_MODE_LABELS[restored.fitMode] ? restored.fitMode : DEFAULT_VIEW_MODE,
@@ -593,18 +611,20 @@ function restoreSessionSnapshot() {
     presetSource: String(restored.presetSource || "Global"),
     localOverride: Boolean(restored.localOverride),
     outputProfiles,
-    activeOutputProfileId: outputProfiles.some((profile) => profile.id === restored.activeOutputProfileId)
-      ? restored.activeOutputProfileId
-      : outputProfiles[0]?.id || state.activeOutputProfileId,
-    outputProfileEditorId: restored.outputProfileEditorId || restored.activeOutputProfileId || outputProfiles[0]?.id,
+    backgroundPresets: restoredBackgroundPresets,
+    backgroundPresetEditor: null,
+    activeOutputProfileId: restoredActiveOutputProfile?.id || "",
+    outputProfileEditorId: outputProfiles.some((profile) => profile.id === restored.outputProfileEditorId)
+      ? restored.outputProfileEditorId
+      : restoredActiveOutputProfile?.id || outputProfiles[0]?.id || "",
     outputProfileDraft: restored.outputProfileDraft && typeof restored.outputProfileDraft === "object"
       ? restored.outputProfileDraft
       : null,
     destinationMode: restored.destinationMode === "custom" ? "custom" : "source",
-    destinationValue: String(restored.destinationValue || "_SALIDA_PRO"),
+    destinationValue: String(restored.destinationValue || "Salida"),
     format: normalizeExportFormat(restored.format),
     size: parseOutputSize(restored.size).normalized,
-    background: ["rgb230", "white", "transparent"].includes(restored.background) ? restored.background : "rgb230",
+    background: normalizeBackgroundValue(restored.background),
     naming: String(restored.naming || "{original}{suffix}"),
     suffix: restored.suffix === undefined || restored.suffix === null ? "_PRO" : String(restored.suffix),
     appSettingsOpen: Boolean(restored.appSettingsOpen),
@@ -744,14 +764,261 @@ function parseOutputSize(value) {
   return outputProfileHelpers.parseOutputSize(value);
 }
 
+function normalizeBackgroundValue(value, fallback = "rgb230") {
+  return outputProfileHelpers.normalizeBackgroundValue(value, fallback);
+}
+
+function parseRgbBackground(value) {
+  return outputProfileHelpers.parseRgbBackground(value);
+}
+
+function backgroundCustomText(value) {
+  return outputProfileHelpers.backgroundCustomText(value);
+}
+
+function customRgbBackgroundValue(value) {
+  return outputProfileHelpers.customRgbBackgroundValue(value);
+}
+
+function backgroundSelectMode(value) {
+  return parseRgbBackground(value) ? "custom" : normalizeBackgroundValue(value);
+}
+
+function normalizePreviewBackgroundValue(value) {
+  if (value === SOFT_BLACK_PREVIEW_BG) {
+    return SOFT_BLACK_PREVIEW_BG;
+  }
+  if (value === "white" || value === "transparent" || value === "rgb230") {
+    return value;
+  }
+  const custom = parseRgbBackground(value);
+  return custom ? `rgb:${custom.join(",")}` : "rgb230";
+}
+
+function backgroundCssColor(value) {
+  const custom = parseRgbBackground(value);
+  if (custom) {
+    return `rgb(${custom.join(", ")})`;
+  }
+  if (value === SOFT_BLACK_PREVIEW_BG) {
+    return "rgb(32, 34, 37)";
+  }
+  if (value === "white") {
+    return "rgb(255, 255, 255)";
+  }
+  if (value === "transparent") {
+    return "";
+  }
+  return "rgb(230, 230, 230)";
+}
+
+function backgroundVisualMode(value) {
+  if (value === SOFT_BLACK_PREVIEW_BG) {
+    return "custom";
+  }
+  if (value === "white" || value === "transparent") {
+    return value;
+  }
+  return parseRgbBackground(value) ? "custom" : "rgb230";
+}
+
+function previewCustomRgbChannels(value) {
+  const custom = parseRgbBackground(value);
+  if (custom) {
+    return custom;
+  }
+  if (value === SOFT_BLACK_PREVIEW_BG) {
+    return [32, 34, 37];
+  }
+  return backgroundColorTuple(value || "rgb230");
+}
+
+function previewCustomBackgroundValue() {
+  const fallback = previewCustomRgbChannels(state.previewBg);
+  const channels = ["r", "g", "b"].map((channel, index) => {
+    const input = $(`[data-preview-bg-channel="${channel}"]`);
+    return Math.round(clampNumber(input?.value, 0, 255, fallback[index]));
+  });
+  return `rgb:${channels.join(",")}`;
+}
+
+function previewBackgroundLabel(value) {
+  const custom = parseRgbBackground(value);
+  if (custom) {
+    return `RGB ${custom.join(", ")}`;
+  }
+  if (value === SOFT_BLACK_PREVIEW_BG) {
+    return "negro suave";
+  }
+  return backgroundLabel(value);
+}
+
+function normalizeBackgroundPreset(preset, index = 0) {
+  const source = preset && typeof preset === "object" ? preset : {};
+  const kind = source.kind === "transparent" || source.value === "transparent" ? "transparent" : "rgb";
+  const parsed = Array.isArray(source.rgb)
+    ? source.rgb
+    : parseRgbBackground(source.value || source.background);
+  const fallbackRgb = defaultBackgroundPresets[index % defaultBackgroundPresets.length]?.rgb || [230, 230, 230];
+  const rgb = kind === "transparent"
+    ? fallbackRgb
+    : (parsed || fallbackRgb).map((channel) => Math.max(0, Math.min(255, Number.parseInt(channel, 10) || 0)));
+  const id = String(source.id || uniqueOutputProfileId(source.name || "fondo", index)).trim();
+  return {
+    id,
+    kind,
+    name: String(source.name || (kind === "transparent" ? "Transparente" : `RGB ${rgb.join(", ")}`)).trim(),
+    rgb,
+  };
+}
+
+function normalizeBackgroundPresetList(presets) {
+  const source = Array.isArray(presets) && presets.length ? presets : defaultBackgroundPresets;
+  const seen = new Set();
+  const normalized = source.map(normalizeBackgroundPreset).filter((preset) => preset.id && preset.name);
+  return normalized.map((preset, index) => {
+    let id = preset.id;
+    while (seen.has(id)) {
+      id = `${preset.id}-${index + seen.size}`;
+    }
+    seen.add(id);
+    return { ...preset, id };
+  });
+}
+
+function readBackgroundPresets() {
+  return normalizeBackgroundPresetList(readPersistentJson(STORAGE_KEYS.backgroundPresets, null));
+}
+
+function persistBackgroundPresets() {
+  window.localStorage.setItem(STORAGE_KEYS.backgroundPresets, JSON.stringify(state.backgroundPresets));
+}
+
+function backgroundPresetValue(preset) {
+  if (!preset || preset.kind === "transparent") {
+    return "transparent";
+  }
+  const rgb = preset.rgb || [230, 230, 230];
+  if (preset.id === "rgb230" && rgb[0] === 230 && rgb[1] === 230 && rgb[2] === 230) {
+    return "rgb230";
+  }
+  if (preset.id === "white" && rgb[0] === 255 && rgb[1] === 255 && rgb[2] === 255) {
+    return "white";
+  }
+  return outputProfileHelpers.rgbBackgroundValue(rgb[0], rgb[1], rgb[2]) || "rgb230";
+}
+
+function backgroundPresetLabel(preset) {
+  if (!preset) {
+    return "Fondo";
+  }
+  return preset.name;
+}
+
+function backgroundPresetById(presetId) {
+  return state.backgroundPresets.find((preset) => preset.id === presetId) || null;
+}
+
+function backgroundPresetByValue(value) {
+  const normalized = normalizeBackgroundValue(value);
+  return state.backgroundPresets.find((preset) => normalizeBackgroundValue(backgroundPresetValue(preset)) === normalized) || null;
+}
+
+function backgroundSelectOptionsHtml(selectedValue) {
+  const selected = normalizeBackgroundValue(selectedValue);
+  const presetOptions = state.backgroundPresets.map((preset) => {
+    const value = backgroundPresetValue(preset);
+    return `<option value="${escapeHtml(value)}">${escapeHtml(backgroundPresetLabel(preset))}</option>`;
+  }).join("");
+  if (state.backgroundPresets.some((preset) => normalizeBackgroundValue(backgroundPresetValue(preset)) === selected)) {
+    return presetOptions;
+  }
+  return `${presetOptions}<option value="${escapeHtml(selected)}">${escapeHtml(`Actual · ${backgroundLabel(selected)}`)}</option>`;
+}
+
 function activeOutputProfile() {
   return state.outputProfiles.find((profile) => profile.id === state.activeOutputProfileId)
     || state.outputProfiles[0]
     || defaultOutputProfiles[0];
 }
 
+function galleryOutputProfiles() {
+  return state.outputProfiles.length ? state.outputProfiles : [currentOutputProfileData()];
+}
+
+function galleryActiveOutputContext() {
+  const savedProfile = activeOutputProfile();
+  const matchesSavedProfile = outputMatchesProfile(savedProfile);
+  const profile = matchesSavedProfile ? savedProfile : currentOutputProfileData();
+  return {
+    background: profile?.background || state.background || "rgb230",
+    id: matchesSavedProfile ? profile.id : "__custom",
+    label: outputProfileCompactLabel(profile),
+    name: matchesSavedProfile ? profile.name : "Formato personalizado",
+    profile,
+    summary: outputProfileSummaryLine(profile),
+  };
+}
+
 function enabledOutputProfiles() {
   return state.outputProfiles.filter((profile) => profile.enabled);
+}
+
+function enabledActiveOutputProfile() {
+  return state.outputProfiles.find((profile) => profile.id === state.activeOutputProfileId && profile.enabled) || null;
+}
+
+function isActiveOutputProfile(profile) {
+  return Boolean(profile && profile.enabled && profile.id === state.activeOutputProfileId);
+}
+
+function syncOutputProfileState(profile) {
+  if (!profile) {
+    return;
+  }
+  state.format = profile.format;
+  state.size = outputProfileSize(profile);
+  state.background = profile.background;
+  state.previewBg = profile.background;
+  state.destinationMode = profile.destinationMode;
+  state.destinationValue = profile.destinationValue;
+  state.naming = profile.naming;
+  state.suffix = profile.suffix;
+  state.exportStatus = isExportReady() ? "ready" : "blocked";
+}
+
+function setActiveOutputProfileReference(profileId, options = {}) {
+  const profile = state.outputProfiles.find((item) => item.id === profileId);
+  if (!profile || !profile.enabled) {
+    return false;
+  }
+  state.activeOutputProfileId = profile.id;
+  syncOutputProfileState(profile);
+  state.statusText = options.statusText || `Formato activo: ${profile.name}`;
+  persistOutputProfiles();
+  if (options.render !== false) {
+    render();
+  }
+  return true;
+}
+
+function reassignActiveOutputProfileReference(options = {}) {
+  const next = enabledOutputProfiles()[0] || null;
+  if (!next) {
+    state.activeOutputProfileId = "";
+    state.exportStatus = isExportReady() ? "ready" : "blocked";
+    state.statusText = options.statusText || "Sin formatos activos";
+    persistOutputProfiles();
+    if (options.render !== false) {
+      render();
+    }
+    return null;
+  }
+  setActiveOutputProfileReference(next.id, {
+    render: options.render,
+    statusText: options.statusText || `Formato activo: ${next.name}`,
+  });
+  return next;
 }
 
 function exportOutputProfiles() {
@@ -852,25 +1119,11 @@ function applyOutputProfile(profileId, options = {}) {
   if (!profile) {
     return false;
   }
-  state.activeOutputProfileId = profile.id;
-  if (options.enable === true) {
-    profile.enabled = true;
+  profile.enabled = true;
+  if (state.outputProfileDraft?.id === profile.id) {
+    state.outputProfileDraft = { ...state.outputProfileDraft, enabled: true };
   }
-  state.format = profile.format;
-  state.size = outputProfileSize(profile);
-  state.background = profile.background;
-  state.previewBg = profile.background;
-  state.destinationMode = profile.destinationMode;
-  state.destinationValue = profile.destinationValue;
-  state.naming = profile.naming;
-  state.suffix = profile.suffix;
-  state.exportStatus = isExportReady() ? "ready" : "blocked";
-  state.statusText = options.statusText || `Formato principal: ${profile.name}`;
-  persistOutputProfiles();
-  if (options.render !== false) {
-    render();
-  }
-  return true;
+  return setActiveOutputProfileReference(profile.id, options);
 }
 
 function setOutputProfileEnabled(profileId, enabled) {
@@ -878,9 +1131,16 @@ function setOutputProfileEnabled(profileId, enabled) {
   if (!profile) {
     return;
   }
+  const wasActiveReference = profile.id === state.activeOutputProfileId;
   profile.enabled = Boolean(enabled);
-  if (profile.enabled) {
-    applyOutputProfile(profile.id, { enable: false, render: false, statusText: `Formato activo: ${profile.name}` });
+  if (state.outputProfileDraft?.id === profile.id) {
+    state.outputProfileDraft = { ...state.outputProfileDraft, enabled: profile.enabled };
+  }
+
+  if (profile.enabled && !enabledActiveOutputProfile()) {
+    setActiveOutputProfileReference(profile.id, { render: false, statusText: `Formato activo: ${profile.name}` });
+  } else if (!profile.enabled && wasActiveReference) {
+    reassignActiveOutputProfileReference({ render: false, statusText: `Formato desactivado: ${profile.name}` });
   }
 
   state.exportStatus = isExportReady() ? "ready" : "blocked";
@@ -1522,7 +1782,7 @@ function setScenario(scenario) {
     exportIssues: [],
     exportResult: null,
     destinationMode: "source",
-    destinationValue: "_SALIDA_PRO",
+    destinationValue: "Salida",
     progress: 0,
     processed: 0,
     errors: [],
@@ -1610,13 +1870,13 @@ function setScenario(scenario) {
       progress: 100,
       processed: exportableImages().length,
       exportCompletedItems: exportableImages().map((image) => ({ name: image.name, success: true })),
-      exportDestinations: ["Mock / _SALIDA_PRO"],
+      exportDestinations: ["Mock / Salida"],
       exportResult: {
         success: true,
         processed: exportableImages().length,
         total: exportableImages().length,
         errors: 0,
-        destinations: ["Mock / _SALIDA_PRO"],
+        destinations: ["Mock / Salida"],
       },
       statusText: "Exportación completada",
     });
@@ -1629,7 +1889,7 @@ function setScenario(scenario) {
         { name: "camiseta_001.png", success: true },
         { name: "chaqueta_004.png", success: false },
       ],
-      exportDestinations: ["Mock / _SALIDA_PRO"],
+      exportDestinations: ["Mock / Salida"],
       exportIssues: [
         { level: "error", title: "chaqueta_004.png", detail: "No se pudo leer alpha." },
         { level: "warning", title: "chaqueta_003.png", detail: "Vista renderizada con fallback." },
@@ -1639,7 +1899,7 @@ function setScenario(scenario) {
         processed: exportableImages().length,
         total: exportableImages().length,
         errors: 1,
-        destinations: ["Mock / _SALIDA_PRO"],
+        destinations: ["Mock / Salida"],
       },
       errors: [
         { level: "error", title: "chaqueta_004.png", detail: "No se pudo leer alpha." },
@@ -1986,7 +2246,7 @@ function resetViewerPan() {
 function viewerPanBounds() {
   const canvas = $("#preview-canvas");
   const target = canvas?.querySelector(".preview-image, .mock-product");
-  if (!canvas || !target || isAutoViewerMode()) {
+  if (!canvas || !target || state.fitMode === "fit") {
     return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
   }
   const canvasRect = canvas.getBoundingClientRect();
@@ -1996,8 +2256,12 @@ function viewerPanBounds() {
   }
   const minVisibleX = Math.min(96, Math.max(32, Math.min(canvasRect.width, targetRect.width) * 0.25));
   const minVisibleY = Math.min(96, Math.max(32, Math.min(canvasRect.height, targetRect.height) * 0.25));
-  const maxX = Math.max(0, Math.round((canvasRect.width + targetRect.width) / 2 - minVisibleX));
-  const maxY = Math.max(0, Math.round((canvasRect.height + targetRect.height) / 2 - minVisibleY));
+  const maxX = targetRect.width > canvasRect.width
+    ? Math.max(0, Math.round((canvasRect.width + targetRect.width) / 2 - minVisibleX))
+    : 0;
+  const maxY = targetRect.height > canvasRect.height
+    ? Math.max(0, Math.round((canvasRect.height + targetRect.height) / 2 - minVisibleY))
+    : 0;
   return { minX: -maxX, maxX, minY: -maxY, maxY };
 }
 
@@ -2005,6 +2269,11 @@ function clampViewerPan() {
   const bounds = viewerPanBounds();
   state.panX = Math.max(bounds.minX, Math.min(bounds.maxX, state.panX));
   state.panY = Math.max(bounds.minY, Math.min(bounds.maxY, state.panY));
+}
+
+function canViewerPan() {
+  const bounds = viewerPanBounds();
+  return bounds.minX !== 0 || bounds.maxX !== 0 || bounds.minY !== 0 || bounds.maxY !== 0;
 }
 
 function isAutoViewerMode(mode = state.fitMode) {
@@ -2052,7 +2321,7 @@ function setViewerZoom(nextZoom, anchorEvent = null) {
 }
 
 function setViewerMode(mode) {
-  if (!["fit", "height", "width"].includes(mode)) {
+  if (!["height", "width"].includes(mode)) {
     return;
   }
   state.fitMode = mode;
@@ -2065,12 +2334,7 @@ function toggleViewerZoomMode() {
   if (!isViewerNavigationAvailable()) {
     return;
   }
-  if (state.fitMode === "manual" && state.zoom === 100) {
-    setViewerMode(DEFAULT_VIEW_MODE);
-    return;
-  }
-  resetViewerPan();
-  setViewerZoom(100);
+  setViewerMode(DEFAULT_VIEW_MODE);
 }
 
 function normalizeSettings(settings = {}) {
@@ -2217,7 +2481,8 @@ function refreshPreviewAfterSettingChange() {
 }
 
 function startExport(options = {}) {
-  if (state.appSettingsOpen && outputProfileHasUnsavedChanges() && !confirmDiscardOutputDraft("exportar sin aplicar esos cambios")) {
+  if (!options.skipOutputProfileUnsavedCheck && state.appSettingsOpen && outputProfileHasUnsavedChanges()) {
+    showOutputProfileUnsavedNotice("Guarda o descarta los cambios antes de exportar.");
     return;
   }
   clearTimers();
@@ -2365,14 +2630,14 @@ function scheduleExportStep() {
       state.progress = 0;
       state.processed = total;
       state.exportCompletedItems = exportableImages().map((image) => ({ name: image.name, success: true }));
-      state.exportDestinations = ["Mock / _SALIDA_PRO"];
+      state.exportDestinations = ["Mock / Salida"];
       state.exportIssues = [];
       state.exportResult = {
         success: true,
         processed: total,
         total,
         errors: 0,
-        destinations: ["Mock / _SALIDA_PRO"],
+        destinations: ["Mock / Salida"],
       };
       state.statusText = "Exportación completada";
       render();
@@ -2615,6 +2880,46 @@ async function pickBridgeFolder() {
     const message = bridgeErrorMessage(error);
     Object.assign(state, scanStateHelpers.folderPickErrorState(message));
     render();
+  }
+}
+
+async function pickOutputProfileDestination() {
+  if (!state.appSettingsOpen) {
+    return;
+  }
+  updateOutputProfileDraftFromForm();
+  renderOutputProfileModalState();
+  const raw = outputProfileFormRawData();
+  const initialPath = raw.destinationMode === "custom" && raw.destinationValue
+    ? raw.destinationValue
+    : readPersistentValue(STORAGE_KEYS.lastOutputFolder);
+  state.statusText = "Eligiendo carpeta de salida";
+  try {
+    const selected = await bridgeRequest("/folders/pick", {
+      method: "POST",
+      body: JSON.stringify({ initialPath: initialPath || "" }),
+      timeoutMs: 300000,
+    });
+    if (!selected.selected || !selected.path) {
+      state.statusText = "Selección de carpeta cancelada";
+      renderOutputProfileModalState();
+      return;
+    }
+    const modeInput = $("#profile-destination-mode-input");
+    const destinationInput = $("#profile-destination-input");
+    if (modeInput) {
+      modeInput.value = "custom";
+    }
+    if (destinationInput) {
+      destinationInput.value = selected.path;
+    }
+    writePersistentValue(STORAGE_KEYS.lastOutputFolder, selected.path);
+    updateOutputProfileDraftFromForm();
+    state.statusText = "Carpeta de salida configurada";
+    renderOutputProfileModalState();
+  } catch (error) {
+    state.statusText = bridgeErrorMessage(error);
+    renderOutputProfileModalState();
   }
 }
 
@@ -2947,6 +3252,7 @@ function render() {
   renderInspector();
   renderFooter();
   renderAccessibilityHints();
+  syncRangeFillStyles();
   syncOpenInspectorDisclosureHeights();
   keepActiveThumbnailVisible();
   if (sessionSnapshotPersistenceEnabled) {
@@ -3117,7 +3423,14 @@ function renderShell() {
   shell.dataset.outputEditing = state.outputEditMode ? "true" : "false";
   if (gallery) {
     gallery.dataset.galleryView = state.galleryView;
-    gallery.dataset.outputBg = activeOutputProfile()?.background || state.background || "rgb230";
+    const galleryBackground = galleryActiveOutputContext().background;
+    gallery.dataset.outputBg = backgroundVisualMode(galleryBackground);
+    const galleryBackgroundColor = backgroundCssColor(galleryBackground);
+    if (galleryBackgroundColor) {
+      gallery.style.setProperty("--custom-output-bg", galleryBackgroundColor);
+    } else {
+      gallery.style.removeProperty("--custom-output-bg");
+    }
   }
 }
 
@@ -3200,8 +3513,13 @@ function renderTop() {
   $("#bridge-url").value = state.bridgeUrl;
   $("#active-batch-label").textContent = "";
   const topStatus = $("#top-status-text");
-  topStatus.textContent = visible.topSummary || compactHeaderStatusText();
-  topStatus.title = visible.subtitle || visible.topSummary || "";
+  const topbarText = conciseTopbarStatusText();
+  const topSummary = $(".top-summary");
+  if (topSummary) {
+    topSummary.hidden = !topbarText;
+  }
+  topStatus.textContent = topbarText;
+  topStatus.title = topbarText ? visible.subtitle || topbarText : "";
   $("#status-dot").className = `status-dot ${statusMode()}`;
   const hasBatchDetail = hasBatch() || state.batch === "empty"
     || counts.reviewIssues > 0
@@ -3251,6 +3569,19 @@ function renderTop() {
   if (moreMenu) {
     moreMenu.hidden = true;
   }
+}
+
+function conciseTopbarStatusText() {
+  if (["running", "completed", "partial", "failed"].includes(state.exportStatus)) {
+    return compactHeaderStatusText();
+  }
+  if (state.batch === "scanning") {
+    return "Escaneando";
+  }
+  if (state.bridgeMode === "bridge" && state.bridgeStatus === "disconnected") {
+    return "Bridge no disponible";
+  }
+  return "";
 }
 
 function compactHeaderStatusText() {
@@ -3643,11 +3974,13 @@ function renderBatch() {
   $("#image-search").value = state.search;
   updateBatchSearchClear();
   renderGalleryViewButtons();
+  renderGalleryOutputControl();
 
   if (state.batch === "none") {
     $("#batch-count").textContent = "Sin lote";
     setBatchPill("Sin carpeta", "muted");
     setGalleryTitle(0, "Sin lote");
+    setGalleryMeta("");
     $("#batch-visible-count").textContent = "";
     $("#folder-list").innerHTML = "";
     $("#image-list").innerHTML = "";
@@ -3671,6 +4004,7 @@ function renderBatch() {
     $("#batch-count").textContent = "Escaneando";
     setBatchPill("Escaneando", "active");
     setGalleryTitle(0, "Escaneando");
+    setGalleryMeta(state.scanStatus || "Leyendo carpeta");
     $("#batch-visible-count").textContent = sidebarSummaryText;
     $("#folder-list").innerHTML = batchDetailViewHelpers.folderItemHtml({
       id: "scan",
@@ -3702,6 +4036,7 @@ function renderBatch() {
     $("#batch-count").textContent = "Sin imágenes";
     setBatchPill("Sin imágenes", "muted");
     setGalleryTitle(0, "No hay PNG válidos");
+    setGalleryMeta(sidebarSummaryText);
     $("#batch-visible-count").textContent = sidebarSummaryText;
     $("#folder-list").innerHTML = emptyFolders.map((folder) => batchDetailViewHelpers.folderItemHtml(folder)).join("");
     $("#image-list").innerHTML = "";
@@ -3726,6 +4061,7 @@ function renderBatch() {
 
   const visible = filteredImages();
   setGalleryTitle(exportable);
+  setGalleryMeta(galleryBatchMetaText(counts, images));
   $("#batch-visible-count").textContent = visible.length === images.length
     ? ""
     : `${visible.length}/${images.length}`;
@@ -3744,6 +4080,56 @@ function setGalleryTitle(count, label = "") {
   if (title) {
     title.textContent = label || readyImagesText(Number(count) || 0);
   }
+}
+
+function setGalleryMeta(text = "") {
+  const meta = $("#gallery-batch-meta");
+  if (meta) {
+    meta.textContent = text;
+    meta.title = text;
+  }
+}
+
+function galleryBatchMetaText(counts = batchCounts(), images = activeImages()) {
+  const filesFound = counts.filesFound === null ? images.length : Number(counts.filesFound) || images.length;
+  const parts = [
+    batchViewHelpers.detectedFormatLabel(images),
+    filesFound ? `${filesFound} archivos` : "",
+  ].filter(Boolean);
+  if (counts.nonBlockingWarnings) {
+    parts.push(`${counts.nonBlockingWarnings} ${counts.nonBlockingWarnings === 1 ? "aviso" : "avisos"}`);
+  }
+  if (counts.ignoredFiles) {
+    parts.push(`${counts.ignoredFiles} ${counts.ignoredFiles === 1 ? "ignorado" : "ignorados"}`);
+  }
+  return parts.join(" · ");
+}
+
+function renderGalleryOutputControl() {
+  const control = $("#gallery-output-control");
+  const select = $("#gallery-output-select");
+  if (!control || !select) {
+    return;
+  }
+  const profiles = galleryOutputProfiles();
+  const showControl = state.batch === "ready" && profiles.length > 1;
+  control.hidden = !showControl;
+  if (!showControl) {
+    select.innerHTML = "";
+    return;
+  }
+  const context = galleryActiveOutputContext();
+  const customOption = context.id === "__custom"
+    ? `<option value="__custom">Formato personalizado · ${escapeHtml(context.label)}</option>`
+    : "";
+  select.innerHTML = `${customOption}${profiles.map((profile) => {
+    return `<option value="${escapeHtml(profile.id)}">${escapeHtml(profile.name)}</option>`;
+  }).join("")}`;
+  select.value = context.id;
+  if (select.value !== context.id) {
+    select.value = profiles[0]?.id || "";
+  }
+  select.title = context.summary;
 }
 
 function setBatchPill(label, tone = "muted") {
@@ -3793,16 +4179,45 @@ function imageThumbnailSrc(image) {
     return "";
   }
   if (image.source === "bridge") {
-    return image.path ? bridgeThumbnailUrl(image.path) : "";
+    return image.thumbnailUrl || (image.path ? bridgeThumbnailUrl(image.path) : "");
   }
   return galleryHelpers.mockThumbnailDataUrl(image);
 }
 
 function thumbnailState(image, src) {
   return galleryHelpers.thumbnailState({
+    displaySrc: src,
+    renderedOnly: false,
     src,
     stored: state.thumbnailStatus[image.id],
   });
+}
+
+function renderedThumbnailKey(image) {
+  const signature = {
+    background: state.background,
+    format: state.format,
+    imagePath: image.path,
+    localOverride: currentImageOverride(image),
+    preset: state.activePreset,
+    settings: bridgePreviewSettings(),
+    size: state.size,
+  };
+  return `rendered:${JSON.stringify(signature)}`;
+}
+
+function thumbnailTargetSize(maxSide = 180) {
+  const match = /^(\d+)x(\d+)$/.exec(state.size);
+  if (!match) {
+    return { targetWidth: maxSide, targetHeight: maxSide };
+  }
+  const width = Number(match[1]) || maxSide;
+  const height = Number(match[2]) || maxSide;
+  const scale = Math.min(maxSide / Math.max(width, height), 1);
+  return {
+    targetWidth: Math.max(1, Math.round(width * scale)),
+    targetHeight: Math.max(1, Math.round(height * scale)),
+  };
 }
 
 function queueThumbnailPreload() {
@@ -3823,7 +4238,6 @@ function preloadBatchThumbnails() {
     if (!src || (current?.src === src && ["loaded", "error"].includes(current.status)) || thumbnailPreloads.has(key)) {
       return;
     }
-
     const preloader = new Image();
     thumbnailPreloads.set(key, preloader);
     preloader.onload = () => {
@@ -3921,6 +4335,7 @@ function requestThumbnailFallback(imageId, sourceSrc) {
   }
 
   state.thumbnailStatus[imageId] = {
+    renderedOnly: true,
     status: "loading",
     src: sourceSrc,
     sourceSrc,
@@ -3958,13 +4373,15 @@ async function renderFallbackThumbnail({ imageId, sourceSrc }) {
     method: "POST",
     body: JSON.stringify({
       imagePath: image.path,
-      targetWidth: 160,
-      targetHeight: 160,
+      ...thumbnailTargetSize(),
       settings: bridgePreviewSettings(),
       localOverride: currentImageOverride(image),
     }),
     timeoutMs: 20000,
   });
+  if (imageThumbnailSrc(image) !== sourceSrc) {
+    return;
+  }
   const data = previewResponseToData(response);
   markThumbnailLoaded(imageId, sourceSrc, data.width, data.height, data.src);
 }
@@ -3976,7 +4393,16 @@ function applyThumbnailDomStatus(imageId, status, resolvedSrc = "") {
     return;
   }
   if (resolvedSrc) {
-    const image = wrapper.querySelector(".thumb-image");
+    let image = wrapper.querySelector(".thumb-image");
+    if (!image) {
+      const item = activeImages().find((activeImage) => activeImage.id === imageId);
+      image = document.createElement("img");
+      image.className = "thumb-image";
+      image.loading = "eager";
+      image.dataset.imageId = imageId;
+      image.alt = `Miniatura de ${item?.name || "imagen"}`;
+      wrapper.prepend(image);
+    }
     if (image && image.getAttribute("src") !== resolvedSrc) {
       image.src = resolvedSrc;
     }
@@ -4000,6 +4426,7 @@ function imageItemHtml(image) {
     fileType: imageFileType(image),
     image,
     imageStatus,
+    outputLabel: "",
     selected: image.id === state.selectedImageId,
     statusLabels,
     thumbState: thumbnailState(image, thumbnailSrc),
@@ -4086,7 +4513,15 @@ function renderPreview() {
   if (outputContext) {
     outputContext.innerHTML = "";
   }
-  $("#canvas-area").className = `canvas-area bg-${state.previewBg === "transparent" ? "transparent" : state.previewBg}`;
+  const previewBackgroundMode = backgroundVisualMode(state.previewBg);
+  const previewBackgroundColor = backgroundCssColor(state.previewBg);
+  const canvasArea = $("#canvas-area");
+  canvasArea.className = `canvas-area bg-${previewBackgroundMode}`;
+  if (previewBackgroundColor) {
+    canvasArea.style.setProperty("--custom-preview-bg", previewBackgroundColor);
+  } else {
+    canvasArea.style.removeProperty("--custom-preview-bg");
+  }
   $$(".preview-toolbar [data-preview-mode]").forEach((button) => {
     button.classList.toggle("active", button.dataset.previewMode === state.previewMode);
     button.disabled = button.dataset.previewMode === "processed"
@@ -4094,23 +4529,36 @@ function renderPreview() {
       : compareControlsDisabled;
   });
   $$(".background-switch [data-preview-bg]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.previewBg === state.previewBg);
+    const previewBg = normalizePreviewBackgroundValue(state.previewBg);
+    const isCustom = button.dataset.previewBg === "custom";
+    const isActive = isCustom ? Boolean(parseRgbBackground(previewBg)) : button.dataset.previewBg === previewBg;
+    button.classList.toggle("active", isActive);
     button.disabled = previewControlsDisabled;
   });
-  $$("[data-action='zoom-fit'], [data-action='zoom-height'], [data-action='zoom-width'], [data-action='zoom-100'], [data-action='zoom-out'], [data-action='zoom-in'], [data-action='force-preview-error']").forEach((button) => {
+  const customPreviewRgb = previewCustomRgbChannels(state.previewBg);
+  ["r", "g", "b"].forEach((channel, index) => {
+    const input = $(`[data-preview-bg-channel="${channel}"]`);
+    if (input) {
+      input.value = String(customPreviewRgb[index]);
+      input.disabled = previewControlsDisabled;
+    }
+  });
+  const customSwatch = $("#preview-bg-custom-swatch");
+  if (customSwatch) {
+    customSwatch.style.setProperty("--custom-preview-bg-control", `rgb(${customPreviewRgb.join(", ")})`);
+  }
+  const customFields = $(".viewer-bg-custom-fields");
+  if (customFields) {
+    customFields.classList.toggle("active", Boolean(parseRgbBackground(state.previewBg)));
+  }
+  $$("[data-action='zoom-height'], [data-action='zoom-width'], [data-action='zoom-out'], [data-action='zoom-in'], [data-action='force-preview-error']").forEach((button) => {
     button.disabled = previewControlsDisabled;
   });
-  $$("[data-action='zoom-fit'], [data-action='zoom-height'], [data-action='zoom-width'], [data-action='zoom-100']").forEach((button) => {
-    const expectedMode = button.dataset.action === "zoom-fit"
-      ? "fit"
-      : button.dataset.action === "zoom-height"
-        ? "height"
-        : button.dataset.action === "zoom-width"
-          ? "width"
-          : "manual";
-    const active = expectedMode === "manual"
-      ? state.fitMode === "manual" && state.zoom === 100
-      : state.fitMode === expectedMode;
+  $$("[data-action='zoom-height'], [data-action='zoom-width']").forEach((button) => {
+    const expectedMode = button.dataset.action === "zoom-height"
+      ? "height"
+      : "width";
+    const active = state.fitMode === expectedMode;
     button.classList.toggle("active", active);
     button.setAttribute("aria-pressed", button.classList.contains("active") ? "true" : "false");
   });
@@ -4123,7 +4571,7 @@ function renderPreview() {
     previewPanel.className = `preview-panel preview-panel--${previewOrientation()}`;
   }
   const canvas = $("#preview-canvas");
-  canvas.className = `preview-canvas ${state.previewMode} bg-${state.previewBg} ${viewerModeClass()}`;
+  canvas.className = `preview-canvas ${state.previewMode} bg-${previewBackgroundMode} ${viewerModeClass()}`;
   canvas.style.setProperty("--preview-scale", isAutoViewerMode() ? "1" : String(state.zoom / 100));
   applyViewerPanDom();
 
@@ -4227,6 +4675,10 @@ function updateFitZoomReadout() {
   const zoom = calculateFitZoom();
   state.fitZoom = zoom;
   label.textContent = `${zoom}%`;
+  if (!viewerPanState.active) {
+    clampViewerPan();
+    applyViewerPanDom();
+  }
 }
 
 function calculateFitZoom() {
@@ -4238,20 +4690,20 @@ function calculateFitZoom() {
   const naturalWidth = Number(image?.naturalWidth || image?.getAttribute("width") || state.previewData?.width || 0);
   const naturalHeight = Number(image?.naturalHeight || image?.getAttribute("height") || state.previewData?.height || 0);
   if (!naturalWidth || !naturalHeight || !canvas.clientWidth || !canvas.clientHeight) {
+    canvas.style.removeProperty("--fit-width");
+    canvas.style.removeProperty("--fit-height");
     return 100;
   }
-  const availableWidth = Math.max(1, canvas.clientWidth - 48);
-  const availableHeight = Math.max(1, canvas.clientHeight - 48);
-  canvas.style.setProperty("--fit-width", `${availableWidth}px`);
-  canvas.style.setProperty("--fit-height", `${availableHeight}px`);
-  const widthFit = availableWidth / naturalWidth;
-  const heightFit = availableHeight / naturalHeight;
-  const fit = state.fitMode === "width"
-    ? widthFit
-    : state.fitMode === "height"
-      ? Math.min(heightFit, widthFit)
-      : Math.min(widthFit, heightFit);
-  return Math.max(1, Math.min(100, Math.round(fit * 100)));
+  const layout = previewStateHelpers.viewerFitLayout({
+    canvasHeight: canvas.clientHeight,
+    canvasWidth: canvas.clientWidth,
+    mode: state.fitMode,
+    naturalHeight,
+    naturalWidth,
+  });
+  canvas.style.setProperty("--fit-width", `${layout.width}px`);
+  canvas.style.setProperty("--fit-height", `${layout.height}px`);
+  return layout.zoom;
 }
 
 function realPreviewHtml(image) {
@@ -4270,6 +4722,7 @@ function realPreviewHtml(image) {
       width: state.previewData.width,
       height: state.previewData.height,
       zoom: state.zoom,
+      inlineSize: !isAutoViewerMode(),
       warning: state.previewData.warning,
     });
   }
@@ -4372,6 +4825,7 @@ function renderSettings() {
         input.checked = Boolean(value);
       } else {
         input.value = value;
+        syncRangeFill(input);
       }
     }
     if (output) {
@@ -4394,6 +4848,7 @@ function renderSettings() {
     const numberInput = $(`[data-local-setting-number="${key}"]`);
     if (input) {
       input.value = value;
+      syncRangeFill(input);
     }
     if (output) {
       output.textContent = settingsViewHelpers.localSettingOutputText(value);
@@ -4662,6 +5117,30 @@ function inspectorCardsHtml() {
   ].filter(Boolean).join("");
 }
 
+function rangeFillPercent(input) {
+  if (!input || input.type !== "range") {
+    return 0;
+  }
+  const min = Number(input.min || 0);
+  const max = Number(input.max || 100);
+  const value = Number(input.value || min);
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) {
+    return 0;
+  }
+  return Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
+}
+
+function syncRangeFill(input) {
+  if (input?.type !== "range") {
+    return;
+  }
+  input.style.setProperty("--range-fill", `${rangeFillPercent(input)}%`);
+}
+
+function syncRangeFillStyles() {
+  $$(".settings-panel input[type='range']").forEach(syncRangeFill);
+}
+
 function lotInspectorCardHtml() {
   const counts = batchCounts();
   const visible = getVisibleAppState();
@@ -4698,9 +5177,7 @@ function outputInspectorCardHtml() {
   });
   return inspectorOutputViewHelpers.outputInspectorCardHtml({
     activeCount: activeProfiles.length,
-    formulaLabel: `${exportable} ${exportable === 1 ? "imagen" : "imágenes"} x ${activeProfiles.length} ${activeProfiles.length === 1 ? "formato" : "formatos"} = ${totalFiles} archivos`,
     totalFiles,
-    readyLabel: exportable ? readyImagesText(exportable) : "Sin imágenes listas",
     rows,
     dirty,
   });
@@ -4755,9 +5232,7 @@ function aspectInspectorCardHtml() {
     hasReadyBatch: hasBatch() && state.batch === "ready",
     activePreset: state.activePreset,
     adjustments: activePresetItems(),
-    appliedCount: images.length,
     customizedCount,
-    statusLabel: state.presetDirty ? "Global · Modificado" : "Global",
   });
 }
 
@@ -4849,7 +5324,7 @@ function renderExport() {
   renderOutputProfileSelect();
   $("#format-select").value = state.format;
   $("#size-select").value = state.size;
-  $("#background-select").value = state.background;
+  syncBackgroundSelectValue($("#background-select"), state.background);
   $("#destination-mode").value = state.destinationMode;
   $("#destination-input").value = state.destinationValue;
   $("#naming-input").value = state.naming;
@@ -4949,6 +5424,237 @@ function outputProfileSummaryLine(profile) {
   return `${profile.format} · ${outputProfileSize(profile).replace("x", " × ")} · ${backgroundLabel(profile.background)}`;
 }
 
+function syncBackgroundSelectValue(select, background) {
+  if (!select) {
+    return;
+  }
+  const normalized = normalizeBackgroundValue(background);
+  select.innerHTML = backgroundSelectOptionsHtml(normalized);
+  select.value = normalized;
+}
+
+function selectedBackgroundPresetFromForm(raw = outputProfileFormRawData()) {
+  return backgroundPresetByValue(raw.background);
+}
+
+function backgroundRgbFromValue(value) {
+  return parseRgbBackground(normalizeBackgroundValue(value)) || backgroundColorTuple(value);
+}
+
+function positionBackgroundPresetEditor() {
+  const editor = $("#background-preset-editor");
+  if (!editor || editor.hidden) {
+    return;
+  }
+  const anchor = $("#profile-background-input");
+  const dialog = $("#app-settings-modal .app-settings-dialog");
+  const footer = $("#app-settings-modal .app-settings-footer");
+  if (!anchor || !dialog) {
+    return;
+  }
+  const margin = 16;
+  const anchorRect = anchor.getBoundingClientRect();
+  const dialogRect = dialog.getBoundingClientRect();
+  const footerRect = footer?.getBoundingClientRect();
+  const maxWidth = Math.max(280, Math.min(486, window.innerWidth - margin * 2, dialogRect.width - margin * 2));
+  editor.style.width = `${maxWidth}px`;
+  const editorHeight = editor.offsetHeight || 0;
+  const left = clampNumber(anchorRect.left, dialogRect.left + margin, dialogRect.right - maxWidth - margin);
+  const footerTop = footerRect?.top || dialogRect.bottom;
+  const preferredTop = anchorRect.bottom + 8;
+  const maxTop = Math.max(dialogRect.top + margin, footerTop - editorHeight - 8);
+  const top = clampNumber(preferredTop, dialogRect.top + margin, maxTop);
+  editor.style.left = `${left}px`;
+  editor.style.top = `${top}px`;
+}
+
+function renderBackgroundPresetControls(raw = outputProfileFormRawData()) {
+  const selectedPreset = selectedBackgroundPresetFromForm(raw);
+  const editor = $("#background-preset-editor");
+  const actions = $(".background-preset-actions");
+  const deleteButton = $("[data-action='delete-background-preset']");
+  if (deleteButton) {
+    deleteButton.disabled = !selectedPreset || state.backgroundPresets.length <= 1;
+    deleteButton.title = !selectedPreset
+      ? "Este fondo no está guardado como preset"
+      : state.backgroundPresets.length <= 1
+        ? "Debe quedar al menos un fondo"
+        : "Eliminar fondo";
+  }
+  if (!editor) {
+    return;
+  }
+  const editorState = state.backgroundPresetEditor;
+  if (actions) {
+    actions.hidden = Boolean(editorState);
+  }
+  editor.hidden = !editorState;
+  if (!editorState) {
+    return;
+  }
+  const nameInput = $("#background-preset-name-input");
+  const kindInput = $("#background-preset-kind-input");
+  const rgbInput = $("#background-preset-rgb-input");
+  const rgbField = $(".background-preset-rgb-field");
+  if (nameInput && nameInput.value !== editorState.name) {
+    nameInput.value = editorState.name;
+  }
+  if (kindInput && kindInput.value !== editorState.kind) {
+    kindInput.value = editorState.kind;
+  }
+  if (rgbInput && rgbInput.value !== editorState.rgbText) {
+    rgbInput.value = editorState.rgbText;
+  }
+  if (rgbField) {
+    rgbField.hidden = editorState.kind === "transparent";
+  }
+  editor.classList.toggle("is-transparent", editorState.kind === "transparent");
+  const swatch = $("#background-preset-swatch");
+  if (swatch) {
+    const rgb = editorState.kind === "transparent" ? null : parseRgbBackground(customRgbBackgroundValue(editorState.rgbText));
+    const isInvalidRgb = editorState.kind !== "transparent" && !rgb;
+    swatch.classList.toggle("is-transparent", editorState.kind === "transparent");
+    swatch.classList.toggle("is-invalid", isInvalidRgb);
+    swatch.style.backgroundColor = rgb ? `rgb(${rgb.join(", ")})` : "";
+    swatch.setAttribute(
+      "aria-label",
+      editorState.kind === "transparent"
+        ? "Muestra del fondo transparente"
+        : rgb
+          ? `Muestra del fondo RGB ${rgb.join(", ")}`
+          : "Muestra del fondo sin RGB válido"
+    );
+  }
+  const message = $("#background-preset-editor-message");
+  if (message) {
+    message.textContent = editorState.error || "";
+    message.hidden = !editorState.error;
+    message.classList.toggle("error", Boolean(editorState.error));
+  }
+  positionBackgroundPresetEditor();
+}
+
+function updateBackgroundPresetEditorFromFields() {
+  const editor = state.backgroundPresetEditor;
+  if (!editor) {
+    return;
+  }
+  state.backgroundPresetEditor = {
+    ...editor,
+    error: "",
+    kind: $("#background-preset-kind-input")?.value === "transparent" ? "transparent" : "rgb",
+    name: $("#background-preset-name-input")?.value || "",
+    rgbText: $("#background-preset-rgb-input")?.value || "",
+  };
+}
+
+function beginBackgroundPresetEdit(mode = "edit") {
+  const raw = outputProfileFormRawData();
+  const preset = mode === "edit" ? selectedBackgroundPresetFromForm(raw) : null;
+  const source = preset || {
+    id: uniqueOutputProfileId("fondo", Date.now()),
+    kind: raw.background === "transparent" ? "transparent" : "rgb",
+    name: preset ? preset.name : "Nuevo fondo",
+    rgb: backgroundRgbFromValue(raw.background),
+  };
+  state.backgroundPresetEditor = {
+    id: mode === "edit" && preset ? preset.id : uniqueOutputProfileId(source.name || "fondo", Date.now()),
+    mode: mode === "edit" && preset ? "edit" : "new",
+    sourceValue: preset ? backgroundPresetValue(preset) : "",
+    kind: source.kind === "transparent" ? "transparent" : "rgb",
+    name: source.name,
+    rgbText: (source.rgb || [230, 230, 230]).join(", "),
+    error: "",
+  };
+  renderOutputProfileModalState();
+}
+
+function saveBackgroundPreset() {
+  updateBackgroundPresetEditorFromFields();
+  const editor = state.backgroundPresetEditor;
+  if (!editor) {
+    return;
+  }
+  const name = editor.name.trim();
+  const rgb = customRgbBackgroundValue(editor.rgbText);
+  if (!name) {
+    state.backgroundPresetEditor = { ...editor, error: "Pon un nombre al fondo." };
+    renderBackgroundPresetControls();
+    return;
+  }
+  if (editor.kind !== "transparent" && !rgb) {
+    state.backgroundPresetEditor = { ...editor, error: "Indica un RGB válido entre 0 y 255." };
+    renderBackgroundPresetControls();
+    return;
+  }
+  const savedPreset = normalizeBackgroundPreset({
+    id: editor.id,
+    kind: editor.kind,
+    name,
+    rgb: editor.kind === "transparent" ? [230, 230, 230] : parseRgbBackground(rgb),
+  });
+  const previousValue = editor.mode === "edit" ? editor.sourceValue : "";
+  const index = state.backgroundPresets.findIndex((preset) => preset.id === editor.id);
+  if (index >= 0) {
+    state.backgroundPresets[index] = savedPreset;
+  } else {
+    state.backgroundPresets.push(savedPreset);
+  }
+  state.backgroundPresets = normalizeBackgroundPresetList(state.backgroundPresets);
+  const nextValue = backgroundPresetValue(savedPreset);
+  if (previousValue) {
+    replaceBackgroundValue(previousValue, nextValue);
+  } else {
+    const draft = ensureOutputProfileDraft();
+    state.outputProfileDraft = { ...draft, background: nextValue };
+  }
+  state.backgroundPresetEditor = null;
+  state.statusText = `Fondo guardado: ${savedPreset.name}`;
+  persistBackgroundPresets();
+  render();
+}
+
+function replaceBackgroundValue(previousValue, nextValue) {
+  const previous = normalizeBackgroundValue(previousValue);
+  const next = normalizeBackgroundValue(nextValue);
+  state.outputProfiles = state.outputProfiles.map((profile) => (
+    normalizeBackgroundValue(profile.background) === previous ? { ...profile, background: next } : profile
+  ));
+  if (state.outputProfileDraft && normalizeBackgroundValue(state.outputProfileDraft.background) === previous) {
+    state.outputProfileDraft = { ...state.outputProfileDraft, background: next };
+  }
+  if (normalizeBackgroundValue(state.background) === previous) {
+    state.background = next;
+  }
+  if (normalizeBackgroundValue(state.previewBg) === previous) {
+    state.previewBg = next;
+  }
+  persistOutputProfiles();
+}
+
+function deleteBackgroundPreset() {
+  const preset = selectedBackgroundPresetFromForm();
+  if (!preset || state.backgroundPresets.length <= 1) {
+    return;
+  }
+  const confirmed = window.confirm(`Eliminar fondo "${preset.name}"?\n\nLos formatos que ya usen ese RGB conservarán el valor actual.`);
+  if (!confirmed) {
+    return;
+  }
+  state.backgroundPresets = state.backgroundPresets.filter((item) => item.id !== preset.id);
+  state.backgroundPresetEditor = null;
+  state.statusText = `Fondo eliminado: ${preset.name}`;
+  persistBackgroundPresets();
+  render();
+}
+
+function outputProfileCompactLabel(profile) {
+  if (!profile) {
+    return "Sin salida";
+  }
+  return `${profile.format} · ${backgroundLabel(profile.background)}`;
+}
+
 function profileDestinationLabel(profile) {
   return outputProfileViewHelpers.profileDestinationLabel(profile);
 }
@@ -4972,10 +5678,10 @@ function ensureOutputProfileDraft() {
 }
 
 function setOutputProfileFormValues(profile) {
+  syncBackgroundSelectValue($("#profile-background-input"), profile.background);
   const pairs = [
     ["profile-name-input", profile.name],
     ["profile-format-input", profile.format],
-    ["profile-background-input", profile.background],
     ["profile-width-input", profile.width],
     ["profile-height-input", profile.height],
     ["profile-destination-mode-input", profile.destinationMode],
@@ -4997,17 +5703,19 @@ function outputProfileFormRawData() {
     const input = $(`#${id}`);
     return input ? String(input.value ?? "") : String(fallback ?? "");
   };
+  const backgroundMode = value("profile-background-input", backgroundSelectMode(current.background));
   return {
     id: current.id,
     name: value("profile-name-input", current.name),
     format: value("profile-format-input", current.format),
-    background: value("profile-background-input", current.background),
+    background: normalizeBackgroundValue(backgroundMode, current.background),
     width: value("profile-width-input", current.width),
     height: value("profile-height-input", current.height),
     destinationMode: value("profile-destination-mode-input", current.destinationMode),
     destinationValue: value("profile-destination-input", current.destinationValue),
     naming: value("profile-naming-input", current.naming),
     suffix: value("profile-suffix-input", current.suffix),
+    enabled: Boolean(current.enabled),
   };
 }
 
@@ -5017,6 +5725,8 @@ function outputProfileRawFromProfile(profile) {
     name: profile.name,
     format: profile.format,
     background: profile.background,
+    backgroundCustom: backgroundCustomText(profile.background),
+    backgroundMode: backgroundSelectMode(profile.background),
     width: String(profile.width),
     height: String(profile.height),
     destinationMode: profile.destinationMode,
@@ -5032,7 +5742,7 @@ function outputProfileDraftFromForm() {
   return normalizeOutputProfile({
     id: current.id,
     name: raw.name,
-    enabled: current.enabled,
+    enabled: Boolean(raw.enabled),
     format: raw.format,
     background: raw.background,
     width: raw.width,
@@ -5048,11 +5758,60 @@ function updateOutputProfileDraftFromForm() {
   if (!state.appSettingsOpen) {
     return;
   }
+  state.outputProfileNotice = "";
+  syncTransparentBackgroundFormat();
+  syncOutputProfileDestinationMode();
+  state.outputDeleteConfirmId = "";
   state.outputProfileDraft = outputProfileDraftFromForm();
 }
 
+function syncTransparentBackgroundFormat() {
+  const backgroundInput = $("#profile-background-input");
+  const formatInput = $("#profile-format-input");
+  if (!backgroundInput || !formatInput) {
+    return;
+  }
+  if (normalizeBackgroundValue(backgroundInput.value) === "transparent" && normalizeExportFormat(formatInput.value) !== "PNG") {
+    formatInput.value = "PNG";
+  }
+}
+
+function looksLikeAbsoluteOutputPath(value) {
+  const text = String(value || "").trim();
+  return /^[A-Za-z]:[\\/]/.test(text) || /^[/\\]{2}/.test(text) || text.startsWith("/");
+}
+
+function syncOutputProfileDestinationMode() {
+  const modeInput = $("#profile-destination-mode-input");
+  const destinationInput = $("#profile-destination-input");
+  if (!modeInput || !destinationInput) {
+    return;
+  }
+  const mode = modeInput.value === "custom" ? "custom" : "source";
+  const value = String(destinationInput.value || "").trim();
+  if (mode === "source" && (!value || looksLikeAbsoluteOutputPath(value))) {
+    destinationInput.value = "Salida";
+    return;
+  }
+  if (mode === "custom" && (!value || value === "Salida")) {
+    destinationInput.value = readPersistentValue(STORAGE_KEYS.lastOutputFolder) || "";
+  }
+}
+
+function setOutputProfileDraftEnabled(enabled) {
+  const draft = ensureOutputProfileDraft();
+  state.outputProfileDraft = {
+    ...draft,
+    enabled: Boolean(enabled),
+  };
+  state.outputProfileNotice = "";
+  state.outputDeleteConfirmId = "";
+  renderAppSettings();
+}
+
 function selectOutputProfileDraft(profileId) {
-  if (state.appSettingsOpen && outputProfileHasUnsavedChanges() && !confirmDiscardOutputDraft("cambiar de formato")) {
+  if (state.appSettingsOpen && outputProfileHasUnsavedChanges()) {
+    showOutputProfileUnsavedNotice("Guarda o descarta los cambios antes de cambiar de formato.");
     return;
   }
   const profile = outputProfileManagerRows().find((item) => item.id === profileId);
@@ -5061,12 +5820,15 @@ function selectOutputProfileDraft(profileId) {
   }
   state.outputProfileEditorId = profile.id;
   state.outputProfileDraft = { ...profile };
+  state.outputProfileNotice = "";
+  state.outputDeleteConfirmId = "";
   state.statusText = `Editando formato: ${profile.name}`;
   render();
 }
 
 function newOutputProfile() {
-  if (state.appSettingsOpen && outputProfileHasUnsavedChanges() && !confirmDiscardOutputDraft("crear un formato nuevo")) {
+  if (state.appSettingsOpen && outputProfileHasUnsavedChanges()) {
+    showOutputProfileUnsavedNotice("Guarda o descarta los cambios antes de crear otro formato.");
     return;
   }
   const source = currentOutputProfileData();
@@ -5078,13 +5840,16 @@ function newOutputProfile() {
     name: "Nuevo formato",
     enabled: false,
   };
+  state.outputProfileNotice = "";
+  state.outputDeleteConfirmId = "";
   state.appSettingsOpen = true;
   state.statusText = "Nuevo formato de salida";
   render();
 }
 
 function duplicateOutputProfile() {
-  if (state.appSettingsOpen && outputProfileHasUnsavedChanges() && !confirmDiscardOutputDraft("duplicar otro formato")) {
+  if (state.appSettingsOpen && outputProfileHasUnsavedChanges()) {
+    showOutputProfileUnsavedNotice("Guarda o descarta los cambios antes de duplicar.");
     return;
   }
   const source = state.outputProfileDraft || activeOutputProfile() || currentOutputProfileData();
@@ -5096,6 +5861,8 @@ function duplicateOutputProfile() {
     name: `${source.name || "Formato"} copia`,
     enabled: false,
   };
+  state.outputProfileNotice = "";
+  state.outputDeleteConfirmId = "";
   state.appSettingsOpen = true;
   state.statusText = "Formato duplicado";
   render();
@@ -5122,6 +5889,13 @@ function commitOutputProfileDraft() {
   state.outputProfiles = normalizeOutputProfileList(state.outputProfiles, saved.id);
   state.outputProfileEditorId = saved.id;
   state.outputProfileDraft = { ...saved };
+  state.outputProfileNotice = "";
+  state.outputDeleteConfirmId = "";
+  if (saved.id === state.activeOutputProfileId && saved.enabled) {
+    syncOutputProfileState(saved);
+  } else if (saved.id === state.activeOutputProfileId && !saved.enabled) {
+    reassignActiveOutputProfileReference({ render: false });
+  }
   persistOutputProfiles();
   return state.outputProfiles.find((profile) => profile.id === saved.id) || saved;
 }
@@ -5138,15 +5912,6 @@ function saveOutputProfile(options = {}) {
   return saved;
 }
 
-function applyManagedOutputProfile() {
-  const saved = saveOutputProfile({ render: false });
-  if (!saved) {
-    return;
-  }
-  state.appSettingsOpen = false;
-  applyOutputProfile(saved.id, { enable: true, statusText: `Formato activo: ${saved.name}` });
-}
-
 function deleteManagedOutputProfile() {
   const draft = ensureOutputProfileDraft();
   const exists = state.outputProfiles.some((profile) => profile.id === draft.id);
@@ -5154,39 +5919,56 @@ function deleteManagedOutputProfile() {
     const fallback = activeOutputProfile() || state.outputProfiles[0];
     state.outputProfileEditorId = fallback?.id || "";
     state.outputProfileDraft = fallback ? { ...fallback } : null;
+    state.outputDeleteConfirmId = "";
     state.statusText = "Formato descartado";
     render();
     return;
   }
   if (state.outputProfiles.length <= 1) {
+    state.outputDeleteConfirmId = "";
     state.statusText = "Debe quedar al menos un formato";
     render();
     return;
   }
-  const deletedName = draft.name;
-  const confirmed = window.confirm(
-    `Eliminar formato "${deletedName}"?\n\nEste formato se eliminará de los formatos guardados. No se eliminarán imágenes ni exportaciones anteriores.`
-  );
-  if (!confirmed) {
+  state.outputDeleteConfirmId = draft.id;
+  state.outputProfileNotice = "";
+  state.statusText = `Confirmar eliminación: ${draft.name}`;
+  render();
+  queueModalFocus("#app-settings-modal", "[data-action='confirm-output-delete']");
+}
+
+function cancelDeleteManagedOutputProfile() {
+  state.outputDeleteConfirmId = "";
+  state.statusText = "Eliminación cancelada";
+  render();
+}
+
+function confirmDeleteManagedOutputProfile() {
+  const profileId = state.outputDeleteConfirmId;
+  const profile = state.outputProfiles.find((item) => item.id === profileId);
+  if (!profile) {
+    state.outputDeleteConfirmId = "";
+    render();
     return;
   }
-  state.outputProfiles = state.outputProfiles.filter((profile) => profile.id !== draft.id);
-  if (state.activeOutputProfileId === draft.id) {
-    const next = state.outputProfiles[0];
-    state.activeOutputProfileId = next.id;
-    state.format = next.format;
-    state.size = outputProfileSize(next);
-    state.background = next.background;
-    state.previewBg = next.background;
-    state.destinationMode = next.destinationMode;
-    state.destinationValue = next.destinationValue;
-    state.naming = next.naming;
-    state.suffix = next.suffix;
+  if (state.outputProfiles.length <= 1) {
+    state.outputDeleteConfirmId = "";
+    state.statusText = "Debe quedar al menos un formato";
+    render();
+    return;
   }
-  const nextDraft = state.outputProfiles.find((profile) => profile.id === state.activeOutputProfileId)
+
+  const deletedName = profile.name;
+  state.outputProfiles = state.outputProfiles.filter((item) => item.id !== profileId);
+  if (state.activeOutputProfileId === profileId) {
+    reassignActiveOutputProfileReference({ render: false, statusText: `Formato eliminado: ${deletedName}` });
+  }
+  const nextDraft = state.outputProfiles.find((profile) => profile.id === state.outputProfileEditorId)
+    || state.outputProfiles.find((profile) => profile.id === state.activeOutputProfileId)
     || state.outputProfiles[0];
-  state.outputProfileEditorId = nextDraft.id;
-  state.outputProfileDraft = { ...nextDraft };
+  state.outputProfileEditorId = nextDraft?.id || "";
+  state.outputProfileDraft = nextDraft ? { ...nextDraft } : null;
+  state.outputDeleteConfirmId = "";
   persistOutputProfiles();
   state.statusText = `Formato eliminado: ${deletedName}`;
   render();
@@ -5198,6 +5980,8 @@ function resetOutputProfileDraft() {
     || normalizeOutputProfile(defaultOutputProfiles[0]);
   state.outputProfileDraft = { ...original };
   state.outputProfileEditorId = original.id;
+  state.outputProfileNotice = "";
+  state.outputDeleteConfirmId = "";
   state.statusText = "Cambios del formato descartados";
   render();
 }
@@ -5217,19 +6001,37 @@ function openAppSettings() {
   state.appSettingsOpen = true;
   state.outputProfileEditorId = profile.id;
   state.outputProfileDraft = { ...profile };
+  state.outputDeleteConfirmId = "";
   state.statusText = "Formatos de salida";
   render();
-  queueModalFocus("#app-settings-modal", "[data-action='apply-output-profile']");
+  queueModalFocus("#app-settings-modal", "[data-action='close-app-settings']");
 }
 
 function closeAppSettings() {
-  if (state.appSettingsOpen && outputProfileHasUnsavedChanges() && !confirmDiscardOutputDraft("cerrar sin guardar")) {
+  if (state.appSettingsOpen && outputProfileHasUnsavedChanges()) {
+    showOutputProfileUnsavedNotice("Guarda o descarta los cambios antes de cerrar.");
     return;
   }
   releaseModalFocusBeforeHide();
   state.appSettingsOpen = false;
   state.outputProfileDraft = null;
+  state.outputProfileNotice = "";
+  state.outputDeleteConfirmId = "";
   state.statusText = "Configuración cerrada";
+  render();
+}
+
+function cancelOutputProfileDraft() {
+  releaseModalFocusBeforeHide();
+  const fallback = enabledActiveOutputProfile()
+    || state.outputProfiles.find((profile) => profile.id === state.activeOutputProfileId)
+    || state.outputProfiles[0]
+    || null;
+  state.appSettingsOpen = false;
+  state.outputProfileEditorId = fallback?.id || "";
+  state.outputProfileDraft = null;
+  state.outputDeleteConfirmId = "";
+  state.statusText = "Formato descartado";
   render();
 }
 
@@ -5253,6 +6055,7 @@ function openExportConfirm(risks, options = {}) {
   rememberModalFocusReturn();
   state.appSettingsOpen = false;
   state.outputProfileDraft = null;
+  state.outputDeleteConfirmId = "";
   state.batchDetailOpen = false;
   state.exportConfirmOpen = true;
   state.exportConfirmRisks = dedupeExportRisks(risks);
@@ -5377,12 +6180,6 @@ function trapOpenModalFocus(event) {
   return false;
 }
 
-function confirmDiscardOutputDraft(actionLabel) {
-  return window.confirm(
-    `Hay cambios sin guardar.\n\nPuedes guardar los cambios, aplicar el formato al lote o ${actionLabel}.`
-  );
-}
-
 function outputProfileHasUnsavedChanges() {
   if (!state.appSettingsOpen) {
     return false;
@@ -5393,6 +6190,12 @@ function outputProfileHasUnsavedChanges() {
     return true;
   }
   return !sameOutputProfileRaw(saved, raw);
+}
+
+function showOutputProfileUnsavedNotice(message) {
+  state.outputProfileNotice = message;
+  state.statusText = "Cambios sin guardar";
+  renderOutputProfileModalState();
 }
 
 function sameOutputProfileRaw(profile, raw) {
@@ -5408,7 +6211,30 @@ function sameOutputProfileRaw(profile, raw) {
     && profile.destinationMode === destinationMode
     && String(profile.destinationValue || "") === String(raw.destinationValue || "")
     && String(profile.naming || "") === String(raw.naming || "")
-    && String(profile.suffix || "") === String(raw.suffix || "");
+    && String(profile.suffix || "") === String(raw.suffix || "")
+    && Boolean(profile.enabled) === Boolean(raw.enabled);
+}
+
+function outputProfileChangeCount() {
+  const raw = outputProfileFormRawData();
+  const saved = state.outputProfiles.find((profile) => profile.id === raw.id);
+  if (!saved) {
+    return 1;
+  }
+  const destinationMode = raw.destinationMode === "custom" ? "custom" : "source";
+  const checks = [
+    String(saved.name || "").trim() !== String(raw.name || "").trim(),
+    saved.format !== normalizeExportFormat(raw.format),
+    saved.background !== raw.background,
+    String(saved.width) !== String(raw.width || "").trim(),
+    String(saved.height) !== String(raw.height || "").trim(),
+    saved.destinationMode !== destinationMode,
+    String(saved.destinationValue || "") !== String(raw.destinationValue || ""),
+    String(saved.naming || "") !== String(raw.naming || ""),
+    String(saved.suffix || "") !== String(raw.suffix || ""),
+    Boolean(saved.enabled) !== Boolean(raw.enabled),
+  ];
+  return checks.filter(Boolean).length;
 }
 
 function outputProfileValidation(raw = outputProfileFormRawData()) {
@@ -5416,16 +6242,18 @@ function outputProfileValidation(raw = outputProfileFormRawData()) {
 }
 
 function outputProfileEditorHeadingHtml(profile, validation, dirty) {
+  const saved = state.outputProfiles.find((item) => item.id === profile.id);
   return outputProfileViewHelpers.outputProfileEditorHeadingHtml({
     profile,
     validation,
     dirty,
-    active: profile.id === state.activeOutputProfileId,
-    summary: outputProfileSummaryLine(profile),
+    enabled: Boolean(profile.enabled),
+    isPersisted: Boolean(saved),
+    new: !saved,
   });
 }
 
-function outputProfilePreviewHtml(profile) {
+function outputProfilePreviewHtml(profile, validation = {}) {
   const image = selectedImage();
   const originalName = image?.name || "imagen_original.png";
   const resultName = outputNameForProfile(profile, image);
@@ -5439,6 +6267,7 @@ function outputProfilePreviewHtml(profile) {
     destination,
     resultPath,
     summary: outputProfileSummaryLine(profile),
+    validation,
   });
 }
 
@@ -5458,6 +6287,9 @@ function renderOutputProfileModalState() {
   const raw = outputProfileFormRawData();
   const profile = outputProfileDraftFromForm();
   state.outputProfileDraft = profile;
+  if (state.outputDeleteConfirmId && state.outputDeleteConfirmId !== profile.id) {
+    state.outputDeleteConfirmId = "";
+  }
   const validation = outputProfileValidation(raw);
   const dirty = outputProfileHasUnsavedChanges();
   const heading = $("#output-profile-editor-heading");
@@ -5466,15 +6298,17 @@ function renderOutputProfileModalState() {
   }
   const preview = $("#output-profile-preview");
   if (preview) {
-    preview.innerHTML = outputProfilePreviewHtml(profile);
+    preview.innerHTML = outputProfilePreviewHtml(profile, validation);
   }
   const validationTarget = $("#output-profile-validation");
   if (validationTarget) {
-    validationTarget.innerHTML = outputProfileValidationHtml(validation);
-    validationTarget.hidden = !validation.errors.length && !validation.warnings.length;
+    validationTarget.innerHTML = "";
+    validationTarget.hidden = true;
   }
   updateOutputProfileFieldStates(validation, raw);
+  renderBackgroundPresetControls(raw);
   updateOutputProfileFooterState(validation, dirty);
+  renderOutputProfileDeleteConfirm(profile);
 }
 
 function updateOutputProfileFieldStates(validation, raw) {
@@ -5482,6 +6316,7 @@ function updateOutputProfileFieldStates(validation, raw) {
     name: "profile-name-input",
     format: "profile-format-input",
     background: "profile-background-input",
+    backgroundCustom: "profile-background-custom-input",
     width: "profile-width-input",
     height: "profile-height-input",
     destinationMode: "profile-destination-mode-input",
@@ -5495,16 +6330,39 @@ function updateOutputProfileFieldStates(validation, raw) {
       return;
     }
     const tone = validation.fields[field];
+    const fieldMessages = validation.fieldMessages?.[field] || [];
     input.classList.toggle("is-invalid", tone === "error");
     input.classList.toggle("has-warning", tone === "warning");
     input.setAttribute("aria-invalid", tone === "error" ? "true" : "false");
+    input.title = fieldMessages[0] || "";
+  });
+
+  $$("[data-profile-field-message]").forEach((message) => {
+    const field = message.dataset.profileFieldMessage;
+    const fieldMessages = validation.fieldMessages?.[field] || [];
+    message.textContent = fieldMessages[0] || "";
+    message.hidden = !fieldMessages.length;
+    message.classList.toggle("error", validation.fields?.[field] === "error");
+    message.classList.toggle("warning", validation.fields?.[field] === "warning");
   });
 
   const destinationInput = $("#profile-destination-input");
   if (destinationInput) {
     destinationInput.placeholder = raw.destinationMode === "custom"
       ? "Ej. C:\\Exports\\FlatShot"
-      : "_SALIDA_PRO";
+      : "Salida";
+  }
+  const destinationLabel = $("#profile-destination-value-label");
+  if (destinationLabel) {
+    destinationLabel.textContent = raw.destinationMode === "custom" ? "Carpeta" : "Subcarpeta";
+  }
+  const destinationPickButton = $("[data-action='pick-output-profile-destination']");
+  if (destinationPickButton) {
+    destinationPickButton.hidden = raw.destinationMode !== "custom";
+    destinationPickButton.disabled = state.bridgeStatus === "checking";
+    destinationPickButton.title = raw.destinationMode === "custom"
+      ? "Elegir carpeta de salida"
+      : "Disponible con carpeta personalizada";
   }
 }
 
@@ -5515,31 +6373,69 @@ function updateOutputProfileFooterState(validation, dirty) {
     draft,
     dirty,
     isPersisted,
+    changeCount: outputProfileChangeCount(),
+    noticeText: state.outputProfileNotice,
     profileCount: state.outputProfiles.length,
     validation,
   });
   const deleteButton = $("[data-action='delete-output-profile']");
   if (deleteButton) {
-    deleteButton.disabled = footerState.deleteDisabled;
-    deleteButton.title = footerState.deleteTitle;
+    const deleteConfirmOpen = state.outputDeleteConfirmId === draft.id;
+    deleteButton.disabled = footerState.deleteDisabled || deleteConfirmOpen;
+    deleteButton.title = deleteConfirmOpen ? "Confirma o cancela la eliminación" : footerState.deleteTitle;
+    deleteButton.setAttribute("aria-expanded", deleteConfirmOpen ? "true" : "false");
   }
-  const resetButton = $("[data-action='reset-output-profile-draft']");
-  if (resetButton) {
+  $$("[data-output-profile-reset]").forEach((resetButton) => {
     resetButton.disabled = footerState.resetDisabled;
-  }
-  const saveButton = $("[data-action='save-output-profile']");
+    resetButton.textContent = footerState.resetLabel;
+    if (resetButton.closest(".app-settings-footer")) {
+      resetButton.dataset.action = "reset-output-profile-draft";
+      resetButton.hidden = footerState.resetHidden;
+    }
+  });
+  const saveButton = $("[data-output-profile-save]");
   if (saveButton) {
     saveButton.disabled = footerState.saveDisabled;
+    saveButton.hidden = footerState.saveHidden;
+    saveButton.textContent = footerState.saveLabel;
+    saveButton.dataset.action = "save-output-profile";
   }
-  const applyButton = $("[data-action='apply-output-profile']");
-  if (applyButton) {
-    applyButton.disabled = footerState.applyDisabled;
-    applyButton.textContent = footerState.applyLabel;
+  const closeButton = $("[data-output-profile-close]");
+  if (closeButton) {
+    closeButton.textContent = footerState.closeLabel;
+    closeButton.dataset.action = footerState.closeAction;
+    closeButton.hidden = footerState.closeHidden;
   }
   const footerNote = $("#output-profile-unsaved");
   if (footerNote) {
     footerNote.textContent = footerState.noteText;
     footerNote.className = footerState.noteClass;
+  }
+}
+
+function renderOutputProfileDeleteConfirm(profile) {
+  const panel = $("#output-delete-confirm");
+  if (!panel) {
+    return;
+  }
+  const isOpen = Boolean(profile?.id && state.outputDeleteConfirmId === profile.id);
+  panel.hidden = !isOpen;
+  panel.setAttribute("aria-hidden", isOpen ? "false" : "true");
+  const footer = panel.closest(".app-settings-footer");
+  if (footer) {
+    footer.classList.toggle("is-confirming-delete", isOpen);
+  }
+
+  const detail = $("#output-delete-confirm-detail");
+  if (detail) {
+    detail.textContent = isOpen
+      ? `Se eliminará "${profile.name}" de los formatos guardados. No se tocarán imágenes ni exportaciones anteriores.`
+      : "";
+  }
+
+  const confirmButton = panel.querySelector("[data-action='confirm-output-delete']");
+  if (confirmButton) {
+    confirmButton.disabled = !isOpen;
   }
 }
 
@@ -5556,21 +6452,24 @@ function renderAppSettings() {
 
   const draft = ensureOutputProfileDraft();
   const rows = outputProfileManagerRows();
+  const profileCount = $("#output-profile-count");
+  if (profileCount) {
+    profileCount.textContent = `${enabledOutputProfiles().length} activos`;
+  }
+  const draftDirty = outputProfileHasUnsavedChanges();
   $("#output-profile-list").innerHTML = rows.map((profile) => {
-    const selected = profile.id === draft.id;
-    const active = profile.id === state.activeOutputProfileId;
+    const selected = profile.id === draft?.id;
     const enabled = profile.enabled;
     const unsaved = !state.outputProfiles.some((item) => item.id === profile.id);
+    const dirty = selected && draftDirty;
     const canToggle = !unsaved;
     return outputProfileViewHelpers.outputProfileManagerRowHtml({
       profile,
       selected,
-      active,
       enabled,
+      dirty,
+      new: unsaved,
       unsaved,
-      canToggle,
-      summary: outputProfileSummaryLine(profile),
-      destination: profileDestinationLabel(profile),
     });
   }).join("");
   setOutputProfileFormValues(draft);
@@ -6170,7 +7069,9 @@ function renderAccessibilityHints() {
   const backgroundHints = {
     rgb230: "Fondo gris claro RGB 230",
     white: "Fondo blanco",
+    [SOFT_BLACK_PREVIEW_BG]: "Fondo negro suave RGB 32, 34, 37",
     transparent: "Fondo transparente",
+    custom: "Fondo personalizado con los campos RGB",
   };
   $$("[data-preview-bg]").forEach((button) => {
     setControlHint(button, backgroundHints[button.dataset.previewBg] || button.textContent.trim());
@@ -6180,10 +7081,8 @@ function renderAccessibilityHints() {
   const zoomHints = {
     "previous-image": "Imagen anterior. Atajo: flecha izquierda",
     "next-image": "Imagen siguiente. Atajo: flecha derecha",
-    "zoom-fit": "Encajar imagen en el visor. Atajo: F",
     "zoom-height": "Ajustar a la altura del visor",
     "zoom-width": "Ajustar a la anchura del visor",
-    "zoom-100": "Ver al 100 %. Atajo: 1",
     "zoom-out": "Reducir zoom",
     "zoom-in": "Aumentar zoom",
   };
@@ -6257,6 +7156,8 @@ function handleAction(action, target = null) {
     render();
   } else if (action === "pick-bridge-folder") {
     void pickBridgeFolder();
+  } else if (action === "pick-output-profile-destination") {
+    void pickOutputProfileDestination();
   } else if (action === "scan-bridge-folder") {
     void scanBridgeFolder();
   } else if (action === "clear-batch") {
@@ -6329,6 +7230,8 @@ function handleAction(action, target = null) {
     openAppSettings();
   } else if (action === "close-app-settings") {
     closeAppSettings();
+  } else if (action === "cancel-output-profile-draft") {
+    cancelOutputProfileDraft();
   } else if (action === "open-batch-detail") {
     openBatchDetail();
   } else if (action === "close-batch-detail") {
@@ -6345,23 +7248,31 @@ function handleAction(action, target = null) {
     resetOutputProfileDraft();
   } else if (action === "delete-output-profile") {
     deleteManagedOutputProfile();
+  } else if (action === "cancel-output-delete") {
+    cancelDeleteManagedOutputProfile();
+  } else if (action === "confirm-output-delete") {
+    confirmDeleteManagedOutputProfile();
   } else if (action === "save-output-profile") {
     saveOutputProfile();
-  } else if (action === "apply-output-profile") {
-    applyManagedOutputProfile();
+  } else if (action === "edit-background-preset") {
+    beginBackgroundPresetEdit("edit");
+  } else if (action === "new-background-preset") {
+    beginBackgroundPresetEdit("new");
+  } else if (action === "delete-background-preset") {
+    deleteBackgroundPreset();
+  } else if (action === "save-background-preset") {
+    saveBackgroundPreset();
+  } else if (action === "cancel-background-preset-edit") {
+    state.backgroundPresetEditor = null;
+    renderOutputProfileModalState();
   } else if (action === "open-preset-editor") {
     openPresetEditor();
   } else if (action === "close-preset-editor") {
     closePresetEditor();
-  } else if (action === "zoom-fit") {
-    setViewerMode("fit");
   } else if (action === "zoom-height") {
     setViewerMode("height");
   } else if (action === "zoom-width") {
     setViewerMode("width");
-  } else if (action === "zoom-100") {
-    resetViewerPan();
-    setViewerZoom(100);
   } else if (action === "zoom-in") {
     setViewerZoom(Math.round(currentViewerZoom() / 10) * 10 + 10);
   } else if (action === "zoom-out") {
@@ -6562,8 +7473,10 @@ document.addEventListener("click", (event) => {
 
   const bgTarget = event.target.closest("[data-preview-bg]");
   if (bgTarget) {
-    state.previewBg = bgTarget.dataset.previewBg;
-    state.statusText = `Fondo: ${bgTarget.textContent.trim()}`;
+    state.previewBg = normalizePreviewBackgroundValue(
+      bgTarget.dataset.previewBg === "custom" ? previewCustomBackgroundValue() : bgTarget.dataset.previewBg
+    );
+    state.statusText = `Fondo: ${previewBackgroundLabel(state.previewBg)}`;
     render();
     return;
   }
@@ -6640,6 +7553,9 @@ $("#bridge-scan-path").addEventListener("input", (event) => {
 });
 
 document.addEventListener("input", (event) => {
+  if (event.target?.matches?.("input[type='range']")) {
+    syncRangeFill(event.target);
+  }
   if (event.target.id === "onboarding-scan-path") {
     state.bridgeScanPath = event.target.value;
     const sidebarInput = $("#bridge-scan-path");
@@ -6657,6 +7573,10 @@ document.addEventListener("input", (event) => {
   if (event.target?.dataset?.localSettingNumber) {
     updateLocalOverrideFromNumberInput(event.target);
   }
+  if (event.target.closest?.("#background-preset-editor")) {
+    updateBackgroundPresetEditorFromFields();
+    return;
+  }
   if (event.target.closest?.("#output-profile-form")) {
     updateOutputProfileDraftFromForm();
     renderOutputProfileModalState();
@@ -6664,6 +7584,18 @@ document.addEventListener("input", (event) => {
 });
 
 document.addEventListener("change", (event) => {
+  if (event.target.matches?.("[data-preview-bg-channel]")) {
+    state.previewBg = normalizePreviewBackgroundValue(previewCustomBackgroundValue());
+    state.statusText = `Fondo: ${previewBackgroundLabel(state.previewBg)}`;
+    render();
+    return;
+  }
+  if (event.target?.id === "gallery-output-select") {
+    if (event.target.value !== "__custom") {
+      applyOutputProfile(event.target.value);
+    }
+    return;
+  }
   if (event.target?.dataset?.settingNumber) {
     updateSettingFromNumberInput(event.target, { commit: true });
     return;
@@ -6674,6 +7606,15 @@ document.addEventListener("change", (event) => {
   }
   if (event.target.matches?.("[data-output-profile-enabled-id]")) {
     setOutputProfileEnabled(event.target.dataset.outputProfileEnabledId, event.target.checked);
+    return;
+  }
+  if (event.target.matches?.("[data-output-profile-draft-enabled]")) {
+    setOutputProfileDraftEnabled(event.target.checked);
+    return;
+  }
+  if (event.target.closest?.("#background-preset-editor")) {
+    updateBackgroundPresetEditorFromFields();
+    renderBackgroundPresetControls();
     return;
   }
   if (event.target.matches?.("[data-image-adjustment-select]")) {
@@ -6762,6 +7703,7 @@ function updateSettingFromNumberInput(input, options = {}) {
   const range = $(`[data-setting="${key}"]`);
   if (range && range.type === "range") {
     range.value = parsed.value;
+    syncRangeFill(range);
   }
   markPresetDirty();
 }
@@ -6782,6 +7724,7 @@ function updateLocalOverrideFromNumberInput(input, options = {}) {
   const range = $(`[data-local-setting="${key}"]`);
   if (range) {
     range.value = value;
+    syncRangeFill(range);
   }
   setCurrentImageOverrideValue(key, value);
 }
@@ -6817,8 +7760,8 @@ $("#size-select").addEventListener("change", (event) => {
 });
 
 $("#background-select").addEventListener("change", (event) => {
-  state.background = event.target.value;
-  state.previewBg = event.target.value;
+  state.background = normalizeBackgroundValue(event.target.value, state.background);
+  state.previewBg = state.background;
   state.statusText = `Fondo: ${backgroundLabel(state.background)}`;
   persistExportPreferences();
   const image = selectedImage();
@@ -6831,7 +7774,7 @@ $("#background-select").addEventListener("change", (event) => {
 
 $("#destination-mode").addEventListener("change", (event) => {
   state.destinationMode = event.target.value;
-  state.destinationValue = state.destinationMode === "custom" ? "" : "_SALIDA_PRO";
+  state.destinationValue = state.destinationMode === "custom" ? "" : "Salida";
   state.exportStatus = isExportReady() ? "ready" : "blocked";
   state.statusText = state.destinationMode === "custom" ? "Carpeta de salida sin configurar" : "Destino junto al origen";
   persistExportPreferences();
@@ -6931,13 +7874,6 @@ document.addEventListener("keydown", (event) => {
   } else if (event.key === "End") {
     event.preventDefault();
     selectEdgeImage("last", { focus: true });
-  } else if (key === "f" && isViewerNavigationAvailable()) {
-    event.preventDefault();
-    setViewerMode("fit");
-  } else if (key === "1" && isViewerNavigationAvailable()) {
-    event.preventDefault();
-    resetViewerPan();
-    setViewerZoom(100);
   }
 });
 
@@ -6956,9 +7892,11 @@ function handleViewerPointerDown(event) {
   if (
     event.button !== 0
     || !isViewerNavigationAvailable()
-    || isAutoViewerMode()
     || event.target.closest("button, input, textarea, select, summary, a")
   ) {
+    return;
+  }
+  if (!canViewerPan()) {
     return;
   }
   const canvas = $("#preview-canvas");
@@ -7055,3 +7993,5 @@ if (restoredSessionSnapshot) {
 }
 window.addEventListener("flatshot:before-live-reload", writeSessionSnapshot);
 window.addEventListener("beforeunload", writeSessionSnapshot);
+window.addEventListener("resize", positionBackgroundPresetEditor);
+document.addEventListener("scroll", positionBackgroundPresetEditor, true);

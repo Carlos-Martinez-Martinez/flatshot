@@ -292,7 +292,12 @@ button.primary:hover:not(:disabled) {
   color: var(--color-primary-hover);
 }
 
-#app-settings-modal:not(.is-hidden), #batch-detail-modal:not(.is-hidden) {
+#app-settings-modal:not(.is-hidden) {
+  display: grid;
+  place-items: center;
+}
+
+#batch-detail-modal:not(.is-hidden) {
   display: flex;
   align-items: stretch;
   justify-content: flex-end;

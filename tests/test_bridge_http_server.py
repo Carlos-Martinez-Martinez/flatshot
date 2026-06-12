@@ -6,6 +6,7 @@ import base64
 import threading
 from concurrent.futures import Future
 from contextlib import contextmanager
+from io import BytesIO
 from pathlib import Path
 from time import sleep
 from types import SimpleNamespace
@@ -265,6 +266,35 @@ def test_bridge_http_render_thumbnail(tmp_path):
     assert status == 200
     assert headers["Content-Type"] == "image/png"
     assert body.startswith(b"\x89PNG")
+
+
+def test_bridge_http_render_thumbnail_crops_transparent_subject(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    png = source / "offset.png"
+    image = Image.new("RGBA", (80, 80), (0, 0, 0, 0))
+    for x in range(56, 72):
+        for y in range(52, 72):
+            image.putpixel((x, y), (255, 0, 0, 255))
+    image.save(png)
+
+    with running_bridge(tmp_path / "config") as port:
+        status, headers, body = request_raw(
+            port,
+            "GET",
+            f"/images/thumbnail?path={quote(str(png), safe='')}&size=40",
+        )
+
+    assert status == 200
+    assert headers["Content-Type"] == "image/png"
+    thumbnail = Image.open(BytesIO(body))
+    assert thumbnail.size == (40, 40)
+    bbox = thumbnail.getbbox()
+    assert bbox is not None
+    thumb_center = (thumbnail.size[0] / 2, thumbnail.size[1] / 2)
+    bbox_center = ((bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2)
+    assert abs(thumb_center[0] - bbox_center[0]) <= 1
+    assert abs(thumb_center[1] - bbox_center[1]) <= 1
 
 
 def test_bridge_http_render_preview_rejects_unsupported_file(tmp_path):

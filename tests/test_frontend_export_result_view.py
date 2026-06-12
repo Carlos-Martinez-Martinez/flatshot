@@ -119,7 +119,7 @@ const html = helpers.exportResultHtml({{
   total: 2,
   errors: 0,
   destinations: ['C:/Salida/"uno"'],
-  destinationFallback: "_SALIDA_PRO",
+  destinationFallback: "Salida",
   currentFileLabel: 'camisa <azul>.png',
   issues: [{{ title: "Aviso" }}],
   issueSummary: "Aviso <uno>",
@@ -143,10 +143,10 @@ const fallbackHtml = helpers.exportResultHtml({{
   total: 2,
   errors: 0,
   destinations: [],
-  destinationFallback: "_SALIDA_PRO",
+  destinationFallback: "Salida",
 }});
 assert.equal(fallbackHtml.includes('result-path muted'), true);
-assert.equal(fallbackHtml.includes('_SALIDA_PRO'), true);
+assert.equal(fallbackHtml.includes('Salida'), true);
 """
     result = subprocess.run(
         ["node", "-e", script],

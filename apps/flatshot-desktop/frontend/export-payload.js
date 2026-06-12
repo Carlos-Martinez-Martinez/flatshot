@@ -32,7 +32,7 @@
         background: primary.background,
         destinationMode: primary.destinationMode,
         destinationValue: primary.destinationValue,
-        outputFolderName: primary.destinationMode === "source" ? primary.destinationValue : "_SALIDA_PRO",
+        outputFolderName: primary.destinationMode === "source" ? primary.destinationValue : "Salida",
         customOutputPath: primary.destinationMode === "custom" ? primary.destinationValue : "",
         namingTemplate: primary.naming,
         suffix: primary.suffix,

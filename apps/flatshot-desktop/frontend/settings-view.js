@@ -84,6 +84,10 @@
   }
 
   function backgroundLabel(value) {
+    const custom = /^rgb\s*:\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})$/i.exec(String(value || "").trim());
+    if (custom) {
+      return `RGB ${custom.slice(1).join(", ")}`;
+    }
     if (value === "transparent") {
       return "transparente";
     }

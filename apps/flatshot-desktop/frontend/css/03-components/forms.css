@@ -59,20 +59,42 @@ input, select {
 
 @supports (-webkit-appearance: none) {
   .settings-panel input[type="range"] {
-    height: 18px;
-    background: var(--color-accent);
+    height: 22px;
+    background: transparent;
+    cursor: pointer;
     -webkit-appearance: none;
   }
 }
 
 @supports (-webkit-appearance: none) {
+  .settings-panel input[type="range"]::-webkit-slider-runnable-track {
+    height: 6px;
+    border: 1px solid color-mix(in srgb, var(--color-accent-border) 45%, var(--color-border));
+    border-radius: var(--radius-pill);
+    background: linear-gradient(
+      to right,
+      var(--color-accent) 0 var(--range-fill, 50%),
+      var(--color-bg-muted) var(--range-fill, 50%) 100%
+    );
+  }
+}
+
+@supports (-webkit-appearance: none) {
   .settings-panel input[type="range"]::-webkit-slider-thumb {
-    width: 16px;
-    height: 16px;
-    margin-top: -6px;
+    width: 14px;
+    height: 14px;
+    margin-top: -5px;
     border: 2px solid var(--color-bg-panel);
     border-radius: var(--radius-pill);
-    box-shadow: var(--shadow-xs);
+    background: var(--color-accent);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
+    -webkit-appearance: none;
+  }
+}
+
+@supports (-webkit-appearance: none) {
+  .settings-panel input[type="range"]:focus-visible::-webkit-slider-thumb {
+    box-shadow: var(--shadow-focus);
   }
 }
 
@@ -120,7 +142,7 @@ input, select {
   min-width: 0;
   min-height: 32px;
   padding: 0 var(--space-2);
-  text-align: right;
+  text-align: center;
   font-variant-numeric: tabular-nums;
 }
 }

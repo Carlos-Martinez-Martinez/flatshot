@@ -171,6 +171,17 @@ assert.deepEqual(helpers.thumbnailState({{
   src: "thumb-new",
   error: "",
 }});
+assert.deepEqual(helpers.thumbnailState({{
+  src: "rendered:thumb",
+  displaySrc: "",
+  renderedOnly: true,
+}}), {{
+  status: "loading",
+  src: "rendered:thumb",
+  error: "",
+  displaySrc: "",
+  renderedOnly: true,
+}});
 
 const mockThumb = helpers.mockThumbnailDataUrl({{ tone: "tone-b" }});
 assert.equal(mockThumb.startsWith("data:image/svg+xml;charset=utf-8,"), true);
@@ -194,6 +205,13 @@ assert.equal(thumb.includes('data-thumb-id="img-1"'), true);
 assert.equal(thumb.includes('src="data:image/png,&lt;x&gt;"'), true);
 assert.equal(thumb.includes('alt="Miniatura de Camisa &lt;azul&gt;.png"'), true);
 assert.equal(thumb.includes('Sin &lt;preview&gt;'), true);
+const renderedOnlyThumb = helpers.thumbnailHtml(
+  {{ id: "img-2", name: "Vestido.png" }},
+  {{ status: "loading", src: "rendered:thumb", renderedOnly: true }},
+  "rendered:thumb",
+);
+assert.equal(renderedOnlyThumb.includes('class="thumb-image"'), false);
+assert.equal(renderedOnlyThumb.includes('class="thumb is-loading"'), true);
 
 const item = helpers.imageItemHtml({{
   image: {{
@@ -220,6 +238,20 @@ assert.equal(item.includes('<strong>Camisa &lt;azul&gt;</strong>'), true);
 assert.equal(item.includes('<small>PNG · 14 KB · sin preview</small>'), true);
 assert.equal(item.includes('class="asset-state error"'), true);
 assert.equal(item.includes('<span aria-hidden="true">×</span>'), true);
+
+const itemWithOutput = helpers.imageItemHtml({{
+  image: {{
+    id: "img-2",
+    name: "Camisa.png",
+    path: "C:/lote/Camisa.png",
+    detail: "PNG · 14 KB",
+    status: "ready",
+  }},
+  outputLabel: "PNG · transparente",
+  statusLabels: {{}},
+}});
+assert.equal(itemWithOutput.includes('aria-label="Camisa.png · Lista · PNG · transparente"'), true);
+assert.equal(itemWithOutput.includes('class="image-output-label">PNG · transparente</span>'), true);
 """
     result = subprocess.run(
         ["node", "-e", script],

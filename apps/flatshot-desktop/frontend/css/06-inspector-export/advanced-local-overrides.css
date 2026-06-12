@@ -49,15 +49,17 @@
 .settings-panel.is-inspector-subview .local-adjustment[open] {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-3);
-  overflow: visible;
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
 }
 
 .settings-panel.is-inspector-subview .local-adjustment[open] > summary {
   position: static;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
   min-height: 0;
   grid-column: 1;
   padding: var(--space-3) var(--space-4);
@@ -69,10 +71,14 @@
   grid-column: 1;
   gap: var(--space-2);
   padding: 0 var(--space-4) var(--space-4);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .settings-panel.is-inspector-subview .local-adjustment[open] .local-control-row {
-  grid-template-columns: minmax(76px, 0.7fr) minmax(90px, 1fr) 64px;
+  grid-template-columns: minmax(76px, 0.72fr) minmax(0, 1fr) 56px;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 .settings-panel.is-inspector-subview .local-adjustment[open] .local-control-row > span {
@@ -80,6 +86,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.settings-panel.is-inspector-subview .local-adjustment[open] .local-control-row input[type="range"] {
+  min-width: 0;
+  width: 100%;
 }
 
 .control-row, .local-control-row {
@@ -91,9 +102,13 @@
 }
 
 .number-input, .setting-number, .local-setting-number {
-  width: 72px;
-  min-width: 64px;
+  width: 64px;
+  min-width: 56px;
   justify-self: end;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-panel);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
   font-variant-numeric: tabular-nums;
 }
 
@@ -103,8 +118,15 @@
 }
 
 .settings-panel.is-editing-preset .number-input, .settings-panel.is-editing-preset .setting-number, .settings-panel.is-editing-preset .local-setting-number {
-  width: 56px;
-  min-width: 56px;
+  width: 54px;
+  min-width: 54px;
+  min-height: 34px;
+  padding-inline: var(--space-2);
+}
+
+.settings-panel.is-inspector-subview .local-adjustment[open] .local-setting-number {
+  width: 54px;
+  min-width: 0;
 }
 
 .settings-panel.is-editing-preset .control-row > span, .settings-panel.is-editing-preset .local-control-row > span {

@@ -71,7 +71,7 @@ assert.equal(editHtml.includes('temporary-output-notice--compact'), true);
 assert.equal(editHtml.includes('data-action="apply-output-edit"'), true);
 
 const profileRows = [
-  {{ format: "JPG", name: "Principal", size: "1800x2400", destinationLabel: "_SALIDA_PRO" }},
+  {{ format: "JPG", name: "Principal", size: "1800x2400", destinationLabel: "Salida" }},
   {{ format: "PNG", name: "Transparente", size: "1200x1200", destinationLabel: "C:/Export" }},
   {{ format: "JPG", name: "Marketplace", size: "1600x1600", destinationLabel: "market" }},
   {{ format: "PNG", name: "Thumb", size: "800x800", destinationLabel: "thumb" }},
@@ -79,7 +79,7 @@ const profileRows = [
 ];
 const rowsHtml = helpers.profileSummaryRowsHtml(profileRows, profileRows.length);
 assert.equal(rowsHtml.includes("Principal · 1800 × 2400"), true);
-assert.equal(rowsHtml.includes('title="Principal · 1800x2400 · _SALIDA_PRO"'), true);
+assert.equal(rowsHtml.includes('title="Principal · 1800x2400 · Salida"'), true);
 assert.equal(rowsHtml.includes("1 formatos más"), true);
 
 const presetHtml = helpers.exportSummaryHtml({{

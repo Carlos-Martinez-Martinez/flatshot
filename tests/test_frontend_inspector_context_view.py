@@ -102,7 +102,7 @@ assert.deepEqual(helpers.contextualPreflightRows({{ batch: "scanning" }}), [
 assert.deepEqual(helpers.contextualPreflightRows({{ batch: "none" }}), [
   {{ state: "pending", title: "Carpeta seleccionada", detail: "Pendiente" }},
   {{ state: "pending", title: "Imágenes listas", detail: "Pendiente" }},
-  {{ state: "pending", title: "Destino de salida", detail: "Origen / _SALIDA_PRO" }},
+  {{ state: "pending", title: "Destino de salida", detail: "Origen / Salida" }},
 ]);
 assert.deepEqual(helpers.contextualPreflightRows({{
   batch: "empty",

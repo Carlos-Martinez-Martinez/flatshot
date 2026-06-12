@@ -55,7 +55,7 @@
   --shadow-sm: 0 4px 12px rgba(15, 23, 42, 0.06);
   --shadow-md: 0 12px 28px rgba(15, 23, 42, 0.08);
   --shadow-focus: 0 0 0 3px rgba(15, 143, 114, 0.18);
-  --column-gallery: clamp(300px, 22vw, 360px);
+  --column-gallery: clamp(360px, 24vw, 430px);
   --column-inspector: clamp(330px, 22vw, 390px);
   --viewer-min: 0px;
   --header-height: 60px;
@@ -140,12 +140,12 @@
   --font-weight-medium: 500;
   --font-weight-regular: 400;
   --font-weight-semibold: 600;
-  --fs-left-col: clamp(300px, 18vw, 360px);
+  --fs-left-col: clamp(360px, 24vw, 430px);
   --fs-left-top-row: clamp(190px, 26vh, 280px);
   --fs-output-edit-col: clamp(460px, 34vw, 520px);
-  --fs-right-col: clamp(500px, 32vw, 620px);
+  --fs-right-col: clamp(380px, 24vw, 440px);
   --fs-viewer-col: minmax(480px, 1fr);
-  --gallery-width: 320px;
+  --gallery-width: 380px;
   --info: #256b8f;
   --info-soft: #e2f0f7;
   --inspector-w: var(--column-inspector);
@@ -254,11 +254,11 @@
 
 @media (max-width: 1500px) {
   :root {
-    --column-gallery: 300px;
+    --column-gallery: clamp(360px, 26vw, 410px);
     --column-inspector: 360px;
     --viewer-min: 340px;
     --column-lot: 310px;
-    --gallery-width: 280px;
+    --gallery-width: 340px;
     --inspector-w: 300px;
     --lot-rail-width: 230px;
     --portrait-stage-max: 700px;
@@ -268,11 +268,11 @@
 
 @media (max-width: 1240px) {
   :root {
-    --column-gallery: clamp(280px, 27vw, 320px);
+    --column-gallery: clamp(350px, 34vw, 390px);
     --column-inspector: clamp(320px, 32vw, 360px);
     --viewer-min: 320px;
     --column-lot: 290px;
-    --gallery-width: 250px;
+    --gallery-width: 320px;
     --inspector-w: 280px;
     --lot-rail-width: 210px;
     --viewer-min-width: 420px;
@@ -281,9 +281,9 @@
 
 @media (max-width: 1280px) {
   :root {
-    --column-gallery: clamp(300px, 25vw, 360px);
+    --column-gallery: clamp(360px, 30vw, 400px);
     --column-inspector: clamp(320px, 27vw, 360px);
-    --fs-left-col: clamp(260px, 22vw, 320px);
+    --fs-left-col: clamp(360px, 30vw, 400px);
     --fs-right-col: clamp(480px, 40vw, 560px);
     --fs-viewer-col: minmax(360px, 1fr);
     --viewer-max: 720px;

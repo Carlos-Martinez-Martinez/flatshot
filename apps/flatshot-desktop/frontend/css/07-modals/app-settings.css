@@ -1,19 +1,11 @@
 @layer flatshot {
 /* Modals: output format settings dialog. */
 
-.app-settings-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: grid;
-  place-items: center;
-  padding: var(--space-6);
-  background: rgba(15, 23, 42, 0.32);
-}
+.app-settings-backdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 32px; background: rgba(15, 23, 42, 0.32); }
 
 .app-settings-dialog {
-  width: min(1040px, calc(100vw - 48px));
-  max-height: min(780px, calc(100vh - 48px));
+  width: min(1040px, calc(100vw - 64px));
+  max-height: min(720px, calc(100vh - 64px));
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
@@ -23,12 +15,7 @@
   box-shadow: var(--shadow-md);
 }
 
-.app-settings-header, .app-settings-footer {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4) var(--space-5);
-}
+.app-settings-header, .app-settings-footer { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-5); }
 
 .app-settings-header {
   justify-content: space-between;
@@ -50,9 +37,46 @@
 }
 
 .app-settings-footer {
+  min-height: 68px;
   justify-content: flex-end;
   border-top: 1px solid var(--color-border);
   background: var(--color-bg-soft);
+}
+
+.output-delete-confirm {
+  position: absolute;
+  inset: var(--space-3) var(--space-5);
+  width: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--color-bg-soft);
+  z-index: 1;
+}
+
+.output-delete-confirm[hidden] {
+  display: none;
+}
+
+.output-delete-confirm-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.output-delete-confirm strong {
+  color: var(--semantic-danger);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-tight);
+}
+
+.output-delete-confirm small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .app-settings-footer .settings-footer-note {
@@ -85,12 +109,12 @@
 .output-format-list, .output-format-form {
   min-width: 0;
   min-height: 0;
-  padding: var(--space-5);
+  padding: var(--space-4);
 }
 
 .output-format-list {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: var(--space-3);
   overflow: hidden;
   border-right: 1px solid var(--color-border);
@@ -100,7 +124,7 @@
 .output-format-form {
   display: grid;
   align-content: start;
-  gap: var(--space-4);
+  gap: var(--space-3);
   overflow-y: auto;
 }
 
@@ -131,7 +155,16 @@
 #app-settings-modal .output-format-list, #app-settings-modal .output-format-form {
   min-width: 0;
   min-height: 0;
-  overflow: auto;
+}
+
+#app-settings-modal .output-format-list {
+  overflow: hidden;
+}
+
+#app-settings-modal .output-format-form {
+  padding-block: var(--space-2);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .top-actions button, .inspector-actionbar button, .settings-toolbar-actions button, .app-settings-footer button {
@@ -141,20 +174,44 @@
 
 #app-settings-modal .app-settings-dialog {
   max-width: none;
-  height: calc(100vh - 32px);
-  max-height: none;
-  margin: 16px;
+  height: auto;
+  max-height: min(740px, calc(100vh - 48px));
+  margin: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
-  width: min(1080px, calc(100vw - 32px));
+  width: min(1180px, calc(100vw - 48px));
+}
+
+#app-settings-modal .app-settings-footer {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) auto auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  overflow: hidden;
+}
+
+#app-settings-modal .app-settings-footer .settings-footer-note {
+  margin-right: 0;
+}
+
+#app-settings-modal .app-settings-footer.is-confirming-delete > :not(.output-delete-confirm) {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 #app-settings-modal .app-settings-content {
   min-height: 0;
   display: grid;
-  gap: var(--space-4);
+  gap: 0;
+  align-items: stretch;
   overflow: hidden;
-  grid-template-columns: minmax(320px, 0.9fr) minmax(440px, 1.1fr);
+  grid-template-columns: 300px minmax(0, 1fr);
+}
+
+#app-settings-modal #output-profile-list {
+  max-height: none;
+  overflow-y: auto;
 }
 }

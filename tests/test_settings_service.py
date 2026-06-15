@@ -21,6 +21,7 @@ def test_load_missing_settings_returns_independent_defaults(tmp_path):
 
     assert second["preview_guides"]["opacity"] == DEFAULT_APP_SETTINGS["preview_guides"]["opacity"]
     assert second["shadow_engine"] == SHADOW_ENGINE_DEFAULT
+    assert second["lighting_scene"]["main"]["type"] == "softbox"
 
 
 def test_load_normalizes_loaded_settings(tmp_path):
@@ -44,6 +45,7 @@ def test_load_normalizes_loaded_settings(tmp_path):
     assert settings["output_width"] == 1000
     assert settings["output_height"] == DEFAULT_APP_SETTINGS["output_height"]
     assert settings["shadow_engine"] == SHADOW_ENGINE_COMPAT
+    assert settings["lighting_scene"]["ambient_intensity"] == 0.25
 
 
 def test_load_invalid_json_returns_defaults(tmp_path):

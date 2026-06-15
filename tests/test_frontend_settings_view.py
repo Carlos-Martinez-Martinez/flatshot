@@ -38,6 +38,16 @@ def test_adjustment_editor_actions_use_explicit_scope_labels():
     assert "Restablecer lote" in html
 
 
+def test_studio_lighting_panel_is_available_in_advanced_settings():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+
+    assert '<option value="studio_2_5d">Estudio 2.5D</option>' in html
+    assert 'id="studio-lighting-panel"' in html
+    assert 'data-lighting-stage' in html
+    assert 'data-lighting-preset="overhead_soft"' in html
+    assert 'data-lighting-field="main.type"' in html
+
+
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
 def test_settings_view_renders_preset_and_state_contracts():
     script = f"""
@@ -119,6 +129,18 @@ assert.equal(helpers.advancedDirtyCount({{
   currentSettings: {{ spread: 0 }},
   presetSettings: {{ spread: 0 }},
 }}), 0);
+assert.equal(helpers.advancedDirtyCount({{
+  presetDirty: true,
+  keys: ["lighting_scene"],
+  currentSettings: {{ lighting_scene: {{ main: {{ type: "softbox", x: -0.25 }}, ambient_intensity: 0.25 }} }},
+  presetSettings: {{ lighting_scene: {{ main: {{ type: "softbox", x: -0.25 }}, ambient_intensity: 0.25 }} }},
+}}), 0);
+assert.equal(helpers.advancedDirtyCount({{
+  presetDirty: true,
+  keys: ["lighting_scene"],
+  currentSettings: {{ lighting_scene: {{ main: {{ type: "softbox", x: -0.25 }}, ambient_intensity: 0.25 }} }},
+  presetSettings: {{ lighting_scene: {{ main: {{ type: "spot", x: -0.25 }}, ambient_intensity: 0.25 }} }},
+}}), 1);
 
 assert.equal(helpers.backgroundLabel("transparent"), "transparente");
 assert.equal(helpers.backgroundLabel("white"), "blanco");

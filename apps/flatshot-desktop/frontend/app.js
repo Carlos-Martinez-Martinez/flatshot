@@ -173,6 +173,7 @@ const shadowSettingKeys = [
   "adaptive_zoom",
   "scale_adjustment",
   "shadow_engine",
+  "lighting_scene",
   "transparent_bg",
   "bg_color",
 ];
@@ -187,6 +188,7 @@ const advancedSettingKeys = [
   "contraction",
   "adaptive_zoom",
   "shadow_engine",
+  "lighting_scene",
 ];
 
 const localOverrideKeys = ["size_delta", "shadow_delta", "blur_delta"];
@@ -194,6 +196,37 @@ const localOverrideLimits = {
   size_delta: [-30, 30],
   shadow_delta: [-40, 40],
   blur_delta: [-40, 40],
+};
+
+const defaultLightingScene = {
+  main: {
+    type: "softbox",
+    x: -0.25,
+    y: -0.65,
+    height: 0.65,
+    size: 0.55,
+    intensity: 0.85,
+  },
+  ambient_intensity: 0.25,
+};
+
+const lightingScenePresets = {
+  overhead_soft: {
+    main: { type: "softbox", x: -0.08, y: -0.78, height: 0.72, size: 0.72, intensity: 0.82 },
+    ambient_intensity: 0.30,
+  },
+  side_soft: {
+    main: { type: "softbox", x: -0.78, y: -0.28, height: 0.58, size: 0.62, intensity: 0.86 },
+    ambient_intensity: 0.28,
+  },
+  front_clean: {
+    main: { type: "softbox", x: 0.0, y: -0.24, height: 0.82, size: 0.82, intensity: 0.72 },
+    ambient_intensity: 0.36,
+  },
+  mild_drama: {
+    main: { type: "strip", x: -0.62, y: -0.70, height: 0.46, size: 0.38, intensity: 1.02 },
+    ambient_intensity: 0.18,
+  },
 };
 
 const defaultSettings = {
@@ -210,6 +243,7 @@ const defaultSettings = {
   adaptive_zoom: true,
   scale_adjustment: 0,
   shadow_engine: "realistic_v2",
+  lighting_scene: defaultLightingScene,
   transparent_bg: false,
   bg_color: [230, 230, 230],
 };
@@ -2337,6 +2371,40 @@ function toggleViewerZoomMode() {
   setViewerMode(DEFAULT_VIEW_MODE);
 }
 
+function clampNumber(value, min, max, fallback) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+  return Math.max(min, Math.min(max, numeric));
+}
+
+function roundedSceneValue(value, min, max, fallback) {
+  return Math.round(clampNumber(value, min, max, fallback) * 1000) / 1000;
+}
+
+function normalizeLightingScene(scene = {}) {
+  const source = scene && typeof scene === "object" ? scene : {};
+  const sourceMain = source.main && typeof source.main === "object" ? source.main : {};
+  const defaultMain = defaultLightingScene.main;
+  const type = ["softbox", "spot", "strip"].includes(sourceMain.type) ? sourceMain.type : defaultMain.type;
+  return {
+    main: {
+      type,
+      x: roundedSceneValue(sourceMain.x, -1, 1, defaultMain.x),
+      y: roundedSceneValue(sourceMain.y, -1, 1, defaultMain.y),
+      height: roundedSceneValue(sourceMain.height, 0, 1, defaultMain.height),
+      size: roundedSceneValue(sourceMain.size, 0, 1, defaultMain.size),
+      intensity: roundedSceneValue(sourceMain.intensity, 0, 1.5, defaultMain.intensity),
+    },
+    ambient_intensity: roundedSceneValue(source.ambient_intensity, 0, 1, defaultLightingScene.ambient_intensity),
+  };
+}
+
+function cloneLightingScene(scene = defaultLightingScene) {
+  return normalizeLightingScene(scene);
+}
+
 function normalizeSettings(settings = {}) {
   const source = settings && typeof settings === "object" ? settings : {};
   const normalized = { ...defaultSettings };
@@ -2349,7 +2417,11 @@ function normalizeSettings(settings = {}) {
       return;
     }
     if (key === "shadow_engine") {
-      normalized[key] = source[key] === "legacy" ? "legacy" : "realistic_v2";
+      normalized[key] = ["legacy", "realistic_v2", "studio_2_5d"].includes(source[key]) ? source[key] : "realistic_v2";
+      return;
+    }
+    if (key === "lighting_scene") {
+      normalized[key] = normalizeLightingScene(source[key]);
       return;
     }
     if (key === "bg_color") {
@@ -2360,6 +2432,7 @@ function normalizeSettings(settings = {}) {
     }
     normalized[key] = Number(source[key]);
   });
+  normalized.lighting_scene = cloneLightingScene(normalized.lighting_scene);
   return normalized;
 }
 
@@ -4874,6 +4947,87 @@ function renderSettings() {
   if (advancedSummaryTitle) {
     advancedSummaryTitle.textContent = settingsViewHelpers.advancedSummaryTitle(advancedDirtyCount());
   }
+  renderLightingSceneControls();
+}
+
+function lightingSceneFieldValue(scene, field) {
+  if (field === "ambient_intensity") {
+    return scene.ambient_intensity;
+  }
+  if (field.startsWith("main.")) {
+    return scene.main[field.slice(5)];
+  }
+  return undefined;
+}
+
+function lightingOutputId(field) {
+  const names = {
+    "main.height": "lighting-height-output",
+    "main.size": "lighting-size-output",
+    "main.intensity": "lighting-intensity-output",
+    ambient_intensity: "lighting-ambient-output",
+  };
+  return names[field] || "";
+}
+
+function lightingSliderValue(field, value) {
+  if (field === "main.intensity") {
+    return Math.round(clampNumber(value, 0, 1.5, defaultLightingScene.main.intensity) * 100);
+  }
+  return Math.round(clampNumber(value, 0, 1, 0) * 100);
+}
+
+function renderLightingSceneControls() {
+  const panel = $("#studio-lighting-panel");
+  if (!panel) {
+    return;
+  }
+  const enabled = state.settings.shadow_engine === "studio_2_5d";
+  panel.hidden = !enabled;
+  const scene = normalizeLightingScene(state.settings.lighting_scene);
+  state.settings.lighting_scene = scene;
+
+  $$("[data-lighting-field]").forEach((input) => {
+    const field = input.dataset.lightingField;
+    const value = lightingSceneFieldValue(scene, field);
+    if (input.tagName === "SELECT") {
+      input.value = value;
+    } else {
+      const sliderValue = lightingSliderValue(field, value);
+      input.value = sliderValue;
+      syncRangeFill(input);
+      const output = $(`#${lightingOutputId(field)}`);
+      if (output) {
+        output.textContent = String(sliderValue);
+      }
+    }
+    input.disabled = !enabled;
+  });
+
+  $$("[data-lighting-preset]").forEach((button) => {
+    const preset = lightingScenePresets[button.dataset.lightingPreset];
+    button.disabled = !enabled;
+    button.classList.toggle("active", enabled && lightingScenesEqual(scene, preset));
+  });
+
+  const stage = $("#lighting-stage");
+  const handle = $("#lighting-handle");
+  if (stage) {
+    stage.disabled = !enabled;
+  }
+  if (handle) {
+    const left = ((scene.main.x + 1) / 2) * 100;
+    const top = ((scene.main.y + 1) / 2) * 100;
+    handle.style.left = `${left}%`;
+    handle.style.top = `${top}%`;
+  }
+}
+
+function lightingScenesEqual(first, second) {
+  if (!second) {
+    return false;
+  }
+  return JSON.stringify(normalizeLightingScene(first)) === JSON.stringify(normalizeLightingScene(second));
 }
 
 function renderReviewPanel() {
@@ -7656,6 +7810,48 @@ $$("[data-setting]").forEach((input) => {
   input.addEventListener("change", updateSetting);
 });
 
+$$("[data-lighting-field]").forEach((input) => {
+  const updateLighting = (event) => {
+    updateLightingSceneField(event.target.dataset.lightingField, event.target.value);
+  };
+  input.addEventListener("input", updateLighting);
+  input.addEventListener("change", updateLighting);
+});
+
+$$("[data-lighting-preset]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const preset = lightingScenePresets[button.dataset.lightingPreset];
+    if (!preset) {
+      return;
+    }
+    state.settings.shadow_engine = "studio_2_5d";
+    state.settings.lighting_scene = cloneLightingScene(preset);
+    markPresetDirty();
+  });
+});
+
+const lightingStage = $("#lighting-stage");
+if (lightingStage) {
+  let lightingDragActive = false;
+  lightingStage.addEventListener("pointerdown", (event) => {
+    lightingDragActive = true;
+    lightingStage.setPointerCapture?.(event.pointerId);
+    updateLightingScenePosition(event.clientX, event.clientY);
+  });
+  lightingStage.addEventListener("pointermove", (event) => {
+    if (lightingDragActive) {
+      updateLightingScenePosition(event.clientX, event.clientY);
+    }
+  });
+  lightingStage.addEventListener("pointerup", (event) => {
+    lightingDragActive = false;
+    lightingStage.releasePointerCapture?.(event.pointerId);
+  });
+  lightingStage.addEventListener("pointercancel", () => {
+    lightingDragActive = false;
+  });
+}
+
 function settingInputValue(input) {
   if (input.type === "checkbox") {
     return input.checked;
@@ -7664,6 +7860,49 @@ function settingInputValue(input) {
     return input.value;
   }
   return Number(input.value);
+}
+
+function updateLightingSceneField(field, rawValue) {
+  const scene = cloneLightingScene(state.settings.lighting_scene);
+  if (field === "main.type") {
+    scene.main.type = ["softbox", "spot", "strip"].includes(rawValue) ? rawValue : scene.main.type;
+  } else if (field === "main.height") {
+    scene.main.height = roundedSceneValue(Number(rawValue) / 100, 0, 1, scene.main.height);
+  } else if (field === "main.size") {
+    scene.main.size = roundedSceneValue(Number(rawValue) / 100, 0, 1, scene.main.size);
+  } else if (field === "main.intensity") {
+    scene.main.intensity = roundedSceneValue(Number(rawValue) / 100, 0, 1.5, scene.main.intensity);
+  } else if (field === "ambient_intensity") {
+    scene.ambient_intensity = roundedSceneValue(Number(rawValue) / 100, 0, 1, scene.ambient_intensity);
+  } else {
+    return;
+  }
+  if (lightingScenesEqual(scene, state.settings.lighting_scene)) {
+    return;
+  }
+  state.settings.lighting_scene = scene;
+  markPresetDirty();
+}
+
+function updateLightingScenePosition(clientX, clientY) {
+  const stage = $("#lighting-stage");
+  if (!stage || state.settings.shadow_engine !== "studio_2_5d") {
+    return;
+  }
+  const rect = stage.getBoundingClientRect();
+  if (!rect.width || !rect.height) {
+    return;
+  }
+  const x = roundedSceneValue(((clientX - rect.left) / rect.width) * 2 - 1, -1, 1, defaultLightingScene.main.x);
+  const y = roundedSceneValue(((clientY - rect.top) / rect.height) * 2 - 1, -1, 1, defaultLightingScene.main.y);
+  const scene = cloneLightingScene(state.settings.lighting_scene);
+  if (scene.main.x === x && scene.main.y === y) {
+    return;
+  }
+  scene.main.x = x;
+  scene.main.y = y;
+  state.settings.lighting_scene = scene;
+  markPresetDirty();
 }
 
 function numericInputValue(input, fallback = 0) {

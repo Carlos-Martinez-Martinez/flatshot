@@ -9,6 +9,7 @@ from flatshot.core.engine import ShadowEngine
 from flatshot.core.models import ShadowSettings, CurveData
 from flatshot.core.shadow.geometry import shadow_vector_from_angle
 from flatshot.core.shadow.realistic_v2 import render_realistic_v2
+from flatshot.core.shadow.studio_2_5d import render_studio_2_5d
 from flatshot.core.shadow.types import ShadowRenderContext
 
 
@@ -490,3 +491,132 @@ class TestAplicarEfectos:
                     )
                 )
             )
+
+    def test_studio_2_5d_is_deterministic_with_noise(self):
+        settings = ShadowSettings(
+            shadow_engine="studio_2_5d",
+            angle=180,
+            distance=30,
+            blur=20,
+            contact_blur=8,
+            opacity=42,
+            noise=8,
+            lighting_scene={
+                "main": {
+                    "type": "softbox",
+                    "x": -0.45,
+                    "y": -0.65,
+                    "height": 0.55,
+                    "size": 0.62,
+                    "intensity": 0.95,
+                },
+                "ambient_intensity": 0.25,
+            },
+        )
+
+        one = render_studio_2_5d(_shadow_context(settings)).shadow
+        two = render_studio_2_5d(_shadow_context(settings)).shadow
+
+        assert one.tobytes() == two.tobytes()
+
+    def test_studio_2_5d_light_position_controls_shadow_direction(self):
+        left_light = render_studio_2_5d(
+            _shadow_context(
+                ShadowSettings(
+                    shadow_engine="studio_2_5d",
+                    distance=55,
+                    blur=12,
+                    opacity=55,
+                    noise=0,
+                    lighting_scene={"main": {"x": -0.8, "y": -0.55, "height": 0.45}},
+                )
+            )
+        ).shadow
+        right_light = render_studio_2_5d(
+            _shadow_context(
+                ShadowSettings(
+                    shadow_engine="studio_2_5d",
+                    distance=55,
+                    blur=12,
+                    opacity=55,
+                    noise=0,
+                    lighting_scene={"main": {"x": 0.8, "y": -0.55, "height": 0.45}},
+                )
+            )
+        ).shadow
+
+        assert _alpha_centroid(left_light)[0] > _alpha_centroid(right_light)[0] + 2.0
+
+    def test_studio_2_5d_light_types_produce_distinct_shadows(self):
+        base = {
+            "shadow_engine": "studio_2_5d",
+            "distance": 42,
+            "blur": 18,
+            "opacity": 45,
+            "noise": 0,
+            "lighting_scene": {
+                "main": {"x": -0.55, "y": -0.55, "height": 0.50, "size": 0.45},
+                "ambient_intensity": 0.20,
+            },
+        }
+        def settings_for(light_type):
+            data = dict(base)
+            scene = {
+                **base["lighting_scene"],
+                "main": {**base["lighting_scene"]["main"], "type": light_type},
+            }
+            data["lighting_scene"] = scene
+            return ShadowSettings(**data)
+
+        softbox = render_studio_2_5d(
+            _shadow_context(settings_for("softbox"))
+        ).shadow
+        spot = render_studio_2_5d(
+            _shadow_context(settings_for("spot"))
+        ).shadow
+        strip = render_studio_2_5d(
+            _shadow_context(settings_for("strip"))
+        ).shadow
+
+        assert softbox.tobytes() != spot.tobytes()
+        assert strip.tobytes() != spot.tobytes()
+
+    def test_studio_2_5d_handles_transparent_context_and_empty_inputs(self):
+        transparent = _shadow_context(
+            ShadowSettings(
+                shadow_engine="studio_2_5d",
+                transparent_bg=True,
+                opacity=40,
+                noise=0,
+            )
+        )
+        transparent = ShadowRenderContext(
+            settings=transparent.settings,
+            canvas_size=transparent.canvas_size,
+            scale_factor=transparent.scale_factor,
+            subject_width=transparent.subject_width,
+            subject_mask_canvas=transparent.subject_mask_canvas,
+            subject_mask_local=transparent.subject_mask_local,
+            subject_position=transparent.subject_position,
+            luminance_value=transparent.luminance_value,
+            background_rgb=None,
+        )
+
+        result = render_studio_2_5d(transparent)
+        assert result.shadow.getchannel("A").getbbox() is not None
+        assert result.diagnostics.engine_used == "studio_2_5d"
+
+        empty_mask = Image.new("L", (120, 120), 0)
+        empty = render_studio_2_5d(
+            ShadowRenderContext(
+                settings=ShadowSettings(shadow_engine="studio_2_5d", opacity=40),
+                canvas_size=empty_mask.size,
+                scale_factor=1.0,
+                subject_width=0,
+                subject_mask_canvas=empty_mask,
+                subject_mask_local=empty_mask,
+                subject_position=(0, 0),
+                luminance_value=0.5,
+            )
+        )
+        assert empty.shadow.getchannel("A").getbbox() is None

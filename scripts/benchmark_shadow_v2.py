@@ -18,6 +18,7 @@ if str(SRC) not in sys.path:
 from flatshot.core.engine import ShadowEngine
 from flatshot.core.models import ShadowSettings
 from flatshot.core.shadow.realistic_v2 import render_realistic_v2
+from flatshot.core.shadow.studio_2_5d import render_studio_2_5d
 from flatshot.core.shadow.types import ShadowRenderContext
 
 
@@ -64,11 +65,11 @@ def make_subject(size: tuple[int, int], product: str, alpha: str) -> Image.Image
     return img
 
 
-def make_context(target_size: tuple[int, int], product: str, background: str, alpha: str) -> ShadowRenderContext:
+def make_context(target_size: tuple[int, int], product: str, background: str, alpha: str, engine: str) -> ShadowRenderContext:
     subject = make_subject(target_size, product, alpha)
     mask = subject.getchannel("A")
     settings = ShadowSettings(
-        shadow_engine="realistic_v2",
+        shadow_engine=engine,
         adaptive_zoom=False,
         angle=180,
         distance=32,
@@ -109,10 +110,16 @@ def summarize(values: list[float]) -> dict:
     }
 
 
-def benchmark_case(size: tuple[int, int], product: str, background: str, alpha: str, runs: int, include_save: bool) -> dict:
+def render_shadow_pure(context: ShadowRenderContext):
+    if context.settings.shadow_engine == "studio_2_5d":
+        return render_studio_2_5d(context)
+    return render_realistic_v2(context)
+
+
+def benchmark_case(size: tuple[int, int], product: str, background: str, alpha: str, runs: int, include_save: bool, engine: str) -> dict:
     source = make_subject((900, 1200), product, alpha)
     settings = ShadowSettings(
-        shadow_engine="realistic_v2",
+        shadow_engine=engine,
         adaptive_zoom=False,
         angle=180,
         distance=32,
@@ -123,7 +130,7 @@ def benchmark_case(size: tuple[int, int], product: str, background: str, alpha: 
         transparent_bg=(background == "transparent"),
         bg_color=(245, 245, 245),
     )
-    context = make_context(size, product, background, alpha)
+    context = make_context(size, product, background, alpha, engine)
 
     result = {
         "case": {
@@ -132,7 +139,7 @@ def benchmark_case(size: tuple[int, int], product: str, background: str, alpha: 
             "background": background,
             "alpha": alpha,
         },
-        "shadow_pure": summarize(time_call(runs, lambda: render_realistic_v2(context))),
+        "shadow_pure": summarize(time_call(runs, lambda: render_shadow_pure(context))),
         "preview_complete": summarize(
             time_call(
                 runs,
@@ -178,20 +185,21 @@ def build_cases(quick: bool) -> list[tuple[tuple[int, int], str, str, str]]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Benchmark FlatShot realistic_v2 shadow renderer.")
+    parser = argparse.ArgumentParser(description="Benchmark FlatShot shadow renderers.")
     parser.add_argument("--runs", type=int, default=5, help="Runs per metric.")
     parser.add_argument("--quick", action="store_true", help="Run only the 1800x2400 reference case.")
     parser.add_argument("--include-save", action="store_true", help="Also measure export with PNG save.")
+    parser.add_argument("--engine", choices=["realistic_v2", "studio_2_5d"], default="realistic_v2", help="Shadow engine to benchmark.")
     parser.add_argument("--json", dest="json_path", help="Optional output JSON path.")
     args = parser.parse_args()
 
     runs = max(1, args.runs)
     results = [
-        benchmark_case(size, product, background, alpha, runs, args.include_save)
+        benchmark_case(size, product, background, alpha, runs, args.include_save, args.engine)
         for size, product, background, alpha in build_cases(args.quick)
     ]
 
-    print("FlatShot realistic_v2 benchmark")
+    print(f"FlatShot {args.engine} benchmark")
     print(f"runs={runs} include_save={args.include_save}")
     for item in results:
         case = item["case"]

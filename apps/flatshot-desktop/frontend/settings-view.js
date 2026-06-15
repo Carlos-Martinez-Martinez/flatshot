@@ -80,7 +80,17 @@
     const keys = Array.isArray(options.keys) ? options.keys : [];
     const currentSettings = options.currentSettings || {};
     const presetSettings = options.presetSettings || {};
-    return keys.filter((key) => currentSettings[key] !== presetSettings[key]).length;
+    return keys.filter((key) => !settingValuesEqual(currentSettings[key], presetSettings[key])).length;
+  }
+
+  function settingValuesEqual(first, second) {
+    if (first === second) {
+      return true;
+    }
+    if (!first || !second || typeof first !== "object" || typeof second !== "object") {
+      return false;
+    }
+    return JSON.stringify(first) === JSON.stringify(second);
   }
 
   function backgroundLabel(value) {

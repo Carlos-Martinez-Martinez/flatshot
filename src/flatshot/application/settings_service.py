@@ -31,6 +31,17 @@ DEFAULT_APP_SETTINGS: dict[str, Any] = {
     },
     "image_overrides": {},
     "shadow_engine": SHADOW_ENGINE_DEFAULT,
+    "lighting_scene": {
+        "main": {
+            "type": "softbox",
+            "x": -0.25,
+            "y": -0.65,
+            "height": 0.65,
+            "size": 0.55,
+            "intensity": 0.85,
+        },
+        "ambient_intensity": 0.25,
+    },
     "scale_curve": dict(DEFAULT_SCALE_CURVE),
     "section_visibility": {
         "presets": True,

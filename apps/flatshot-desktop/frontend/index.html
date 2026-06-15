@@ -441,9 +441,56 @@
                   <span>Motor</span>
                   <select data-setting="shadow_engine">
                     <option value="realistic_v2">Realista V2</option>
+                    <option value="studio_2_5d">Estudio 2.5D</option>
                     <option value="legacy">Clásico</option>
                   </select>
                 </label>
+                <div class="studio-lighting-panel" id="studio-lighting-panel" hidden>
+                  <div class="lighting-scene-toolbar" aria-label="Escenas de luz">
+                    <button type="button" data-lighting-preset="overhead_soft">Cenital suave</button>
+                    <button type="button" data-lighting-preset="side_soft">Lateral suave</button>
+                    <button type="button" data-lighting-preset="front_clean">Frontal limpia</button>
+                    <button type="button" data-lighting-preset="mild_drama">Drama leve</button>
+                  </div>
+                  <div class="lighting-stage-row">
+                    <button type="button" class="lighting-stage" id="lighting-stage" data-lighting-stage aria-label="Posición de la luz">
+                      <span class="lighting-stage__cross lighting-stage__cross--x"></span>
+                      <span class="lighting-stage__cross lighting-stage__cross--y"></span>
+                      <span class="lighting-stage__product"></span>
+                      <span class="lighting-stage__handle" id="lighting-handle"></span>
+                    </button>
+                    <div class="lighting-stage-fields">
+                      <label class="control-row control-row--select">
+                        <span>Tipo</span>
+                        <select data-lighting-field="main.type">
+                          <option value="softbox">Softbox</option>
+                          <option value="spot">Spot</option>
+                          <option value="strip">Strip</option>
+                        </select>
+                      </label>
+                      <label class="control-row">
+                        <span>Altura</span>
+                        <input type="range" min="0" max="100" value="65" data-lighting-field="main.height" />
+                        <output id="lighting-height-output">65</output>
+                      </label>
+                    </div>
+                  </div>
+                  <label class="control-row">
+                    <span>Tamaño</span>
+                    <input type="range" min="0" max="100" value="55" data-lighting-field="main.size" />
+                    <output id="lighting-size-output">55</output>
+                  </label>
+                  <label class="control-row">
+                    <span>Intensidad</span>
+                    <input type="range" min="0" max="150" value="85" data-lighting-field="main.intensity" />
+                    <output id="lighting-intensity-output">85</output>
+                  </label>
+                  <label class="control-row">
+                    <span>Ambiente</span>
+                    <input type="range" min="0" max="100" value="25" data-lighting-field="ambient_intensity" />
+                    <output id="lighting-ambient-output">25</output>
+                  </label>
+                </div>
               </div>
           </details>
 

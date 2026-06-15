@@ -48,6 +48,7 @@ PREVIEW_SETTING_ALIASES = {
     "shadowEngine": "shadow_engine",
     "contactBlur": "contact_blur",
     "adaptiveZoom": "adaptive_zoom",
+    "lightingScene": "lighting_scene",
 }
 PREVIEW_SETTING_KEYS = {
     "angle",
@@ -63,6 +64,7 @@ PREVIEW_SETTING_KEYS = {
     "adaptive_zoom",
     "scale_adjustment",
     "shadow_engine",
+    "lighting_scene",
     "transparent_bg",
     "bg_color",
 }

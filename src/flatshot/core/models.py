@@ -3,13 +3,29 @@ import re
 from pydantic import BaseModel, Field, field_validator
 from typing import Any, Dict, List, Literal, Mapping, Optional, Tuple
 
-ShadowEngineName = Literal["realistic_v2", "legacy"]
+ShadowEngineName = Literal["realistic_v2", "legacy", "studio_2_5d"]
+StudioLightType = Literal["softbox", "spot", "strip"]
 
 SHADOW_ENGINE_REALISTIC_V2 = "realistic_v2"
 SHADOW_ENGINE_LEGACY = "legacy"
+SHADOW_ENGINE_STUDIO_2_5D = "studio_2_5d"
 SHADOW_ENGINE_DEFAULT: ShadowEngineName = SHADOW_ENGINE_REALISTIC_V2
 SHADOW_ENGINE_COMPAT: ShadowEngineName = SHADOW_ENGINE_LEGACY
-VALID_SHADOW_ENGINES = {SHADOW_ENGINE_REALISTIC_V2, SHADOW_ENGINE_LEGACY}
+VALID_SHADOW_ENGINES = {SHADOW_ENGINE_REALISTIC_V2, SHADOW_ENGINE_LEGACY, SHADOW_ENGINE_STUDIO_2_5D}
+
+
+class StudioLight(BaseModel):
+    type: StudioLightType = "softbox"
+    x: float = Field(-0.25, ge=-1.0, le=1.0)
+    y: float = Field(-0.65, ge=-1.0, le=1.0)
+    height: float = Field(0.65, ge=0.0, le=1.0)
+    size: float = Field(0.55, ge=0.0, le=1.0)
+    intensity: float = Field(0.85, ge=0.0, le=1.5)
+
+
+class LightingScene(BaseModel):
+    main: StudioLight = Field(default_factory=StudioLight)
+    ambient_intensity: float = Field(0.25, ge=0.0, le=1.0)
 
 class ShadowSettings(BaseModel):
     angle: int = Field(180, ge=0, le=360)
@@ -25,6 +41,7 @@ class ShadowSettings(BaseModel):
     adaptive_zoom: bool = True
     scale_adjustment: int = Field(0, ge=-30, le=30)
     shadow_engine: ShadowEngineName = SHADOW_ENGINE_DEFAULT
+    lighting_scene: LightingScene = Field(default_factory=LightingScene)
     transparent_bg: bool = False
     bg_color: Tuple[int, int, int] = (230, 230, 230)
 

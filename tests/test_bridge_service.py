@@ -227,6 +227,49 @@ def test_bridge_render_preview_applies_local_override(tmp_path):
     assert captured["settings"].blur == 38
 
 
+def test_bridge_render_preview_accepts_lighting_scene_alias(tmp_path):
+    image = _png(tmp_path / "source.png")
+    captured = {}
+
+    class CapturingPreviewService:
+        def render_preview(self, request):
+            captured["settings"] = request.settings
+            return PreviewResult(width=1, height=1, bytes_rgb=b"\x00\x00\x00")
+
+    service = FlatShotBridgeService(
+        config_resolver=ConfigPathResolver(tmp_path / "config"),
+        preview_service=CapturingPreviewService(),
+    )
+
+    response = service.render_preview(
+        {
+            "imagePath": str(image),
+            "targetWidth": 1,
+            "targetHeight": 1,
+            "settings": {
+                "shadowEngine": "studio_2_5d",
+                "lightingScene": {
+                    "main": {
+                        "type": "strip",
+                        "x": 0.45,
+                        "y": -0.7,
+                        "height": 0.4,
+                        "size": 0.35,
+                        "intensity": 1.1,
+                    },
+                    "ambient_intensity": 0.2,
+                },
+            },
+        }
+    )
+
+    assert response["ok"] is True
+    assert captured["settings"].shadow_engine == "studio_2_5d"
+    assert captured["settings"].lighting_scene.main.type == "strip"
+    assert captured["settings"].lighting_scene.main.x == 0.45
+    assert captured["settings"].lighting_scene.ambient_intensity == 0.2
+
+
 def test_bridge_serializes_image_info_with_stable_keys(tmp_path):
     image = ImageFileInfo(
         path=tmp_path / "item.png",

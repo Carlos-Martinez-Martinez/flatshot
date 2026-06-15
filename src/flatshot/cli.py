@@ -18,6 +18,7 @@ from flatshot.core.models import (
     SHADOW_ENGINE_COMPAT,
     SHADOW_ENGINE_LEGACY,
     SHADOW_ENGINE_REALISTIC_V2,
+    SHADOW_ENGINE_STUDIO_2_5D,
     ShadowSettings,
     normalize_shadow_settings,
 )
@@ -245,8 +246,8 @@ def main():
     )
     process_parser.add_argument(
         "--shadow-engine",
-        choices=[SHADOW_ENGINE_REALISTIC_V2, SHADOW_ENGINE_LEGACY],
-        help="Shadow renderer override: realistic_v2 or legacy"
+        choices=[SHADOW_ENGINE_REALISTIC_V2, SHADOW_ENGINE_STUDIO_2_5D, SHADOW_ENGINE_LEGACY],
+        help="Shadow renderer override: realistic_v2, studio_2_5d or legacy"
     )
     process_parser.add_argument(
         "--output", "-o",

@@ -6,6 +6,7 @@ from typing import Tuple, Optional
 from flatshot.core.models import (
     SHADOW_ENGINE_LEGACY,
     SHADOW_ENGINE_REALISTIC_V2,
+    SHADOW_ENGINE_STUDIO_2_5D,
     ShadowSettings,
     CurveData,
     normalize_shadow_settings,
@@ -18,6 +19,7 @@ from flatshot.core.shadow.legacy import (
     render_legacy,
 )
 from flatshot.core.shadow.realistic_v2 import render_realistic_v2
+from flatshot.core.shadow.studio_2_5d import render_studio_2_5d
 from flatshot.core.shadow.types import RenderDiagnostics, ShadowRenderContext, ShadowRenderResult
 
 class ShadowEngine:
@@ -256,17 +258,19 @@ class ShadowEngine:
             return render_legacy(context)
 
         try:
+            if engine == SHADOW_ENGINE_STUDIO_2_5D:
+                return render_studio_2_5d(context)
             return render_realistic_v2(context)
         except Exception as exc:
             if os.environ.get("FLATSHOT_SHADOW_STRICT") == "1":
                 raise
-            warning = f"realistic_v2 failed; rendered legacy: {exc}"
+            warning = f"{engine} failed; rendered legacy: {exc}"
             logging.warning("FlatShot shadow fallback: %s", warning)
             legacy_result = render_legacy(context)
             return ShadowRenderResult(
                 shadow=legacy_result.shadow,
                 diagnostics=RenderDiagnostics(
-                    engine_requested=SHADOW_ENGINE_REALISTIC_V2,
+                    engine_requested=engine,
                     engine_used=SHADOW_ENGINE_LEGACY,
                     fallback_used=True,
                     warning=warning,

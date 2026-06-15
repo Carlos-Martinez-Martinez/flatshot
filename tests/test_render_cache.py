@@ -99,6 +99,40 @@ def test_render_cache_key_changes_with_export_variant_background_and_opacity(tmp
     assert key_rgb255 != key_rgb255_shadow
 
 
+def test_render_cache_key_changes_with_lighting_scene(tmp_path):
+    source = tmp_path / "source.png"
+    Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(source)
+
+    cache = RenderCache()
+    curve = {"xp": [0.0, 1.0], "fp": [1.0, 1.0]}
+    base_scene = {
+        "main": {
+            "type": "softbox",
+            "x": -0.25,
+            "y": -0.65,
+            "height": 0.65,
+            "size": 0.55,
+            "intensity": 0.85,
+        },
+        "ambient_intensity": 0.25,
+    }
+    moved_scene = {
+        **base_scene,
+        "main": {**base_scene["main"], "x": 0.45},
+    }
+    softbox_settings = {"shadow_engine": "studio_2_5d", "lighting_scene": base_scene}
+    moved_settings = {"shadow_engine": "studio_2_5d", "lighting_scene": moved_scene}
+    spot_settings = {
+        "shadow_engine": "studio_2_5d",
+        "lighting_scene": {**base_scene, "main": {**base_scene["main"], "type": "spot"}},
+    }
+
+    key_softbox = cache.get_cache_key(str(source), softbox_settings, curve, (1800, 2400), {}, "jpg")
+
+    assert key_softbox != cache.get_cache_key(str(source), moved_settings, curve, (1800, 2400), {}, "jpg")
+    assert key_softbox != cache.get_cache_key(str(source), spot_settings, curve, (1800, 2400), {}, "jpg")
+
+
 def test_render_cache_validate_rejects_corrupt_files_and_temp_sidecars(tmp_path):
     cache = RenderCache()
     cache.cache_dir = tmp_path / "cache"

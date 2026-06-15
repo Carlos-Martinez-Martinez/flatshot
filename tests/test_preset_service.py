@@ -22,6 +22,7 @@ def test_default_presets_use_realistic_v2(tmp_path):
 
     assert flat
     assert {settings["shadow_engine"] for settings in flat.values()} == {SHADOW_ENGINE_DEFAULT}
+    assert {settings["lighting_scene"]["main"]["type"] for settings in flat.values()} == {"softbox"}
 
 
 def test_flat_preset_load_and_save_adds_shadow_engine(tmp_path):

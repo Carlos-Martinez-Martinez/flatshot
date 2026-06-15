@@ -5,9 +5,11 @@ import pytest
 from flatshot.core.models import (
     SHADOW_ENGINE_COMPAT,
     SHADOW_ENGINE_DEFAULT,
+    SHADOW_ENGINE_STUDIO_2_5D,
     WEB_RGB230,
     WHITE_RGB255,
     ExportVariant,
+    LightingScene,
     ShadowSettings, ExportConfig, CurveData,
     JobItem, PresetCategory, CategorizedPresets,
     build_variant_settings,
@@ -30,6 +32,9 @@ class TestShadowSettings:
         assert settings.padding == 10
         assert settings.adaptive_zoom is True
         assert settings.shadow_engine == SHADOW_ENGINE_DEFAULT
+        assert settings.lighting_scene.main.type == "softbox"
+        assert settings.lighting_scene.main.x == -0.25
+        assert settings.lighting_scene.ambient_intensity == 0.25
         assert settings.transparent_bg is False
         assert settings.bg_color == (230, 230, 230)
     
@@ -79,6 +84,34 @@ class TestShadowSettings:
         )
 
         assert settings.shadow_engine == SHADOW_ENGINE_DEFAULT
+
+    def test_studio_2_5d_lighting_scene_serializes_and_validates(self):
+        settings = ShadowSettings(
+            shadow_engine=SHADOW_ENGINE_STUDIO_2_5D,
+            lighting_scene={
+                "main": {
+                    "type": "strip",
+                    "x": 0.4,
+                    "y": -0.7,
+                    "height": 0.45,
+                    "size": 0.35,
+                    "intensity": 1.1,
+                },
+                "ambient_intensity": 0.18,
+            },
+        )
+        data = settings.model_dump()
+
+        assert settings.shadow_engine == SHADOW_ENGINE_STUDIO_2_5D
+        assert data["lighting_scene"]["main"]["type"] == "strip"
+        assert data["lighting_scene"]["main"]["x"] == 0.4
+        assert data["lighting_scene"]["ambient_intensity"] == 0.18
+
+        with pytest.raises(ValueError):
+            LightingScene(main={"type": "laser"})
+
+        with pytest.raises(ValueError):
+            LightingScene(main={"height": 2})
 
 
 class TestExportConfig:

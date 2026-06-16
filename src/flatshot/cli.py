@@ -170,8 +170,10 @@ def process_folder(args):
     processed = 0
     errors = 0
     
-    settings.transparent_bg = export_config.transparent_bg
-    settings.bg_color = export_config.bg_color
+    settings = settings.model_copy(update={
+        "transparent_bg": export_config.transparent_bg,
+        "bg_color": export_config.bg_color,
+    })
     
     for index, img_path in enumerate(sorted(images), start=1):
         try:

@@ -9,7 +9,12 @@ from PIL import Image, ImageChops, ImageFilter
 from flatshot.core.shadow.compositing import (
     accumulate_alpha,
     alpha_to_shadow_rgba,
+    apply_protection,
     deterministic_noise_alpha,
+    from_float,
+    smoothstep,
+    to_float,
+    vertical_profile,
 )
 from flatshot.core.shadow.geometry import (
     compute_shadow_roi,
@@ -52,61 +57,23 @@ LAYER_SPECS = (
 )
 
 
-def _to_float(mask: Image.Image) -> np.ndarray:
-    return np.asarray(mask, dtype=np.float32) / 255.0
-
-
-def _from_float(alpha: np.ndarray) -> Image.Image:
-    return Image.fromarray(np.clip(alpha * 255.0, 0, 255).astype(np.uint8), mode="L")
-
-
-def _smoothstep(edge0: float, edge1: float, value: np.ndarray) -> np.ndarray:
-    if edge1 <= edge0:
-        return (value >= edge1).astype(np.float32)
-    t = np.clip((value - edge0) / (edge1 - edge0), 0.0, 1.0)
-    return t * t * (3.0 - 2.0 * t)
-
-
-def _vertical_profile(mask_alpha: np.ndarray) -> tuple[np.ndarray, tuple[int, int, int, int] | None]:
-    ys, xs = np.where(mask_alpha > 0.02)
-    h, w = mask_alpha.shape
-    if len(xs) == 0 or len(ys) == 0:
-        return np.zeros_like(mask_alpha, dtype=np.float32), None
-
-    left = int(xs.min())
-    right = int(xs.max()) + 1
-    top = int(ys.min())
-    bottom = int(ys.max()) + 1
-    denom = max(bottom - top - 1, 1)
-    row = (np.arange(h, dtype=np.float32)[:, None] - top) / float(denom)
-    profile = np.broadcast_to(np.clip(row, 0.0, 1.0), (h, w)).copy()
-    return profile, (left, top, right, bottom)
-
-
 def _contact_source(mask_alpha: np.ndarray) -> np.ndarray:
-    vertical, bbox = _vertical_profile(mask_alpha)
+    vertical, bbox = vertical_profile(mask_alpha)
     if bbox is None:
         return mask_alpha
-    bottom_bias = _smoothstep(0.58, 1.0, vertical)
+    bottom_bias = smoothstep(0.58, 1.0, vertical)
     baseline = 0.10 + 0.90 * bottom_bias
     return np.clip(mask_alpha * baseline, 0.0, 1.0)
 
 
 def _height_weighted_source(mask_alpha: np.ndarray) -> np.ndarray:
-    vertical, bbox = _vertical_profile(mask_alpha)
+    vertical, bbox = vertical_profile(mask_alpha)
     if bbox is None:
         return mask_alpha
     height_map = 1.0 - vertical
     influence = min(max(HEIGHT_INFLUENCE, 0.15), 0.35)
     weight = (1.0 - influence) + influence * height_map
     return np.clip(mask_alpha * weight, 0.0, 1.0)
-
-
-def _smoothstep_scalar(edge0: float, edge1: float, values: np.ndarray) -> np.ndarray:
-    if edge1 <= edge0:
-        return (values >= edge1).astype(np.float32)
-    t = np.clip((values - edge0) / (edge1 - edge0), 0.0, 1.0)
-    return t * t * (3.0 - 2.0 * t)
 
 
 def _weighted_mask(mask: Image.Image, *, contact: bool) -> Image.Image:
@@ -118,7 +85,7 @@ def _weighted_mask(mask: Image.Image, *, contact: bool) -> Image.Image:
     vertical = (np.arange(h, dtype=np.float32) - bbox[1]) / float(denom)
     vertical = np.clip(vertical, 0.0, 1.0)
     if contact:
-        lower_falloff = _smoothstep_scalar(0.35, 1.0, vertical)
+        lower_falloff = smoothstep(0.35, 1.0, vertical)
         weights = 1.0 - 0.08 * lower_falloff
     else:
         influence = min(max(HEIGHT_INFLUENCE, 0.15), 0.35)
@@ -140,7 +107,7 @@ def _local_background_luminance(
         return 0.5
 
     protect = roi_mask.filter(ImageFilter.GaussianBlur(max(1.0, min(roi_mask.size) * 0.012)))
-    protect_arr = _to_float(protect)
+    protect_arr = to_float(protect)
     valid = (shadow_alpha > 0.01) & (protect_arr < 0.08)
     if int(valid.sum()) < 32:
         return 0.5
@@ -248,21 +215,14 @@ def render_realistic_v2(context: ShadowRenderContext) -> ShadowRenderResult:
             contact_blur=scaled_contact_blur,
             spread=scaled_spread,
         )
-        if spec.protect_strength > 0:
-            protect = work_mask
-            protect_blur = max(
-                0.0,
-                (scaled_blur * spec.protect_blur_factor + scaled_contact_blur * 0.08),
-            )
-            if protect_blur > 0:
-                protect = protect.filter(ImageFilter.GaussianBlur(protect_blur))
-            lut = [
-                int(max(0.0, min(255.0, 255.0 - value * spec.protect_strength)))
-                for value in range(256)
-            ]
-            layer_mask = ImageChops.multiply(layer_mask, protect.point(lut))
+        layer_mask = apply_protection(
+            layer_mask,
+            work_mask,
+            strength=spec.protect_strength,
+            blur=max(0.0, (scaled_blur * spec.protect_blur_factor + scaled_contact_blur * 0.08)),
+        )
 
-        layer = _to_float(layer_mask) * opacity_scale * spec.weight
+        layer = to_float(layer_mask) * opacity_scale * spec.weight
         if spec.contact:
             contact_alpha = accumulate_alpha(contact_alpha, layer)
         else:
@@ -291,10 +251,10 @@ def render_realistic_v2(context: ShadowRenderContext) -> ShadowRenderResult:
     )
     roi_alpha = accumulate_alpha(contact_alpha, diffuse_alpha)
 
-    alpha_image = _from_float(roi_alpha)
+    alpha_image = from_float(roi_alpha)
     if alpha_image.size != roi.local_mask.size:
         alpha_image = alpha_image.resize(roi.local_mask.size, Image.Resampling.BILINEAR)
-        roi_alpha = _to_float(alpha_image)
+        roi_alpha = to_float(alpha_image)
 
     local_shadow = alpha_to_shadow_rgba(roi_alpha, context.paint)
     shadow = Image.new("RGBA", context.canvas_size, (0, 0, 0, 0))

@@ -32,6 +32,10 @@ from flatshot.core.models import (
     normalize_shadow_settings,
 )
 from flatshot.core.overrides import apply_image_override, override_key
+from flatshot.application.export_config_service import (
+    variant_base_destination as variant_base_output_folder,
+    variant_output_folder,
+)
 from flatshot.utils.render_cache import RenderCache
 
 
@@ -123,25 +127,6 @@ def variant_target_size(export_config: ExportConfig, variant: ExportVariant) -> 
         int(variant.output_width or export_config.output_width),
         int(variant.output_height or export_config.output_height),
     )
-
-
-def variant_base_output_folder(
-    input_folder: Path,
-    export_config: ExportConfig,
-    variant: ExportVariant,
-) -> Path:
-    output_destination = variant.output_destination or export_config.output_destination
-    if output_destination == "custom":
-        custom_output_path = variant.custom_output_path or export_config.custom_output_path
-        return Path(custom_output_path) if custom_output_path else Path()
-    output_folder_name = variant.output_folder_name or export_config.output_folder_name
-    return input_folder / output_folder_name
-
-
-def variant_output_folder(base_output_folder: Path, variant: ExportVariant) -> Path:
-    if variant.output_subfolder:
-        return base_output_folder / variant.output_subfolder
-    return base_output_folder
 
 
 def build_variant_output_path(
@@ -278,34 +263,16 @@ def validate_export_requests_outputs(
 
 def process_single_image(args):
     """Process a single image in a worker process."""
-    if len(args) == 8:
-        (
-            img_path,
-            save_path,
-            settings_dict,
-            target_size,
-            fmt,
-            curve_data_dict,
-            local_override,
-            display_name,
-        ) = args
-    else:
-        (
-            img_path,
-            output_folder,
-            settings_dict,
-            target_size,
-            naming_template,
-            suffix,
-            folder_name,
-            index,
-            fmt,
-            curve_data_dict,
-            local_override,
-        ) = args
-        base_name = apply_naming_template(naming_template, img_path.stem, suffix, folder_name, index)
-        save_path = Path(output_folder) / f"{base_name}.{fmt}"
-        display_name = str(img_path.name)
+    (
+        img_path,
+        save_path,
+        settings_dict,
+        target_size,
+        fmt,
+        curve_data_dict,
+        local_override,
+        display_name,
+    ) = args
 
     try:
         settings = apply_image_override(
@@ -509,7 +476,7 @@ class ExportRunner:
                 self._emit(ExportFinishedEvent(False, 0, total, 0, duration))
                 return result
 
-            completed_count, error_count = self._export_cached_tasks(
+            completed_count, error_count, fallback = self._export_cached_tasks(
                 cached_tasks,
                 cache,
                 completed_count,
@@ -517,8 +484,15 @@ class ExportRunner:
                 total,
             )
 
+            if fallback:
+                tasks.extend(fallback)
+
             if tasks and not self.cancellation_token.cancelled:
-                completed_count, error_count = self._export_render_tasks(
+                self.pause_token.wait_if_paused()
+                if self.cancellation_token.cancelled:
+                    self._emit(ExportLogEvent("Exportación cancelada."))
+                else:
+                    completed_count, error_count = self._export_render_tasks(
                     tasks,
                     completed_count,
                     error_count,
@@ -571,10 +545,11 @@ class ExportRunner:
         completed_count: int,
         error_count: int,
         total: int,
-    ) -> tuple[int, int]:
+    ) -> tuple[int, int, list]:
         if not cached_tasks:
-            return completed_count, error_count
+            return completed_count, error_count, []
 
+        fallback_tasks: list[tuple] = []
         self._emit(ExportLogEvent(f"Exportando {len(cached_tasks)} archivos desde caché..."))
         for cached in cached_tasks:
             if self.cancellation_token.cancelled:
@@ -596,19 +571,9 @@ class ExportRunner:
                         f"Caché no válida para {cached['display_name']}; renderizando normal ({e})"
                     )
                 )
-                success, msg, warning = self.image_processor(cached["task_args"])
-                if success:
-                    if warning:
-                        self._emit(ExportLogEvent(f"Aviso: {msg}: {warning}"))
-                    self._emit(ExportImageCompletedEvent(msg, True))
-                else:
-                    error_count += 1
-                    self._emit(ExportLogEvent(f"Error: {msg}"))
-                    self._emit(ExportImageCompletedEvent(msg.split(":")[0], False))
-                completed_count += 1
-                self._emit_progress(completed_count, total)
+                fallback_tasks.append(cached["task_args"])
 
-        return completed_count, error_count
+        return completed_count, error_count, fallback_tasks
 
     def _export_render_tasks(
         self,

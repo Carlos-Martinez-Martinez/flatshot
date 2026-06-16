@@ -13,6 +13,7 @@ class ActivityLogService:
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self._logger_name = logger_name
+        self._handler: logging.FileHandler | None = None
         self._setup_logger()
         self._cleanup_old_logs()
 
@@ -23,7 +24,9 @@ class ActivityLogService:
     def _setup_logger(self) -> None:
         self._logger = logging.getLogger(self._logger_name)
         self._logger.setLevel(logging.INFO)
-        self._logger.handlers.clear()
+
+        if self._handler is not None:
+            self._logger.removeHandler(self._handler)
 
         handler = logging.FileHandler(self.get_today_log_path(), encoding="utf-8")
         handler.setLevel(logging.INFO)
@@ -34,6 +37,7 @@ class ActivityLogService:
             )
         )
         self._logger.addHandler(handler)
+        self._handler = handler
 
     def _cleanup_old_logs(self, days_to_keep: int = 7) -> None:
         cutoff = datetime.now() - timedelta(days=days_to_keep)
@@ -88,7 +92,27 @@ class ActivityLogService:
             return []
 
         try:
-            with log_file.open("r", encoding="utf-8") as handle:
-                return handle.readlines()[-max_lines:]
+            return _tail_lines(log_file, max_lines)
         except Exception:
             return []
+
+
+def _tail_lines(path: Path, max_lines: int) -> list[str]:
+    with path.open("rb") as handle:
+        handle.seek(0, 2)
+        file_size = handle.tell()
+        if file_size == 0:
+            return []
+
+        block_size = 4096
+        lines: list[str] = []
+        position = file_size
+
+        while len(lines) <= max_lines and position > 0:
+            read_size = min(block_size, position)
+            position -= read_size
+            handle.seek(position)
+            block = handle.read(read_size).decode("utf-8", errors="replace")
+            lines = block.splitlines(keepends=True) + lines
+
+        return [line.rstrip("\n\r") for line in lines[-max_lines:]]

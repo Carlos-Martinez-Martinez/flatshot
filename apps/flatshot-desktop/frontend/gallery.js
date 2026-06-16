@@ -291,7 +291,7 @@
     const displaySrc = current.resolvedSrc || current.displaySrc || fallbackSrc;
     return `
     <span class="thumb is-${escapeHtml(status)}" data-thumb-id="${escapeHtml(image.id)}">
-      ${displaySrc ? `<img class="thumb-image" src="${escapeHtml(displaySrc)}" alt="${escapeHtml(alt)}" loading="eager" data-image-id="${escapeHtml(image.id)}" />` : ""}
+      ${displaySrc ? `<img class="thumb-image" src="${escapeHtml(displaySrc)}" alt="${escapeHtml(alt)}" loading="lazy" data-image-id="${escapeHtml(image.id)}" />` : ""}
       <span class="thumb-skeleton" aria-hidden="true"></span>
       <span class="thumb-error">${escapeHtml(error)}</span>
     </span>

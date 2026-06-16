@@ -45,6 +45,11 @@ class ShadowSettings(BaseModel):
     transparent_bg: bool = False
     bg_color: Tuple[int, int, int] = (230, 230, 230)
 
+    @field_validator("bg_color", mode="before")
+    @classmethod
+    def _validate_bg_color(cls, value: Any) -> Tuple[int, int, int]:
+        return _coerce_rgb_tuple(value)
+
 
 def _coerce_rgb_tuple(value: Any) -> Tuple[int, int, int]:
     if isinstance(value, tuple) and len(value) == 3:

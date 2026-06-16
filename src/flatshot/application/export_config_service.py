@@ -101,10 +101,10 @@ class ExportConfigService:
         for folder in folders:
             input_folder = Path(folder)
             for variant in active_variants:
-                base_destination = self._variant_base_destination(input_folder, config, variant)
+                base_destination = variant_base_destination(input_folder, config, variant)
                 if base_destination is None:
                     continue
-                destination = self._variant_output_folder(base_destination, variant)
+                destination = variant_output_folder(base_destination, variant)
                 key = str(destination)
                 if key in seen:
                     continue
@@ -113,37 +113,28 @@ class ExportConfigService:
 
         return destinations
 
-    def _base_destinations(
-        self,
-        folders: Iterable[str | Path],
-        config: ExportConfig,
-    ) -> list[Path]:
-        if config.output_destination == "custom":
-            return [Path(config.custom_output_path)] if config.custom_output_path else []
-        return [Path(folder) / config.output_folder_name for folder in folders]
-
-    @staticmethod
-    def _variant_base_destination(
-        input_folder: Path,
-        config: ExportConfig,
-        variant: ExportVariant,
-    ) -> Path | None:
-        output_destination = variant.output_destination or config.output_destination
-        if output_destination == "custom":
-            custom_output_path = variant.custom_output_path or config.custom_output_path
-            return Path(custom_output_path) if custom_output_path else None
-        output_folder_name = variant.output_folder_name or config.output_folder_name
-        return input_folder / output_folder_name
-
-    @staticmethod
-    def _variant_output_folder(base_output_folder: Path, variant: ExportVariant) -> Path:
-        if variant.output_subfolder:
-            return base_output_folder / variant.output_subfolder
-        return base_output_folder
-
     @staticmethod
     def _normalize_format(value: Any) -> str:
         text = str(value or "JPG").strip().upper().lstrip(".")
         if text == "JPEG":
             return "JPG"
         return text
+
+
+def variant_base_destination(
+    input_folder: Path,
+    config: ExportConfig,
+    variant: ExportVariant,
+) -> Path | None:
+    output_destination = variant.output_destination or config.output_destination
+    if output_destination == "custom":
+        custom_output_path = variant.custom_output_path or config.custom_output_path
+        return Path(custom_output_path) if custom_output_path else None
+    output_folder_name = variant.output_folder_name or config.output_folder_name
+    return input_folder / output_folder_name
+
+
+def variant_output_folder(base_output_folder: Path, variant: ExportVariant) -> Path:
+    if variant.output_subfolder:
+        return base_output_folder / variant.output_subfolder
+    return base_output_folder

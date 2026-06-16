@@ -22,6 +22,7 @@ class RenderCache:
             else Path(tempfile.gettempdir()) / "flatshot_render_cache"
         )
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self._prune_temp_sidecars()
         
     def _file_fingerprint(self, image_path: str) -> dict:
         path = Path(image_path)
@@ -104,6 +105,14 @@ class RenderCache:
             shutil.rmtree(self.cache_dir)
             self.cache_dir.mkdir(parents=True, exist_ok=True)
 
+    def _prune_temp_sidecars(self) -> None:
+        for pattern in ("*.tmp", ".*.tmp"):
+            for temp_file in self.cache_dir.glob(pattern):
+                try:
+                    temp_file.unlink()
+                except OSError:
+                    pass
+
     def _cache_files(self) -> Iterable[Path]:
         return (
             path for path in self.cache_dir.glob("*.*")
@@ -112,12 +121,7 @@ class RenderCache:
 
     def prune(self, max_files=1000, max_bytes: int | None = 2 * 1024 * 1024 * 1024):
         """Remove oldest files if cache exceeds file or byte limits."""
-        for pattern in ("*.tmp", ".*.tmp"):
-            for temp_file in self.cache_dir.glob(pattern):
-                try:
-                    temp_file.unlink()
-                except OSError:
-                    pass
+        self._prune_temp_sidecars()
 
         files = []
         total_size = 0

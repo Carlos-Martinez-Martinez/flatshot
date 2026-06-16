@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import copy
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -94,8 +96,14 @@ class SettingsService:
 
     def save(self, settings: Mapping[str, Any]) -> None:
         self.settings_file.parent.mkdir(parents=True, exist_ok=True)
-        with self.settings_file.open("w", encoding="utf-8") as handle:
-            json.dump(dict(settings), handle, indent=4)
+        tmp_path = self.settings_file.with_suffix(".tmp")
+        try:
+            with open(tmp_path, "w", encoding="utf-8") as handle:
+                json.dump(dict(settings), handle, indent=4)
+            os.replace(tmp_path, self.settings_file)
+        finally:
+            if tmp_path.exists():
+                tmp_path.unlink(missing_ok=True)
 
     @classmethod
     def normalize(cls, loaded: Mapping[str, Any]) -> dict[str, Any]:

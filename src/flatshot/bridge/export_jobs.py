@@ -54,7 +54,7 @@ class BridgeExportJob:
                 return
             self.status = "running"
             self._started_at = perf_counter()
-        self._thread = threading.Thread(target=self._run, name=f"flatshot-export-{self.job_id}", daemon=True)
+        self._thread = threading.Thread(target=self._run, name=f"flatshot-export-{self.job_id}", daemon=False)
         self._thread.start()
 
     def pause(self) -> None:

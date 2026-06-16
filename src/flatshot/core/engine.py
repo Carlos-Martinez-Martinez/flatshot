@@ -55,7 +55,8 @@ class ShadowEngine:
             INTENSITY = 0.06 
             factor = 1.0 + (lum_norm - 0.5) * INTENSITY
             return factor, lum_norm
-        except: return 1.0, 0.5
+        except Exception:
+            return 1.0, 0.5
 
     @staticmethod
     def _calcular_centro_masa(img_rgba: Image.Image) -> Tuple[int, int]:
@@ -148,8 +149,8 @@ class ShadowEngine:
             new_w = max(1, int(round(adjusted_w * fit_ratio)))
             new_h = max(1, int(round(adjusted_h * fit_ratio)))
 
-        if original_trimmed.width == 0:
-            empty = Image.new("RGB", target_size, (230,230,230))
+        if original_trimmed.width == 0 or original_trimmed.height == 0:
+            empty = Image.new("RGB", target_size, settings.bg_color)
             return empty, RenderDiagnostics(settings.shadow_engine, settings.shadow_engine)
         
         # Prepare subject for processing

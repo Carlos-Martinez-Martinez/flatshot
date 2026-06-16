@@ -79,22 +79,20 @@ def test_process_single_image_accepts_local_override(tmp_path):
     subject.paste(Image.new("RGBA", (60, 80), (40, 80, 180, 255)), (20, 20))
     subject.save(source)
 
+    save_path = tmp_path / "source_PRO.png"
     success, message, warning = process_single_image(
         (
             source,
-            tmp_path,
+            save_path,
             ShadowSettings(adaptive_zoom=False, opacity=0, blur=0, noise=0).model_dump(),
             (300, 400),
-            "{original}{suffix}",
-            "_PRO",
-            "folder",
-            1,
             "png",
             None,
             {"size_delta": 10, "shadow_delta": -5, "blur_delta": 3},
+            "source.png",
         )
     )
 
     assert success, message
     assert warning is None
-    assert (tmp_path / "source_PRO.png").exists()
+    assert save_path.exists()

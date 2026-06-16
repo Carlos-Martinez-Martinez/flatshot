@@ -4,11 +4,16 @@ import math
 from dataclasses import dataclass
 
 import numpy as np
-from PIL import Image, ImageChops, ImageFilter
+from PIL import Image, ImageFilter
 
 from flatshot.core.shadow.compositing import (
     accumulate_alpha,
+    apply_protection,
     deterministic_noise_alpha,
+    from_float,
+    smoothstep,
+    to_float,
+    vertical_profile,
 )
 from flatshot.core.shadow.geometry import (
     ShadowVector,
@@ -97,53 +102,25 @@ LIGHT_TYPE_SEEDS = {"softbox": 101, "spot": 211, "strip": 307}
 STUDIO_ALPHA_GAIN = 0.58
 
 
-def _to_float(mask: Image.Image) -> np.ndarray:
-    return np.asarray(mask, dtype=np.float32) / 255.0
-
-
-def _from_float(alpha: np.ndarray) -> Image.Image:
-    return Image.fromarray(np.clip(alpha * 255.0, 0, 255).astype(np.uint8), mode="L")
-
-
 def _alpha_to_rgba(alpha: Image.Image, context: ShadowRenderContext) -> Image.Image:
     shadow = Image.new("RGBA", alpha.size, (*context.paint.rgb, 0))
     shadow.putalpha(alpha)
     return shadow
 
 
-def _smoothstep(edge0: float, edge1: float, value: np.ndarray) -> np.ndarray:
-    if edge1 <= edge0:
-        return (value >= edge1).astype(np.float32)
-    t = np.clip((value - edge0) / (edge1 - edge0), 0.0, 1.0)
-    return t * t * (3.0 - 2.0 * t)
-
-
-def _vertical_profile(mask: Image.Image) -> tuple[np.ndarray, tuple[int, int, int, int] | None]:
-    arr = _to_float(mask)
-    ys, xs = np.where(arr > 0.02)
-    if len(xs) == 0 or len(ys) == 0:
-        return np.zeros_like(arr, dtype=np.float32), None
-
-    bbox = (int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1)
-    denom = max(bbox[3] - bbox[1] - 1, 1)
-    row = (np.arange(mask.height, dtype=np.float32)[:, None] - bbox[1]) / float(denom)
-    vertical = np.broadcast_to(np.clip(row, 0.0, 1.0), arr.shape).copy()
-    return vertical, bbox
-
-
 def _weighted_source(mask: Image.Image, kind: str) -> Image.Image:
-    alpha = _to_float(mask)
-    vertical, bbox = _vertical_profile(mask)
+    alpha = to_float(mask)
+    vertical, bbox = vertical_profile(alpha)
     if bbox is None:
         return mask
 
     if kind == "contact":
-        weight = 0.18 + 0.82 * _smoothstep(0.52, 1.0, vertical)
+        weight = 0.18 + 0.82 * smoothstep(0.52, 1.0, vertical)
     elif kind == "height":
         weight = 0.78 + 0.22 * (1.0 - vertical)
     else:
         weight = np.ones_like(alpha, dtype=np.float32)
-    return _from_float(np.clip(alpha * weight, 0.0, 1.0))
+    return from_float(np.clip(alpha * weight, 0.0, 1.0))
 
 
 def _shadow_vector_from_light(x: float, y: float) -> ShadowVector:
@@ -203,18 +180,8 @@ def _strip_smear(mask: Image.Image, vector: ShadowVector, radius: float) -> Imag
         dx = int(round(perp.x * radius * offset))
         dy = int(round(perp.y * radius * offset))
         shifted = paste_offset(mask, dx, dy)
-        alpha = accumulate_alpha(alpha, _to_float(shifted) * weight)
-    return _from_float(alpha)
-
-
-def _protected(layer: Image.Image, mask: Image.Image, *, strength: float, blur: float) -> Image.Image:
-    if strength <= 0:
-        return layer
-    protect = mask
-    if blur > 0:
-        protect = protect.filter(ImageFilter.GaussianBlur(blur))
-    lut = [int(max(0.0, min(255.0, 255.0 - value * strength))) for value in range(256)]
-    return ImageChops.multiply(layer, protect.point(lut))
+        alpha = accumulate_alpha(alpha, to_float(shifted) * weight)
+    return from_float(alpha)
 
 
 def _background_luminance(context: ShadowRenderContext) -> float:
@@ -359,13 +326,13 @@ def render_studio_2_5d(context: ShadowRenderContext) -> ShadowRenderResult:
 
     contact_alpha = accumulate_alpha(
         contact_alpha,
-        _to_float(hard_contact) * opacity_scale * contact_energy * profile.hard_contact_weight,
+        to_float(hard_contact) * opacity_scale * contact_energy * profile.hard_contact_weight,
     )
     contact_alpha = accumulate_alpha(
         contact_alpha,
-        _to_float(soft_contact) * opacity_scale * contact_energy * profile.soft_contact_weight,
+        to_float(soft_contact) * opacity_scale * contact_energy * profile.soft_contact_weight,
     )
-    floor_contact = _protected(
+    floor_contact = apply_protection(
         floor_contact,
         work_mask,
         strength=0.08,
@@ -374,29 +341,29 @@ def render_studio_2_5d(context: ShadowRenderContext) -> ShadowRenderResult:
     floor_energy = (0.20 + 0.28 * intensity + 0.16 * ambient) * profile.contact_gain
     contact_alpha = accumulate_alpha(
         contact_alpha,
-        _to_float(floor_contact) * opacity_scale * floor_energy * profile.floor_contact_weight,
+        to_float(floor_contact) * opacity_scale * floor_energy * profile.floor_contact_weight,
     )
 
-    near_body = _protected(near_body, work_mask, strength=0.10, blur=max(0.0, scaled_blur * 0.12))
-    cast = _protected(cast, work_mask, strength=0.26, blur=max(0.0, scaled_blur * 0.18))
-    wash = _protected(wash, work_mask, strength=0.34, blur=max(0.0, scaled_blur * 0.26))
-    ambient_layer = _protected(ambient_layer, work_mask, strength=0.08, blur=max(0.0, scaled_blur * 0.10))
+    near_body = apply_protection(near_body, work_mask, strength=0.10, blur=max(0.0, scaled_blur * 0.12))
+    cast = apply_protection(cast, work_mask, strength=0.26, blur=max(0.0, scaled_blur * 0.18))
+    wash = apply_protection(wash, work_mask, strength=0.34, blur=max(0.0, scaled_blur * 0.26))
+    ambient_layer = apply_protection(ambient_layer, work_mask, strength=0.08, blur=max(0.0, scaled_blur * 0.10))
 
     diffuse_alpha = accumulate_alpha(
         diffuse_alpha,
-        _to_float(ambient_layer) * opacity_scale * ambient_energy * profile.ambient_weight,
+        to_float(ambient_layer) * opacity_scale * ambient_energy * profile.ambient_weight,
     )
     diffuse_alpha = accumulate_alpha(
         diffuse_alpha,
-        _to_float(near_body) * opacity_scale * directional_energy * profile.near_body_weight,
+        to_float(near_body) * opacity_scale * directional_energy * profile.near_body_weight,
     )
     diffuse_alpha = accumulate_alpha(
         diffuse_alpha,
-        _to_float(cast) * opacity_scale * directional_energy * profile.cast_weight,
+        to_float(cast) * opacity_scale * directional_energy * profile.cast_weight,
     )
     diffuse_alpha = accumulate_alpha(
         diffuse_alpha,
-        _to_float(wash) * opacity_scale * directional_energy * profile.wash_weight,
+        to_float(wash) * opacity_scale * directional_energy * profile.wash_weight,
     )
 
     density = _density_factor(context)
@@ -424,7 +391,7 @@ def render_studio_2_5d(context: ShadowRenderContext) -> ShadowRenderResult:
     )
     roi_alpha = np.clip(accumulate_alpha(contact_alpha, diffuse_alpha) * STUDIO_ALPHA_GAIN * profile.alpha_gain, 0.0, 1.0)
 
-    alpha_image = _from_float(roi_alpha)
+    alpha_image = from_float(roi_alpha)
     if alpha_image.size != roi.local_mask.size:
         alpha_image = alpha_image.resize(roi.local_mask.size, Image.Resampling.BILINEAR)
 

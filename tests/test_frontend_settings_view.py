@@ -10,6 +10,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
 HELPER_PATH = FRONTEND_DIR / "settings-view.js"
 INDEX_PATH = FRONTEND_DIR / "index.html"
+APP_PATH = FRONTEND_DIR / "app.js"
+ADVANCED_CSS_PATH = FRONTEND_DIR / "css" / "06-inspector-export" / "advanced-local-overrides.css"
+INSPECTOR_NAV_CSS_PATH = FRONTEND_DIR / "css" / "06-inspector-export" / "inspector-navigation.css"
+BUTTONS_CSS_PATH = FRONTEND_DIR / "css" / "03-components" / "buttons.css"
 
 
 def test_settings_view_helper_loads_before_app_script():
@@ -46,6 +50,67 @@ def test_studio_lighting_panel_is_available_in_advanced_settings():
     assert 'data-lighting-stage' in html
     assert 'data-lighting-preset="overhead_soft"' in html
     assert 'data-lighting-field="main.type"' in html
+    assert 'data-lighting-number-field="main.height"' in html
+    assert '<output id="lighting-height-output"' not in html
+    assert 'data-engine-row="direction"' in html
+    assert 'class="lighting-editor-grid"' in html
+    assert 'class="lighting-slider-stack"' in html
+    assert 'class="advanced-technical-panel"' in html
+    assert "Altura luz" in html
+    assert "Tamaño luz" in html
+    assert "Potencia" in html
+    assert "Escala imagen" in html
+    assert html.index('id="lighting-stage"') < html.index('data-lighting-field="main.type"')
+    assert html.index('class="lighting-slider-stack"') < html.index('data-lighting-field="main.height"')
+    assert html.index('data-setting="shadow_engine"') < html.index('data-setting="spread"')
+    assert html.index('id="studio-lighting-panel"') < html.index('data-setting="spread"')
+
+
+def test_studio_lighting_panel_css_keeps_active_preset_filled_and_unclipped():
+    css = ADVANCED_CSS_PATH.read_text(encoding="utf-8")
+    buttons_css = BUTTONS_CSS_PATH.read_text(encoding="utf-8")
+
+    assert ".lighting-scene-toolbar button.active::after" not in css
+    assert ".lighting-scene-toolbar button.active {" in css
+    active_rule = css.split(".lighting-scene-toolbar button.active {", 1)[1].split("}", 1)[0]
+    assert "background: var(--color-accent)" in active_rule
+    assert "color: #fff" in active_rule
+    assert "button:not(.primary):not(.active)" in buttons_css
+    assert ".settings-panel details.advanced-block[open] { overflow: visible; }" in css
+    assert (
+        ".settings-panel details.advanced-block[open] .inspector-disclosure__body "
+        "{ max-height: none; overflow: visible; }"
+    ) in css
+    assert (
+        '.settings-panel details.inspector-disclosure[data-inspector-section="advanced"]:not([open]) '
+        "{ min-height: 54px; overflow: hidden; }"
+    ) in css
+    assert (
+        '.settings-panel[data-shadow-engine="studio_2_5d"] '
+        '[data-engine-row="direction"] { display: none; }'
+    ) in css
+
+
+def test_inspector_navigation_does_not_grid_advanced_disclosures():
+    css = INSPECTOR_NAV_CSS_PATH.read_text(encoding="utf-8")
+
+    assert '[data-inspector-section="advanced"]:not(.is-hidden)' not in css
+
+
+def test_studio_lighting_preset_selection_state_is_explicit():
+    js = APP_PATH.read_text(encoding="utf-8")
+
+    assert 'lightingPresetId: ""' in js
+    assert "const rememberedPresetId =" in js
+    assert 'button.classList.toggle("active", selected);' in js
+    assert 'button.classList.toggle("is-modified", selected && !exact);' in js
+    assert 'button.setAttribute("aria-pressed", String(selected));' in js
+    assert "state.lightingPresetId = presetId;" in js
+    assert 'const selectedPresetId = enabled ? exactPresetId || rememberedPresetId || "overhead_soft" : "";' in js
+    assert "settingsPanel.dataset.shadowEngine = state.settings.shadow_engine" in js
+    assert "visibleAdvancedSettingKeys(state.settings)" in js
+    assert 'advancedSettingKeys.filter((key) => key !== "angle")' in js
+    assert 'data-lighting-number-field' in js
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")

@@ -547,15 +547,46 @@ class TestAplicarEfectos:
 
         assert _alpha_centroid(left_light)[0] > _alpha_centroid(right_light)[0] + 2.0
 
+    def test_studio_2_5d_bottom_spot_keeps_ground_contact_visible(self):
+        settings = ShadowSettings(
+            shadow_engine="studio_2_5d",
+            distance=80,
+            blur=30,
+            contact_blur=15,
+            opacity=20,
+            noise=0,
+            lighting_scene={
+                "main": {
+                    "type": "spot",
+                    "x": 0.0,
+                    "y": 1.0,
+                    "height": 0.65,
+                    "size": 0.0,
+                    "intensity": 1.15,
+                },
+                "ambient_intensity": 0.0,
+            },
+        )
+        context = _shadow_context(settings)
+        shadow = render_studio_2_5d(context).shadow
+
+        alpha = np.asarray(shadow.getchannel("A"), dtype=np.float32)
+        left, _top, right, bottom = context.subject_mask_canvas.getbbox()
+        below_contact = alpha[bottom:min(alpha.shape[0], bottom + 36), left:right]
+
+        assert below_contact.max() >= 6.0
+        assert below_contact.sum() >= 900.0
+
     def test_studio_2_5d_light_types_produce_distinct_shadows(self):
         base = {
             "shadow_engine": "studio_2_5d",
-            "distance": 42,
-            "blur": 18,
+            "distance": 90,
+            "blur": 24,
+            "contact_blur": 9,
             "opacity": 45,
             "noise": 0,
             "lighting_scene": {
-                "main": {"x": -0.55, "y": -0.55, "height": 0.50, "size": 0.45},
+                "main": {"x": -0.55, "y": -0.55, "height": 0.45, "size": 0.45, "intensity": 0.95},
                 "ambient_intensity": 0.20,
             },
         }
@@ -568,18 +599,62 @@ class TestAplicarEfectos:
             data["lighting_scene"] = scene
             return ShadowSettings(**data)
 
-        softbox = render_studio_2_5d(
-            _shadow_context(settings_for("softbox"))
-        ).shadow
-        spot = render_studio_2_5d(
-            _shadow_context(settings_for("spot"))
-        ).shadow
-        strip = render_studio_2_5d(
-            _shadow_context(settings_for("strip"))
-        ).shadow
+        def wide_context(settings):
+            mask = Image.new("L", (420, 420), 0)
+            mask.paste(255, (160, 130, 260, 260))
+            return ShadowRenderContext(
+                settings=settings,
+                canvas_size=mask.size,
+                scale_factor=1.0,
+                subject_width=100,
+                subject_mask_canvas=mask,
+                subject_mask_local=mask.crop((160, 130, 260, 260)),
+                subject_position=(160, 130),
+                luminance_value=0.5,
+                background_rgb=(230, 230, 230),
+            )
 
-        assert softbox.tobytes() != spot.tobytes()
-        assert strip.tobytes() != spot.tobytes()
+        def light_metrics(light_type):
+            context = wide_context(settings_for(light_type))
+            shadow = render_studio_2_5d(context).shadow
+            alpha = np.asarray(shadow.getchannel("A"), dtype=np.float32)
+            alpha[np.asarray(context.subject_mask_canvas) > 0] = 0
+            ys, xs = np.where(alpha > 2)
+            weights = alpha[ys, xs]
+            total = float(weights.sum())
+            assert total > 0
+
+            vector_x, vector_y = 0.55, 0.55
+            length = float(np.hypot(vector_x, vector_y))
+            vector_x, vector_y = vector_x / length, vector_y / length
+            perp_x, perp_y = -vector_y, vector_x
+            center_x = float((xs * weights).sum() / total)
+            center_y = float((ys * weights).sum() / total)
+            parallel = (xs - center_x) * vector_x + (ys - center_y) * vector_y
+            perpendicular = (xs - center_x) * perp_x + (ys - center_y) * perp_y
+            parallel_std = float(np.sqrt(((parallel * parallel) * weights).sum() / total))
+            perpendicular_std = float(np.sqrt(((perpendicular * perpendicular) * weights).sum() / total))
+
+            return {
+                "peak": float(alpha.max()),
+                "mean": float(weights.mean()),
+                "support": int(weights.size),
+                "parallel_std": parallel_std,
+                "perpendicular_std": perpendicular_std,
+                "perpendicular_ratio": perpendicular_std / max(parallel_std, 1e-6),
+            }
+
+        softbox = light_metrics("softbox")
+        spot = light_metrics("spot")
+        strip = light_metrics("strip")
+
+        assert softbox["support"] > spot["support"] * 1.15
+        assert spot["peak"] > softbox["peak"] * 2.4
+        assert spot["mean"] > softbox["mean"] * 4.0
+        assert spot["perpendicular_ratio"] < 0.90
+        assert strip["perpendicular_ratio"] > 1.04
+        assert strip["perpendicular_std"] > spot["perpendicular_std"] * 1.15
+        assert strip["mean"] < spot["mean"] * 0.45
 
     def test_studio_2_5d_handles_transparent_context_and_empty_inputs(self):
         transparent = _shadow_context(

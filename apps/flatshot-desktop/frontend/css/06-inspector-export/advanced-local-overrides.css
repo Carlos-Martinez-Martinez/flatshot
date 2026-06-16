@@ -1,59 +1,35 @@
 @layer flatshot {
 /* Inspector/export: advanced local override rows and edit-mode guards. */
 
-.advanced-controls {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  padding: var(--space-3) var(--space-4) var(--space-4);
-}
+.advanced-controls { border: 0; border-radius: 0; background: transparent; padding: var(--space-3) var(--space-4) calc(var(--space-4) + var(--space-2)); }
 
-.settings-panel .advanced-controls {
-  gap: var(--space-2);
-}
+.settings-panel .advanced-controls { gap: var(--space-3); }
 
-.settings-panel .advanced-controls .control-row {
-  grid-template-columns: minmax(86px, 0.9fr) minmax(150px, 1.4fr) 44px;
-}
+.settings-panel .advanced-controls > .control-row, .settings-panel .advanced-technical-panel .control-row { grid-template-columns: minmax(76px, 0.72fr) minmax(0, 1fr) 64px; }
 
-.control-row--toggle, .control-row--select {
-  grid-template-columns: minmax(86px, 0.9fr) minmax(0, 1.4fr) 44px;
-}
+.control-row--toggle, .control-row--select { grid-template-columns: minmax(86px, 0.9fr) minmax(0, 1.4fr) 44px; }
 
-.control-row--select select {
-  grid-column: 2 / 4;
-  width: 100%;
-  height: 34px;
-  min-width: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-panel);
-  padding: 0 var(--space-3);
-  color: var(--color-text);
-  font-size: var(--font-size-sm);
-}
+.control-row--select select { grid-column: 2 / 4; width: 100%; height: 34px; min-width: 0; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-bg-panel); padding: 0 var(--space-3); color: var(--color-text); font-size: var(--font-size-sm); }
 
-.studio-lighting-panel {
-  display: grid; gap: var(--space-3);
-  margin-top: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-panel);
-}
+.studio-lighting-panel { display: grid; gap: var(--space-3); margin: 0; padding: var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-bg-panel); min-width: 0; }
 
-.studio-lighting-panel[hidden] {
-  display: none;
-}
+.studio-lighting-panel[hidden] { display: none; }
 
-.lighting-scene-toolbar {
-  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-2);
-}
+.studio-lighting-panel .control-row { grid-template-columns: minmax(72px, 0.72fr) minmax(0, 1fr) 56px; gap: var(--space-2); }
+
+.studio-lighting-panel .control-row--select { grid-template-columns: minmax(70px, 0.72fr) minmax(0, 1fr); }
+.studio-lighting-panel .control-row--select select { grid-column: 2; }
+.lighting-stage-fields .control-row--select { grid-template-columns: minmax(0, 1fr); align-content: start; }
+.lighting-stage-fields .control-row--select select { grid-column: 1; }
+
+.advanced-controls input[type="range"] { min-width: 0; width: 100%; }
+
+.lighting-scene-toolbar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
 
 .lighting-scene-toolbar button {
+  position: relative;
   min-width: 0;
-  min-height: 32px; padding: 0 var(--space-2);
+  min-height: 30px; padding: 0 var(--space-2);
   overflow: hidden;
   border-radius: var(--radius-sm);
   text-overflow: ellipsis; white-space: nowrap;
@@ -61,18 +37,15 @@
 
 .lighting-scene-toolbar button.active {
   border-color: var(--color-accent-border);
-  background: var(--color-accent-soft); color: var(--color-accent-hover);
+  background: var(--color-accent); color: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
 }
 
-.lighting-stage-row {
-  display: grid; grid-template-columns: 132px minmax(0, 1fr);
-  gap: var(--space-3);
-  align-items: stretch;
-}
+.lighting-editor-grid { display: grid; grid-template-columns: minmax(102px, 112px) minmax(0, 1fr); gap: var(--space-2); align-items: start; }
 
 .lighting-stage {
   position: relative;
-  width: 132px; min-width: 132px;
+  width: 100%; min-width: 0;
   aspect-ratio: 1;
   overflow: hidden;
   border: 1px solid var(--color-border);
@@ -82,7 +55,9 @@
     linear-gradient(0deg, rgba(15, 23, 42, 0.06) 1px, transparent 1px),
     var(--color-bg-soft);
   background-size: 33px 33px;
+  padding: 0;
   cursor: crosshair;
+  touch-action: none;
 }
 
 .lighting-stage__cross {
@@ -125,14 +100,21 @@
   pointer-events: none;
 }
 
-.lighting-stage-fields {
-  display: grid; gap: var(--space-2);
-  min-width: 0;
-}
+.lighting-stage-fields { display: grid; gap: var(--space-2); min-width: 0; }
 
-.lighting-stage-fields .control-row {
-  grid-template-columns: minmax(62px, 0.7fr) minmax(0, 1fr) 38px;
-}
+.lighting-stage-fields .control-row { grid-template-columns: minmax(62px, 0.64fr) minmax(0, 1fr) 56px; }
+
+.lighting-slider-stack, .advanced-technical-panel { display: grid; gap: var(--space-2); min-width: 0; }
+
+.advanced-technical-panel { padding-top: var(--space-3); border-top: 1px solid var(--color-border); }
+
+.settings-panel details.advanced-block[open] { overflow: visible; }
+
+.settings-panel details.advanced-block[open] .inspector-disclosure__body { max-height: none; overflow: visible; }
+
+.settings-panel details.inspector-disclosure[data-inspector-section="advanced"]:not([open]) { min-height: 54px; overflow: hidden; }
+
+.settings-panel[data-shadow-engine="studio_2_5d"] [data-engine-row="direction"] { display: none; }
 
 .settings-panel .preset-section, .settings-panel .appearance-section, .settings-panel .review-background-panel, .settings-panel .advanced-block, .settings-panel .local-adjustment {
   margin: 0;
@@ -216,6 +198,22 @@
 .settings-panel.is-editing-preset .control-row, .settings-panel.is-editing-preset .local-control-row {
   grid-template-columns: 96px minmax(82px, 1fr) 56px;
   gap: var(--space-2);
+}
+
+.settings-panel.is-editing-preset .studio-lighting-panel .control-row {
+  grid-template-columns: minmax(72px, 0.72fr) minmax(0, 1fr) 56px;
+}
+
+.settings-panel.is-editing-preset .lighting-stage-fields .control-row {
+  grid-template-columns: minmax(62px, 0.64fr) minmax(0, 1fr) 56px;
+}
+
+.settings-panel.is-editing-preset .studio-lighting-panel .control-row--select {
+  grid-template-columns: minmax(62px, 0.64fr) minmax(0, 1fr);
+}
+
+.settings-panel.is-editing-preset .lighting-stage-fields .control-row--select {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .settings-panel.is-editing-preset .number-input, .settings-panel.is-editing-preset .setting-number, .settings-panel.is-editing-preset .local-setting-number {

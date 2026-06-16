@@ -81,7 +81,7 @@
   padding-inline: var(--space-2);
 }
 
-.settings-panel [data-inspector-section="review"]:not(.is-hidden), .settings-panel [data-inspector-section="output"]:not(.is-hidden), .settings-panel [data-inspector-section="warnings"]:not(.is-hidden), .settings-panel [data-inspector-section="advanced"]:not(.is-hidden) {
+.settings-panel [data-inspector-section="review"]:not(.is-hidden), .settings-panel section[data-inspector-section="output"]:not(.is-hidden), .settings-panel section[data-inspector-section="warnings"]:not(.is-hidden) {
   display: grid;
 }
 
@@ -167,7 +167,7 @@
   display: none;
 }
 
-.settings-panel.is-inspector-subview [data-inspector-section="output"]:not(.is-hidden), .settings-panel.is-inspector-subview [data-inspector-section="warnings"]:not(.is-hidden), .settings-panel.is-inspector-subview [data-inspector-section="advanced"]:not(.is-hidden) {
+.settings-panel.is-inspector-subview section[data-inspector-section="output"]:not(.is-hidden), .settings-panel.is-inspector-subview section[data-inspector-section="warnings"]:not(.is-hidden) {
   display: grid;
 }
 

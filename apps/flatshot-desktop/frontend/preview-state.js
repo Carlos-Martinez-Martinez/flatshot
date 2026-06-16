@@ -108,16 +108,22 @@
 
   function bridgePreviewMeta(options = {}) {
     const previewStatus = options.previewStatus;
+    const engineLabel = String(options.engineLabel || "").trim();
+    const withEngine = (label) => engineLabel ? `${label} · ${engineLabel}` : label;
     if (previewStatus === "loading") {
-      return "Generando vista";
+      return withEngine("Generando vista");
     }
     if (previewStatus === "error") {
       return options.previewError || "Vista no disponible";
     }
     if (options.previewData) {
-      return options.previewData.warning ? "Vista con aviso" : options.activePreset;
+      if (options.previewData.warning) {
+        return withEngine("Vista con aviso");
+      }
+      const presetLabel = String(options.activePreset || "").trim();
+      return engineLabel && presetLabel ? `${engineLabel} · ${presetLabel}` : engineLabel || presetLabel || "Vista generada";
     }
-    return "Vista pendiente";
+    return withEngine("Vista pendiente");
   }
 
   function previewSettingsLabel(options = {}) {

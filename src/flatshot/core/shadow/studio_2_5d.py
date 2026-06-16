@@ -25,15 +25,76 @@ class StudioProfile:
     directional_gain: float
     ambient_gain: float
     softness: float
+    distance_scale: float = 1.0
+    contact_blur_scale: float = 1.0
+    cast_blur_scale: float = 1.0
+    alpha_gain: float = 1.0
+    hard_contact_weight: float = 0.82
+    soft_contact_weight: float = 0.48
+    floor_contact_weight: float = 0.66
+    near_body_weight: float = 0.34
+    cast_weight: float = 0.46
+    wash_weight: float = 0.18
+    ambient_weight: float = 0.42
     strip_anisotropy: float = 0.0
 
 
 STUDIO_PROFILES = {
-    "softbox": StudioProfile(0.92, 0.72, 0.72, 1.12),
-    "spot": StudioProfile(1.12, 1.05, 0.42, 0.58),
-    "strip": StudioProfile(0.98, 0.82, 0.54, 0.82, strip_anisotropy=1.0),
+    "softbox": StudioProfile(
+        contact_gain=0.74,
+        directional_gain=0.54,
+        ambient_gain=1.05,
+        softness=1.48,
+        distance_scale=0.86,
+        contact_blur_scale=1.55,
+        cast_blur_scale=1.35,
+        alpha_gain=0.88,
+        hard_contact_weight=0.42,
+        soft_contact_weight=0.76,
+        floor_contact_weight=0.80,
+        near_body_weight=0.24,
+        cast_weight=0.30,
+        wash_weight=0.42,
+        ambient_weight=0.78,
+    ),
+    "spot": StudioProfile(
+        contact_gain=1.26,
+        directional_gain=1.34,
+        ambient_gain=0.20,
+        softness=0.34,
+        distance_scale=1.12,
+        contact_blur_scale=0.55,
+        cast_blur_scale=0.68,
+        alpha_gain=1.06,
+        hard_contact_weight=1.18,
+        soft_contact_weight=0.24,
+        floor_contact_weight=0.54,
+        near_body_weight=0.52,
+        cast_weight=0.86,
+        wash_weight=0.06,
+        ambient_weight=0.12,
+    ),
+    "strip": StudioProfile(
+        contact_gain=0.92,
+        directional_gain=0.82,
+        ambient_gain=0.50,
+        softness=0.82,
+        distance_scale=0.98,
+        contact_blur_scale=0.85,
+        cast_blur_scale=0.86,
+        alpha_gain=0.94,
+        hard_contact_weight=0.58,
+        soft_contact_weight=0.52,
+        floor_contact_weight=0.62,
+        near_body_weight=0.32,
+        cast_weight=0.52,
+        wash_weight=0.24,
+        ambient_weight=0.35,
+        strip_anisotropy=3.2,
+    ),
 }
 LIGHT_TYPE_SEEDS = {"softbox": 101, "spot": 211, "strip": 307}
+STUDIO_ALPHA_GAIN = 0.58
 
 
 def _to_float(mask: Image.Image) -> np.ndarray:
@@ -91,6 +152,13 @@ def _shadow_vector_from_light(x: float, y: float) -> ShadowVector:
     length = math.hypot(sx, sy)
     if length < 1e-4:
         return ShadowVector(0.0, 1.0)
+    return ShadowVector(sx / length, sy / length)
+
+
+def _floor_support_vector(vector: ShadowVector) -> ShadowVector:
+    sx = min(max(vector.x * 0.32, -0.36), 0.36)
+    sy = 1.0
+    length = math.hypot(sx, sy)
     return ShadowVector(sx / length, sy / length)
 
 
@@ -201,10 +269,11 @@ def render_studio_2_5d(context: ShadowRenderContext) -> ShadowRenderResult:
     intensity = min(max(float(light.intensity), 0.0), 1.5)
     ambient = min(max(float(scene.ambient_intensity), 0.0), 1.0)
 
-    cast_distance = distance_setting * (0.55 + light_distance * 0.50 + (1.0 - height) * 0.82)
-    cast_blur = blur_setting * profile.softness * (0.44 + size * 1.05 + height * 0.20)
-    contact_blur = contact_setting * (0.24 + size * 0.36)
-    max_blur = max(cast_blur * 1.65, contact_blur * 1.2, spread_setting)
+    cast_distance = distance_setting * (0.55 + light_distance * 0.50 + (1.0 - height) * 0.82) * profile.distance_scale
+    cast_blur = blur_setting * profile.softness * profile.cast_blur_scale * (0.44 + size * 1.05 + height * 0.20)
+    contact_blur = contact_setting * profile.contact_blur_scale * (0.24 + size * 0.36)
+    strip_pad = cast_blur * profile.strip_anisotropy * 0.80
+    max_blur = max(cast_blur * 1.65, contact_blur * 1.2, spread_setting, strip_pad)
 
     roi = compute_shadow_roi(
         context.subject_mask_canvas,
@@ -226,7 +295,16 @@ def render_studio_2_5d(context: ShadowRenderContext) -> ShadowRenderResult:
     contact_source = _weighted_source(source_mask, "contact")
     height_source = _weighted_source(source_mask, "height")
     if profile.strip_anisotropy:
-        height_source = _strip_smear(height_source, vector, max(1.0, scaled_blur * 0.38))
+        contact_source = _strip_smear(
+            contact_source,
+            vector,
+            max(1.0, scaled_contact_blur * profile.strip_anisotropy * 0.72),
+        )
+        height_source = _strip_smear(
+            height_source,
+            vector,
+            max(2.0, scaled_blur * profile.strip_anisotropy * 0.80),
+        )
 
     shape = (work_mask.height, work_mask.width)
     contact_alpha = np.zeros(shape, dtype=np.float32)
@@ -247,6 +325,12 @@ def render_studio_2_5d(context: ShadowRenderContext) -> ShadowRenderResult:
         vector,
         distance=scaled_distance * 0.085,
         blur=max(0.0, scaled_contact_blur * 1.15 + scaled_blur * 0.06),
+    )
+    floor_contact = _render_offset_layer(
+        contact_source,
+        _floor_support_vector(vector),
+        distance=max(1.0, scaled_distance * (0.050 + (1.0 - height) * 0.030)),
+        blur=max(0.75, scaled_contact_blur * (0.78 + size * 0.18) + scaled_blur * 0.08),
     )
     near_body = _render_offset_layer(
         source_mask,
@@ -273,18 +357,47 @@ def render_studio_2_5d(context: ShadowRenderContext) -> ShadowRenderResult:
         blur=max(0.0, scaled_blur * 1.05 + scaled_contact_blur * 0.24),
     )
 
-    contact_alpha = accumulate_alpha(contact_alpha, _to_float(hard_contact) * opacity_scale * contact_energy * 0.82)
-    contact_alpha = accumulate_alpha(contact_alpha, _to_float(soft_contact) * opacity_scale * contact_energy * 0.48)
+    contact_alpha = accumulate_alpha(
+        contact_alpha,
+        _to_float(hard_contact) * opacity_scale * contact_energy * profile.hard_contact_weight,
+    )
+    contact_alpha = accumulate_alpha(
+        contact_alpha,
+        _to_float(soft_contact) * opacity_scale * contact_energy * profile.soft_contact_weight,
+    )
+    floor_contact = _protected(
+        floor_contact,
+        work_mask,
+        strength=0.08,
+        blur=max(0.0, scaled_contact_blur * 0.28 + scaled_blur * 0.04),
+    )
+    floor_energy = (0.20 + 0.28 * intensity + 0.16 * ambient) * profile.contact_gain
+    contact_alpha = accumulate_alpha(
+        contact_alpha,
+        _to_float(floor_contact) * opacity_scale * floor_energy * profile.floor_contact_weight,
+    )
 
     near_body = _protected(near_body, work_mask, strength=0.10, blur=max(0.0, scaled_blur * 0.12))
     cast = _protected(cast, work_mask, strength=0.26, blur=max(0.0, scaled_blur * 0.18))
     wash = _protected(wash, work_mask, strength=0.34, blur=max(0.0, scaled_blur * 0.26))
     ambient_layer = _protected(ambient_layer, work_mask, strength=0.08, blur=max(0.0, scaled_blur * 0.10))
 
-    diffuse_alpha = accumulate_alpha(diffuse_alpha, _to_float(ambient_layer) * opacity_scale * ambient_energy * 0.42)
-    diffuse_alpha = accumulate_alpha(diffuse_alpha, _to_float(near_body) * opacity_scale * directional_energy * 0.34)
-    diffuse_alpha = accumulate_alpha(diffuse_alpha, _to_float(cast) * opacity_scale * directional_energy * 0.46)
-    diffuse_alpha = accumulate_alpha(diffuse_alpha, _to_float(wash) * opacity_scale * directional_energy * 0.18)
+    diffuse_alpha = accumulate_alpha(
+        diffuse_alpha,
+        _to_float(ambient_layer) * opacity_scale * ambient_energy * profile.ambient_weight,
+    )
+    diffuse_alpha = accumulate_alpha(
+        diffuse_alpha,
+        _to_float(near_body) * opacity_scale * directional_energy * profile.near_body_weight,
+    )
+    diffuse_alpha = accumulate_alpha(
+        diffuse_alpha,
+        _to_float(cast) * opacity_scale * directional_energy * profile.cast_weight,
+    )
+    diffuse_alpha = accumulate_alpha(
+        diffuse_alpha,
+        _to_float(wash) * opacity_scale * directional_energy * profile.wash_weight,
+    )
 
     density = _density_factor(context)
     contact_alpha = np.clip(contact_alpha * density, 0.0, 1.0)
@@ -309,7 +422,7 @@ def render_studio_2_5d(context: ShadowRenderContext) -> ShadowRenderResult:
         ),
         bbox=work_mask.getbbox(),
     )
-    roi_alpha = accumulate_alpha(contact_alpha, diffuse_alpha)
+    roi_alpha = np.clip(accumulate_alpha(contact_alpha, diffuse_alpha) * STUDIO_ALPHA_GAIN * profile.alpha_gain, 0.0, 1.0)
 
     alpha_image = _from_float(roi_alpha)
     if alpha_image.size != roi.local_mask.size:
@@ -317,7 +430,7 @@ def render_studio_2_5d(context: ShadowRenderContext) -> ShadowRenderResult:
 
     local_shadow = _alpha_to_rgba(alpha_image, context)
     shadow = Image.new("RGBA", context.canvas_size, (0, 0, 0, 0))
-    shadow.paste(local_shadow, roi.origin, mask=alpha_image)
+    shadow.alpha_composite(local_shadow, roi.origin)
 
     return ShadowRenderResult(
         shadow=shadow,

@@ -210,6 +210,12 @@ const defaultLightingScene = {
   ambient_intensity: 0.25,
 };
 
+const shadowEngineLabels = {
+  realistic_v2: "Realista V2",
+  studio_2_5d: "Estudio 2.5D",
+  legacy: "Clásico",
+};
+
 const lightingScenePresets = {
   overhead_soft: {
     main: { type: "softbox", x: -0.08, y: -0.78, height: 0.72, size: 0.72, intensity: 0.82 },
@@ -382,6 +388,7 @@ const state = {
   activePreset: initialImageAdjustmentPreset,
   presetOutputSettings: {},
   settings: { ...defaultSettings },
+  lightingPresetId: "",
   presetDirty: false,
   presetSource: "Global",
   localOverride: false,
@@ -454,6 +461,7 @@ let viewerResizeObserver = null;
 let inspectorScrollTopBeforeToggle = 0;
 let modalFocusReturnTarget = null;
 let sessionSnapshotPersistenceEnabled = false;
+let pendingAdvancedDisclosure = "";
 const inspectorDisclosureTimers = new WeakMap();
 const INSPECTOR_DISCLOSURE_MS = 220;
 const viewerPanState = {
@@ -2521,9 +2529,12 @@ function applyGlobalAdjustmentWithoutSaving() {
   refreshPreviewAfterSettingChange();
 }
 
-function markPresetDirty() {
+function markPresetDirty(options = {}) {
   state.presetDirty = true;
   state.presetSource = "Modificado";
+  if (options.deferRender) {
+    return;
+  }
   refreshPreviewAfterSettingChange();
 }
 
@@ -3382,6 +3393,20 @@ function setInspectorDisclosureHeight(details, height = null) {
     }
   }
   body.style.setProperty("--inspector-disclosure-height", `${Math.max(0, Math.round(nextHeight))}px`);
+}
+
+function setInspectorDisclosureOpenState(details, open) {
+  if (!details) {
+    return;
+  }
+  const previousTimer = inspectorDisclosureTimers.get(details);
+  if (previousTimer) {
+    window.clearTimeout(previousTimer);
+    inspectorDisclosureTimers.delete(details);
+  }
+  details.open = open;
+  details.classList.remove("is-opening", "is-closing", "is-open");
+  inspectorDisclosureBody(details)?.style.removeProperty("--inspector-disclosure-height");
 }
 
 function restoreInspectorScroll(panel, scrollTop = inspectorScrollTopBeforeToggle) {
@@ -4809,6 +4834,7 @@ function realPreviewHtml(image) {
 function bridgePreviewMeta() {
   return previewStateHelpers.bridgePreviewMeta({
     activePreset: state.activePreset,
+    engineLabel: shadowEngineLabels[state.settings.shadow_engine] || "",
     previewData: state.previewData,
     previewError: state.previewError,
     previewStatus: state.previewStatus,
@@ -4875,6 +4901,10 @@ function previewSubtitle(image) {
 
 function renderSettings() {
   renderReviewPanel();
+  const settingsPanel = $(".settings-panel");
+  if (settingsPanel) {
+    settingsPanel.dataset.shadowEngine = state.settings.shadow_engine || "";
+  }
   const activePreset = $("#active-preset");
   if (activePreset) {
     activePreset.textContent = state.activePreset;
@@ -4986,6 +5016,9 @@ function renderLightingSceneControls() {
   panel.hidden = !enabled;
   const scene = normalizeLightingScene(state.settings.lighting_scene);
   state.settings.lighting_scene = scene;
+  const exactPresetId = lightingScenePresetId(scene);
+  const rememberedPresetId = lightingScenePresets[state.lightingPresetId] ? state.lightingPresetId : "";
+  const selectedPresetId = enabled ? exactPresetId || rememberedPresetId || "overhead_soft" : "";
 
   $$("[data-lighting-field]").forEach((input) => {
     const field = input.dataset.lightingField;
@@ -4998,16 +5031,35 @@ function renderLightingSceneControls() {
       syncRangeFill(input);
       const output = $(`#${lightingOutputId(field)}`);
       if (output) {
-        output.textContent = String(sliderValue);
+        if ("value" in output && document.activeElement !== output) {
+          output.value = String(sliderValue);
+        } else {
+          output.textContent = String(sliderValue);
+        }
       }
     }
     input.disabled = !enabled;
   });
 
+  $$("[data-lighting-number-field]").forEach((input) => {
+    const field = input.dataset.lightingNumberField;
+    const value = lightingSliderValue(field, lightingSceneFieldValue(scene, field));
+    if (document.activeElement !== input) {
+      input.value = String(value);
+    }
+    input.disabled = !enabled;
+  });
+
   $$("[data-lighting-preset]").forEach((button) => {
-    const preset = lightingScenePresets[button.dataset.lightingPreset];
+    const presetId = button.dataset.lightingPreset;
+    const preset = lightingScenePresets[presetId];
+    const selected = enabled && presetId === selectedPresetId;
+    const exact = selected && lightingScenesEqual(scene, preset);
     button.disabled = !enabled;
-    button.classList.toggle("active", enabled && lightingScenesEqual(scene, preset));
+    button.classList.toggle("active", selected);
+    button.classList.toggle("is-modified", selected && !exact);
+    button.setAttribute("aria-pressed", String(selected));
+    button.title = selected && !exact ? "Preset modificado" : "";
   });
 
   const stage = $("#lighting-stage");
@@ -5028,6 +5080,11 @@ function lightingScenesEqual(first, second) {
     return false;
   }
   return JSON.stringify(normalizeLightingScene(first)) === JSON.stringify(normalizeLightingScene(second));
+}
+
+function lightingScenePresetId(scene) {
+  return Object.entries(lightingScenePresets)
+    .find(([, preset]) => lightingScenesEqual(scene, preset))?.[0] || "";
 }
 
 function renderReviewPanel() {
@@ -5167,10 +5224,17 @@ function advancedDirtyCount() {
   const presetSettings = normalizeSettings(activePresetItem()?.settings || defaultSettings);
   return settingsViewHelpers.advancedDirtyCount({
     currentSettings: state.settings,
-    keys: advancedSettingKeys,
+    keys: visibleAdvancedSettingKeys(state.settings),
     presetDirty: state.presetDirty,
     presetSettings,
   });
+}
+
+function visibleAdvancedSettingKeys(settings = state.settings) {
+  if (settings.shadow_engine === "studio_2_5d") {
+    return advancedSettingKeys.filter((key) => key !== "angle");
+  }
+  return advancedSettingKeys;
 }
 
 function advancedSettingsDirty() {
@@ -5221,26 +5285,45 @@ function renderInspector() {
 }
 
 function syncAdvancedInspectorDetails(mode) {
-  $$(".settings-panel details.inspector-disclosure[data-inspector-section='advanced']").forEach((details) => {
+  const detailsItems = $$(".settings-panel details.inspector-disclosure[data-inspector-section='advanced']");
+  detailsItems.forEach((details) => {
     if (mode !== "advanced") {
-      details.open = false;
-      return;
+      setInspectorDisclosureOpenState(details, false);
     }
-    if (state.presetEditorOpen) {
-      details.open = details.classList.contains("preset-section");
-      return;
+  });
+  if (mode !== "advanced") {
+    pendingAdvancedDisclosure = "";
+    return;
+  }
+
+  if (state.presetEditorOpen) {
+    detailsItems.forEach((details) => {
+      setInspectorDisclosureOpenState(details, details.classList.contains("preset-section"));
+    });
+    pendingAdvancedDisclosure = "";
+    return;
+  }
+
+  const editableDetails = detailsItems.filter((details) => !details.classList.contains("preset-section"));
+  detailsItems
+    .filter((details) => details.classList.contains("preset-section"))
+    .forEach((details) => setInspectorDisclosureOpenState(details, false));
+
+  if (pendingAdvancedDisclosure) {
+    const preferred = editableDetails.find((details) => details.classList.contains(pendingAdvancedDisclosure));
+    if (preferred) {
+      editableDetails.forEach((details) => setInspectorDisclosureOpenState(details, details === preferred));
     }
-    if (details.classList.contains("preset-section")) {
-      details.open = false;
-      return;
-    }
-    if (
-      details.classList.contains("appearance-section")
-      || details.classList.contains("local-adjustment")
-      || (state.presetEditorOpen && details.classList.contains("preset-section"))
-    ) {
-      details.open = true;
-    }
+    pendingAdvancedDisclosure = "";
+    return;
+  }
+
+  if (editableDetails.some((details) => details.open)) {
+    return;
+  }
+
+  editableDetails.forEach((details) => {
+    setInspectorDisclosureOpenState(details, details.classList.contains("appearance-section"));
   });
 }
 
@@ -7124,6 +7207,7 @@ function openPresetEditor() {
 function closePresetEditor() {
   state.presetEditorOpen = false;
   state.inspectorTab = "advanced";
+  pendingAdvancedDisclosure = "appearance-section";
   state.statusText = "Editar ajuste";
   render();
 }
@@ -7350,11 +7434,13 @@ function handleAction(action, target = null) {
     }
   } else if (action === "open-advanced") {
     state.inspectorTab = "advanced";
+    pendingAdvancedDisclosure = "appearance-section";
     state.statusText = "Ajustes";
     render();
   } else if (action === "open-image-adjustment") {
     state.inspectorTab = "advanced";
     state.presetEditorOpen = false;
+    pendingAdvancedDisclosure = "local-adjustment";
     state.statusText = "Ajuste de esta imagen";
     render();
   } else if (action === "apply-global-adjustment-to-overrides") {
@@ -7818,14 +7904,24 @@ $$("[data-lighting-field]").forEach((input) => {
   input.addEventListener("change", updateLighting);
 });
 
+$$("[data-lighting-number-field]").forEach((input) => {
+  const updateLighting = (event) => {
+    updateLightingSceneField(event.target.dataset.lightingNumberField, event.target.value);
+  };
+  input.addEventListener("input", updateLighting);
+  input.addEventListener("change", updateLighting);
+});
+
 $$("[data-lighting-preset]").forEach((button) => {
   button.addEventListener("click", () => {
-    const preset = lightingScenePresets[button.dataset.lightingPreset];
+    const presetId = button.dataset.lightingPreset;
+    const preset = lightingScenePresets[presetId];
     if (!preset) {
       return;
     }
     state.settings.shadow_engine = "studio_2_5d";
     state.settings.lighting_scene = cloneLightingScene(preset);
+    state.lightingPresetId = presetId;
     markPresetDirty();
   });
 });
@@ -7833,22 +7929,41 @@ $$("[data-lighting-preset]").forEach((button) => {
 const lightingStage = $("#lighting-stage");
 if (lightingStage) {
   let lightingDragActive = false;
+  let lightingDragChanged = false;
+  let lightingPointerId = null;
+  const finishLightingDrag = (event) => {
+    if (!lightingDragActive || (lightingPointerId !== null && event.pointerId !== lightingPointerId)) {
+      return;
+    }
+    lightingDragActive = false;
+    lightingPointerId = null;
+    lightingStage.releasePointerCapture?.(event.pointerId);
+    if (lightingDragChanged) {
+      lightingDragChanged = false;
+      refreshPreviewAfterSettingChange();
+    }
+  };
   lightingStage.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
     lightingDragActive = true;
+    lightingDragChanged = false;
+    lightingPointerId = event.pointerId;
     lightingStage.setPointerCapture?.(event.pointerId);
-    updateLightingScenePosition(event.clientX, event.clientY);
+    lightingDragChanged = updateLightingScenePosition(event.clientX, event.clientY, { deferRender: true });
   });
   lightingStage.addEventListener("pointermove", (event) => {
-    if (lightingDragActive) {
-      updateLightingScenePosition(event.clientX, event.clientY);
+    if (lightingDragActive && event.pointerId === lightingPointerId) {
+      event.preventDefault();
+      lightingDragChanged = updateLightingScenePosition(event.clientX, event.clientY, { deferRender: true })
+        || lightingDragChanged;
     }
   });
   lightingStage.addEventListener("pointerup", (event) => {
-    lightingDragActive = false;
-    lightingStage.releasePointerCapture?.(event.pointerId);
+    event.preventDefault();
+    finishLightingDrag(event);
   });
-  lightingStage.addEventListener("pointercancel", () => {
-    lightingDragActive = false;
+  lightingStage.addEventListener("pointercancel", (event) => {
+    finishLightingDrag(event);
   });
 }
 
@@ -7884,25 +7999,29 @@ function updateLightingSceneField(field, rawValue) {
   markPresetDirty();
 }
 
-function updateLightingScenePosition(clientX, clientY) {
+function updateLightingScenePosition(clientX, clientY, options = {}) {
   const stage = $("#lighting-stage");
   if (!stage || state.settings.shadow_engine !== "studio_2_5d") {
-    return;
+    return false;
   }
   const rect = stage.getBoundingClientRect();
   if (!rect.width || !rect.height) {
-    return;
+    return false;
   }
   const x = roundedSceneValue(((clientX - rect.left) / rect.width) * 2 - 1, -1, 1, defaultLightingScene.main.x);
   const y = roundedSceneValue(((clientY - rect.top) / rect.height) * 2 - 1, -1, 1, defaultLightingScene.main.y);
   const scene = cloneLightingScene(state.settings.lighting_scene);
   if (scene.main.x === x && scene.main.y === y) {
-    return;
+    return false;
   }
   scene.main.x = x;
   scene.main.y = y;
   state.settings.lighting_scene = scene;
-  markPresetDirty();
+  markPresetDirty({ deferRender: options.deferRender });
+  if (options.deferRender) {
+    renderLightingSceneControls();
+  }
+  return true;
 }
 
 function numericInputValue(input, fallback = 0) {

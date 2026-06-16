@@ -26,20 +26,9 @@
 
 .lighting-scene-toolbar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
 
-.lighting-scene-toolbar button {
-  position: relative;
-  min-width: 0;
-  min-height: 30px; padding: 0 var(--space-2);
-  overflow: hidden;
-  border-radius: var(--radius-sm);
-  text-overflow: ellipsis; white-space: nowrap;
-}
+.lighting-scene-toolbar button { position: relative; min-width: 0; min-height: 30px; padding: 0 var(--space-2); overflow: hidden; border-radius: var(--radius-sm); text-overflow: ellipsis; white-space: nowrap; }
 
-.lighting-scene-toolbar button.active {
-  border-color: var(--color-accent-border);
-  background: var(--color-accent); color: #fff;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
-}
+.lighting-scene-toolbar button.active { border-color: var(--color-accent-border); background: var(--color-accent); color: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12); }
 
 .lighting-editor-grid { display: grid; grid-template-columns: minmax(102px, 112px) minmax(0, 1fr); gap: var(--space-2); align-items: start; }
 
@@ -111,6 +100,11 @@
 .settings-panel details.advanced-block[open] { overflow: visible; }
 
 .settings-panel details.advanced-block[open] .inspector-disclosure__body { max-height: none; overflow: visible; }
+
+.settings-panel.is-advanced-subview { min-height: 0; display: flex; flex-direction: column; align-content: stretch; overflow: hidden; }
+.settings-panel.is-advanced-subview .inspector-start:not(.is-hidden) { flex: 0 0 auto; }
+.settings-panel.is-advanced-subview details.inspector-disclosure[data-inspector-section="advanced"][open]:not(.preset-section) { min-height: 0; flex: 1 1 auto; display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
+.settings-panel.is-advanced-subview details.inspector-disclosure[data-inspector-section="advanced"][open]:not(.preset-section) .inspector-disclosure__body { min-height: 0; height: 100%; max-height: none; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
 
 .settings-panel details.inspector-disclosure[data-inspector-section="advanced"]:not([open]) { min-height: 54px; overflow: hidden; }
 

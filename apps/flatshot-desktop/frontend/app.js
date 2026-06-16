@@ -5258,6 +5258,7 @@ function renderInspector() {
   panel.classList.toggle("is-editing-output", state.outputEditMode);
   panel.classList.toggle("is-editing-preset", state.presetEditorOpen || mode === "advanced");
   panel.classList.toggle("is-inspector-subview", mode !== "summary");
+  panel.classList.toggle("is-advanced-subview", mode === "advanced");
   const start = $("#inspector-start");
   start.classList.remove("is-hidden");
   if (mode === "summary") {

@@ -139,7 +139,7 @@ html.dev-mode [data-action="toggle-inspector"] {
   color: var(--text-muted);
 }
 
-button:hover:not(:disabled) {
+button:hover:not(:disabled):not(.active) {
   border-color: var(--color-border-strong);
   background: var(--color-bg-soft);
 }

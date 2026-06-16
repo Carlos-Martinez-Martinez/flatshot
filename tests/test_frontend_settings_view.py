@@ -14,6 +14,7 @@ APP_PATH = FRONTEND_DIR / "app.js"
 ADVANCED_CSS_PATH = FRONTEND_DIR / "css" / "06-inspector-export" / "advanced-local-overrides.css"
 INSPECTOR_NAV_CSS_PATH = FRONTEND_DIR / "css" / "06-inspector-export" / "inspector-navigation.css"
 BUTTONS_CSS_PATH = FRONTEND_DIR / "css" / "03-components" / "buttons.css"
+STATES_CSS_PATH = FRONTEND_DIR / "css" / "08-states-responsive" / "states.css"
 
 
 def test_settings_view_helper_loads_before_app_script():
@@ -69,6 +70,7 @@ def test_studio_lighting_panel_is_available_in_advanced_settings():
 def test_studio_lighting_panel_css_keeps_active_preset_filled_and_unclipped():
     css = ADVANCED_CSS_PATH.read_text(encoding="utf-8")
     buttons_css = BUTTONS_CSS_PATH.read_text(encoding="utf-8")
+    states_css = STATES_CSS_PATH.read_text(encoding="utf-8")
 
     assert ".lighting-scene-toolbar button.active::after" not in css
     assert ".lighting-scene-toolbar button.active {" in css
@@ -76,11 +78,29 @@ def test_studio_lighting_panel_css_keeps_active_preset_filled_and_unclipped():
     assert "background: var(--color-accent)" in active_rule
     assert "color: #fff" in active_rule
     assert "button:not(.primary):not(.active)" in buttons_css
+    assert "button:hover:not(:disabled):not(.active)" in states_css
     assert ".settings-panel details.advanced-block[open] { overflow: visible; }" in css
     assert (
         ".settings-panel details.advanced-block[open] .inspector-disclosure__body "
         "{ max-height: none; overflow: visible; }"
     ) in css
+    assert ".settings-panel.is-advanced-subview {" in css
+    assert "overflow: hidden" in css.split(".settings-panel.is-advanced-subview {", 1)[1].split("}", 1)[0]
+    open_rule = css.split(
+        '.settings-panel.is-advanced-subview details.inspector-disclosure'
+        '[data-inspector-section="advanced"][open]:not(.preset-section) {',
+        1,
+    )[1].split("}", 1)[0]
+    assert "flex: 1 1 auto" in open_rule
+    assert "grid-template-rows: auto minmax(0, 1fr)" in open_rule
+    body_rule = css.split(
+        '.settings-panel.is-advanced-subview details.inspector-disclosure'
+        '[data-inspector-section="advanced"][open]:not(.preset-section) .inspector-disclosure__body {',
+        1,
+    )[1].split("}", 1)[0]
+    assert "height: 100%" in body_rule
+    assert "overflow-y: auto" in body_rule
+    assert "overflow-x: hidden" in body_rule
     assert (
         '.settings-panel details.inspector-disclosure[data-inspector-section="advanced"]:not([open]) '
         "{ min-height: 54px; overflow: hidden; }"
@@ -108,6 +128,7 @@ def test_studio_lighting_preset_selection_state_is_explicit():
     assert "state.lightingPresetId = presetId;" in js
     assert 'const selectedPresetId = enabled ? exactPresetId || rememberedPresetId || "overhead_soft" : "";' in js
     assert "settingsPanel.dataset.shadowEngine = state.settings.shadow_engine" in js
+    assert 'panel.classList.toggle("is-advanced-subview", mode === "advanced");' in js
     assert "visibleAdvancedSettingKeys(state.settings)" in js
     assert 'advancedSettingKeys.filter((key) => key !== "angle")' in js
     assert 'data-lighting-number-field' in js

@@ -5,13 +5,13 @@
   }
   root.FlatShotBatchDetailView = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  function escapeHtml(value) {
+  const escapeHtml = globalThis.FlatShotFormatters?.escapeHtml || function escapeHtml(value) {
     return String(value)
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;");
-  }
+  };
 
   function batchDetailRowHtml(label, value, title = "") {
     const text = value === null || value === undefined || value === "" ? "Pendiente" : String(value);

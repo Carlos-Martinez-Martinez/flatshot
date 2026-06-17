@@ -47,7 +47,7 @@ def list_presets():
         print("No presets found.")
         return
     
-    print("\n📋 Available Presets:\n")
+    print("\nAvailable Presets:\n")
     
     # Show by category
     for cat_key, category in presets.categories.items():
@@ -205,9 +205,9 @@ def process_folder(args):
             
             if fmt in ['jpg', 'jpeg']:
                 final_img = final_img.convert("RGB")
-                final_img.save(save_path, quality=100, subsampling=0, dpi=dpi)
+                final_img.save(save_path, quality=95, subsampling="4:2:0", dpi=dpi)
             else:
-                final_img.save(save_path, optimize=False, compress_level=0, dpi=dpi)
+                final_img.save(save_path, optimize=True, dpi=dpi)
             
             processed += 1
             

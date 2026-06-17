@@ -3,6 +3,7 @@ from __future__ import annotations
 import http.client
 import json
 import base64
+import os
 import threading
 from concurrent.futures import Future
 from contextlib import contextmanager
@@ -450,3 +451,26 @@ def test_bridge_http_invalid_json_returns_json_error(tmp_path):
             "message": "Request body must be valid JSON.",
         },
     }
+
+
+def test_bridge_http_thumbnail_rejects_path_traversal(tmp_path):
+    """Thumbnail endpoint must not leak file existence via 404 vs 415 for arbitrary paths."""
+    traversed = "C:/Windows/System32/drivers/etc/hosts" if os.name == "nt" else "/etc/passwd"
+    encoded = quote(traversed, safe="")
+    with running_bridge(tmp_path / "config") as port:
+        status, data = request_json(port, "GET", f"/images/thumbnail?path={encoded}&size=128")
+    assert data.get("ok") is False
+
+
+def test_bridge_http_thumbnail_handles_relative_path(tmp_path):
+    """Relative paths should be rejected safely."""
+    with running_bridge(tmp_path / "config") as port:
+        status, data = request_json(port, "GET", "/images/thumbnail?path=../secret.png&size=128")
+    assert data.get("ok") is False
+
+
+def test_bridge_http_thumbnail_handles_missing_param(tmp_path):
+    """Missing path parameter should return error, not crash."""
+    with running_bridge(tmp_path / "config") as port:
+        status, data = request_json(port, "GET", "/images/thumbnail?size=128")
+    assert data.get("ok") is False

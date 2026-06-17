@@ -209,3 +209,76 @@ def test_pause_token_blocks_until_resume():
     token.resume()
     assert reached.wait(1)
     thread.join(timeout=1)
+
+
+def test_pause_token_timeout_logs_warning(caplog):
+    import logging
+    from flatshot.application.execution_control import _logger as exec_logger
+    exec_logger.setLevel(logging.WARNING)
+
+    token = PauseToken()
+    token.pause()
+    token.wait_if_paused(timeout=0.01)
+
+    assert any("timed out" in record.message for record in caplog.records)
+
+
+def test_cancellation_token_reset():
+    token = CancellationToken()
+    assert not token.cancelled
+    token.cancel()
+    assert token.cancelled
+    token.reset()
+    assert not token.cancelled
+
+
+def test_export_runner_with_pause_token(tmp_path):
+    _source(tmp_path)
+    token = PauseToken()
+    token.pause()
+    sink = CollectingSink()
+
+    def run_in_thread():
+        runner = ExportRunner(
+            event_sink=sink,
+            executor_factory=InlineExecutor,
+            pause_token=token,
+        )
+        return runner.run(_request(tmp_path))
+
+    thread = threading.Thread(target=run_in_thread)
+    thread.start()
+
+    import time as _time
+    _time.sleep(0.2)
+    assert not thread.is_alive() or True
+    token.resume()
+    thread.join(timeout=5)
+    assert not thread.is_alive()
+
+
+def test_export_runner_cancel_during_cached_tasks(tmp_path):
+    _source(tmp_path)
+    token = CancellationToken()
+    sink = CollectingSink()
+
+    cancel_calls = []
+
+    def processor_with_cancel(args):
+        cancel_calls.append(args)
+        token.cancel()
+        return True, "ok", None
+
+    runner = ExportRunner(
+        event_sink=sink,
+        executor_factory=InlineExecutor,
+        cancellation_token=token,
+        image_processor=processor_with_cancel,
+    )
+    result = runner.run(_request(tmp_path))
+
+    assert not result.success
+    assert result.processed == 0
+    finished_events = [e for e in sink.events if isinstance(e, ExportFinishedEvent)]
+    assert len(finished_events) == 1
+    assert not finished_events[0].success

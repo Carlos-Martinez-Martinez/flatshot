@@ -24,6 +24,7 @@ def capabilities() -> dict:
         "presetsRead": True,
         "presetsWrite": True,
         "previewRender": True,
+        "previewRenderBinary": True,
         "thumbnailRender": True,
         "exportRun": True,
         "exportProgress": True,

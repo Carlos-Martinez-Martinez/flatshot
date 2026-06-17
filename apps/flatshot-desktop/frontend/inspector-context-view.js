@@ -5,13 +5,13 @@
   }
   root.FlatShotInspectorContextView = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  function escapeHtml(value) {
+  const escapeHtml = globalThis.FlatShotFormatters?.escapeHtml || function escapeHtml(value) {
     return String(value)
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;");
-  }
+  };
 
   function inspectorSubviewHeaderHtml(options = {}) {
     const detail = options.detail || "";

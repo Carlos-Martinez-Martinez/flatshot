@@ -1,6 +1,6 @@
 import re
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator
 from typing import Any, Dict, List, Literal, Mapping, Optional, Tuple
 
 ShadowEngineName = Literal["realistic_v2", "legacy", "studio_2_5d"]
@@ -52,6 +52,7 @@ class ShadowSettings(BaseModel):
 
 
 def _coerce_rgb_tuple(value: Any) -> Tuple[int, int, int]:
+    """Accept (r,g,b) as tuple or list, reject bools, coerce to validated int triplet."""
     if isinstance(value, tuple) and len(value) == 3:
         raw = value
     elif isinstance(value, list) and len(value) == 3:
@@ -313,7 +314,7 @@ def normalize_export_variants(config_or_settings: Any) -> list[ExportVariant]:
         for item in variants_data:
             try:
                 variant = item if isinstance(item, ExportVariant) else ExportVariant.model_validate(item)
-            except Exception:
+            except ValidationError:
                 continue
             if variant.id in seen_ids:
                 continue
@@ -349,7 +350,7 @@ class JobItem(BaseModel):
     """Represents a folder in the processing queue."""
     folder_path: str
     input_files: Optional[List[str]] = None
-    status: str = "pending"  # pending, processing, completed, error, cancelled
+    status: Literal["pending", "processing", "completed", "error", "cancelled"] = "pending"
     progress: int = 0
     total_images: int = 0
     processed_images: int = 0

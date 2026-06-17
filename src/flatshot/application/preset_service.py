@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -24,6 +25,7 @@ class PresetService:
     def __init__(self, config_dir: str | Path) -> None:
         self.config_dir = Path(config_dir)
         self.config_dir.mkdir(parents=True, exist_ok=True)
+        self._write_lock = threading.Lock()
 
     @property
     def presets_path(self) -> Path:
@@ -70,8 +72,9 @@ class PresetService:
             presets,
             missing_engine=SHADOW_ENGINE_COMPAT,
         )
-        self.save_categorized_presets(presets)
-        self.save_presets(self.get_flat_presets_from_categorized(presets))
+        with self._write_lock:
+            self.save_categorized_presets(presets)
+            self.save_presets(self.get_flat_presets_from_categorized(presets))
 
     def load_categorized_presets(self) -> CategorizedPresets:
         if self.categorized_presets_path.exists():

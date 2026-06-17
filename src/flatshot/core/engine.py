@@ -23,7 +23,6 @@ from flatshot.core.shadow.studio_2_5d import render_studio_2_5d
 from flatshot.core.shadow.types import RenderDiagnostics, ShadowRenderContext, ShadowRenderResult
 
 class ShadowEngine:
-    _noise_cache = {}
 
     @staticmethod
     def generar_ruido(width: int, height: int, intensidad: float) -> Optional[Image.Image]:

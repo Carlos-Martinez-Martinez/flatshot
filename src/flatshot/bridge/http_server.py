@@ -76,6 +76,8 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
                 raise MethodNotAllowedError("Use POST for /folders/pick.")
             elif path == "/preview/render":
                 raise MethodNotAllowedError("Use POST for /preview/render.")
+            elif path == "/preview/render-image":
+                raise MethodNotAllowedError("Use POST for /preview/render-image.")
             elif path.startswith("/exports/"):
                 raise MethodNotAllowedError("Use POST for this export endpoint.")
             else:
@@ -92,6 +94,9 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(self.server.service.scan_folders(self._read_json_body()))
             elif path == "/folders/pick":
                 self._send_json(self.server.service.pick_folder(self._read_json_body()))
+            elif path == "/preview/render-image":
+                mime_type, body, width, height, warning = self.server.service.render_preview_binary(self._read_json_body())
+                self._send_binary(body, content_type=mime_type, width=width, height=height, warning=warning)
             elif path == "/preview/render":
                 self._send_json(self.server.service.render_preview(self._read_json_body()))
             elif path == "/presets/save":
@@ -172,12 +177,26 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
         except CLIENT_DISCONNECT_ERRORS:
             return
 
-    def _send_binary(self, body: bytes, *, content_type: str, status: int = 200) -> None:
+    def _send_binary(self, body: bytes, *, content_type: str, status: int = 200, width: int | None = None, height: int | None = None, warning: str | None = None) -> None:
         try:
             self.send_response(status)
             self.send_header("Content-Type", content_type)
             self.send_header("Cache-Control", "no-store")
             self._send_cors_headers()
+            if width is not None:
+                self.send_header("X-FlatShot-Width", str(width))
+            if height is not None:
+                self.send_header("X-FlatShot-Height", str(height))
+            if warning:
+                self.send_header("X-FlatShot-Warning", warning)
+            expose_headers = []
+            if width is not None or height is not None:
+                expose_headers.append("X-FlatShot-Width")
+                expose_headers.append("X-FlatShot-Height")
+            if warning:
+                expose_headers.append("X-FlatShot-Warning")
+            if expose_headers:
+                self.send_header("Access-Control-Expose-Headers", ", ".join(expose_headers))
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)

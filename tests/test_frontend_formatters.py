@@ -57,6 +57,8 @@ assert.equal(helpers.capabilitiesSummary(null), "Sin comprobar");
 assert.equal(helpers.capabilitiesSummary({{ folderScan: true, presetsRead: true, previewRender: true, exportRun: true }}), "scan · presets · preview · export");
 assert.equal(helpers.capabilitiesSummary({{}}), "Sin capacidades activas");
 
+assert.equal(helpers.escapeHtml('<a&b"c>'), '&lt;a&amp;b&quot;c&gt;');
+
 const dataLabel = helpers.debugUrlLabel("data:image/png;base64,abc123");
 assert.equal(dataLabel, "data:image/png;base64...");
 assert.equal(helpers.debugUrlLabel("x".repeat(121)), "x".repeat(117) + "...");

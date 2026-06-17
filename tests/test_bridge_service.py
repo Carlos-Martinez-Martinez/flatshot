@@ -105,6 +105,7 @@ def test_bridge_health_app_info_and_capabilities(tmp_path):
         "presetsRead": True,
         "presetsWrite": True,
         "previewRender": True,
+        "previewRenderBinary": True,
         "thumbnailRender": True,
         "exportRun": True,
         "exportProgress": True,

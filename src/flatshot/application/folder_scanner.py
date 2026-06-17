@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable
+from typing import Callable, Iterable
 
 from PIL import Image, UnidentifiedImageError
 
@@ -25,13 +25,28 @@ IGNORED_SYSTEM_SUFFIXES = {
 class FolderScanner:
     """Scan selected source folders for PNG files and local override state."""
 
+    def __init__(
+        self,
+        progress_callback: Callable[[int, int], None] | None = None,
+    ) -> None:
+        self._progress_callback = progress_callback
+
     def scan_folders(
         self,
         folders: Iterable[str | Path],
         image_overrides: dict | None = None,
+        progress_callback: Callable[[int, int], None] | None = None,
     ) -> BatchScanResult:
+        cb = progress_callback if progress_callback is not None else self._progress_callback
         overrides = dict(image_overrides or {})
-        folder_results = [self._scan_folder(Path(folder), overrides) for folder in folders]
+        folder_list = list(folders)
+        total = len(folder_list)
+        folder_results: list[FolderScanResult] = []
+        for idx, folder in enumerate(folder_list):
+            result = self._scan_folder(Path(folder), overrides)
+            folder_results.append(result)
+            if cb is not None:
+                cb(idx + 1, total)
         errors = [error for result in folder_results for error in result.errors]
         total_images = sum(len(result.images) for result in folder_results)
         total_files = sum(result.files_found for result in folder_results)

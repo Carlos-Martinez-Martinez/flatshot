@@ -82,6 +82,7 @@ class FlatShotBridgeService:
         export_runner_factory: ExportRunnerFactory = ExportRunner,
         config_resolver: ConfigPathResolver | None = None,
         folder_picker: Callable[[Path | None], Path | None] | None = None,
+        max_concurrent_exports: int = 1,
     ) -> None:
         self.folder_scanner = folder_scanner or FolderScanner()
         self.preview_service = preview_service or PreviewService()
@@ -89,6 +90,7 @@ class FlatShotBridgeService:
         self.export_runner_factory = export_runner_factory
         self.config_resolver = config_resolver or ConfigPathResolver()
         self.folder_picker = folder_picker or pick_folder_with_tk
+        self.max_concurrent_exports = max_concurrent_exports
         self._jobs: dict[str, BridgeExportJob] = {}
         self._jobs_lock = threading.Lock()
 
@@ -252,6 +254,39 @@ class FlatShotBridgeService:
         elapsed_ms = int(round((perf_counter() - started) * 1000))
         return preview_result_to_dict(result, source_path=image_path, render_time_ms=elapsed_ms)
 
+    def render_preview_binary(self, payload: Mapping[str, Any]) -> tuple[str, bytes, int, int, str | None]:
+        if not isinstance(payload, Mapping):
+            raise InvalidRequestError("Expected a JSON object.")
+
+        image_path = self._preview_image_path(payload)
+        target_size = self._preview_target_size(payload)
+        settings = normalize_shadow_settings(
+            self._preview_settings(payload.get("settings", {})),
+            missing_engine=SHADOW_ENGINE_DEFAULT,
+        )
+        local_override = normalize_image_override(payload.get("localOverride", {}))
+        preview_settings = apply_image_override(settings, local_override)
+
+        try:
+            result = self.preview_service.render_preview(
+                PreviewRequest(
+                    image_path=image_path,
+                    settings=preview_settings,
+                    target_size=target_size,
+                    scale_factor=1.0,
+                    is_preview=True,
+                )
+            )
+        except BridgeError:
+            raise
+        except Exception as exc:
+            raise BridgeError("preview_failed", "No se pudo generar la preview.", status=422) from exc
+
+        image = Image.frombytes("RGB", (result.width, result.height), result.bytes_rgb)
+        buffer = BytesIO()
+        image.save(buffer, format="PNG")
+        return "image/png", buffer.getvalue(), result.width, result.height, result.warning
+
     def render_thumbnail(self, payload: Mapping[str, Any]) -> tuple[str, bytes]:
         if not isinstance(payload, Mapping):
             raise InvalidRequestError("Expected a JSON object.")
@@ -313,6 +348,19 @@ class FlatShotBridgeService:
             config,
         )
         job_id = uuid4().hex
+
+        with self._jobs_lock:
+            active_count = sum(
+                1 for job in self._jobs.values()
+                if job.status in {"queued", "running", "paused", "cancelling"}
+            )
+            if active_count >= self.max_concurrent_exports:
+                raise BridgeError(
+                    "export_busy",
+                    "Ya hay una exportación en curso. Espera a que termine o cancélala.",
+                    status=409,
+                )
+
         job = BridgeExportJob(
             job_id=job_id,
             requests=requests,

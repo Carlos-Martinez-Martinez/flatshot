@@ -20,13 +20,13 @@
     return basename(name).replace(/\.[^.\\/]+$/, "") || basename(name) || "Imagen";
   }
 
-  function escapeHtml(value) {
+  const escapeHtml = globalThis.FlatShotFormatters?.escapeHtml || function escapeHtml(value) {
     return String(value)
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;");
-  }
+  };
 
   function imageSearchText(image) {
     const name = String(image?.name || "");

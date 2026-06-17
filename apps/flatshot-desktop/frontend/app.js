@@ -406,14 +406,6 @@ function clampNumber(value, min, max, fallback) {
   return Math.min(max, Math.max(min, numeric));
 }
 
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
 function setTimer(callback, delay) {
   const timer = window.setTimeout(() => {
     timers.delete(timer);
@@ -2207,7 +2199,7 @@ function markPresetDirty(options = {}) {
 function refreshPreviewAfterSettingChange() {
   if (selectedImage()?.source === "bridge") {
     Object.assign(state, previewStateHelpers.previewLoadingState());
-    render();
+    renderAdjustmentResponse();
     clearTimers();
     setTimer(() => {
       const image = selectedImage();
@@ -2219,14 +2211,14 @@ function refreshPreviewAfterSettingChange() {
   }
   if (hasBatch() && state.previewStatus !== "error") {
     Object.assign(state, previewStateHelpers.previewLoadingState({ clearData: false }));
-    render();
+    renderAdjustmentResponse();
     clearTimers();
     setTimer(() => {
       Object.assign(state, previewStateHelpers.previewImageStatusState(selectedImage()?.status, { errorAsReady: true }));
-      render();
+      renderAdjustmentResponse();
     }, 420);
   } else {
-    render();
+    renderAdjustmentResponse();
   }
 }
 
@@ -2467,6 +2459,9 @@ function bridgeThumbnailUrl(path, size = 128) {
   return `${normalizedBridgeUrl()}/images/thumbnail?path=${encodeURIComponent(path)}&size=${encodeURIComponent(size)}`;
 }
 
+const BRIDGE_MAX_RETRIES = 3;
+const BRIDGE_RETRY_DELAY_MS = 500;
+
 async function bridgeRequest(path, options = {}) {
   const controller = new AbortController();
   const timeoutMs = options.timeoutMs || 3500;
@@ -2474,23 +2469,54 @@ async function bridgeRequest(path, options = {}) {
   const headers = options.body
     ? { "Content-Type": "application/json", ...(options.headers || {}) }
     : { ...(options.headers || {}) };
-  const { timeoutMs: _timeoutMs, ...fetchOptions } = options;
+  const { timeoutMs: _timeoutMs, retries: _retries, ...fetchOptions } = options;
 
-  try {
-    const response = await fetch(`${normalizedBridgeUrl()}${path}`, {
-      ...fetchOptions,
-      headers,
-      signal: controller.signal,
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.error?.message || `HTTP ${response.status}`);
+  const maxRetries = options.retries ?? BRIDGE_MAX_RETRIES;
+  let lastError = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (controller.signal.aborted) break;
+
+    try {
+      const response = await fetch(`${normalizedBridgeUrl()}${path}`, {
+        ...fetchOptions,
+        headers,
+        signal: controller.signal,
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error?.message || `HTTP ${response.status}`);
+      }
+      return payload;
+    } catch (err) {
+      lastError = err;
+      if (controller.signal.aborted) break;
+      if (attempt < maxRetries) {
+        const delay = BRIDGE_RETRY_DELAY_MS * Math.pow(2, attempt);
+        await new Promise((resolve) => { const id = window.setTimeout(resolve, delay); if (controller.signal) controller.signal.addEventListener("abort", () => { window.clearTimeout(id); resolve(); }, { once: true }); });
+      }
     }
-    return payload;
-  } finally {
-    window.clearTimeout(timer);
   }
+
+  window.clearTimeout(timer);
+  throw lastError || new Error("Bridge request failed");
 }
+
+function bridgeErrorMessage(error) {
+  if (error && error.name === "AbortError") {
+    return "La conexión local tardó demasiado. Verifica que FlatShot esté funcionando.";
+  }
+  const message = (error && error.message) ? String(error.message) : "";
+  if (message.startsWith("HTTP ")) {
+    return `Error del servidor local: ${message}`;
+  }
+  if (message) {
+    return `Conexión local no disponible: ${message}`;
+  }
+  return "Conexión local no disponible. Reinicia la aplicación.";
+}
+
+let _previewBlobUrl = null;
 
 async function requestBridgePreview(image) {
   const requestId = state.previewRequestId + 1;
@@ -2498,8 +2524,11 @@ async function requestBridgePreview(image) {
   Object.assign(state, previewStateHelpers.previewLoadingState());
   render();
 
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 20000);
+
   try {
-    const response = await bridgeRequest("/preview/render", {
+    const response = await fetch(`${normalizedBridgeUrl()}/preview/render-image`, {
       method: "POST",
       body: JSON.stringify({
         imagePath: image.path,
@@ -2507,19 +2536,49 @@ async function requestBridgePreview(image) {
         settings: bridgePreviewSettings(),
         localOverride: currentImageOverride(image),
       }),
-      timeoutMs: 20000,
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
     });
+    window.clearTimeout(timer);
 
     if (isStalePreviewResponse(requestId, image)) {
       return;
     }
 
-    Object.assign(state, previewStateHelpers.previewBridgeResultState(previewResponseToData(response), response.warning));
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error?.message || `HTTP ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    if (isStalePreviewResponse(requestId, image)) {
+      return;
+    }
+
+    if (_previewBlobUrl) {
+      URL.revokeObjectURL(_previewBlobUrl);
+    }
+    _previewBlobUrl = URL.createObjectURL(blob);
+
+    const previewData = {
+      src: _previewBlobUrl,
+      width: Number(response.headers.get("X-FlatShot-Width")) || 0,
+      height: Number(response.headers.get("X-FlatShot-Height")) || 0,
+      sourceName: image.name,
+      sourcePath: image.path,
+      warning: response.headers.get("X-FlatShot-Warning") || "",
+      renderTimeMs: 0,
+    };
+
+    Object.assign(state, previewStateHelpers.previewBridgeResultState(previewData, previewData.warning));
   } catch (error) {
+    window.clearTimeout(timer);
     if (isStalePreviewResponse(requestId, image)) {
       return;
     }
-    const message = bridgeErrorMessage(error);
+    const message = error.name === "AbortError"
+      ? "La vista tardó demasiado. Intenta de nuevo."
+      : bridgeErrorMessage(error);
     Object.assign(state, previewStateHelpers.previewErrorState(message));
   }
 
@@ -2885,13 +2944,6 @@ function formatBytes(bytes) {
   return formatterHelpers.formatBytes(bytes);
 }
 
-function bridgeErrorMessage(error) {
-  if (error?.name === "AbortError") {
-    return "La conexión local no responde";
-  }
-  return error?.message || "Conexión local no disponible";
-}
-
 function capabilitiesSummary(capabilities) {
   return formatterHelpers.capabilitiesSummary(capabilities);
 }
@@ -3008,6 +3060,18 @@ function render() {
   if (sessionSnapshotPersistenceEnabled) {
     writeSessionSnapshot();
   }
+}
+
+function renderAdjustmentResponse() {
+  renderPreview();
+  renderSettings();
+  renderBatch();
+  renderExport();
+  renderInspector();
+  renderTop();
+  syncRangeFillStyles();
+  syncOpenInspectorDisclosureHeights();
+  keepActiveThumbnailVisible();
 }
 
 function syncOpenInspectorDisclosureHeights() {

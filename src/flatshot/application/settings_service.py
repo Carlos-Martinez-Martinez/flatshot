@@ -55,9 +55,6 @@ DEFAULT_APP_SETTINGS: dict[str, Any] = {
     },
     "grid_columns": 3,
     "grid_folder_index": 0,
-    "background_pre_render": False,
-    "background_pre_render_cache_mb": 2048,
-    "background_pre_render_idle_ms": 8000,
 }
 
 

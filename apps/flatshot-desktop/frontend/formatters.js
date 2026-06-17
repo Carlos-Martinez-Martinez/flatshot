@@ -73,10 +73,23 @@
     return text.length > 120 ? `${text.slice(0, 117)}...` : text;
   }
 
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;");
+  }
+
+  if (typeof window !== "undefined") {
+    window.escapeHtml = escapeHtml;
+  }
+
   return {
     basename,
     capabilitiesSummary,
     debugUrlLabel,
+    escapeHtml,
     formatBytes,
     imageFileStem,
     imageFileType,

@@ -68,6 +68,8 @@ const output = helpers.batchDetailOutputHtml({{
   example: "camisa <azul>.jpg",
 }});
 assert.equal(output.includes('class="batch-detail-output"'), true);
+assert.equal(output.includes('class="batch-detail-output__main"'), true);
+assert.equal(output.includes('class="batch-detail-output__details"'), true);
 assert.equal(output.includes("<span>2.</span>"), true);
 assert.equal(output.includes('title="Web &lt;gris&gt;"'), true);
 assert.equal(output.includes("Web &lt;gris&gt;"), true);
@@ -116,9 +118,11 @@ const grid = helpers.batchDetailGridHtml({{
   issueRowsHtml: problem,
 }});
 assert.equal(grid.includes('batch-detail-grid batch-detail-grid--compact'), true);
-assert.equal(grid.includes("<h3>Resumen</h3>"), true);
+assert.equal(grid.includes('class="batch-detail-overview"'), true);
+assert.equal(grid.includes('class="batch-detail-metric"'), true);
+assert.equal(grid.includes("<span>Encontrados</span>"), true);
 assert.equal(grid.includes("<h3>Entrada</h3>"), true);
-assert.equal(grid.includes("<h3>Lote</h3>"), true);
+assert.equal(grid.includes("<h3>Lote</h3>"), false);
 assert.equal(grid.includes("<h3>Formatos activos</h3>"), true);
 assert.equal(grid.includes("<h3>Incidencias</h3>"), true);
 assert.equal(grid.includes("Entrada &lt;uno&gt;"), true);
@@ -129,6 +133,7 @@ assert.equal(grid.includes('class="batch-detail-problem warning"'), true);
 const emptyGrid = helpers.batchDetailGridHtml({{ counts: {{}} }});
 assert.equal(emptyGrid.includes("Sin formatos activos."), true);
 assert.equal(emptyGrid.includes("Sin incidencias."), true);
+assert.equal(emptyGrid.includes("batch-detail-secondary--single"), true);
 
 const folder = helpers.folderItemHtml({{
   name: "Carpeta <A>",

@@ -299,8 +299,8 @@ button.primary:hover:not(:disabled) {
 
 #batch-detail-modal:not(.is-hidden) {
   display: flex;
-  align-items: stretch;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: center;
 }
 
 #image-search-clear.is-visible {

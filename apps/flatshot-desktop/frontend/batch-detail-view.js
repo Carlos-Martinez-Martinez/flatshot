@@ -35,17 +35,31 @@
   `;
   }
 
+  function batchDetailMetricHtml(label, value, title = "") {
+    const text = value === null || value === undefined || value === "" ? "Pendiente" : String(value);
+    return `
+    <div class="batch-detail-metric">
+      <span>${escapeHtml(label)}</span>
+      <strong title="${escapeHtml(title || text)}">${escapeHtml(text)}</strong>
+    </div>
+  `;
+  }
+
   function batchDetailOutputHtml(options = {}) {
     const indexLabel = `${Number(options.index) + 1 || 1}.`;
     return `
     <div class="batch-detail-output">
-      <div class="batch-detail-output__title">
-        <span>${escapeHtml(indexLabel)}</span>
-        <strong title="${escapeHtml(options.name || "")}">${escapeHtml(options.name || "")}</strong>
+      <div class="batch-detail-output__main">
+        <div class="batch-detail-output__title">
+          <span>${escapeHtml(indexLabel)}</span>
+          <strong title="${escapeHtml(options.name || "")}">${escapeHtml(options.name || "")}</strong>
+        </div>
+        <div class="batch-detail-output__meta">${escapeHtml(options.summary || "")}</div>
       </div>
-      <div class="batch-detail-output__meta">${escapeHtml(options.summary || "")}</div>
-      ${batchDetailRowHtml("Destino", options.destination || "", options.destination || "")}
-      ${batchDetailRowHtml("Ejemplo", options.example || "", options.example || "")}
+      <div class="batch-detail-output__details">
+        ${batchDetailRowHtml("Destino", options.destination || "", options.destination || "")}
+        ${batchDetailRowHtml("Ejemplo", options.example || "", options.example || "")}
+      </div>
     </div>
   `;
   }
@@ -71,42 +85,37 @@
 
   function batchDetailGridHtml(options = {}) {
     const counts = options.counts || {};
+    const secondaryClass = options.ignoredSectionHtml ? "" : " batch-detail-secondary--single";
     return `
     <div class="batch-detail-grid batch-detail-grid--compact">
-      <section class="batch-detail-section">
-        <h3>Resumen</h3>
-        ${batchDetailRowHtml("Encontrados", options.files)}
-        ${batchDetailRowHtml("Exportables", counts.exportableImages)}
-        ${batchDetailRowHtml("Ignorados técnicos", counts.ignoredFiles)}
-        ${batchDetailRowHtml("Incidencias", options.issueCount)}
+      <section class="batch-detail-overview" aria-label="Resumen del lote">
+        ${batchDetailMetricHtml("Encontrados", options.files)}
+        ${batchDetailMetricHtml("Exportables", counts.exportableImages)}
+        ${batchDetailMetricHtml("Imágenes", options.valid)}
+        ${batchDetailMetricHtml("Ignorados", counts.ignoredFiles)}
+        ${batchDetailMetricHtml("Incidencias", options.issueCount)}
       </section>
 
-      <section class="batch-detail-section">
+      <section class="batch-detail-section batch-detail-section--input">
         <h3>Entrada</h3>
         ${batchDetailRowHtml("Carpeta", options.sourceFolderName, options.sourcePath)}
         ${batchDetailRowHtml("Ruta", options.sourcePath || "Pendiente", options.sourcePath)}
         ${batchDetailRowHtml("Imágenes", options.valid)}
-      </section>
-
-      <section class="batch-detail-section">
-        <h3>Lote</h3>
-        ${batchDetailRowHtml("Archivos", options.files)}
-        ${batchDetailRowHtml("Exportables", counts.exportableImages)}
-        ${batchDetailRowHtml("Excluidas", counts.nonExportableImages)}
         ${batchDetailRowHtml("Estado", options.stateTitle)}
       </section>
 
-      <section class="batch-detail-section">
+      <section class="batch-detail-section batch-detail-section--outputs">
         <h3>Formatos activos</h3>
         ${options.outputRowsHtml || '<span class="batch-detail-muted">Sin formatos activos.</span>'}
       </section>
 
-      ${options.ignoredSectionHtml || ""}
-
-      <section class="batch-detail-section">
-        <h3>Incidencias</h3>
-        ${options.issueRowsHtml || '<span class="batch-detail-muted">Sin incidencias.</span>'}
-      </section>
+      <div class="batch-detail-secondary${secondaryClass}">
+        ${options.ignoredSectionHtml || ""}
+        <section class="batch-detail-section batch-detail-section--issues">
+          <h3>Incidencias</h3>
+          ${options.issueRowsHtml || '<span class="batch-detail-muted">Sin incidencias.</span>'}
+        </section>
+      </div>
     </div>
   `;
   }

@@ -133,3 +133,16 @@ def test_css_audit_check_mode_passes_current_contract():
     )
 
     assert result.returncode == 0, result.stderr
+
+
+def test_advanced_disclosures_keep_content_sized_rows():
+    css = (
+        FRONTEND_DIR
+        / "css"
+        / "06-inspector-export"
+        / "advanced-local-overrides.css"
+    ).read_text(encoding="utf-8")
+
+    assert "overflow-y: auto" in css
+    assert "flex: 1 1 auto" not in css
+    assert "height: 100%" not in css

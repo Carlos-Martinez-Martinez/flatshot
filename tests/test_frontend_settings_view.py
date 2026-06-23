@@ -85,22 +85,25 @@ def test_studio_lighting_panel_css_keeps_active_preset_filled_and_unclipped():
         "{ max-height: none; overflow: visible; }"
     ) in css
     assert ".settings-panel.is-advanced-subview {" in css
-    assert "overflow: hidden" in css.split(".settings-panel.is-advanced-subview {", 1)[1].split("}", 1)[0]
+    panel_rule = css.split(".settings-panel.is-advanced-subview {", 1)[1].split("}", 1)[0]
+    assert "overflow-x: hidden" in panel_rule
+    assert "overflow-y: auto" in panel_rule
     open_rule = css.split(
         '.settings-panel.is-advanced-subview details.inspector-disclosure'
         '[data-inspector-section="advanced"][open]:not(.preset-section) {',
         1,
     )[1].split("}", 1)[0]
-    assert "flex: 1 1 auto" in open_rule
-    assert "grid-template-rows: auto minmax(0, 1fr)" in open_rule
+    assert "flex: 0 0 auto" in open_rule
+    assert "display: block" in open_rule
+    assert "grid-template-rows" not in open_rule
     body_rule = css.split(
         '.settings-panel.is-advanced-subview details.inspector-disclosure'
         '[data-inspector-section="advanced"][open]:not(.preset-section) .inspector-disclosure__body {',
         1,
     )[1].split("}", 1)[0]
-    assert "height: 100%" in body_rule
-    assert "overflow-y: auto" in body_rule
-    assert "overflow-x: hidden" in body_rule
+    assert "height: auto" in body_rule
+    assert "align-content: start" in body_rule
+    assert "overflow: visible" in body_rule
     assert (
         '.settings-panel details.inspector-disclosure[data-inspector-section="advanced"]:not([open]) '
         "{ min-height: 54px; overflow: hidden; }"

@@ -48,6 +48,31 @@ button:not(.image-item):not(.preset-chip):not(.output-profile-edit) {
   line-height: 1;
 }
 
+.button-icon {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.button-icon svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.button-icon--fill svg {
+  fill: currentColor;
+  stroke: none;
+}
+
 button, .status-dot, .asset-state, .preflight-chip, .change-chip, .state-chip, .empty-output-chip {
   user-select: none;
 }

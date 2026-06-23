@@ -69,11 +69,16 @@
 
           <div class="top-actions">
             <span class="preflight-chip" id="top-preflight-status" hidden>Exportación bloqueada</span>
-            <button type="button" class="primary top-export" id="top-primary-action" data-action="primary">Seleccionar carpeta</button>
-            <button type="button" class="top-secondary-action" id="top-secondary-action" data-action="secondary-primary" hidden></button>
-            <button type="button" class="top-format-action" data-action="open-app-settings">Formatos</button>
-            <button type="button" class="top-folder-action" data-action="pick-bridge-folder">Carpeta</button>
-            <button type="button" class="top-reset-action" data-action="clear-batch">Nuevo lote</button>
+            <div class="top-action-cluster top-action-cluster--batch" aria-label="Importación">
+              <button type="button" class="top-folder-action" data-action="pick-bridge-folder" data-icon="folder-open"><span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 6.5A2.5 2.5 0 0 1 5.5 4H10l2 2.5h6.5A2.5 2.5 0 0 1 21 9v8.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"></path><path d="M3 10h18"></path></svg></span>Carpeta</button>
+            </div>
+            <div class="top-action-cluster top-action-cluster--config" aria-label="Exportación">
+              <button type="button" class="top-format-action" data-action="open-app-settings" data-icon="sliders"><span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h8M16 7h4M4 17h4M12 17h8"></path><path d="M12 5v4M8 15v4"></path></svg></span>Formatos</button>
+            </div>
+            <div class="top-action-cluster top-action-cluster--run" aria-label="Procesamiento">
+              <button type="button" class="top-secondary-action" id="top-secondary-action" data-action="secondary-primary" hidden></button>
+              <button type="button" class="primary top-export" id="top-primary-action" data-action="primary">Seleccionar carpeta</button>
+            </div>
             <button type="button" data-action="toggle-inspector">Diagnóstico</button>
             <details class="debug-panel" id="debug-panel">
               <summary>Debug</summary>

@@ -105,35 +105,6 @@
   display: none;
 }
 
-.top-secondary-action {
-  color: var(--color-text);
-}
-
-.top-secondary-action[hidden] {
-  display: none !important;
-}
-
-.top-format-action, .top-detail-action, .top-folder-action, .top-reset-action, #top-secondary-action {
-  min-height: var(--control-h-compact);
-  border-color: transparent;
-  background: transparent;
-  color: var(--text-secondary);
-}
-
-.top-format-action:hover:not(:disabled), .top-detail-action:hover:not(:disabled), .top-folder-action:hover:not(:disabled), .top-reset-action:hover:not(:disabled), #top-secondary-action:hover:not(:disabled) {
-  border-color: var(--border-default);
-  background: var(--surface-muted);
-  color: var(--text-primary);
-}
-
-.app-shell[data-ui-state="scanning"] .top-format-action, .app-shell[data-ui-state="scanning"] .top-detail-action, .app-shell[data-ui-state="scanning"] .top-folder-action, .app-shell[data-ui-state="scanning"] .top-reset-action, .app-shell[data-ui-state="scanning"] #top-secondary-action {
-  display: none;
-}
-
-.app-shell[data-ui-state="no_folder"] .top-folder-action, .app-shell[data-ui-state="no_folder"] .top-reset-action {
-  display: none;
-}
-
 .app-shell[data-ui-state="ready_with_omitted"] .top-export, .app-shell[data-ui-state="ready_with_warnings"] .top-export {
   border-color: var(--semantic-primary);
   background: var(--semantic-primary);
@@ -150,14 +121,14 @@
   min-height: 36px;
   border-radius: var(--radius-md);
   padding-inline: 20px;
-  box-shadow: var(--shadow-cta);
+  box-shadow: none;
   font-size: var(--font-size-base);
   font-weight: 700;
 }
 
 #top-primary-action.top-export:hover:not(:disabled) {
-  box-shadow: 0 14px 28px rgba(15, 143, 114, 0.22);
-  transform: translateY(-1px);
+  box-shadow: none;
+  transform: none;
 }
 
 .top-bar {
@@ -189,14 +160,14 @@
   min-width: 194px;
   min-height: 42px;
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-cta);
+  box-shadow: none;
   font-size: var(--font-size-base);
   font-weight: 700;
 }
 
 .top-export:hover:not(:disabled) {
-  box-shadow: 0 14px 28px rgba(15, 143, 114, 0.22);
-  transform: translateY(-1px);
+  box-shadow: none;
+  transform: none;
 }
 
 .app-shell[data-ui-state="no_folder"] .top-actions {
@@ -216,11 +187,11 @@
   height: 32px;
 }
 
-.top-export, .top-format-action, .top-folder-action, .top-reset-action, .top-secondary-action, .top-more-menu > summary {
+.top-export, .top-format-action, .top-folder-action, .top-secondary-action, .top-more-menu > summary {
   min-height: var(--control-height);
 }
 
-.top-format-action, .top-folder-action, .top-reset-action, .top-secondary-action, .top-more-menu > summary {
+.top-format-action, .top-folder-action, .top-secondary-action, .top-more-menu > summary {
   min-height: 34px;
   font-weight: 500;
   box-shadow: none;
@@ -229,13 +200,13 @@
   color: var(--color-muted);
 }
 
-.top-format-action:hover:not(:disabled), .top-folder-action:hover:not(:disabled), .top-reset-action:hover:not(:disabled), .top-secondary-action:hover:not(:disabled), .top-more-menu > summary:hover {
+.top-format-action:hover:not(:disabled), .top-folder-action:hover:not(:disabled), .top-secondary-action:hover:not(:disabled), .top-more-menu > summary:hover {
   border-color: var(--color-border-strong);
-  background: var(--color-bg-soft);
+  background: var(--color-surface);
   color: var(--color-text);
 }
 
-.app-shell[data-ui-state="scanning"] .top-more-menu, .app-shell[data-ui-state="scanning"] .top-format-action, .app-shell[data-ui-state="scanning"] .top-folder-action, .app-shell[data-ui-state="scanning"] .top-reset-action {
+.app-shell[data-ui-state="scanning"] .top-more-menu, .app-shell[data-ui-state="scanning"] .top-format-action, .app-shell[data-ui-state="scanning"] .top-folder-action, .app-shell[data-ui-state="scanning"] .top-action-cluster--batch, .app-shell[data-ui-state="scanning"] .top-action-cluster--config {
   display: none;
 }
 
@@ -254,7 +225,7 @@
   display: none;
 }
 
-.top-export, .top-format-action, .top-folder-action, .top-reset-action, .top-secondary-action {
+.top-export, .top-format-action, .top-folder-action, .top-secondary-action {
   min-height: 36px;
   border-radius: var(--radius-sm);
   padding-inline: var(--space-4);
@@ -272,6 +243,11 @@
   gap: var(--space-2);
   overflow: hidden;
 }
+
+.top-action-cluster { flex: 0 0 auto; min-width: 0; min-height: 42px; display: inline-flex; align-items: center; gap: 4px; }
+.top-action-cluster--run { margin-inline-start: var(--space-2); }
+.top-action-cluster--batch, .top-action-cluster--config { padding: 0; }
+.top-action-cluster--config { margin-inline-start: var(--space-1); }
 
 #top-status-text {
   max-width: 520px;

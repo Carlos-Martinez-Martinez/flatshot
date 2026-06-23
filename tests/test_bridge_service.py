@@ -165,6 +165,37 @@ def test_bridge_save_preset_creates_persisted_config(tmp_path):
     assert (config_dir / PresetService.CATEGORIZED_PRESETS_FILE).exists()
 
 
+def test_bridge_ui_preferences_persist_between_service_instances(tmp_path):
+    config_dir = tmp_path / "config"
+    preferences = {
+        "outputProfiles": [
+            {
+                "id": "jpg_rgb230",
+                "name": "JPG gris claro",
+                "enabled": True,
+                "format": "JPG",
+                "width": 1800,
+                "height": 2400,
+                "background": "rgb230",
+                "destinationMode": "source",
+                "destinationValue": "Salida",
+                "naming": "{original}{suffix}",
+                "suffix": "_WEB",
+            }
+        ],
+        "activeOutputProfile": "jpg_rgb230",
+        "activeOutputFormats": ["jpg_rgb230"],
+        "exportPreferences": {"format": "JPG", "size": "1800x2400", "background": "rgb230"},
+    }
+
+    saved = _service(config_dir).save_ui_preferences(preferences)
+    loaded = _service(config_dir).load_ui_preferences()
+
+    assert saved["ok"] is True
+    assert loaded["source"] == "config"
+    assert loaded["preferences"] == preferences
+
+
 def test_bridge_delete_preset_persists_remaining_presets(tmp_path):
     preset_service = PresetService(tmp_path)
     categorized = preset_service.get_default_categorized_presets()

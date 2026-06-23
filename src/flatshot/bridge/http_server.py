@@ -59,6 +59,8 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(self.server.service.capabilities())
             elif path == "/presets":
                 self._send_json(self.server.service.list_presets())
+            elif path == "/ui/preferences":
+                self._send_json(self.server.service.load_ui_preferences())
             elif path == "/images/thumbnail":
                 query = parse_qs(parsed.query)
                 mime_type, body = self.server.service.render_thumbnail(
@@ -103,6 +105,8 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(self.server.service.save_preset(self._read_json_body()))
             elif path == "/presets/delete":
                 self._send_json(self.server.service.delete_preset(self._read_json_body()))
+            elif path == "/ui/preferences":
+                self._send_json(self.server.service.save_ui_preferences(self._read_json_body()))
             elif path == "/exports/prepare":
                 self._send_json(self.server.service.prepare_export(self._read_json_body()))
             elif path == "/exports/run":
@@ -114,7 +118,7 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
             elif _is_export_job_action_path(path, "cancel"):
                 self._send_json(self.server.service.cancel_export(_export_job_id(path)))
             else:
-                if path in {"/health", "/app-info", "/capabilities", "/presets"}:
+                if path in {"/health", "/app-info", "/capabilities", "/presets", "/ui/preferences"}:
                     raise MethodNotAllowedError("Use GET for this endpoint.")
                 if _is_export_job_status_path(path):
                     raise MethodNotAllowedError("Use GET for this endpoint.")

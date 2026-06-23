@@ -22,6 +22,7 @@ from flatshot.application.export_runner import (
 from flatshot.application.folder_scanner import FolderScanner
 from flatshot.application.preset_service import PresetService
 from flatshot.application.preview_service import PreviewService
+from flatshot.application.settings_service import SettingsService
 from flatshot.bridge import app_info as bridge_app_info
 from flatshot.bridge.errors import BridgeError, InvalidRequestError
 from flatshot.bridge.export_jobs import BridgeExportJob, ExportRunnerFactory
@@ -68,6 +69,7 @@ PREVIEW_SETTING_KEYS = {
     "transparent_bg",
     "bg_color",
 }
+UI_PREFERENCES_SETTINGS_KEY = "desktop_ui_preferences"
 
 
 class FlatShotBridgeService:
@@ -180,6 +182,41 @@ class FlatShotBridgeService:
         response = self.list_presets()
         response["ok"] = True
         response["activePreset"] = response["items"][0]["name"] if response.get("items") else None
+        return response
+
+    def load_ui_preferences(self) -> dict[str, Any]:
+        config_dir = self.config_resolver.config_dir(create=False)
+        warning = None
+        preferences: dict[str, Any] = {}
+
+        if config_dir.exists() and not config_dir.is_dir():
+            warning = "Config path is not a directory. UI preferences not loaded."
+        elif config_dir.exists():
+            settings = SettingsService(config_dir / "settings.json").load_existing(fallback={})
+            raw_preferences = settings.get(UI_PREFERENCES_SETTINGS_KEY, {})
+            if isinstance(raw_preferences, Mapping):
+                preferences = dict(raw_preferences)
+
+        response: dict[str, Any] = {
+            "ok": True,
+            "source": "config" if preferences else "defaults",
+            "preferences": preferences,
+        }
+        if warning:
+            response["warning"] = warning
+        return response
+
+    def save_ui_preferences(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+        if not isinstance(payload, Mapping):
+            raise InvalidRequestError("Expected a JSON object.")
+
+        service = self._writable_settings_service()
+        settings = service.load()
+        settings[UI_PREFERENCES_SETTINGS_KEY] = _json_compatible(payload)
+        service.save(settings)
+
+        response = self.load_ui_preferences()
+        response["ok"] = True
         return response
 
     def scan_folders(self, payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -559,6 +596,12 @@ class FlatShotBridgeService:
             raise BridgeError("config_path_invalid", "Config path is not a directory.", status=409)
         return PresetService(config_dir)
 
+    def _writable_settings_service(self) -> SettingsService:
+        config_dir = self.config_resolver.config_dir(create=False)
+        if config_dir.exists() and not config_dir.is_dir():
+            raise BridgeError("config_path_invalid", "Config path is not a directory.", status=409)
+        return SettingsService(config_dir / "settings.json")
+
 
 def pick_folder_with_tk(initial_path: Path | None = None) -> Path | None:
     try:
@@ -608,6 +651,16 @@ def _optional_string(value: Any) -> str | None:
         raise InvalidRequestError("Expected string value.")
     text = value.strip()
     return text or None
+
+
+def _json_compatible(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): _json_compatible(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_compatible(item) for item in value]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return str(value)
 
 
 def _required_string(value: Any, field_name: str) -> str:

@@ -127,6 +127,8 @@ let viewerResizeObserver = null;
 let inspectorScrollTopBeforeToggle = 0;
 let modalFocusReturnTarget = null;
 let sessionSnapshotPersistenceEnabled = false;
+let bridgeUiPreferencesSaveTimer = 0;
+let bridgeUiPreferencesRestored = false;
 let pendingAdvancedDisclosure = "";
 const inspectorDisclosureTimers = new WeakMap();
 const INSPECTOR_DISCLOSURE_MS = 220;
@@ -591,7 +593,8 @@ function readBackgroundPresets() {
 }
 
 function persistBackgroundPresets() {
-  window.localStorage.setItem(STORAGE_KEYS.backgroundPresets, JSON.stringify(state.backgroundPresets));
+  writePersistentJson(STORAGE_KEYS.backgroundPresets, state.backgroundPresets);
+  scheduleBridgeUiPreferencesSave();
 }
 
 function backgroundPresetValue(preset) {
@@ -789,14 +792,16 @@ function persistOutputProfiles() {
   writePersistentJson(STORAGE_KEYS.outputProfiles, state.outputProfiles);
   writePersistentValue(STORAGE_KEYS.activeOutputProfile, state.activeOutputProfileId);
   writePersistentJson(STORAGE_KEYS.activeOutputFormats, enabledOutputProfiles().map((profile) => profile.id));
-  persistExportPreferences();
+  persistExportPreferences({ saveBridge: false });
+  scheduleBridgeUiPreferencesSave(0);
 }
 
 function persistImageAdjustmentSelection() {
   writePersistentValue(STORAGE_KEYS.imageAdjustmentPreset, state.activePreset);
+  scheduleBridgeUiPreferencesSave();
 }
 
-function persistExportPreferences() {
+function persistExportPreferences(options = {}) {
   const preferences = {
     activeOutputProfileId: state.activeOutputProfileId,
     activeOutputFormatIds: enabledOutputProfiles().map((profile) => profile.id),
@@ -811,6 +816,175 @@ function persistExportPreferences() {
   writePersistentJson(STORAGE_KEYS.exportPreferences, preferences);
   if (String(state.destinationValue || "").trim()) {
     writePersistentValue(STORAGE_KEYS.lastOutputFolder, state.destinationValue);
+  }
+  if (options.saveBridge !== false) {
+    scheduleBridgeUiPreferencesSave();
+  }
+}
+
+function uiPreferencesPayload() {
+  return {
+    outputProfiles: state.outputProfiles,
+    backgroundPresets: state.backgroundPresets,
+    activeOutputProfile: state.activeOutputProfileId,
+    activeOutputFormats: enabledOutputProfiles().map((profile) => profile.id),
+    imageAdjustmentPreset: state.activePreset,
+    bridgeScanPath: state.bridgeScanPath,
+    lastOutputFolder: readPersistentValue(STORAGE_KEYS.lastOutputFolder),
+    exportPreferences: {
+      activeOutputProfileId: state.activeOutputProfileId,
+      activeOutputFormatIds: enabledOutputProfiles().map((profile) => profile.id),
+      destinationMode: state.destinationMode,
+      destinationValue: state.destinationValue,
+      format: state.format,
+      size: state.size,
+      background: state.background,
+      naming: state.naming,
+      suffix: state.suffix,
+    },
+  };
+}
+
+function cacheUiPreferences(preferences = uiPreferencesPayload()) {
+  const source = safeObject(preferences);
+  if (Array.isArray(source.outputProfiles)) {
+    writePersistentJson(STORAGE_KEYS.outputProfiles, source.outputProfiles);
+  }
+  if (Array.isArray(source.backgroundPresets)) {
+    writePersistentJson(STORAGE_KEYS.backgroundPresets, source.backgroundPresets);
+  }
+  if (source.activeOutputProfile !== undefined) {
+    writePersistentValue(STORAGE_KEYS.activeOutputProfile, source.activeOutputProfile);
+  }
+  if (Array.isArray(source.activeOutputFormats)) {
+    writePersistentJson(STORAGE_KEYS.activeOutputFormats, source.activeOutputFormats);
+  }
+  if (source.imageAdjustmentPreset !== undefined) {
+    writePersistentValue(STORAGE_KEYS.imageAdjustmentPreset, source.imageAdjustmentPreset);
+  }
+  if (source.bridgeScanPath !== undefined) {
+    writePersistentValue(STORAGE_KEYS.bridgeScanPath, source.bridgeScanPath);
+  }
+  if (source.lastOutputFolder !== undefined) {
+    writePersistentValue(STORAGE_KEYS.lastOutputFolder, source.lastOutputFolder);
+  }
+  if (source.exportPreferences && typeof source.exportPreferences === "object") {
+    writePersistentJson(STORAGE_KEYS.exportPreferences, source.exportPreferences);
+  }
+}
+
+function applyBridgeUiPreferences(preferences) {
+  const source = safeObject(preferences);
+  if (!Object.keys(source).length) {
+    return false;
+  }
+
+  const exportPreferences = safeObject(source.exportPreferences);
+  const activeFormatIds = Array.isArray(source.activeOutputFormats)
+    ? source.activeOutputFormats.map(String)
+    : Array.isArray(exportPreferences.activeOutputFormatIds)
+      ? exportPreferences.activeOutputFormatIds.map(String)
+      : null;
+  const activeProfileId = String(source.activeOutputProfile || exportPreferences.activeOutputProfileId || "");
+
+  if (Array.isArray(source.outputProfiles)) {
+    const normalized = normalizeOutputProfileList(source.outputProfiles, activeProfileId).map((profile) => (
+      activeFormatIds ? { ...profile, enabled: activeFormatIds.includes(profile.id) } : profile
+    ));
+    if (normalized.length) {
+      state.outputProfiles = normalized;
+    }
+  }
+
+  if (Array.isArray(source.backgroundPresets)) {
+    state.backgroundPresets = normalizeBackgroundPresetList(source.backgroundPresets);
+  }
+
+  const enabledProfiles = enabledOutputProfiles();
+  const activeProfile = state.outputProfiles.find((profile) => profile.id === activeProfileId && profile.enabled)
+    || enabledProfiles[0]
+    || state.outputProfiles.find((profile) => profile.id === activeProfileId)
+    || state.outputProfiles[0]
+    || defaultOutputProfiles[0];
+  state.activeOutputProfileId = activeProfile?.enabled ? activeProfile.id : enabledProfiles[0]?.id || "";
+  state.outputProfileEditorId = state.outputProfiles.some((profile) => profile.id === state.outputProfileEditorId)
+    ? state.outputProfileEditorId
+    : activeProfile?.id || state.outputProfiles[0]?.id || "";
+
+  const profileForDefaults = activeProfile || defaultOutputProfiles[0];
+  state.destinationMode = exportPreferences.destinationMode === "custom"
+    ? "custom"
+    : profileForDefaults.destinationMode;
+  state.destinationValue = String(
+    exportPreferences.destinationValue
+    || source.lastOutputFolder
+    || profileForDefaults.destinationValue
+    || (state.destinationMode === "custom" ? "" : "Salida")
+  );
+  state.format = normalizeExportFormat(exportPreferences.format || profileForDefaults.format);
+  state.size = parseOutputSize(exportPreferences.size || outputProfileSize(profileForDefaults)).normalized;
+  state.background = normalizeBackgroundValue(exportPreferences.background, profileForDefaults.background);
+  state.previewBg = state.background;
+  state.naming = String(exportPreferences.naming || profileForDefaults.naming || "{original}{suffix}");
+  state.suffix = exportPreferences.suffix === undefined || exportPreferences.suffix === null
+    ? profileForDefaults.suffix
+    : String(exportPreferences.suffix);
+
+  if (source.imageAdjustmentPreset !== undefined) {
+    state.activePreset = String(source.imageAdjustmentPreset || state.activePreset);
+  }
+  if (source.bridgeScanPath !== undefined) {
+    state.bridgeScanPath = String(source.bridgeScanPath || "");
+  }
+
+  state.exportStatus = isExportReady() ? "ready" : "blocked";
+  cacheUiPreferences(source);
+  return true;
+}
+
+function scheduleBridgeUiPreferencesSave(delayMs = 250) {
+  if (state.bridgeMode !== "bridge" || state.bridgeStatus === "disconnected") {
+    return;
+  }
+  window.clearTimeout(bridgeUiPreferencesSaveTimer);
+  bridgeUiPreferencesSaveTimer = window.setTimeout(() => {
+    bridgeUiPreferencesSaveTimer = 0;
+    void saveBridgeUiPreferences();
+  }, delayMs);
+}
+
+async function saveBridgeUiPreferences() {
+  if (state.bridgeMode !== "bridge" || state.bridgeStatus === "disconnected") {
+    return false;
+  }
+  try {
+    await bridgeRequest("/ui/preferences", {
+      method: "POST",
+      body: JSON.stringify(uiPreferencesPayload()),
+      timeoutMs: 5000,
+      retries: 1,
+    });
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+async function restoreBridgeUiPreferences(options = {}) {
+  if (options.skipSessionSnapshot && restoredSessionSnapshot) {
+    return false;
+  }
+  try {
+    const payload = await bridgeRequest("/ui/preferences", { timeoutMs: 5000, retries: 1 });
+    const restored = applyBridgeUiPreferences(payload.preferences);
+    bridgeUiPreferencesRestored = restored || bridgeUiPreferencesRestored;
+    if (restored) {
+      state.statusText = state.statusText === "Sin lote" ? "Ajustes restaurados" : state.statusText;
+      render();
+    }
+    return restored;
+  } catch (error) {
+    return false;
   }
 }
 
@@ -2639,6 +2813,9 @@ async function checkBridge() {
   try {
     const health = await bridgeRequest("/health");
     const capabilities = await bridgeRequest("/capabilities");
+    const uiPreferences = bridgeUiPreferencesRestored || restoredSessionSnapshot
+      ? null
+      : await bridgeRequest("/ui/preferences").catch(() => null);
     const presetPayload = await bridgeRequest("/presets");
     state.bridgeStatus = "connected";
     state.bridgeCapabilities = capabilities;
@@ -2650,6 +2827,10 @@ async function checkBridge() {
       state.scanIssues = [];
     }
     state.statusText = "Listo";
+    if (uiPreferences) {
+      applyBridgeUiPreferences(uiPreferences.preferences);
+      bridgeUiPreferencesRestored = true;
+    }
     applyBridgePresets(presetPayload);
   } catch (error) {
     const message = bridgeErrorMessage(error);
@@ -2804,6 +2985,7 @@ async function scanBridgeFolder() {
 
 function persistBridgeScanPath(path = parseFolderInput(state.bridgeScanPath)[0] || "") {
   writePersistentValue(STORAGE_KEYS.bridgeScanPath, path);
+  scheduleBridgeUiPreferencesSave();
 }
 
 function applyBridgeScanResult(response) {
@@ -8078,6 +8260,7 @@ if (restoredSessionSnapshot) {
   render();
 } else {
   setScenario("initial");
+  void restoreBridgeUiPreferences({ skipSessionSnapshot: true });
   restorePersistentBridgeSession();
 }
 window.addEventListener("flatshot:before-live-reload", writeSessionSnapshot);

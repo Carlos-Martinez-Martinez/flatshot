@@ -182,6 +182,24 @@ def test_bridge_http_presets_include_settings(tmp_path):
     assert data["items"][0]["settings"]["shadow_engine"] == "realistic_v2"
 
 
+def test_bridge_http_ui_preferences_round_trip(tmp_path):
+    preferences = {
+        "outputProfiles": [{"id": "png_transparent", "name": "PNG transparente", "enabled": True}],
+        "activeOutputProfile": "png_transparent",
+        "activeOutputFormats": ["png_transparent"],
+    }
+
+    with running_bridge(tmp_path / "config") as port:
+        save_status, saved = request_json(port, "POST", "/ui/preferences", preferences)
+        load_status, loaded = request_json(port, "GET", "/ui/preferences")
+
+    assert save_status == 200
+    assert saved["ok"] is True
+    assert load_status == 200
+    assert loaded["source"] == "config"
+    assert loaded["preferences"] == preferences
+
+
 def test_bridge_http_scan_folder(tmp_path):
     source = tmp_path / "source"
     source.mkdir()

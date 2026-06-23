@@ -20,6 +20,20 @@ def test_output_profile_helper_loads_before_app_script():
     assert helper_index < app_index
 
 
+def test_output_profiles_are_synced_with_bridge_ui_preferences():
+    app_js = (PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend" / "app.js").read_text(encoding="utf-8")
+
+    persist_start = app_js.index("function persistOutputProfiles()")
+    persist_end = app_js.index("function persistImageAdjustmentSelection()", persist_start)
+    persist_block = app_js[persist_start:persist_end]
+
+    assert "function applyBridgeUiPreferences(" in app_js
+    assert "function restoreBridgeUiPreferences(" in app_js
+    assert 'bridgeRequest("/ui/preferences")' in app_js
+    assert 'bridgeRequest("/ui/preferences", {' in app_js
+    assert "scheduleBridgeUiPreferencesSave(0);" in persist_block
+
+
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
 def test_output_profile_helpers_keep_export_contracts():
     script = f"""

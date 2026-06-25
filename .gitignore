@@ -51,6 +51,7 @@ htmlcov/
 # =========================
 # Local tool artifacts
 # =========================
+.worktrees/
 .playwright-cli/
 playwright-report/
 test-results/

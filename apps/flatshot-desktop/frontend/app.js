@@ -352,7 +352,11 @@ function restoreSessionSnapshot() {
     errors: [],
     paused: false,
     bridgeMode: "bridge",
-    bridgeUrl: String(restored.bridgeUrl || initialBridgeUrl || defaultBridgeUrl),
+    bridgeUrl: bridgeUrlHelpers.resolveRuntimeBridgeUrl({
+      currentBridgeUrl: initialBridgeUrl,
+      restoredBridgeUrl: restored.bridgeUrl,
+      defaultBridgeUrl,
+    }),
     bridgeStatus: restored.bridgeStatus === "connected" ? "connected" : "idle",
     bridgeMessage: String(restored.bridgeMessage || "Estado restaurado"),
     bridgeLastResponse: String(restored.bridgeLastResponse || "Estado restaurado tras recarga"),

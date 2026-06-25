@@ -1,178 +1,94 @@
 # FlatShot
 
-FlatShot is a local desktop tool for batch product-image processing. The active
-interface is the modern web/bridge desktop app in `apps/flatshot-desktop`; the
-Python package provides the image engine, application services, bridge and CLI.
+FlatShot prepara imágenes de producto por lotes desde tu propio equipo. Importa
+una carpeta, aplica un ajuste de aspecto y exporta copias finales sin modificar
+las imágenes originales.
 
-## Requirements
+## Cómo funciona
 
-- Python 3.10 or newer.
-- Dependencies: Pillow, numpy and pydantic.
-- A local browser for the desktop frontend.
+1. Eliges una carpeta con imágenes PNG.
+2. FlatShot crea el lote y muestra una vista previa.
+3. Seleccionas un ajuste de aspecto.
+4. Revisas la imagen seleccionada y posibles avisos del lote.
+5. Configuras la carpeta de destino.
+6. Procesas el lote y FlatShot guarda los archivos finales.
 
-No Node, Tauri, Rust, Electron, PyQt or qtawesome installation is required for
-the current local app.
+## Instalar
 
-## Install
+### Si tienes la versión portátil
 
-From the repository root:
-
-```bash
-python -m venv .venv
-.\.venv\Scripts\activate
-pip install -e .
-```
-
-On macOS/Linux:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
-```
-
-Installer helpers are available in `scripts/install.bat` and
-`scripts/install.sh`.
-
-## Run The Desktop App
-
-From the repository root:
-
-```bash
-python apps/flatshot-desktop/run_dev.py --open
-```
-
-On Windows you can also use:
-
-```bat
-scripts\run.bat
-```
-
-On macOS/Linux:
-
-```bash
-./scripts/run.sh
-```
-
-The runner starts:
-
-- frontend: `http://127.0.0.1:4173` when available;
-- bridge: `http://127.0.0.1:8765` when available.
-
-If either default port is busy, the runner automatically chooses the next free
-port and prints the final URL to open.
-
-## Portable
-
-Build or refresh the Windows portable folder:
-
-```powershell
-python scripts\build_portable.py
-```
-
-The generated portable lives in:
-
-```text
-release\FlatShotPortable
-```
-
-Run it with:
+No necesitas instalar nada. Abre:
 
 ```text
 release\FlatShotPortable\Abrir FlatShot.vbs
 ```
 
-The portable starts the bridge and frontend on `127.0.0.1`, choosing the next
-free ports if `8765` or `4173` are already busy. It opens FlatShot in its own
-desktop window through WebView2/pywebview, and falls back to the browser only if
-the native window cannot start. It stores portable data under
-`release\FlatShotPortable\data`, including settings, logs and render cache.
+FlatShot se abrirá en una ventana local. Si esa ventana no puede iniciarse, se
+abrirá en el navegador.
 
-When the portable remains inside `release\FlatShotPortable`, every launch checks
-the source repo in `source_path.txt` and auto-syncs changes from:
+### Si partes del proyecto
 
-- `src\flatshot`
-- `apps\flatshot-desktop\frontend`
+Necesitas Python 3.10 o superior.
 
-While the source repo is available, the portable window serves the frontend
-directly from `apps\flatshot-desktop\frontend` and reloads automatically when
-HTML, CSS or JS files change. The frontend stores a session snapshot before
-live reload so the current batch, selected image, filters, view mode, inspector
-tab and output controls are restored after the reload. Set
-`FLATSHOT_LIVE_RELOAD=0` before launching to force the copied portable frontend
-instead. Python bridge/core changes still need an app restart because modules
-are already loaded in the running process.
+En Windows:
 
-If `requirements.txt` or `pyproject.toml` changes, run
-`python scripts\build_portable.py` again so the portable virtual environment is
-updated.
-
-## Development URLs
-
-Typical full run:
-
-```bash
-python apps/flatshot-desktop/run_dev.py --open
+```bat
+scripts\install.bat
 ```
 
-Explicit ports:
+En macOS o Linux:
 
 ```bash
-python apps/flatshot-desktop/run_dev.py --bridge-port 8765 --frontend-port 4173
+./scripts/install.sh
 ```
 
-Frontend only:
+Cuando termine la instalación, abre FlatShot con:
+
+```bat
+scripts\run.bat
+```
+
+En macOS o Linux:
 
 ```bash
-python apps/flatshot-desktop/run_dev.py --no-bridge
+./scripts/run.sh
 ```
 
-Manual bridge run:
+## Crear la versión portátil
 
-```bash
-python apps/flatshot-desktop/bridge/run_bridge.py --host 127.0.0.1 --port 8765
+Desde la carpeta del proyecto:
+
+```powershell
+python scripts\build_portable.py
 ```
 
-## CLI
-
-The installed `flatshot` command remains available for automation:
-
-```bash
-flatshot list-presets
-flatshot process --input RUTA/DE/ENTRADA --preset "Luz cenital" --dry-run
-```
-
-Use `flatshot process --help` for all export options.
-
-## Project Structure
+La versión portátil se genera en:
 
 ```text
-apps/flatshot-desktop/
-  frontend/          # active desktop UI, static HTML/CSS/JS
-  bridge/            # source-checkout bridge launcher
-src/flatshot/
-  bridge/            # local HTTP bridge
-  application/       # reusable workflows and services
-  core/              # image/shadow engine, models, scaling, export helpers
-  utils/             # shared non-UI utilities
-tests/               # core, application, bridge, CLI and architecture tests
-docs/                # current architecture and UX documentation
+release\FlatShotPortable
 ```
 
-The retired Qt desktop surface has been removed. Keep new code out of deleted
-compatibility packages such as `flatshot.ui` and `flatshot.workers`.
+## Uso básico
 
-## Tests
+- Importa una carpeta con imágenes PNG.
+- Elige un ajuste de aspecto.
+- Ajusta el resultado si hace falta.
+- Revisa la vista previa y los avisos.
+- Elige la carpeta de destino.
+- Procesa el lote.
+
+## Qué conserva FlatShot
+
+- Las imágenes originales no se sobrescriben.
+- Los archivos exportados se guardan en la carpeta de destino configurada.
+- La exportación mantiene el comportamiento definido por la aplicación para
+  tamaño, formato, transparencia, calidad y nombre de archivo.
+
+## Comprobar el proyecto
 
 ```bash
 pytest
 ```
 
-For UI or bridge workflow changes, also launch the app and manually verify the
-affected flow with an empty folder and a folder containing PNG images.
-
-## Output Invariant
-
-Do not change exported image appearance, naming, destination behavior, format,
-quality/subsampling, transparency or DPI handling unless the task explicitly
-asks for it.
+Si cambia la interfaz o la exportación, abre FlatShot y revisa al menos una
+carpeta vacía y una carpeta con imágenes PNG.

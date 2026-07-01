@@ -51,6 +51,14 @@ class CollectingSink:
         self.events.append(event)
 
 
+class RecordingExecutor(InlineExecutor):
+    created_workers: list[int] = []
+
+    def __init__(self, max_workers=1):
+        super().__init__(max_workers=max_workers)
+        self.created_workers.append(max_workers)
+
+
 def _curve():
     return CurveData(xp=[0.0, 1.0], fp=[1.0, 1.0])
 
@@ -115,6 +123,18 @@ def test_export_runner_exports_one_png_to_subfolder(tmp_path):
     assert output.parent in result.destinations
     assert any(isinstance(event, ExportProgressEvent) and event.percent == 100 for event in sink.events)
     assert any(isinstance(event, ExportImageCompletedEvent) and event.success for event in sink.events)
+
+
+def test_export_runner_honors_configured_max_workers(tmp_path):
+    for index in range(4):
+        Image.new("RGBA", (8, 8), (120, 80, 40, 255)).save(tmp_path / f"source-{index}.png")
+    RecordingExecutor.created_workers = []
+    runner = ExportRunner(executor_factory=RecordingExecutor, max_workers=2)
+
+    result = runner.run(_request(tmp_path))
+
+    assert result.success
+    assert RecordingExecutor.created_workers == [2]
 
 
 def test_export_runner_exports_to_custom_destination(tmp_path):

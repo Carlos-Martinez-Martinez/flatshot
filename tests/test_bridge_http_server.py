@@ -17,7 +17,11 @@ from PIL import Image
 
 from flatshot.application.config_paths import ConfigPathResolver
 from flatshot.application.export_runner import ExportRunner
-from flatshot.bridge.http_server import FlatShotBridgeRequestHandler, create_server
+from flatshot.bridge.http_server import (
+    MAX_JSON_BODY_BYTES,
+    FlatShotBridgeRequestHandler,
+    create_server,
+)
 from flatshot.bridge.service import FlatShotBridgeService
 
 
@@ -469,6 +473,17 @@ def test_bridge_http_invalid_json_returns_json_error(tmp_path):
             "message": "Request body must be valid JSON.",
         },
     }
+
+
+def test_bridge_http_rejects_oversized_json_body(tmp_path):
+    payload = {"payload": "x" * (MAX_JSON_BODY_BYTES + 1)}
+
+    with running_bridge(tmp_path / "config") as port:
+        status, data = request_json(port, "POST", "/folders/scan", payload)
+
+    assert status == 413
+    assert data["ok"] is False
+    assert data["error"]["code"] == "payload_too_large"
 
 
 def test_bridge_http_thumbnail_rejects_path_traversal(tmp_path):

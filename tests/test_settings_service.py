@@ -57,6 +57,18 @@ def test_load_invalid_json_returns_defaults(tmp_path):
     assert settings == SettingsService.default_settings()
 
 
+def test_load_invalid_json_creates_backup_and_logs_warning(tmp_path, caplog):
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text("{invalid", encoding="utf-8")
+
+    settings = SettingsService(settings_file).load()
+
+    assert settings == SettingsService.default_settings()
+    backup = tmp_path / "settings.json.invalid"
+    assert backup.read_text(encoding="utf-8") == "{invalid"
+    assert any("Invalid settings file" in record.message for record in caplog.records)
+
+
 def test_load_existing_returns_fallback_for_missing_invalid_or_non_object_json(tmp_path):
     missing = SettingsService(tmp_path / "missing.json")
     assert missing.load_existing(fallback={}) == {}
@@ -91,6 +103,7 @@ def test_load_non_object_json_returns_defaults(tmp_path):
     settings = SettingsService(settings_file).load()
 
     assert settings == SettingsService.default_settings()
+    assert (tmp_path / "settings.json.invalid").exists()
 
 
 def test_save_writes_settings_file(tmp_path):

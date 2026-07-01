@@ -43,6 +43,24 @@ EXPORT_OUTPUT_COLLISION_MESSAGE = (
     "Hay archivos de salida repetidos o ya existentes. "
     "Cambia el destino, el sufijo o el patrón de nombre antes de exportar."
 )
+DEFAULT_MAX_EXPORT_WORKERS = 4
+MAX_EXPORT_WORKERS_ENV = "FLATSHOT_MAX_WORKERS"
+
+
+def resolve_export_max_workers(configured_max_workers: int | None = None) -> int:
+    """Return a bounded export worker count for high-resolution renders."""
+    if configured_max_workers is not None:
+        return max(1, int(configured_max_workers))
+
+    raw_env = os.environ.get(MAX_EXPORT_WORKERS_ENV)
+    if raw_env:
+        try:
+            return max(1, int(raw_env))
+        except ValueError:
+            pass
+
+    cpu_workers = max(1, (os.cpu_count() or 2) - 1)
+    return min(cpu_workers, DEFAULT_MAX_EXPORT_WORKERS)
 
 
 class OutputPathValidationError(ValueError):
@@ -348,6 +366,7 @@ class ExportRunner:
         executor_factory=ProcessPoolExecutor,
         image_processor: Callable = process_single_image,
         copy_file: Callable = shutil.copy2,
+        max_workers: int | None = None,
     ):
         self.event_sink = event_sink
         self.cancellation_token = cancellation_token or CancellationToken()
@@ -355,6 +374,7 @@ class ExportRunner:
         self.executor_factory = executor_factory
         self.image_processor = image_processor
         self.copy_file = copy_file
+        self.max_workers = max_workers
         self.executor = None
         self._snapshot_dir: Path | None = None
 
@@ -582,7 +602,7 @@ class ExportRunner:
         error_count: int,
         total: int,
     ) -> tuple[int, int]:
-        max_workers = max(1, (os.cpu_count() or 2) - 1)
+        max_workers = resolve_export_max_workers(self.max_workers)
         self._emit(ExportLogEvent(f"Procesando {len(tasks)} archivos restantes con {max_workers} núcleos..."))
 
         try:

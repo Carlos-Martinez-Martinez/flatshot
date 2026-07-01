@@ -86,8 +86,18 @@ release\FlatShotPortable
 
 ## Comprobar el proyecto
 
+Instala también las dependencias de desarrollo si vas a ejecutar la batería
+local completa:
+
 ```bash
-pytest
+python -m pip install -r requirements-dev.txt
+```
+
+```bash
+python -m pytest
+python -m ruff check .
+python scripts/audit_css.py --check
+python scripts/build_portable.py --skip-venv
 ```
 
 Si cambia la interfaz o la exportación, abre FlatShot y revisa al menos una

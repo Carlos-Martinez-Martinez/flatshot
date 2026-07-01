@@ -43,6 +43,7 @@ def test_build_portable_sync_stamp_separates_runtime_and_dependencies(tmp_path):
     assert stamp["dependency_hash"] == build_portable.dependency_manifest_hash(PROJECT_ROOT)
     assert stamp["portable_dependencies"] == list(build_portable.PORTABLE_DEPENDENCIES)
     assert stamp["dependency_status"] == "current"
+    assert stamp["python_version"].startswith(str(build_portable.sys.version_info.major))
 
 
 def test_source_manifest_tracks_backend_and_frontend_files():

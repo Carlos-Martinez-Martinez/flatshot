@@ -22,6 +22,7 @@
 }
 
 html:not(.dev-mode) .debug-panel,
+html:not(.dev-mode) .dev-only,
 html:not(.dev-mode) .review-panel,
 html:not(.dev-mode) .preview-debug,
 html:not(.dev-mode) [data-action="toggle-inspector"],

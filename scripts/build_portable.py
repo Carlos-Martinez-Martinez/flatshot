@@ -188,6 +188,7 @@ def write_sync_stamp(source_root: Path, target: Path) -> None:
                 "dependency_hash": dependency_manifest_hash(source_root),
                 "portable_dependencies": list(PORTABLE_DEPENDENCIES),
                 "dependency_status": "current",
+                "python_version": sys.version.split()[0],
                 "synced_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             },
             indent=2,

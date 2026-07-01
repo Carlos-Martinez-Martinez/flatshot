@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 import os
 import tempfile
 from pathlib import Path
@@ -11,6 +12,8 @@ from typing import Any, Mapping
 from flatshot.core.models import SHADOW_ENGINE_COMPAT, SHADOW_ENGINE_DEFAULT
 from flatshot.core.scaling import DEFAULT_SCALE_CURVE
 
+
+LOGGER = logging.getLogger(__name__)
 
 DEFAULT_APP_SETTINGS: dict[str, Any] = {
     "output_folder_name": "_SALIDA_PRO",
@@ -63,33 +66,48 @@ class SettingsService:
         self.settings_file = Path(settings_file)
 
     def load(self) -> dict[str, Any]:
-        if not self.settings_file.exists():
-            return self.default_settings()
-
-        try:
-            with self.settings_file.open("r", encoding="utf-8") as handle:
-                loaded = json.load(handle)
-        except Exception:
-            return self.default_settings()
-
-        if not isinstance(loaded, Mapping):
+        loaded = self._load_existing_mapping()
+        if loaded is None:
             return self.default_settings()
         return self.normalize(loaded)
 
     def load_existing(self, fallback: Mapping[str, Any] | None = None) -> dict[str, Any]:
         """Load settings only when an existing file contains a JSON object."""
-        if not self.settings_file.exists():
+        loaded = self._load_existing_mapping()
+        if loaded is None:
             return dict(fallback or {})
+        return self.normalize(loaded)
+
+    def _load_existing_mapping(self) -> Mapping[str, Any] | None:
+        if not self.settings_file.exists():
+            return None
 
         try:
             with self.settings_file.open("r", encoding="utf-8") as handle:
                 loaded = json.load(handle)
-        except Exception:
-            return dict(fallback or {})
+        except Exception as exc:
+            self._preserve_invalid_file("Invalid settings file", exc)
+            return None
 
         if not isinstance(loaded, Mapping):
-            return dict(fallback or {})
-        return self.normalize(loaded)
+            self._preserve_invalid_file("Invalid settings file is not a JSON object")
+            return None
+        return loaded
+
+    def _preserve_invalid_file(self, reason: str, exc: Exception | None = None) -> None:
+        backup_path = self.settings_file.with_name(f"{self.settings_file.name}.invalid")
+        try:
+            backup_path.write_bytes(self.settings_file.read_bytes())
+            LOGGER.warning("%s: %s. Backed up to %s.", reason, self.settings_file, backup_path)
+        except Exception as backup_exc:
+            LOGGER.warning(
+                "%s: %s. Could not create backup: %s.",
+                reason,
+                self.settings_file,
+                backup_exc,
+            )
+        if exc is not None:
+            LOGGER.debug("Settings load error", exc_info=exc)
 
     def save(self, settings: Mapping[str, Any]) -> None:
         self.settings_file.parent.mkdir(parents=True, exist_ok=True)

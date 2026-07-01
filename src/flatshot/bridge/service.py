@@ -32,6 +32,7 @@ from flatshot.bridge.serialization import (
     preview_result_to_dict,
     serialize_path,
 )
+from flatshot.bridge.validation import export_image_paths, preview_image_path
 from flatshot.core.models import ExportConfig, SHADOW_ENGINE_DEFAULT, normalize_shadow_settings
 from flatshot.core.overrides import apply_image_override, normalize_image_override
 from flatshot.core.scaling import find_subject_bbox
@@ -41,7 +42,6 @@ MAX_PREVIEW_SIDE = 1200
 DEFAULT_PREVIEW_SIDE = 900
 MAX_THUMBNAIL_SIDE = 320
 DEFAULT_THUMBNAIL_SIDE = 160
-SUPPORTED_PREVIEW_SUFFIXES = {".png"}
 PREVIEW_SETTING_ALIASES = {
     "transparentBg": "transparent_bg",
     "bgColor": "bg_color",
@@ -263,7 +263,7 @@ class FlatShotBridgeService:
         if not isinstance(payload, Mapping):
             raise InvalidRequestError("Expected a JSON object.")
 
-        image_path = self._preview_image_path(payload)
+        image_path = preview_image_path(payload)
         target_size = self._preview_target_size(payload)
         settings = normalize_shadow_settings(
             self._preview_settings(payload.get("settings", {})),
@@ -295,7 +295,7 @@ class FlatShotBridgeService:
         if not isinstance(payload, Mapping):
             raise InvalidRequestError("Expected a JSON object.")
 
-        image_path = self._preview_image_path(payload)
+        image_path = preview_image_path(payload)
         target_size = self._preview_target_size(payload)
         settings = normalize_shadow_settings(
             self._preview_settings(payload.get("settings", {})),
@@ -328,7 +328,7 @@ class FlatShotBridgeService:
         if not isinstance(payload, Mapping):
             raise InvalidRequestError("Expected a JSON object.")
 
-        image_path = self._preview_image_path(payload)
+        image_path = preview_image_path(payload)
         size = min(_positive_int(payload.get("size"), "size", default=DEFAULT_THUMBNAIL_SIDE), MAX_THUMBNAIL_SIDE)
 
         try:
@@ -430,21 +430,6 @@ class FlatShotBridgeService:
         return job.snapshot()
 
     @staticmethod
-    def _preview_image_path(payload: Mapping[str, Any]) -> Path:
-        raw_path = payload.get("imagePath")
-        if not isinstance(raw_path, str) or not raw_path.strip():
-            raise InvalidRequestError("Field 'imagePath' must be a non-empty path string.")
-
-        path = Path(raw_path).expanduser()
-        if not path.exists():
-            raise BridgeError("preview_file_not_found", "Imagen no encontrada.", status=404)
-        if not path.is_file():
-            raise InvalidRequestError("Field 'imagePath' must point to a file.")
-        if path.suffix.lower() not in SUPPORTED_PREVIEW_SUFFIXES:
-            raise BridgeError("unsupported_preview_file", "Formato de imagen no soportado.", status=415)
-        return path
-
-    @staticmethod
     def _preview_target_size(payload: Mapping[str, Any]) -> tuple[int, int]:
         width = _positive_int(payload.get("targetWidth"), "targetWidth", default=DEFAULT_PREVIEW_SIDE)
         height = _positive_int(payload.get("targetHeight"), "targetHeight", default=DEFAULT_PREVIEW_SIDE)
@@ -468,7 +453,7 @@ class FlatShotBridgeService:
         if not isinstance(payload, Mapping):
             raise InvalidRequestError("Expected a JSON object.")
 
-        image_paths = self._export_image_paths(payload.get("imagePaths"))
+        image_paths = export_image_paths(payload.get("imagePaths"))
         settings = normalize_shadow_settings(
             self._preview_settings(payload.get("settings", {})),
             missing_engine=SHADOW_ENGINE_DEFAULT,
@@ -514,25 +499,6 @@ class FlatShotBridgeService:
             validate_export_requests_outputs(requests)
         except OutputPathValidationError as exc:
             raise BridgeError("export_output_collision", str(exc), status=409) from exc
-
-    @staticmethod
-    def _export_image_paths(raw_paths: Any) -> list[Path]:
-        if not isinstance(raw_paths, list) or not raw_paths:
-            raise InvalidRequestError("Field 'imagePaths' must be a non-empty list of paths.")
-
-        paths: list[Path] = []
-        for index, raw_path in enumerate(raw_paths):
-            if not isinstance(raw_path, str) or not raw_path.strip():
-                raise InvalidRequestError(f"Field 'imagePaths[{index}]' must be a non-empty path string.")
-            path = Path(raw_path).expanduser()
-            if not path.exists():
-                raise BridgeError("export_file_not_found", "Imagen no encontrada.", status=404)
-            if not path.is_file():
-                raise InvalidRequestError(f"Field 'imagePaths[{index}]' must point to a file.")
-            if path.suffix.lower() != ".png":
-                raise BridgeError("unsupported_export_file", "Formato de exportación no soportado.", status=415)
-            paths.append(path)
-        return paths
 
     def _export_config(self, raw_export: Any) -> ExportConfig:
         if raw_export is None:

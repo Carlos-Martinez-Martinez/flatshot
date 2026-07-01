@@ -24,7 +24,7 @@ def test_topbar_groups_mixed_actions_by_task_type():
 def test_topbar_exposes_single_batch_entry_action():
     html = (FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
 
-    top_actions = html.split('<div class="top-actions">', 1)[1].split('<button type="button" data-action="toggle-inspector">', 1)[0]
+    top_actions = html.split('<div class="top-actions">', 1)[1].split('data-action="toggle-inspector"', 1)[0]
 
     assert top_actions.count('data-action="pick-bridge-folder"') == 1
     assert 'top-reset-action' not in top_actions
@@ -67,3 +67,13 @@ def test_primary_toolbar_controls_use_stable_icon_names():
     assert "button[data-icon]::before" not in buttons_css
     assert ".button-icon svg" in buttons_css
     assert 'class="button-icon' in html
+
+
+def test_dev_review_controls_are_hidden_outside_dev_mode():
+    html = (FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
+    debug_css = (FRONTEND_DIR / "css" / "03-components" / "dev-debug.css").read_text(encoding="utf-8")
+
+    assert '<button type="button" class="dev-only" data-action="toggle-inspector">Diagnóstico</button>' in html
+    assert '<details class="debug-panel dev-only" id="debug-panel">' in html
+    assert '<details class="review-panel dev-only">' in html
+    assert "html:not(.dev-mode) .dev-only" in debug_css

@@ -1,6 +1,7 @@
 from pathlib import Path
 from concurrent.futures import Future
 
+import numpy as np
 import pytest
 from PIL import Image, ImageDraw
 from PIL.JpegImagePlugin import get_sampling
@@ -67,20 +68,18 @@ def _assert_dpi_close(actual, expected=(300, 300)):
 
 def _has_grayscale_shadow(path: Path, bg: tuple[int, int, int]) -> bool:
     with Image.open(path) as img:
-        rgb = img.convert("RGB")
-        for pixel in rgb.getdata():
-            if pixel == bg:
-                continue
-            if not all(pixel[index] <= bg[index] for index in range(3)):
-                continue
-            if max(pixel) - min(pixel) <= 8:
-                return True
-    return False
+        arr = np.asarray(img.convert("RGB"), dtype=np.int16)
+    bg_arr = np.asarray(bg, dtype=np.int16)
+    differs_from_bg = np.any(arr != bg_arr, axis=2)
+    below_or_equal_bg = np.all(arr <= bg_arr, axis=2)
+    near_grayscale = (arr.max(axis=2) - arr.min(axis=2)) <= 8
+    return bool(np.any(differs_from_bg & below_or_equal_bg & near_grayscale))
 
 
 def _contains_background(path: Path, bg: tuple[int, int, int]) -> bool:
     with Image.open(path) as img:
-        return bg in set(img.convert("RGB").getdata())
+        arr = np.asarray(img.convert("RGB"), dtype=np.int16)
+    return bool(np.any(np.all(arr == np.asarray(bg, dtype=np.int16), axis=2)))
 
 
 def test_two_enabled_variants_with_different_suffixes_generate_distinct_paths(tmp_path):

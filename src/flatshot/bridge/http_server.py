@@ -22,6 +22,7 @@ DEFAULT_ALLOWED_ORIGINS = {
     "http://localhost:4173",
 }
 CLIENT_DISCONNECT_ERRORS = (BrokenPipeError, ConnectionAbortedError, ConnectionResetError)
+MAX_JSON_BODY_BYTES = 1_000_000
 
 
 class FlatShotBridgeHTTPServer(ThreadingHTTPServer):
@@ -150,6 +151,11 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
             length = int(raw_length)
         except ValueError as exc:
             raise BridgeError("invalid_request", "Invalid Content-Length.", status=400) from exc
+        if length < 0:
+            raise BridgeError("invalid_request", "Invalid Content-Length.", status=400)
+        if length > MAX_JSON_BODY_BYTES:
+            self.rfile.read(min(length, MAX_JSON_BODY_BYTES + 1))
+            raise BridgeError("payload_too_large", "Request body is too large.", status=413)
 
         raw_body = self.rfile.read(length) if length else b"{}"
         try:

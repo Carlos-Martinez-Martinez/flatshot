@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from itertools import pairwise
 from typing import Any, Mapping
 
 import numpy as np
@@ -45,7 +46,7 @@ def normalize_curve_data(curve: CurveData | Mapping[str, Any] | None) -> CurveDa
 
     xp = list(data.get("xp") or [])
     fp = list(data.get("fp") or [])
-    is_valid_pair = len(xp) >= 2 and len(xp) == len(fp) and all(x2 > x1 for x1, x2 in zip(xp, xp[1:]))
+    is_valid_pair = len(xp) >= 2 and len(xp) == len(fp) and all(x2 > x1 for x1, x2 in pairwise(xp))
 
     if not is_valid_pair:
         xp = list(DEFAULT_SCALE_CURVE["xp"])

@@ -1,22 +1,17 @@
 """Testable bridge service for the modern FlatShot desktop prototype."""
+
 from __future__ import annotations
 
-from io import BytesIO
-from pathlib import Path
 import threading
-from time import perf_counter
+from pathlib import Path
 from typing import Any, Callable, Mapping
-from uuid import uuid4
-
-from PIL import Image
 
 from flatshot.application.config_paths import ConfigPathResolver
-from flatshot.application.contracts import ExportJobRequest, PreviewRequest
+from flatshot.application.contracts import ExportJobRequest
 from flatshot.application.export_config_service import ExportConfigService
 from flatshot.application.export_runner import (
     ExportRunner,
     OutputPathValidationError,
-    get_enabled_export_variants,
     validate_export_requests_outputs,
 )
 from flatshot.application.folder_scanner import FolderScanner
@@ -24,52 +19,28 @@ from flatshot.application.preset_service import PresetService
 from flatshot.application.preview_service import PreviewService
 from flatshot.application.settings_service import SettingsService
 from flatshot.bridge import app_info as bridge_app_info
+from flatshot.bridge import export_endpoints, preferences, preset_endpoints, preview_endpoints
 from flatshot.bridge.errors import BridgeError, InvalidRequestError
 from flatshot.bridge.export_jobs import BridgeExportJob, ExportRunnerFactory
+from flatshot.bridge.payload_helpers import (
+    backgroundColorTuple,
+)
+from flatshot.bridge.payload_helpers import (
+    export_size as _export_size,
+)
+from flatshot.bridge.payload_helpers import (
+    optional_string as _optional_string,
+)
+from flatshot.bridge.payload_helpers import (
+    preview_settings as _preview_settings,
+)
 from flatshot.bridge.serialization import (
     batch_scan_result_to_dict,
-    categorized_presets_to_dict,
-    preview_result_to_dict,
     serialize_path,
 )
-from flatshot.bridge.validation import export_image_paths, preview_image_path
-from flatshot.core.models import ExportConfig, SHADOW_ENGINE_DEFAULT, normalize_shadow_settings
-from flatshot.core.overrides import apply_image_override, normalize_image_override
-from flatshot.core.scaling import find_subject_bbox
-
-
-MAX_PREVIEW_SIDE = 1200
-DEFAULT_PREVIEW_SIDE = 900
-MAX_THUMBNAIL_SIDE = 320
-DEFAULT_THUMBNAIL_SIDE = 160
-PREVIEW_SETTING_ALIASES = {
-    "transparentBg": "transparent_bg",
-    "bgColor": "bg_color",
-    "scaleAdjustment": "scale_adjustment",
-    "shadowEngine": "shadow_engine",
-    "contactBlur": "contact_blur",
-    "adaptiveZoom": "adaptive_zoom",
-    "lightingScene": "lighting_scene",
-}
-PREVIEW_SETTING_KEYS = {
-    "angle",
-    "distance",
-    "blur",
-    "spread",
-    "fusion",
-    "opacity",
-    "noise",
-    "padding",
-    "contact_blur",
-    "contraction",
-    "adaptive_zoom",
-    "scale_adjustment",
-    "shadow_engine",
-    "lighting_scene",
-    "transparent_bg",
-    "bg_color",
-}
-UI_PREFERENCES_SETTINGS_KEY = "desktop_ui_preferences"
+from flatshot.bridge.validation import export_image_paths
+from flatshot.core.models import SHADOW_ENGINE_DEFAULT, ExportConfig, normalize_shadow_settings
+from flatshot.core.overrides import normalize_image_override
 
 
 class FlatShotBridgeService:
@@ -110,114 +81,19 @@ class FlatShotBridgeService:
         return bridge_app_info.capabilities()
 
     def list_presets(self) -> dict[str, Any]:
-        config_dir = self.config_resolver.config_dir(create=False)
-        source = "defaults"
-        warning = None
-
-        if config_dir.exists() and not config_dir.is_dir():
-            categorized = PresetService.get_default_categorized_presets()
-            warning = "Config path is not a directory. Default presets returned."
-        elif config_dir.exists():
-            service = PresetService(config_dir)
-            if service.categorized_presets_path.exists():
-                categorized = service.load_categorized_presets()
-                source = "config"
-            elif service.presets_path.exists():
-                categorized = service.categorize_flat_presets(service.load_presets())
-                source = "legacy-config"
-            else:
-                categorized = PresetService.get_default_categorized_presets()
-        else:
-            categorized = PresetService.get_default_categorized_presets()
-
-        payload = categorized_presets_to_dict(categorized)
-        payload["source"] = source
-        if warning:
-            payload["warning"] = warning
-        return payload
+        return preset_endpoints.list_presets(self)
 
     def save_preset(self, payload: Mapping[str, Any]) -> dict[str, Any]:
-        if not isinstance(payload, Mapping):
-            raise InvalidRequestError("Expected a JSON object.")
-
-        name = _required_string(payload.get("name"), "name")
-        raw_settings = payload.get("settings")
-        if not isinstance(raw_settings, Mapping):
-            raise InvalidRequestError("Field 'settings' must be an object.")
-
-        try:
-            settings = normalize_shadow_settings(
-                self._preview_settings(raw_settings),
-                missing_engine=SHADOW_ENGINE_DEFAULT,
-            ).model_dump()
-        except Exception as exc:
-            raise InvalidRequestError("Field 'settings' contains invalid preset values.") from exc
-
-        service = self._writable_preset_service()
-        flat_presets = service.load_flat_presets()
-        updated = PresetService.save_current_preset(flat_presets, name, settings)
-        service.save_flat_presets_preserving_categories(updated)
-
-        response = self.list_presets()
-        response["ok"] = True
-        response["activePreset"] = name
-        return response
+        return preset_endpoints.save_preset(self, payload)
 
     def delete_preset(self, payload: Mapping[str, Any]) -> dict[str, Any]:
-        if not isinstance(payload, Mapping):
-            raise InvalidRequestError("Expected a JSON object.")
-
-        name = _required_string(payload.get("name"), "name")
-        service = self._writable_preset_service()
-        flat_presets = service.load_flat_presets()
-        if len(flat_presets) <= 1:
-            raise InvalidRequestError("At least one preset must remain.")
-
-        try:
-            updated = PresetService.delete_preset(flat_presets, name)
-        except ValueError as exc:
-            raise InvalidRequestError(str(exc)) from exc
-
-        service.save_flat_presets_preserving_categories(updated)
-        response = self.list_presets()
-        response["ok"] = True
-        response["activePreset"] = response["items"][0]["name"] if response.get("items") else None
-        return response
+        return preset_endpoints.delete_preset(self, payload)
 
     def load_ui_preferences(self) -> dict[str, Any]:
-        config_dir = self.config_resolver.config_dir(create=False)
-        warning = None
-        preferences: dict[str, Any] = {}
-
-        if config_dir.exists() and not config_dir.is_dir():
-            warning = "Config path is not a directory. UI preferences not loaded."
-        elif config_dir.exists():
-            settings = SettingsService(config_dir / "settings.json").load_existing(fallback={})
-            raw_preferences = settings.get(UI_PREFERENCES_SETTINGS_KEY, {})
-            if isinstance(raw_preferences, Mapping):
-                preferences = dict(raw_preferences)
-
-        response: dict[str, Any] = {
-            "ok": True,
-            "source": "config" if preferences else "defaults",
-            "preferences": preferences,
-        }
-        if warning:
-            response["warning"] = warning
-        return response
+        return preferences.load_ui_preferences(self)
 
     def save_ui_preferences(self, payload: Mapping[str, Any]) -> dict[str, Any]:
-        if not isinstance(payload, Mapping):
-            raise InvalidRequestError("Expected a JSON object.")
-
-        service = self._writable_settings_service()
-        settings = service.load()
-        settings[UI_PREFERENCES_SETTINGS_KEY] = _json_compatible(payload)
-        service.save(settings)
-
-        response = self.load_ui_preferences()
-        response["ok"] = True
-        return response
+        return preferences.save_ui_preferences(self, payload)
 
     def scan_folders(self, payload: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(payload, Mapping):
@@ -260,156 +136,19 @@ class FlatShotBridgeService:
         return {"ok": True, "selected": True, "path": serialize_path(selected)}
 
     def render_preview(self, payload: Mapping[str, Any]) -> dict[str, Any]:
-        if not isinstance(payload, Mapping):
-            raise InvalidRequestError("Expected a JSON object.")
-
-        image_path = preview_image_path(payload)
-        target_size = self._preview_target_size(payload)
-        settings = normalize_shadow_settings(
-            self._preview_settings(payload.get("settings", {})),
-            missing_engine=SHADOW_ENGINE_DEFAULT,
-        )
-        local_override = normalize_image_override(payload.get("localOverride", {}))
-        preview_settings = apply_image_override(settings, local_override)
-
-        started = perf_counter()
-        try:
-            result = self.preview_service.render_preview(
-                PreviewRequest(
-                    image_path=image_path,
-                    settings=preview_settings,
-                    target_size=target_size,
-                    scale_factor=1.0,
-                    is_preview=True,
-                )
-            )
-        except BridgeError:
-            raise
-        except Exception as exc:
-            raise BridgeError("preview_failed", "No se pudo generar la preview.", status=422) from exc
-
-        elapsed_ms = int(round((perf_counter() - started) * 1000))
-        return preview_result_to_dict(result, source_path=image_path, render_time_ms=elapsed_ms)
+        return preview_endpoints.render_preview(self, payload)
 
     def render_preview_binary(self, payload: Mapping[str, Any]) -> tuple[str, bytes, int, int, str | None]:
-        if not isinstance(payload, Mapping):
-            raise InvalidRequestError("Expected a JSON object.")
-
-        image_path = preview_image_path(payload)
-        target_size = self._preview_target_size(payload)
-        settings = normalize_shadow_settings(
-            self._preview_settings(payload.get("settings", {})),
-            missing_engine=SHADOW_ENGINE_DEFAULT,
-        )
-        local_override = normalize_image_override(payload.get("localOverride", {}))
-        preview_settings = apply_image_override(settings, local_override)
-
-        try:
-            result = self.preview_service.render_preview(
-                PreviewRequest(
-                    image_path=image_path,
-                    settings=preview_settings,
-                    target_size=target_size,
-                    scale_factor=1.0,
-                    is_preview=True,
-                )
-            )
-        except BridgeError:
-            raise
-        except Exception as exc:
-            raise BridgeError("preview_failed", "No se pudo generar la preview.", status=422) from exc
-
-        image = Image.frombytes("RGB", (result.width, result.height), result.bytes_rgb)
-        buffer = BytesIO()
-        image.save(buffer, format="PNG")
-        return "image/png", buffer.getvalue(), result.width, result.height, result.warning
+        return preview_endpoints.render_preview_binary(self, payload)
 
     def render_thumbnail(self, payload: Mapping[str, Any]) -> tuple[str, bytes]:
-        if not isinstance(payload, Mapping):
-            raise InvalidRequestError("Expected a JSON object.")
-
-        image_path = preview_image_path(payload)
-        size = min(_positive_int(payload.get("size"), "size", default=DEFAULT_THUMBNAIL_SIDE), MAX_THUMBNAIL_SIDE)
-
-        try:
-            with Image.open(image_path) as opened:
-                thumbnail = _thumbnail_canvas(opened.convert("RGBA"), size)
-        except BridgeError:
-            raise
-        except Exception as exc:
-            raise BridgeError("thumbnail_failed", "No se pudo generar la miniatura.", status=422) from exc
-
-        buffer = BytesIO()
-        thumbnail.save(buffer, format="PNG")
-        return "image/png", buffer.getvalue()
+        return preview_endpoints.render_thumbnail(self, payload)
 
     def prepare_export(self, payload: Mapping[str, Any]) -> dict[str, Any]:
-        requests, config = self._export_requests(payload)
-        self._validate_export_outputs(requests)
-        image_count = sum(len(request.input_files or []) for request in requests)
-        variants = get_enabled_export_variants(config)
-        destinations = self.export_config_service.destinations_for_folders(
-            [request.input_folder for request in requests],
-            config,
-        )
-        return {
-            "ok": True,
-            "sourceImages": image_count,
-            "totalOutputs": image_count * len(variants),
-            "destinations": [serialize_path(path) for path in destinations],
-            "activeVariants": [
-                {
-                    "id": variant.id,
-                    "label": variant.label,
-                    "format": variant.format or config.format,
-                    "outputWidth": variant.output_width or config.output_width,
-                    "outputHeight": variant.output_height or config.output_height,
-                    "destinationMode": variant.output_destination or config.output_destination,
-                    "outputFolderName": variant.output_folder_name or config.output_folder_name,
-                    "customOutputPath": variant.custom_output_path or config.custom_output_path,
-                    "namingTemplate": variant.naming_template or config.naming_template,
-                    "suffix": variant.suffix,
-                }
-                for variant in variants
-            ],
-            "errors": [],
-        }
+        return export_endpoints.prepare_export(self, payload)
 
     def start_export(self, payload: Mapping[str, Any]) -> dict[str, Any]:
-        requests, config = self._export_requests(payload)
-        self._validate_export_outputs(requests)
-        image_count = sum(len(request.input_files or []) for request in requests)
-        variants = get_enabled_export_variants(config)
-        destinations = self.export_config_service.destinations_for_folders(
-            [request.input_folder for request in requests],
-            config,
-        )
-        job_id = uuid4().hex
-
-        with self._jobs_lock:
-            active_count = sum(
-                1 for job in self._jobs.values()
-                if job.status in {"queued", "running", "paused", "cancelling"}
-            )
-            if active_count >= self.max_concurrent_exports:
-                raise BridgeError(
-                    "export_busy",
-                    "Ya hay una exportación en curso. Espera a que termine o cancélala.",
-                    status=409,
-                )
-
-        job = BridgeExportJob(
-            job_id=job_id,
-            requests=requests,
-            source_images=image_count,
-            total_outputs=image_count * len(variants),
-            destinations=destinations,
-            runner_factory=self.export_runner_factory,
-        )
-        with self._jobs_lock:
-            self._jobs[job_id] = job
-        job.start()
-        return job.snapshot()
+        return export_endpoints.start_export(self, payload)
 
     def export_status(self, job_id: str) -> dict[str, Any]:
         return self._job(job_id).snapshot()
@@ -429,33 +168,13 @@ class FlatShotBridgeService:
         job.cancel()
         return job.snapshot()
 
-    @staticmethod
-    def _preview_target_size(payload: Mapping[str, Any]) -> tuple[int, int]:
-        width = _positive_int(payload.get("targetWidth"), "targetWidth", default=DEFAULT_PREVIEW_SIDE)
-        height = _positive_int(payload.get("targetHeight"), "targetHeight", default=DEFAULT_PREVIEW_SIDE)
-        return min(width, MAX_PREVIEW_SIDE), min(height, MAX_PREVIEW_SIDE)
-
-    @staticmethod
-    def _preview_settings(raw_settings: Any) -> dict[str, Any]:
-        if raw_settings is None:
-            return {}
-        if not isinstance(raw_settings, Mapping):
-            raise InvalidRequestError("Field 'settings' must be an object when provided.")
-
-        settings: dict[str, Any] = {}
-        for key, value in raw_settings.items():
-            normalized_key = PREVIEW_SETTING_ALIASES.get(str(key), str(key))
-            if normalized_key in PREVIEW_SETTING_KEYS:
-                settings[normalized_key] = value
-        return settings
-
     def _export_requests(self, payload: Mapping[str, Any]) -> tuple[list[ExportJobRequest], ExportConfig]:
         if not isinstance(payload, Mapping):
             raise InvalidRequestError("Expected a JSON object.")
 
         image_paths = export_image_paths(payload.get("imagePaths"))
         settings = normalize_shadow_settings(
-            self._preview_settings(payload.get("settings", {})),
+            _preview_settings(payload.get("settings", {})),
             missing_engine=SHADOW_ENGINE_DEFAULT,
         )
         raw_image_overrides = payload.get("imageOverrides", {})
@@ -514,9 +233,11 @@ class FlatShotBridgeService:
         custom_output_path = _optional_string(raw_export.get("customOutputPath")) or (
             destination_value if output_destination == "custom" else None
         )
-        output_folder_name = _optional_string(raw_export.get("outputFolderName")) or (
-            destination_value if output_destination == "subfolder" else None
-        ) or "_SALIDA_PRO"
+        output_folder_name = (
+            _optional_string(raw_export.get("outputFolderName"))
+            or (destination_value if output_destination == "subfolder" else None)
+            or "_SALIDA_PRO"
+        )
 
         settings = {
             "format": raw_export.get("format", "JPG"),
@@ -594,90 +315,3 @@ def pick_folder_with_tk(initial_path: Path | None = None) -> Path | None:
         root.destroy()
 
     return Path(selected).expanduser() if selected else None
-
-
-def _positive_int(value: Any, field_name: str, *, default: int) -> int:
-    if value is None:
-        return default
-    if isinstance(value, bool):
-        raise InvalidRequestError(f"Field '{field_name}' must be a positive integer.")
-    try:
-        numeric = int(value)
-    except (TypeError, ValueError) as exc:
-        raise InvalidRequestError(f"Field '{field_name}' must be a positive integer.") from exc
-    if numeric <= 0:
-        raise InvalidRequestError(f"Field '{field_name}' must be a positive integer.")
-    return numeric
-
-
-def _optional_string(value: Any) -> str | None:
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        raise InvalidRequestError("Expected string value.")
-    text = value.strip()
-    return text or None
-
-
-def _json_compatible(value: Any) -> Any:
-    if isinstance(value, Mapping):
-        return {str(key): _json_compatible(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_json_compatible(item) for item in value]
-    if isinstance(value, (str, int, float, bool)) or value is None:
-        return value
-    return str(value)
-
-
-def _required_string(value: Any, field_name: str) -> str:
-    text = _optional_string(value)
-    if text is None:
-        raise InvalidRequestError(f"Field '{field_name}' must be a non-empty string.")
-    return text
-
-
-def _export_size(raw_export: Mapping[str, Any]) -> tuple[int, int]:
-    size = raw_export.get("size")
-    if isinstance(size, str):
-        normalized = size.lower().replace("×", "x")
-        parts = normalized.split("x", 1)
-        if len(parts) == 2:
-            return (
-                _positive_int(parts[0], "outputWidth", default=1800),
-                _positive_int(parts[1], "outputHeight", default=2400),
-            )
-
-    return (
-        _positive_int(raw_export.get("outputWidth"), "outputWidth", default=1800),
-        _positive_int(raw_export.get("outputHeight"), "outputHeight", default=2400),
-    )
-
-
-def backgroundColorTuple(value: str) -> tuple[int, int, int]:
-    if value == "white":
-        return (255, 255, 255)
-    return (230, 230, 230)
-
-
-def _thumbnail_subject(image: Image.Image) -> Image.Image:
-    bbox = find_subject_bbox(image)
-    if not bbox:
-        return image
-
-    left, top, right, bottom = bbox
-    if right <= left or bottom <= top:
-        return image
-    if (left, top, right, bottom) == (0, 0, image.width, image.height):
-        return image
-    return image.crop(bbox)
-
-
-def _thumbnail_canvas(image: Image.Image, size: int) -> Image.Image:
-    subject = _thumbnail_subject(image)
-    subject.thumbnail((size, size), Image.Resampling.LANCZOS)
-
-    thumbnail = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    left = (size - subject.width) // 2
-    top = (size - subject.height) // 2
-    thumbnail.alpha_composite(subject, (left, top))
-    return thumbnail

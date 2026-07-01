@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
 HELPER_PATH = FRONTEND_DIR / "output-profiles.js"
@@ -30,17 +29,14 @@ def test_output_profile_helper_loads_before_app_script():
 
 
 def test_output_profiles_are_synced_with_bridge_ui_preferences():
-    app_js = app_domain_source()
+    output_state = (FRONTEND_DIR / "app-output-profile-state.js").read_text(encoding="utf-8")
+    bridge_preferences = (FRONTEND_DIR / "app-bridge-ui-preferences.js").read_text(encoding="utf-8")
 
-    persist_start = app_js.index("function persistOutputProfiles()")
-    persist_end = app_js.index("function persistImageAdjustmentSelection()", persist_start)
-    persist_block = app_js[persist_start:persist_end]
-
-    assert "function applyBridgeUiPreferences(" in app_js
-    assert "function restoreBridgeUiPreferences(" in app_js
-    assert 'bridgeRequest("/ui/preferences")' in app_js
-    assert 'bridgeRequest("/ui/preferences", {' in app_js
-    assert "scheduleBridgeUiPreferencesSave(0);" in persist_block
+    assert "function applyBridgeUiPreferences(" in bridge_preferences
+    assert "function restoreBridgeUiPreferences(" in bridge_preferences
+    assert 'bridgeRequest("/ui/preferences", {' in bridge_preferences
+    assert bridge_preferences.count('bridgeRequest("/ui/preferences"') >= 2
+    assert "scheduleBridgeUiPreferencesSave(0);" in output_state
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")

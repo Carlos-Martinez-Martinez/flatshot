@@ -1,11 +1,14 @@
-from pathlib import Path
 import re
-
+import subprocess
+import sys
+from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend" / "app.js"
 INDEX_PATH = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend" / "index.html"
 FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
+APP_DOMAIN_SCRIPT_LIMIT = 400
+APP_RENDER_SCRIPT_LIMIT = 400
 
 
 def app_domain_source():
@@ -29,7 +32,17 @@ def test_app_domain_scripts_stay_bounded():
         path.name: len(path.read_text(encoding="utf-8").splitlines())
         for path in FRONTEND_DIR.glob("app-*.js")
         if path.name != "app-state.js"
-        and len(path.read_text(encoding="utf-8").splitlines()) > 1800
+        and len(path.read_text(encoding="utf-8").splitlines()) > APP_DOMAIN_SCRIPT_LIMIT
+    }
+
+    assert oversized == {}
+
+
+def test_app_render_scripts_are_focused_controllers():
+    oversized = {
+        path.name: len(path.read_text(encoding="utf-8").splitlines())
+        for path in FRONTEND_DIR.glob("app-render-*.js")
+        if len(path.read_text(encoding="utf-8").splitlines()) > APP_RENDER_SCRIPT_LIMIT
     }
 
     assert oversized == {}
@@ -55,24 +68,132 @@ def test_app_js_no_longer_contains_domain_sections():
 
 
 def test_app_domain_scripts_are_loaded_in_order():
-    html = INDEX_PATH.read_text(encoding="utf-8")
+    loader_source = (FRONTEND_DIR / "app-loader.js").read_text(encoding="utf-8")
 
     expected_order = [
+        "app-globals.js",
         "mock-data.js",
-        "app-core.js",
-        "app-workflow.js",
-        "app-bridge-export.js",
+        "app-state-selectors.js",
+        "app-preflight-state.js",
+        "app-export-readiness-state.js",
+        "app-visible-state.js",
+        "app-session-snapshot-controller.js",
+        "app-timer-controller.js",
+        "app-output-profile-storage.js",
+        "app-background-state.js",
+        "app-output-profile-state.js",
+        "app-export-preferences.js",
+        "app-bridge-ui-preferences.js",
+        "app-output-profile-apply.js",
+        "app-settings-preset-workflow.js",
+        "app-viewer-state.js",
+        "app-local-adjustment-workflow.js",
+        "app-gallery-selection-workflow.js",
+        "app-batch-workflow.js",
+        "app-bridge-api.js",
+        "app-bridge-preview-controller.js",
+        "app-export-controller.js",
+        "app-bridge-connection-controller.js",
+        "app-bridge-scan-controller.js",
+        "app-review-actions.js",
+        "app-inspector-disclosure-controller.js",
+        "app-shell.js",
+        "app-topbar-bridge.js",
+        "app-gallery-controller.js",
+        "app-thumbnail-controller.js",
+        "app-modal-render-controller.js",
+        "app-preview-controller.js",
+        "app-range-fill-controller.js",
+        "app-review-panel-controller.js",
+        "app-inspector-cards.js",
+        "app-contextual-inspector-controller.js",
+        "app-settings-panel-controller.js",
+        "app-inspector-layout-controller.js",
+        "app-background-preset-controller.js",
+        "app-output-profile-summary.js",
+        "app-output-profile-draft.js",
+        "app-output-profile-manager.js",
+        "app-output-profile-modal-renderer.js",
+        "app-modal-controller.js",
+        "app-export-view.js",
+        "app-preset-controller.js",
+        "app-footer-status-controller.js",
         "app-render-shell-gallery.js",
-        "app-render-preview-inspector.js",
-        "app-render-export-settings.js",
-        "app-actions.js",
+        "app-action-dispatcher.js",
+        "app-document-events.js",
+        "app-form-events.js",
+        "app-viewer-events.js",
         "app.js",
         "app-startup.js",
     ]
 
-    positions = [html.index(script) for script in expected_order]
+    positions = [loader_source.index(script) for script in expected_order]
 
     assert positions == sorted(positions)
+
+
+def test_app_domain_scripts_are_loaded_through_loader_only():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+    manual_app_scripts = [
+        match
+        for match in re.findall(r'<script src="\./(app-[^"?]+\.js)', html)
+        if match not in {"app-state.js", "app-loader.js"}
+    ]
+
+    assert manual_app_scripts == []
+
+
+def test_mock_data_does_not_own_helper_alias_globals():
+    source = (FRONTEND_DIR / "mock-data.js").read_text(encoding="utf-8")
+
+    forbidden_aliases = [
+        "global.storageHelpers =",
+        "global.numberHelpers =",
+        "global.bridgeUrlHelpers =",
+        "global.bridgeClientHelpers =",
+        "global.actionHandlerHelpers =",
+        "global.interactionBindingHelpers =",
+        "global.sessionSnapshotHelpers =",
+        "global.backgroundPresetHelpers =",
+        "global.appStateHelpers =",
+        "global.formatterHelpers =",
+        "global.outputProfileHelpers =",
+        "global.outputProfileViewHelpers =",
+        "global.exportPayloadHelpers =",
+        "global.exportStateHelpers =",
+        "global.exportSummaryViewHelpers =",
+        "global.exportResultViewHelpers =",
+        "global.exportPreflightViewHelpers =",
+        "global.topStatusViewHelpers =",
+        "global.preflightHelpers =",
+        "global.batchViewHelpers =",
+        "global.scanStateHelpers =",
+        "global.exportConfirmViewHelpers =",
+        "global.emptyStateViewHelpers =",
+        "global.batchDetailViewHelpers =",
+        "global.galleryHelpers =",
+        "global.previewViewHelpers =",
+        "global.previewStateHelpers =",
+        "global.settingsViewHelpers =",
+        "global.inspectorOutputViewHelpers =",
+        "global.inspectorReviewViewHelpers =",
+        "global.inspectorContextViewHelpers =",
+    ]
+
+    for alias in forbidden_aliases:
+        assert alias not in source
+
+
+def test_frontend_audit_check_mode_passes_current_contract():
+    result = subprocess.run(
+        [sys.executable, str(PROJECT_ROOT / "scripts" / "audit_frontend.py"), "--check"],
+        cwd=PROJECT_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_app_js_does_not_reintroduce_extracted_wrapper_helpers():

@@ -5,12 +5,11 @@ from pathlib import Path
 
 import pytest
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
 HELPER_PATH = FRONTEND_DIR / "background-presets.js"
 INDEX_PATH = FRONTEND_DIR / "index.html"
-MOCK_DATA_PATH = FRONTEND_DIR / "mock-data.js"
+APP_GLOBALS_PATH = FRONTEND_DIR / "app-globals.js"
 
 
 def test_background_preset_helper_loads_before_mock_data_and_app():
@@ -23,8 +22,8 @@ def test_background_preset_helper_loads_before_mock_data_and_app():
     assert helper_index < mock_data_index < app_index
 
 
-def test_mock_data_exposes_background_preset_helpers():
-    source = MOCK_DATA_PATH.read_text(encoding="utf-8")
+def test_app_globals_exposes_background_preset_helpers():
+    source = APP_GLOBALS_PATH.read_text(encoding="utf-8")
 
     assert "global.backgroundPresetHelpers = window.FlatShotBackgroundPresets;" in source
 

@@ -8,17 +8,17 @@ from pathlib import Path
 from time import time
 
 from flatshot.application.config_paths import ConfigPathResolver
+from flatshot.application.export_runner import apply_naming_template
 from flatshot.application.log_service import ActivityLogService
 from flatshot.application.preset_service import PresetService
 from flatshot.application.settings_service import SettingsService
-from flatshot.application.export_runner import apply_naming_template
 from flatshot.core.engine import ShadowEngine
 from flatshot.core.models import (
-    ExportConfig,
     SHADOW_ENGINE_COMPAT,
     SHADOW_ENGINE_LEGACY,
     SHADOW_ENGINE_REALISTIC_V2,
     SHADOW_ENGINE_STUDIO_2_5D,
+    ExportConfig,
     ShadowSettings,
     normalize_shadow_settings,
 )
@@ -50,7 +50,7 @@ def list_presets():
     print("\nAvailable Presets:\n")
     
     # Show by category
-    for cat_key, category in presets.categories.items():
+    for category in presets.categories.values():
         if category.presets:
             print(f"  [{category.name}]")
             for name in category.presets.keys():
@@ -234,7 +234,7 @@ def main():
     subparsers = parser.add_subparsers(dest="command", help="Commands")
     
     # List presets command
-    list_parser = subparsers.add_parser("list-presets", help="List available presets")
+    subparsers.add_parser("list-presets", help="List available presets")
     
     # Process command
     process_parser = subparsers.add_parser("process", help="Process images in a folder")

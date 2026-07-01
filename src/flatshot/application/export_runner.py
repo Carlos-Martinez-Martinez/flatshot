@@ -1,17 +1,15 @@
 """Qt-free export runner and export planning helpers."""
+
 from __future__ import annotations
 
 import os
 import shutil
 import tempfile
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
-from dataclasses import dataclass
 from pathlib import Path
 from time import time
 from typing import Callable, Protocol
 from uuid import uuid4
-
-from PIL import Image
 
 from flatshot.application.contracts import ExportJobRequest, ExportJobResult
 from flatshot.application.events import (
@@ -23,28 +21,31 @@ from flatshot.application.events import (
     ExportStartedEvent,
 )
 from flatshot.application.execution_control import CancellationToken, PauseToken
-from flatshot.core.engine import ShadowEngine
-from flatshot.core.models import (
-    CurveData,
-    ExportConfig,
-    ExportVariant,
-    SHADOW_ENGINE_DEFAULT,
-    build_variant_settings,
-    normalize_export_variants,
-    normalize_shadow_settings,
+from flatshot.application.export_naming import (
+    OutputPathValidationError,
+    validate_output_path_collisions,
 )
-from flatshot.core.overrides import apply_image_override, override_key
-from flatshot.application.export_config_service import (
-    variant_base_destination as variant_base_output_folder,
-    variant_output_folder,
+from flatshot.application.export_naming import (
+    apply_naming_template as apply_naming_template,
 )
+from flatshot.application.export_naming import (
+    build_variant_output_path as build_variant_output_path,
+)
+from flatshot.application.export_naming import (
+    get_enabled_export_variants as get_enabled_export_variants,
+)
+from flatshot.application.export_naming import (
+    validate_export_requests_outputs as validate_export_requests_outputs,
+)
+from flatshot.application.export_naming import (
+    variant_target_size as variant_target_size,
+)
+from flatshot.application.export_planning import ExportPlan as ExportPlan
+from flatshot.application.export_planning import ExportRenderTask, build_export_plan
+from flatshot.application.export_workers import copy_stable, process_single_image
+from flatshot.core.overrides import override_key
 from flatshot.utils.render_cache import RenderCache
 
-
-EXPORT_OUTPUT_COLLISION_MESSAGE = (
-    "Hay archivos de salida repetidos o ya existentes. "
-    "Cambia el destino, el sufijo o el patrón de nombre antes de exportar."
-)
 DEFAULT_MAX_EXPORT_WORKERS = 4
 MAX_EXPORT_WORKERS_ENV = "FLATSHOT_MAX_WORKERS"
 
@@ -65,403 +66,8 @@ def resolve_export_max_workers(configured_max_workers: int | None = None) -> int
     return min(cpu_workers, DEFAULT_MAX_EXPORT_WORKERS)
 
 
-class OutputPathValidationError(ValueError):
-    """Raised when planned export outputs are not safe to write."""
-
-
 class ExportEventSink(Protocol):
-    def emit(self, event: ExportEvent) -> None:
-        ...
-
-
-@dataclass
-class ExportRenderTask:
-    img_path: Path
-    key: str
-    fmt: str
-    save_path: Path
-    cache_path: Path
-    task_args: tuple
-    display_name: str
-
-
-@dataclass
-class ExportPlan:
-    source_total: int
-    total: int
-    enabled_variants: list[ExportVariant]
-    planned_outputs: list[dict]
-    render_tasks: list[ExportRenderTask]
-    cached_tasks: list[ExportRenderTask]
-
-
-def apply_naming_template(
-    template: str,
-    original_name: str,
-    suffix: str,
-    folder_name: str,
-    index: int,
-    variant_label: str = "",
-    variant_id: str = "",
-    bg: str = "",
-) -> str:
-    """
-    Apply naming template to generate output filename.
-
-    Supported placeholders:
-    - {original}: Original filename without extension
-    - {suffix}: The suffix from export config
-    - {folder}: Parent folder name
-    - {variant}: Output variant label
-    - {variant_id}: Output variant id
-    - {bg}: Output background as RRGGBB
-    - {index}: Zero-padded index (e.g., 001, 002)
-    - {index:03d}: Custom padding format
-    """
-    result = template
-    result = result.replace("{original}", original_name)
-    result = result.replace("{suffix}", suffix)
-    result = result.replace("{folder}", folder_name)
-    result = result.replace("{variant}", _safe_filename_token(variant_label))
-    result = result.replace("{variant_id}", _safe_filename_token(variant_id))
-    result = result.replace("{bg}", _safe_filename_token(bg))
-
-    if "{index:" in result:
-        import re
-
-        match = re.search(r"\{index:(\d+)d\}", result)
-        if match:
-            padding = int(match.group(1))
-            result = re.sub(r"\{index:\d+d\}", str(index).zfill(padding), result)
-    else:
-        result = result.replace("{index}", str(index).zfill(3))
-
-    return result
-
-
-def _safe_filename_token(value: str) -> str:
-    text = str(value or "").strip()
-    for char in '<>:"/\\|?*':
-        text = text.replace(char, "_")
-    text = "".join("_" if ord(ch) < 32 else ch for ch in text)
-    return text.strip(" .")
-
-
-def variant_bg_token(variant: ExportVariant) -> str:
-    return "{:02X}{:02X}{:02X}".format(*variant.bg_color)
-
-
-def get_enabled_export_variants(export_config: ExportConfig) -> list[ExportVariant]:
-    return [variant for variant in normalize_export_variants(export_config) if variant.enabled]
-
-
-def variant_export_format(export_config: ExportConfig, variant: ExportVariant) -> str:
-    return RenderCache.normalize_format(variant.format or export_config.format)
-
-
-def variant_naming_template(export_config: ExportConfig, variant: ExportVariant) -> str:
-    return variant.naming_template or export_config.naming_template
-
-
-def variant_target_size(export_config: ExportConfig, variant: ExportVariant) -> tuple[int, int]:
-    return (
-        int(variant.output_width or export_config.output_width),
-        int(variant.output_height or export_config.output_height),
-    )
-
-
-def build_variant_output_path(
-    base_output_folder: Path,
-    export_config: ExportConfig,
-    variant: ExportVariant,
-    original_name: str,
-    folder_name: str,
-    index: int,
-) -> tuple[Path, str]:
-    fmt = variant_export_format(export_config, variant)
-    output_folder = variant_output_folder(base_output_folder, variant)
-    base_name = apply_naming_template(
-        variant_naming_template(export_config, variant),
-        original_name,
-        variant.suffix,
-        folder_name,
-        index,
-        variant_label=variant.label,
-        variant_id=variant.id,
-        bg=variant_bg_token(variant),
-    )
-    return output_folder / f"{base_name}.{fmt}", fmt
-
-
-def _path_collision_key(path: Path) -> str:
-    return os.path.normcase(os.path.abspath(str(path)))
-
-
-def validate_output_path_collisions(planned_outputs: list[dict], *, check_existing: bool = True) -> None:
-    seen: dict[str, dict] = {}
-    for item in planned_outputs:
-        key = _path_collision_key(Path(item["save_path"]))
-        previous = seen.get(key)
-        if previous is None:
-            seen[key] = item
-            continue
-
-        current_variant = item["variant"]
-        previous_variant = previous["variant"]
-        if current_variant.id != previous_variant.id:
-            raise OutputPathValidationError(
-                f"{EXPORT_OUTPUT_COLLISION_MESSAGE} "
-                "Las variantes "
-                f"{previous_variant.label} y {current_variant.label} generarían el mismo archivo. "
-                "Cambia el sufijo o la subcarpeta."
-            )
-
-        raise OutputPathValidationError(
-            f"{EXPORT_OUTPUT_COLLISION_MESSAGE} "
-            f"Dos entradas generarían el mismo archivo: {Path(item['save_path']).name}. "
-            "Cambia la plantilla de nombre, el sufijo o la subcarpeta."
-        )
-
-    if not check_existing:
-        return
-
-    for item in planned_outputs:
-        save_path = Path(item["save_path"])
-        try:
-            exists = save_path.exists()
-        except OSError as exc:
-            raise OutputPathValidationError(
-                f"{EXPORT_OUTPUT_COLLISION_MESSAGE} "
-                f"No se pudo comprobar la salida {save_path.name}."
-            ) from exc
-        if exists:
-            raise OutputPathValidationError(
-                f"{EXPORT_OUTPUT_COLLISION_MESSAGE} "
-                f"Ya existe una salida llamada {save_path.name}."
-            )
-
-
-def planned_output_paths_for_request(request: ExportJobRequest) -> list[dict]:
-    """Plan the output paths for a single request without touching the filesystem."""
-    if request.input_files is not None:
-        image_paths = [Path(p) for p in request.input_files]
-        image_paths = [p for p in image_paths if p.is_file() and p.suffix.lower() == ".png"]
-    else:
-        image_paths = [
-            path
-            for path in request.input_folder.iterdir()
-            if path.is_file() and path.suffix.lower() == ".png"
-        ]
-
-    enabled_variants = get_enabled_export_variants(request.export_config)
-    parent_folder_name = request.input_folder.name
-    planned_outputs: list[dict] = []
-
-    for index, img_path in enumerate(sorted(image_paths, key=lambda path: path.name), start=1):
-        for variant in enabled_variants:
-            base_output_folder = variant_base_output_folder(
-                request.input_folder,
-                request.export_config,
-                variant,
-            )
-            save_path, fmt = build_variant_output_path(
-                base_output_folder,
-                request.export_config,
-                variant,
-                img_path.stem,
-                parent_folder_name,
-                index,
-            )
-            planned_outputs.append(
-                {
-                    "save_path": save_path,
-                    "variant": variant,
-                    "image_path": img_path,
-                    "format": fmt,
-                    "input_folder": request.input_folder,
-                }
-            )
-
-    return planned_outputs
-
-
-def planned_output_paths_for_requests(requests: list[ExportJobRequest]) -> list[dict]:
-    planned_outputs: list[dict] = []
-    for request in requests:
-        planned_outputs.extend(planned_output_paths_for_request(request))
-    return planned_outputs
-
-
-def validate_export_requests_outputs(
-    requests: list[ExportJobRequest],
-    *,
-    check_existing: bool = True,
-) -> list[dict]:
-    planned_outputs = planned_output_paths_for_requests(requests)
-    validate_output_path_collisions(planned_outputs, check_existing=check_existing)
-    return planned_outputs
-
-
-def build_export_plan(
-    request: ExportJobRequest,
-    image_items: list[tuple[Path, str, Path]],
-    cache: RenderCache,
-) -> ExportPlan:
-    enabled_variants = get_enabled_export_variants(request.export_config)
-    curve_data_dict = request.curve_data.model_dump() if request.curve_data else None
-    parent_folder_name = request.input_folder.name
-    render_tasks: list[ExportRenderTask] = []
-    cached_tasks: list[ExportRenderTask] = []
-    planned_outputs: list[dict] = []
-
-    for index, (img_path, local_key, cache_identity_path) in enumerate(
-        sorted(image_items, key=lambda item: item[0].name),
-        start=1,
-    ):
-        local_override = dict(request.image_overrides or {}).get(local_key, {})
-
-        for variant in enabled_variants:
-            variant_settings = build_variant_settings(request.settings, variant)
-            settings_dict = variant_settings.model_dump()
-            target_size = variant_target_size(request.export_config, variant)
-            variant_base_folder = variant_base_output_folder(
-                request.input_folder,
-                request.export_config,
-                variant,
-            )
-            save_path, fmt = build_variant_output_path(
-                variant_base_folder,
-                request.export_config,
-                variant,
-                img_path.stem,
-                parent_folder_name,
-                index,
-            )
-            display_name = f"{img_path.name} · {variant.label}"
-            task_args = (
-                img_path,
-                save_path,
-                settings_dict,
-                target_size,
-                fmt,
-                curve_data_dict,
-                local_override,
-                display_name,
-            )
-            key = cache.get_cache_key(
-                str(cache_identity_path),
-                settings_dict,
-                curve_data_dict,
-                target_size,
-                local_override,
-                fmt,
-            )
-            render_task = ExportRenderTask(
-                img_path=img_path,
-                key=key,
-                fmt=fmt,
-                save_path=save_path,
-                cache_path=cache.get_cached_path(key, fmt),
-                task_args=task_args,
-                display_name=display_name,
-            )
-            planned_outputs.append(
-                {
-                    "save_path": save_path,
-                    "variant": variant,
-                    "image_path": img_path,
-                }
-            )
-            if cache.exists(key, fmt, validate=True):
-                cached_tasks.append(render_task)
-            else:
-                render_tasks.append(render_task)
-
-    return ExportPlan(
-        source_total=len(image_items),
-        total=len(image_items) * len(enabled_variants),
-        enabled_variants=enabled_variants,
-        planned_outputs=planned_outputs,
-        render_tasks=render_tasks,
-        cached_tasks=cached_tasks,
-    )
-
-
-def process_single_image(args):
-    """Process a single image in a worker process."""
-    (
-        img_path,
-        save_path,
-        settings_dict,
-        target_size,
-        fmt,
-        curve_data_dict,
-        local_override,
-        display_name,
-    ) = args
-
-    try:
-        settings = apply_image_override(
-            normalize_shadow_settings(
-                settings_dict,
-                missing_engine=SHADOW_ENGINE_DEFAULT,
-            ),
-            local_override,
-        )
-        curve_data = CurveData(**curve_data_dict) if curve_data_dict else None
-
-        original = Image.open(img_path).convert("RGBA")
-        dpi = original.info.get("dpi", (300, 300))
-
-        final_img, diagnostics = ShadowEngine._aplicar_efectos_with_diagnostics(
-            original,
-            settings,
-            target_size,
-            scale_factor=1.0,
-            curve_data=curve_data,
-        )
-        warning = diagnostics.warning if diagnostics.fallback_used else None
-
-        save_path = Path(save_path)
-        save_path.parent.mkdir(parents=True, exist_ok=True)
-
-        if fmt in ["jpg", "jpeg"]:
-            final_img = final_img.convert("RGB")
-            final_img.save(save_path, quality=100, subsampling=0, dpi=dpi)
-        else:
-            final_img.save(save_path, optimize=False, compress_level=0, dpi=dpi)
-
-        return True, display_name, warning
-    except Exception as e:
-        return False, f"{img_path.name}: {e}", None
-
-
-def copy_stable(src: Path, dest: Path, copy_file: Callable = shutil.copy2) -> bool:
-    """Copy a file while ensuring we capture a stable snapshot."""
-    for _ in range(3):
-        try:
-            before = src.stat()
-        except FileNotFoundError:
-            return False
-        try:
-            copy_file(src, dest)
-        except Exception:
-            return False
-        try:
-            after = src.stat()
-        except FileNotFoundError:
-            try:
-                dest.unlink(missing_ok=True)
-            except Exception:
-                pass
-            return False
-        if before.st_mtime_ns == after.st_mtime_ns and before.st_size == after.st_size:
-            return True
-        try:
-            dest.unlink(missing_ok=True)
-        except Exception:
-            pass
-    return False
+    def emit(self, event: ExportEvent) -> None: ...
 
 
 class ExportRunner:
@@ -625,11 +231,7 @@ class ExportRunner:
                 self._emit(ExportImageCompletedEvent(cached.display_name, True))
                 self._emit_progress(completed_count, total)
             except Exception as e:
-                self._emit(
-                    ExportLogEvent(
-                        f"Caché no válida para {cached.display_name}; renderizando normal ({e})"
-                    )
-                )
+                self._emit(ExportLogEvent(f"Caché no válida para {cached.display_name}; renderizando normal ({e})"))
                 fallback_tasks.append(cached)
 
         return completed_count, error_count, fallback_tasks

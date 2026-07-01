@@ -15,6 +15,9 @@
 - `app.js` owns state, workflow orchestration, rendering calls, and domain decisions that genuinely need the live state object.
 - Reusable frontend helpers live in separate files loaded before `app.js`, expose browser globals, and are importable from Node tests.
 - Browser event/listener wiring lives outside `app.js` in `interaction-bindings.js`; `app.js` calls a single wiring function and passes explicit dependencies.
+- Session snapshot serialization and restoration normalization live in `session-snapshot.js`; `app.js` only applies live side effects such as selecting an image or requesting a preview.
+- Background preset and preview background normalization live in `background-presets.js`; `app.js` only reads DOM values and persists the resulting state.
+- Batch selection, export item state, validation issue construction, image dimensions, low-resolution checks, and compact UI state live in `app-state.js`; `app.js` keeps small state-bound wrappers for render readability.
 - Trivial helper passthrough wrappers in `app.js` are eliminated unless they bind several pieces of live state into a clearer domain concept.
 - Portable builder and launcher share common sync/manifest modules.
 - Export planning uses typed dataclasses instead of anonymous dict task objects.
@@ -93,7 +96,53 @@ python -m pytest tests/test_frontend_app_cleanup.py tests/test_frontend_output_p
 
 Expected: all selected tests pass.
 
-## Phase 3: Final Architecture Audit and Verification
+## Phase 3: Full `app.js` Decomposition
+
+**Files:**
+- Create: `apps/flatshot-desktop/frontend/session-snapshot.js`
+- Create: `apps/flatshot-desktop/frontend/background-presets.js`
+- Create: `apps/flatshot-desktop/frontend/app-state.js`
+- Modify: `apps/flatshot-desktop/frontend/index.html`
+- Modify: `apps/flatshot-desktop/frontend/mock-data.js`
+- Modify: `apps/flatshot-desktop/frontend/app.js`
+- Test: `tests/test_frontend_session_snapshot.py`
+- Test: `tests/test_frontend_background_presets.py`
+- Test: `tests/test_frontend_app_state.py`
+- Test: `tests/test_frontend_app_cleanup.py`
+
+- [ ] **Step 1: Write failing helper and cleanup tests**
+
+Require the three new helper scripts to load before `mock-data.js`/`app.js`, expose globals from `mock-data.js`, keep Node-tested behavior contracts, and ensure `app.js` delegates extracted algorithms.
+
+- [ ] **Step 2: Verify red**
+
+Run:
+
+```powershell
+python -m pytest tests\test_frontend_app_cleanup.py tests\test_frontend_background_presets.py tests\test_frontend_session_snapshot.py tests\test_frontend_app_state.py -q
+```
+
+Expected: failure because the helper files and script wiring do not exist yet and `app.js` still owns the extracted logic.
+
+- [ ] **Step 3: Implement the helper modules**
+
+Create `session-snapshot.js`, `background-presets.js`, and `app-state.js` using the existing UMD helper pattern. Keep them importable from Node tests and browser globals.
+
+- [ ] **Step 4: Thin `app.js` wrappers**
+
+Replace large pure/helper bodies in `app.js` with calls to `sessionSnapshotHelpers`, `backgroundPresetHelpers`, and `appStateHelpers`. Keep wrappers only where they bind live state, DOM values, timers, or render side effects.
+
+- [ ] **Step 5: Verify green**
+
+Run:
+
+```powershell
+python -m pytest tests\test_frontend_app_cleanup.py tests\test_frontend_background_presets.py tests\test_frontend_session_snapshot.py tests\test_frontend_app_state.py -q
+```
+
+Expected: all selected tests pass.
+
+## Phase 4: Final Architecture Audit and Verification
 
 **Files:**
 - Modify only if the audit exposes a real gap.

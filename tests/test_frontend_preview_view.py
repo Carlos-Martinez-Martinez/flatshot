@@ -37,7 +37,8 @@ def test_preview_toolbar_keeps_compact_context_labels():
     assert ">Gris</button>" not in html
     assert ">Blanco</button>" not in html
     assert ">Transparente</button>" not in html
-    assert "function normalizePreviewBackgroundValue" in app_js
+    assert html.index("background-presets.js") < html.index("app.js")
+    assert "backgroundPresetHelpers.normalizePreviewBackgroundValue" in app_js
     assert "function previewCustomBackgroundValue" in app_js
     assert 'bgTarget.dataset.previewBg === "custom" ? previewCustomBackgroundValue()' in app_js
     assert 'data-action="zoom-fit"' not in html

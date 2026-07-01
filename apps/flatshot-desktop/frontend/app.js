@@ -1,7 +1,11 @@
 const initialImageAdjustmentPreset = storageHelpers.readValue(window.localStorage, STORAGE_KEYS.imageAdjustmentPreset) || "Luz cenital";
 const initialOutputProfileId = storageHelpers.readValue(window.localStorage, STORAGE_KEYS.activeOutputProfile);
 const initialExportPreferences = storageHelpers.readJson(window.localStorage, STORAGE_KEYS.exportPreferences, {});
-const initialBackgroundPresets = readBackgroundPresets();
+const initialBackgroundPresets = backgroundPresetHelpers.readBackgroundPresets(window.localStorage, STORAGE_KEYS.backgroundPresets, {
+  defaultPresets: defaultBackgroundPresets,
+  outputProfileHelpers,
+  storageHelpers,
+});
 const initialOutputProfiles = readOutputProfiles(initialOutputProfileId);
 const initialEnabledOutputProfiles = initialOutputProfiles.filter((profile) => profile.enabled);
 const initialOutputProfile = initialEnabledOutputProfiles.find((profile) => profile.id === initialOutputProfileId)
@@ -127,6 +131,7 @@ let viewerResizeObserver = null;
 let inspectorScrollTopBeforeToggle = 0;
 let modalFocusReturnTarget = null;
 let sessionSnapshotPersistenceEnabled = false;
+let restoredSessionSnapshot = false;
 let bridgeUiPreferencesSaveTimer = 0;
 let bridgeUiPreferencesRestored = false;
 let pendingAdvancedDisclosure = "";
@@ -145,77 +150,21 @@ const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
 function readSessionSnapshot() {
-  const snapshot = storageHelpers.readJson(window.sessionStorage, STORAGE_KEYS.sessionSnapshot, null);
-  return snapshot?.version === 1 && snapshot.state && typeof snapshot.state === "object"
-    ? snapshot
-    : null;
+  return sessionSnapshotHelpers.readSessionSnapshot(window.sessionStorage, STORAGE_KEYS.sessionSnapshot, storageHelpers);
 }
 
 function writeSessionSnapshot() {
-  storageHelpers.writeJson(window.sessionStorage, STORAGE_KEYS.sessionSnapshot, buildSessionSnapshot());
-}
-
-function buildSessionSnapshot() {
   const selected = selectedImage();
-  return {
-    version: 1,
-    savedAt: Date.now(),
-    state: {
-      batch: state.batch,
-      batchSource: state.batchSource,
-      selectedImageId: state.selectedImageId,
-      selectedImagePath: selected?.path || storageHelpers.readValue(window.localStorage, STORAGE_KEYS.selectedImagePath),
-      previewMode: state.previewMode,
-      previewBg: state.previewBg,
-      zoom: state.zoom,
-      fitZoom: state.fitZoom,
-      fitMode: state.fitMode,
-      panX: state.panX,
-      panY: state.panY,
-      filter: state.filter,
-      search: state.search,
-      galleryView: state.galleryView,
-      inspectorTab: state.inspectorTab,
-      inspectorCollapsed: state.inspectorCollapsed,
-      activePreset: state.activePreset,
-      presetOutputSettings: state.presetOutputSettings,
-      settings: state.settings,
-      presetDirty: state.presetDirty,
-      presetSource: state.presetSource,
-      localOverride: state.localOverride,
-      outputProfiles: state.outputProfiles,
-      backgroundPresets: state.backgroundPresets,
-      activeOutputProfileId: state.activeOutputProfileId,
-      outputProfileEditorId: state.outputProfileEditorId,
-      outputProfileDraft: state.outputProfileDraft,
-      destinationMode: state.destinationMode,
-      destinationValue: state.destinationValue,
-      format: state.format,
-      size: state.size,
-      background: state.background,
-      naming: state.naming,
-      suffix: state.suffix,
-      appSettingsOpen: state.appSettingsOpen,
-      batchDetailOpen: state.batchDetailOpen,
-      bridgeMode: state.bridgeMode,
-      bridgeUrl: state.bridgeUrl,
-      bridgeStatus: state.bridgeStatus,
-      bridgeMessage: state.bridgeMessage,
-      bridgeLastResponse: state.bridgeLastResponse,
-      bridgeCapabilitiesSummary: state.bridgeCapabilitiesSummary,
-      bridgeCapabilities: state.bridgeCapabilities,
-      bridgePresets: state.bridgePresets,
-      bridgePresetSource: state.bridgePresetSource,
-      bridgePresetWarning: state.bridgePresetWarning,
-      bridgeScanPath: state.bridgeScanPath,
-      scanStatus: state.scanStatus,
-      scanIssues: state.scanIssues,
-      scanDiagnostics: state.scanDiagnostics,
-      realFolders: state.realFolders,
-      realImages: state.realImages,
-      imageOverrides: state.imageOverrides,
-    },
-  };
+  sessionSnapshotHelpers.writeSessionSnapshot(
+    window.sessionStorage,
+    STORAGE_KEYS.sessionSnapshot,
+    sessionSnapshotHelpers.buildSessionSnapshot({
+      state,
+      selectedImagePath: selected?.path,
+      fallbackSelectedImagePath: storageHelpers.readValue(window.localStorage, STORAGE_KEYS.selectedImagePath),
+    }),
+    storageHelpers
+  );
 }
 
 function restoreSessionSnapshot() {
@@ -224,107 +173,33 @@ function restoreSessionSnapshot() {
     return false;
   }
 
-  const restored = snapshot.state;
-  const restoredBackgroundPresets = normalizeBackgroundPresetList(restored.backgroundPresets || state.backgroundPresets);
-  const outputProfiles = Array.isArray(restored.outputProfiles)
-    ? outputProfileHelpers.normalizeOutputProfileList(restored.outputProfiles, restored.activeOutputProfileId)
-    : state.outputProfiles;
-  const restoredActiveOutputProfile = outputProfiles.find((profile) => profile.id === restored.activeOutputProfileId && profile.enabled)
-    || outputProfiles.find((profile) => profile.enabled)
-    || null;
-  const selectedPath = String(restored.selectedImagePath || "");
-  const realFolders = Array.isArray(restored.realFolders) ? restored.realFolders : [];
-  const realImages = Array.isArray(restored.realImages) ? restored.realImages : [];
-
-  Object.assign(state, {
-    batch: restored.batch === "empty" ? "empty" : realImages.length ? "ready" : "none",
-    batchSource: realImages.length || restored.batch === "empty" ? "bridge" : "none",
-    scenario: "initial",
-    selectedImageId: null,
-    previewStatus: "empty",
-    previewData: null,
-    previewError: "",
-    previewMode: ["processed", "original", "compare"].includes(restored.previewMode) ? restored.previewMode : "processed",
-    previewBg: normalizePreviewBackgroundValue(restored.previewBg || state.previewBg),
-    zoom: numberHelpers.clampNumber(restored.zoom, 25, 400, 100),
-    fitZoom: numberHelpers.clampNumber(restored.fitZoom, 25, 400, 100),
-    fitMode: VIEW_MODE_LABELS[restored.fitMode] ? restored.fitMode : DEFAULT_VIEW_MODE,
-    panX: numberHelpers.clampNumber(restored.panX, -10000, 10000, 0),
-    panY: numberHelpers.clampNumber(restored.panY, -10000, 10000, 0),
-    filter: Object.values(BATCH_FILTERS).includes(restored.filter) ? restored.filter : BATCH_FILTERS.all,
-    search: String(restored.search || ""),
-    galleryView: restored.galleryView === "list" ? "list" : "thumbs",
-    inspectorTab: ["review", "output", "warnings", "advanced"].includes(restored.inspectorTab) ? restored.inspectorTab : "review",
-    inspectorCollapsed: Boolean(restored.inspectorCollapsed),
-    activePreset: String(restored.activePreset || state.activePreset),
-    presetOutputSettings: safeObject(restored.presetOutputSettings),
-    settings: normalizeSettings(restored.settings),
-    presetDirty: Boolean(restored.presetDirty),
-    presetSource: String(restored.presetSource || "Global"),
-    localOverride: Boolean(restored.localOverride),
-    outputProfiles,
-    backgroundPresets: restoredBackgroundPresets,
-    backgroundPresetEditor: null,
-    activeOutputProfileId: restoredActiveOutputProfile?.id || "",
-    outputProfileEditorId: outputProfiles.some((profile) => profile.id === restored.outputProfileEditorId)
-      ? restored.outputProfileEditorId
-      : restoredActiveOutputProfile?.id || outputProfiles[0]?.id || "",
-    outputProfileDraft: restored.outputProfileDraft && typeof restored.outputProfileDraft === "object"
-      ? restored.outputProfileDraft
-      : null,
-    destinationMode: restored.destinationMode === "custom" ? "custom" : "source",
-    destinationValue: String(restored.destinationValue || "Salida"),
-    format: outputProfileHelpers.normalizeExportFormat(restored.format),
-    size: outputProfileHelpers.parseOutputSize(restored.size).normalized,
-    background: outputProfileHelpers.normalizeBackgroundValue(restored.background),
-    naming: String(restored.naming || "{original}{suffix}"),
-    suffix: restored.suffix === undefined || restored.suffix === null ? "_PRO" : String(restored.suffix),
-    appSettingsOpen: Boolean(restored.appSettingsOpen),
-    batchDetailOpen: Boolean(restored.batchDetailOpen),
-    exportConfirmOpen: false,
-    exportStatus: "blocked",
-    exportJobId: null,
-    exportDestinations: [],
-    exportMessages: [],
-    exportCompletedItems: [],
-    exportIssues: [],
-    exportResult: null,
-    progress: 0,
-    processed: 0,
-    errors: [],
-    paused: false,
-    bridgeMode: "bridge",
-    bridgeUrl: bridgeUrlHelpers.resolveRuntimeBridgeUrl({
-      currentBridgeUrl: initialBridgeUrl,
-      restoredBridgeUrl: restored.bridgeUrl,
-      defaultBridgeUrl,
-    }),
-    bridgeStatus: restored.bridgeStatus === "connected" ? "connected" : "idle",
-    bridgeMessage: String(restored.bridgeMessage || "Estado restaurado"),
-    bridgeLastResponse: String(restored.bridgeLastResponse || "Estado restaurado tras recarga"),
-    bridgeCapabilitiesSummary: String(restored.bridgeCapabilitiesSummary || "Restaurado"),
-    bridgeCapabilities: restored.bridgeCapabilities || null,
-    bridgePresets: Array.isArray(restored.bridgePresets) ? restored.bridgePresets.map(normalizePresetItem).filter(Boolean) : [],
-    bridgePresetSource: String(restored.bridgePresetSource || "unavailable"),
-    bridgePresetWarning: String(restored.bridgePresetWarning || ""),
-    bridgeScanPath: String(restored.bridgeScanPath || ""),
-    scanStatus: String(restored.scanStatus || "Estado restaurado"),
-    scanIssues: Array.isArray(restored.scanIssues) ? restored.scanIssues.map(normalizeBridgeIssue) : [],
-    scanDiagnostics: restored.scanDiagnostics && typeof restored.scanDiagnostics === "object"
-      ? restored.scanDiagnostics
-      : emptyScanDiagnostics(),
-    realFolders,
-    realImages,
-    imageOverrides: safeObject(restored.imageOverrides),
-    thumbnailStatus: {},
-    thumbnailErrors: [],
-    statusText: "Estado restaurado",
+  const restored = sessionSnapshotHelpers.restoreSessionState(snapshot.state, {
+    currentState: state,
+    initialBridgeUrl,
+    defaultBridgeUrl,
+    defaultViewMode: DEFAULT_VIEW_MODE,
+    batchFilters: BATCH_FILTERS,
+    viewModeLabels: VIEW_MODE_LABELS,
+    defaultOutputProfiles,
+    normalizeBackgroundPresetList: (presets) => backgroundPresetHelpers.normalizeBackgroundPresetList(presets, backgroundPresetOptions()),
+    normalizeOutputProfileList: outputProfileHelpers.normalizeOutputProfileList,
+    normalizePreviewBackgroundValue: (value) => backgroundPresetHelpers.normalizePreviewBackgroundValue(value, backgroundHelperOptions()),
+    normalizeSettings,
+    normalizePresetItem,
+    normalizeBridgeIssue: exportStateHelpers.normalizeBridgeIssue,
+    normalizeExportFormat: outputProfileHelpers.normalizeExportFormat,
+    parseOutputSize: outputProfileHelpers.parseOutputSize,
+    normalizeBackgroundValue: outputProfileHelpers.normalizeBackgroundValue,
+    clampNumber: numberHelpers.clampNumber,
+    resolveRuntimeBridgeUrl: bridgeUrlHelpers.resolveRuntimeBridgeUrl,
+    emptyScanDiagnostics,
   });
+  Object.assign(state, restored.patch);
 
   if (state.batch === "ready") {
-    const selected = selectedPath
-      ? state.realImages.find((image) => image.path === selectedPath)
-      : state.realImages.find((image) => image.id === restored.selectedImageId);
+    const selected = restored.selectedPath
+      ? state.realImages.find((image) => image.path === restored.selectedPath)
+      : state.realImages.find((image) => image.id === snapshot.state.selectedImageId);
     const nextImage = selected || state.realImages[0];
     state.selectedImageId = nextImage?.id || null;
     state.localOverride = hasImageAdjustmentOverride(nextImage);
@@ -340,10 +215,6 @@ function restoreSessionSnapshot() {
   }
 
   return true;
-}
-
-function safeObject(value) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 
 function setTimer(callback, delay) {
@@ -372,114 +243,31 @@ function readOutputProfiles(activeProfileId = "") {
   return normalized.length ? normalized : outputProfileHelpers.normalizeOutputProfileList(defaultOutputProfiles, activeProfileId);
 }
 
-function backgroundSelectMode(value) {
-  return outputProfileHelpers.parseRgbBackground(value) ? "custom" : outputProfileHelpers.normalizeBackgroundValue(value);
-}
-
-function normalizePreviewBackgroundValue(value) {
-  if (value === SOFT_BLACK_PREVIEW_BG) {
-    return SOFT_BLACK_PREVIEW_BG;
-  }
-  if (value === "white" || value === "transparent" || value === "rgb230") {
-    return value;
-  }
-  const custom = outputProfileHelpers.parseRgbBackground(value);
-  return custom ? `rgb:${custom.join(",")}` : "rgb230";
-}
-
-function backgroundCssColor(value) {
-  const custom = outputProfileHelpers.parseRgbBackground(value);
-  if (custom) {
-    return `rgb(${custom.join(", ")})`;
-  }
-  if (value === SOFT_BLACK_PREVIEW_BG) {
-    return "rgb(32, 34, 37)";
-  }
-  if (value === "white") {
-    return "rgb(255, 255, 255)";
-  }
-  if (value === "transparent") {
-    return "";
-  }
-  return "rgb(230, 230, 230)";
-}
-
-function backgroundVisualMode(value) {
-  if (value === SOFT_BLACK_PREVIEW_BG) {
-    return "custom";
-  }
-  if (value === "white" || value === "transparent") {
-    return value;
-  }
-  return outputProfileHelpers.parseRgbBackground(value) ? "custom" : "rgb230";
-}
-
-function previewCustomRgbChannels(value) {
-  const custom = outputProfileHelpers.parseRgbBackground(value);
-  if (custom) {
-    return custom;
-  }
-  if (value === SOFT_BLACK_PREVIEW_BG) {
-    return [32, 34, 37];
-  }
-  return outputProfileHelpers.backgroundColorTuple(value || "rgb230");
-}
-
-function previewCustomBackgroundValue() {
-  const fallback = previewCustomRgbChannels(state.previewBg);
-  const channels = ["r", "g", "b"].map((channel, index) => {
-    const input = $(`[data-preview-bg-channel="${channel}"]`);
-    return Math.round(numberHelpers.clampNumber(input?.value, 0, 255, fallback[index]));
-  });
-  return `rgb:${channels.join(",")}`;
-}
-
-function previewBackgroundLabel(value) {
-  const custom = outputProfileHelpers.parseRgbBackground(value);
-  if (custom) {
-    return `RGB ${custom.join(", ")}`;
-  }
-  if (value === SOFT_BLACK_PREVIEW_BG) {
-    return "negro suave";
-  }
-  return settingsViewHelpers.backgroundLabel(value);
-}
-
-function normalizeBackgroundPreset(preset, index = 0) {
-  const source = preset && typeof preset === "object" ? preset : {};
-  const kind = source.kind === "transparent" || source.value === "transparent" ? "transparent" : "rgb";
-  const parsed = Array.isArray(source.rgb)
-    ? source.rgb
-    : outputProfileHelpers.parseRgbBackground(source.value || source.background);
-  const fallbackRgb = defaultBackgroundPresets[index % defaultBackgroundPresets.length]?.rgb || [230, 230, 230];
-  const rgb = kind === "transparent"
-    ? fallbackRgb
-    : (parsed || fallbackRgb).map((channel) => Math.max(0, Math.min(255, Number.parseInt(channel, 10) || 0)));
-  const id = String(source.id || outputProfileHelpers.uniqueOutputProfileId(source.name || "fondo", index)).trim();
+function backgroundHelperOptions(extra = {}) {
   return {
-    id,
-    kind,
-    name: String(source.name || (kind === "transparent" ? "Transparente" : `RGB ${rgb.join(", ")}`)).trim(),
-    rgb,
+    outputProfileHelpers,
+    softBlackPreviewBg: SOFT_BLACK_PREVIEW_BG,
+    ...extra,
   };
 }
 
-function normalizeBackgroundPresetList(presets) {
-  const source = Array.isArray(presets) && presets.length ? presets : defaultBackgroundPresets;
-  const seen = new Set();
-  const normalized = source.map(normalizeBackgroundPreset).filter((preset) => preset.id && preset.name);
-  return normalized.map((preset, index) => {
-    let id = preset.id;
-    while (seen.has(id)) {
-      id = `${preset.id}-${index + seen.size}`;
-    }
-    seen.add(id);
-    return { ...preset, id };
+function backgroundPresetOptions(extra = {}) {
+  return backgroundHelperOptions({
+    defaultPresets: defaultBackgroundPresets,
+    ...extra,
   });
 }
 
-function readBackgroundPresets() {
-  return normalizeBackgroundPresetList(storageHelpers.readJson(window.localStorage, STORAGE_KEYS.backgroundPresets, null));
+function previewCustomBackgroundValue() {
+  const fallback = backgroundPresetHelpers.previewCustomRgbChannels(state.previewBg, backgroundHelperOptions());
+  const channels = ["r", "g", "b"].map((channel, index) => {
+    const input = $(`[data-preview-bg-channel="${channel}"]`);
+    return input?.value ?? fallback[index];
+  });
+  return backgroundPresetHelpers.previewCustomBackgroundValue(channels, {
+    clampNumber: numberHelpers.clampNumber,
+    fallback,
+  });
 }
 
 function persistBackgroundPresets() {
@@ -487,46 +275,21 @@ function persistBackgroundPresets() {
   scheduleBridgeUiPreferencesSave();
 }
 
-function backgroundPresetValue(preset) {
-  if (!preset || preset.kind === "transparent") {
-    return "transparent";
-  }
-  const rgb = preset.rgb || [230, 230, 230];
-  if (preset.id === "rgb230" && rgb[0] === 230 && rgb[1] === 230 && rgb[2] === 230) {
-    return "rgb230";
-  }
-  if (preset.id === "white" && rgb[0] === 255 && rgb[1] === 255 && rgb[2] === 255) {
-    return "white";
-  }
-  return outputProfileHelpers.rgbBackgroundValue(rgb[0], rgb[1], rgb[2]) || "rgb230";
-}
-
-function backgroundPresetLabel(preset) {
-  if (!preset) {
-    return "Fondo";
-  }
-  return preset.name;
-}
-
 function backgroundPresetById(presetId) {
   return state.backgroundPresets.find((preset) => preset.id === presetId) || null;
 }
 
 function backgroundPresetByValue(value) {
-  const normalized = outputProfileHelpers.normalizeBackgroundValue(value);
-  return state.backgroundPresets.find((preset) => outputProfileHelpers.normalizeBackgroundValue(backgroundPresetValue(preset)) === normalized) || null;
+  return backgroundPresetHelpers.backgroundPresetByValue(value, state.backgroundPresets, { outputProfileHelpers });
 }
 
 function backgroundSelectOptionsHtml(selectedValue) {
-  const selected = outputProfileHelpers.normalizeBackgroundValue(selectedValue);
-  const presetOptions = state.backgroundPresets.map((preset) => {
-    const value = backgroundPresetValue(preset);
-    return `<option value="${escapeHtml(value)}">${escapeHtml(backgroundPresetLabel(preset))}</option>`;
-  }).join("");
-  if (state.backgroundPresets.some((preset) => outputProfileHelpers.normalizeBackgroundValue(backgroundPresetValue(preset)) === selected)) {
-    return presetOptions;
-  }
-  return `${presetOptions}<option value="${escapeHtml(selected)}">${escapeHtml(`Actual · ${settingsViewHelpers.backgroundLabel(selected)}`)}</option>`;
+  return backgroundPresetHelpers.backgroundSelectOptionsHtml(selectedValue, {
+    backgroundLabel: settingsViewHelpers.backgroundLabel,
+    escapeHtml,
+    outputProfileHelpers,
+    presets: state.backgroundPresets,
+  });
 }
 
 function activeOutputProfile() {
@@ -736,7 +499,7 @@ function uiPreferencesPayload() {
 }
 
 function cacheUiPreferences(preferences = uiPreferencesPayload()) {
-  const source = safeObject(preferences);
+  const source = sessionSnapshotHelpers.safeObject(preferences);
   if (Array.isArray(source.outputProfiles)) {
     storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.outputProfiles, source.outputProfiles);
   }
@@ -764,12 +527,12 @@ function cacheUiPreferences(preferences = uiPreferencesPayload()) {
 }
 
 function applyBridgeUiPreferences(preferences) {
-  const source = safeObject(preferences);
+  const source = sessionSnapshotHelpers.safeObject(preferences);
   if (!Object.keys(source).length) {
     return false;
   }
 
-  const exportPreferences = safeObject(source.exportPreferences);
+  const exportPreferences = sessionSnapshotHelpers.safeObject(source.exportPreferences);
   const activeFormatIds = Array.isArray(source.activeOutputFormats)
     ? source.activeOutputFormats.map(String)
     : Array.isArray(exportPreferences.activeOutputFormatIds)
@@ -787,7 +550,7 @@ function applyBridgeUiPreferences(preferences) {
   }
 
   if (Array.isArray(source.backgroundPresets)) {
-    state.backgroundPresets = normalizeBackgroundPresetList(source.backgroundPresets);
+    state.backgroundPresets = backgroundPresetHelpers.normalizeBackgroundPresetList(source.backgroundPresets, backgroundPresetOptions());
   }
 
   const enabledProfiles = enabledOutputProfiles();
@@ -914,62 +677,49 @@ function setOutputProfileEnabled(profileId, enabled) {
 }
 
 function selectedImage() {
-  return activeImages().find((image) => image.id === state.selectedImageId)
-    || mockImages.find((image) => image.id === state.selectedImageId)
-    || null;
+  return appStateHelpers.selectedImage(state, { mockImages });
 }
 
 function hasBatch() {
-  return state.batch === "ready" || state.batch === "scanning";
+  return appStateHelpers.hasBatch(state);
 }
 
 function isBridgeBatch() {
-  return state.batchSource === "bridge";
+  return appStateHelpers.isBridgeBatch(state);
 }
 
 function isMockBatch() {
-  return state.batchSource === "mock";
+  return appStateHelpers.isMockBatch(state);
 }
 
 function activeImages() {
-  if (state.batch !== "ready") {
-    return [];
-  }
-  if (isBridgeBatch()) {
-    return state.realImages;
-  }
-  return isMockBatch() ? mockImages : [];
+  return appStateHelpers.activeImages(state, { mockImages });
 }
 
 function activeFolders() {
-  if (state.batch !== "ready") {
-    return [];
-  }
-  if (isBridgeBatch()) {
-    return state.realFolders;
-  }
-  return isMockBatch() ? mockFolders : [];
+  return appStateHelpers.activeFolders(state, { mockFolders });
 }
 
 function activePresetItems() {
-  if (state.bridgeMode === "bridge" && state.bridgePresets.length) {
-    return state.bridgePresets;
-  }
-  return mockPresets.map((name) => ({
-    name,
-    category: devMode ? "Demo" : "Ajuste",
-    categoryId: devMode ? "mock" : "fallback",
-    settings: normalizeSettings(mockPresetSettings[name]),
-    source: devMode ? "demo" : "fallback",
-  }));
+  return appStateHelpers.activePresetItems(state, {
+    devMode,
+    mockPresets,
+    mockPresetSettings,
+    normalizeSettings,
+  });
 }
 
 function activePresetItem() {
-  return activePresetItems().find((preset) => preset.name === state.activePreset) || null;
+  return appStateHelpers.activePresetItem(state, {
+    devMode,
+    mockPresets,
+    mockPresetSettings,
+    normalizeSettings,
+  });
 }
 
 function exportableImages() {
-  return activeImages().filter((image) => image.exportable);
+  return appStateHelpers.exportableImages(activeImages());
 }
 
 function ignoredNeutralText(count = batchCounts().ignoredFiles) {
@@ -1017,7 +767,7 @@ function excludedImageCount(images = activeImages()) {
 }
 
 function exportItemStatusMap(images = activeImages()) {
-  return new Map(images.map((image) => [image.id, exportItemState(image)]));
+  return appStateHelpers.exportItemStatusMap(images, state.exportCompletedItems);
 }
 
 function batchCounts() {
@@ -1039,26 +789,7 @@ function batchCounts() {
 }
 
 function exportItemState(image) {
-  const items = Array.isArray(state.exportCompletedItems) ? state.exportCompletedItems : [];
-  if (!items.length || !image?.name) {
-    return null;
-  }
-  const sourceName = image.name.toLowerCase();
-  const sourceStem = sourceName.replace(/\.[^.]+$/, "");
-  const matches = items.filter((item) => {
-    const itemName = String(item.name || "").toLowerCase();
-    return itemName === sourceName
-      || itemName === sourceStem
-      || itemName.startsWith(`${sourceStem}.`)
-      || itemName.startsWith(`${sourceStem}_`);
-  });
-  if (matches.some((item) => item.success === false)) {
-    return { status: "error", label: "Error" };
-  }
-  if (matches.some((item) => item.success === true)) {
-    return { status: "exported", label: "Exportada" };
-  }
-  return null;
+  return appStateHelpers.exportItemState(image, state.exportCompletedItems);
 }
 
 function filteredImages() {
@@ -1072,39 +803,13 @@ function filteredImages() {
 }
 
 function validationIssues() {
-  const issues = [];
-  if (state.batch === "none") {
-    issues.push({ level: "error", title: "Sin lote", detail: "Selecciona una carpeta." });
-  }
-  if (state.batch === "empty") {
-    issues.push({ level: "warning", title: "No hay PNG válidos", detail: "Elige otra carpeta." });
-  }
-  if (exportableImages().length === 0 && state.batch === "ready") {
-    issues.push({ level: "error", title: "Sin imágenes exportables", detail: "Revisa los errores." });
-  }
-  if (!String(state.activePreset || "").trim()) {
-    issues.push({ level: "error", title: "Sin ajuste de imagen", detail: "Selecciona un ajuste de imagen." });
-  }
-  if (exportOutputProfiles().length === 0) {
-    issues.push({ level: "error", title: "Sin formatos activos", detail: "Selecciona al menos un formato de salida." });
-  }
-  if (!state.naming.trim()) {
-    issues.push({ level: "error", title: "Nombre de archivo vacío", detail: "Define una plantilla de nombre." });
-  }
-  if (state.destinationMode === "custom" && !state.destinationValue.trim()) {
-    issues.push({ level: "error", title: "Carpeta de salida sin configurar", detail: "Elige una carpeta de salida." });
-  }
-  exportOutputProfiles()
-    .forEach((profile) => {
-      outputProfileValidation(outputProfileRawFromProfile(profile)).errors.forEach((message) => {
-        issues.push({
-          level: "error",
-          title: "Formato incompleto",
-          detail: `${profile.name}: ${message}`,
-        });
-      });
-    });
-  return issues;
+  return appStateHelpers.validationIssues({
+    state,
+    exportableImages: exportableImages(),
+    exportOutputProfiles: exportOutputProfiles(),
+    outputProfileRawFromProfile,
+    outputProfileValidation: outputProfileHelpers.outputProfileValidation,
+  });
 }
 
 function preflightIssues() {
@@ -1171,7 +876,7 @@ function exportConfirmationRisks() {
     });
   }
 
-  const existingOutputIssue = [...state.errors, ...state.exportIssues].find(issueMentionsExistingOutput);
+  const existingOutputIssue = [...state.errors, ...state.exportIssues].find(preflightHelpers.issueMentionsExistingOutput);
   if (existingOutputIssue) {
     risks.push({
       id: "existing-output-blocker",
@@ -1237,28 +942,15 @@ function hasPreviousExportDestination() {
 }
 
 function imageDimensions(image) {
-  const width = Number(image?.width || image?.naturalWidth || image?.sourceWidth || 0);
-  const height = Number(image?.height || image?.naturalHeight || image?.sourceHeight || 0);
-  if (width > 0 && height > 0) {
-    return { width, height };
-  }
-  const detail = String(image?.detail || "");
-  const match = /(\d{2,5})\s*[x×]\s*(\d{2,5})/i.exec(detail);
-  if (!match) {
-    return null;
-  }
-  return {
-    width: Number.parseInt(match[1], 10),
-    height: Number.parseInt(match[2], 10),
-  };
+  return appStateHelpers.imageDimensions(image);
 }
 
 function lowResolutionImageCount() {
   const targets = exportOutputProfiles().map((profile) => outputProfileHelpers.parseOutputSize(outputProfileHelpers.outputProfileSize(profile)));
-  return exportableImages().filter((image) => {
-    const dimensions = imageDimensions(image);
-    return dimensions && targets.some((target) => dimensions.width < target.width || dimensions.height < target.height);
-  }).length;
+  return appStateHelpers.lowResolutionImageCount({
+    images: exportableImages(),
+    targets,
+  });
 }
 
 function isExportReady() {
@@ -1275,17 +967,14 @@ function uiState() {
   const counts = preflightCounts();
   const lotCounts = batchCounts();
   const image = selectedImage();
-  return {
+  return appStateHelpers.uiState({
+    state,
+    counts,
+    lotCounts,
+    selectedImage: image,
     hasBatch: hasBatch(),
-    hasBatchContext: hasBatch() || state.batch === "empty" || state.batch === "scanning",
-    hasSelectedImage: Boolean(image),
-    isBridgeReady: state.bridgeMode === "bridge" && state.bridgeStatus === "connected",
     canExport: isExportReady(),
-    hasWarnings: lotCounts.nonBlockingWarnings > 0 || counts.warnings > 0,
-    hasBlockingErrors: lotCounts.blockingErrors > 0,
-    isProcessing: state.batch === "scanning" || state.previewStatus === "loading" || state.exportStatus === "running",
-    isExporting: state.exportStatus === "running",
-  };
+  });
 }
 
 function visibleWarningCount() {
@@ -3186,8 +2875,8 @@ function renderShell() {
   if (gallery) {
     gallery.dataset.galleryView = state.galleryView;
     const galleryBackground = galleryActiveOutputContext().background;
-    gallery.dataset.outputBg = backgroundVisualMode(galleryBackground);
-    const galleryBackgroundColor = backgroundCssColor(galleryBackground);
+    gallery.dataset.outputBg = backgroundPresetHelpers.backgroundVisualMode(galleryBackground, backgroundHelperOptions());
+    const galleryBackgroundColor = backgroundPresetHelpers.backgroundCssColor(galleryBackground, backgroundHelperOptions());
     if (galleryBackgroundColor) {
       gallery.style.setProperty("--custom-output-bg", galleryBackgroundColor);
     } else {
@@ -4271,8 +3960,8 @@ function renderPreview() {
   if (outputContext) {
     outputContext.innerHTML = "";
   }
-  const previewBackgroundMode = backgroundVisualMode(state.previewBg);
-  const previewBackgroundColor = backgroundCssColor(state.previewBg);
+  const previewBackgroundMode = backgroundPresetHelpers.backgroundVisualMode(state.previewBg, backgroundHelperOptions());
+  const previewBackgroundColor = backgroundPresetHelpers.backgroundCssColor(state.previewBg, backgroundHelperOptions());
   const canvasArea = $("#canvas-area");
   canvasArea.className = `canvas-area bg-${previewBackgroundMode}`;
   if (previewBackgroundColor) {
@@ -4287,13 +3976,13 @@ function renderPreview() {
       : compareControlsDisabled;
   });
   $$(".background-switch [data-preview-bg]").forEach((button) => {
-    const previewBg = normalizePreviewBackgroundValue(state.previewBg);
+    const previewBg = backgroundPresetHelpers.normalizePreviewBackgroundValue(state.previewBg, backgroundHelperOptions());
     const isCustom = button.dataset.previewBg === "custom";
     const isActive = isCustom ? Boolean(outputProfileHelpers.parseRgbBackground(previewBg)) : button.dataset.previewBg === previewBg;
     button.classList.toggle("active", isActive);
     button.disabled = previewControlsDisabled;
   });
-  const customPreviewRgb = previewCustomRgbChannels(state.previewBg);
+  const customPreviewRgb = backgroundPresetHelpers.previewCustomRgbChannels(state.previewBg, backgroundHelperOptions());
   ["r", "g", "b"].forEach((channel, index) => {
     const input = $(`[data-preview-bg-channel="${channel}"]`);
     if (input) {
@@ -5454,7 +5143,7 @@ function beginBackgroundPresetEdit(mode = "edit") {
   state.backgroundPresetEditor = {
     id: mode === "edit" && preset ? preset.id : outputProfileHelpers.uniqueOutputProfileId(source.name || "fondo", Date.now()),
     mode: mode === "edit" && preset ? "edit" : "new",
-    sourceValue: preset ? backgroundPresetValue(preset) : "",
+    sourceValue: preset ? backgroundPresetHelpers.backgroundPresetValue(preset, backgroundHelperOptions()) : "",
     kind: source.kind === "transparent" ? "transparent" : "rgb",
     name: source.name,
     rgbText: (source.rgb || [230, 230, 230]).join(", "),
@@ -5481,12 +5170,12 @@ function saveBackgroundPreset() {
     renderBackgroundPresetControls();
     return;
   }
-  const savedPreset = normalizeBackgroundPreset({
+  const savedPreset = backgroundPresetHelpers.normalizeBackgroundPreset({
     id: editor.id,
     kind: editor.kind,
     name,
     rgb: editor.kind === "transparent" ? [230, 230, 230] : outputProfileHelpers.parseRgbBackground(rgb),
-  });
+  }, 0, backgroundPresetOptions());
   const previousValue = editor.mode === "edit" ? editor.sourceValue : "";
   const index = state.backgroundPresets.findIndex((preset) => preset.id === editor.id);
   if (index >= 0) {
@@ -5494,8 +5183,8 @@ function saveBackgroundPreset() {
   } else {
     state.backgroundPresets.push(savedPreset);
   }
-  state.backgroundPresets = normalizeBackgroundPresetList(state.backgroundPresets);
-  const nextValue = backgroundPresetValue(savedPreset);
+  state.backgroundPresets = backgroundPresetHelpers.normalizeBackgroundPresetList(state.backgroundPresets, backgroundPresetOptions());
+  const nextValue = backgroundPresetHelpers.backgroundPresetValue(savedPreset, backgroundHelperOptions());
   if (previousValue) {
     replaceBackgroundValue(previousValue, nextValue);
   } else {
@@ -5589,7 +5278,7 @@ function outputProfileFormRawData() {
     const input = $(`#${id}`);
     return input ? String(input.value ?? "") : String(fallback ?? "");
   };
-  const backgroundMode = value("profile-background-input", backgroundSelectMode(current.background));
+  const backgroundMode = value("profile-background-input", backgroundPresetHelpers.backgroundSelectMode(current.background, backgroundHelperOptions()));
   return {
     id: current.id,
     name: value("profile-name-input", current.name),
@@ -5612,7 +5301,7 @@ function outputProfileRawFromProfile(profile) {
     format: profile.format,
     background: profile.background,
     backgroundCustom: outputProfileHelpers.backgroundCustomText(profile.background),
-    backgroundMode: backgroundSelectMode(profile.background),
+    backgroundMode: backgroundPresetHelpers.backgroundSelectMode(profile.background, backgroundHelperOptions()),
     width: String(profile.width),
     height: String(profile.height),
     destinationMode: profile.destinationMode,
@@ -5755,7 +5444,7 @@ function duplicateOutputProfile() {
 }
 
 function commitOutputProfileDraft() {
-  const validation = outputProfileValidation();
+  const validation = outputProfileHelpers.outputProfileValidation(outputProfileFormRawData());
   if (validation.errors.length) {
     state.statusText = validation.errors[0];
     renderOutputProfileModalState();
@@ -6123,10 +5812,6 @@ function outputProfileChangeCount() {
   return checks.filter(Boolean).length;
 }
 
-function outputProfileValidation(raw = outputProfileFormRawData()) {
-  return outputProfileHelpers.outputProfileValidation(raw);
-}
-
 function outputProfileEditorHeadingHtml(profile, validation, dirty) {
   const saved = state.outputProfiles.find((item) => item.id === profile.id);
   return outputProfileViewHelpers.outputProfileEditorHeadingHtml({
@@ -6172,7 +5857,7 @@ function renderOutputProfileModalState() {
   if (state.outputDeleteConfirmId && state.outputDeleteConfirmId !== profile.id) {
     state.outputDeleteConfirmId = "";
   }
-  const validation = outputProfileValidation(raw);
+  const validation = outputProfileHelpers.outputProfileValidation(raw);
   const dirty = outputProfileHasUnsavedChanges();
   const heading = $("#output-profile-editor-heading");
   if (heading) {
@@ -7308,10 +6993,14 @@ function handleDocumentClick(event) {
 
   const bgTarget = event.target.closest("[data-preview-bg]");
   if (bgTarget) {
-    state.previewBg = normalizePreviewBackgroundValue(
-      bgTarget.dataset.previewBg === "custom" ? previewCustomBackgroundValue() : bgTarget.dataset.previewBg
+    state.previewBg = backgroundPresetHelpers.normalizePreviewBackgroundValue(
+      bgTarget.dataset.previewBg === "custom" ? previewCustomBackgroundValue() : bgTarget.dataset.previewBg,
+      backgroundHelperOptions()
     );
-    state.statusText = `Fondo: ${previewBackgroundLabel(state.previewBg)}`;
+    state.statusText = `Fondo: ${backgroundPresetHelpers.previewBackgroundLabel(state.previewBg, {
+      ...backgroundHelperOptions(),
+      backgroundLabel: settingsViewHelpers.backgroundLabel,
+    })}`;
     render();
     return;
   }
@@ -7420,8 +7109,11 @@ function handleDocumentInput(event) {
 
 function handleDocumentChange(event) {
   if (event.target.matches?.("[data-preview-bg-channel]")) {
-    state.previewBg = normalizePreviewBackgroundValue(previewCustomBackgroundValue());
-    state.statusText = `Fondo: ${previewBackgroundLabel(state.previewBg)}`;
+    state.previewBg = backgroundPresetHelpers.normalizePreviewBackgroundValue(previewCustomBackgroundValue(), backgroundHelperOptions());
+    state.statusText = `Fondo: ${backgroundPresetHelpers.previewBackgroundLabel(state.previewBg, {
+      ...backgroundHelperOptions(),
+      backgroundLabel: settingsViewHelpers.backgroundLabel,
+    })}`;
     render();
     return;
   }
@@ -7869,7 +7561,7 @@ function restorePersistentBridgeSession() {
 }
 
 function startFlatShotApp() {
-  const restoredSessionSnapshot = restoreSessionSnapshot();
+  restoredSessionSnapshot = restoreSessionSnapshot();
   sessionSnapshotPersistenceEnabled = true;
   if (restoredSessionSnapshot) {
     render();

@@ -117,11 +117,76 @@ def test_app_js_does_not_keep_pure_helper_passthrough_wrappers():
         "function profileDestinationLabel(",
         "function profileDestinationPreviewLabel(",
         "function outputProfileValidationHtml(",
+        "function outputProfileValidation(",
         "function backgroundLabel(",
     ]
 
     for wrapper in pure_passthrough_wrappers:
         assert wrapper not in source
+
+
+def test_app_js_does_not_keep_extracted_background_or_snapshot_helpers():
+    source = APP_PATH.read_text(encoding="utf-8")
+
+    extracted_helpers = [
+        "function buildSessionSnapshot(",
+        "function safeObject(",
+        "function backgroundSelectMode(",
+        "function normalizePreviewBackgroundValue(",
+        "function backgroundCssColor(",
+        "function backgroundVisualMode(",
+        "function previewCustomRgbChannels(",
+        "function previewBackgroundLabel(",
+        "function normalizeBackgroundPreset(",
+        "function normalizeBackgroundPresetList(",
+        "function backgroundPresetValue(",
+        "function backgroundPresetLabel(",
+    ]
+
+    for helper in extracted_helpers:
+        assert helper not in source
+
+    assert "sessionSnapshotHelpers.buildSessionSnapshot(" in source
+    assert "backgroundPresetHelpers.normalizePreviewBackgroundValue(" in source
+
+
+def test_app_js_uses_explicit_helper_references_after_wrapper_removal():
+    source = APP_PATH.read_text(encoding="utf-8")
+
+    forbidden_bare_calls = [
+        r"(?<!exportStateHelpers\.)\bnormalizeBridgeIssue\(",
+        r"(?<!preflightHelpers\.)\bissueMentionsExistingOutput\(",
+        r"(?<!preflightHelpers\.)\bissueMentionsExistingOutput\b",
+        r"(?<!preflightHelpers\.)\bdedupeExportRisks\(",
+        r"(?<!outputProfileHelpers\.)\boutputProfileValidation\(",
+    ]
+
+    for pattern in forbidden_bare_calls:
+        assert not re.search(pattern, source)
+
+
+def test_app_js_delegates_derived_state_algorithms():
+    source = APP_PATH.read_text(encoding="utf-8")
+
+    assert "appStateHelpers.exportItemState(" in source
+    assert "appStateHelpers.validationIssues(" in source
+    assert "appStateHelpers.lowResolutionImageCount(" in source
+    assert "appStateHelpers.uiState(" in source
+
+    extracted_snippets = [
+        "const sourceStem = sourceName.replace(",
+        "outputProfileHelpers.outputProfileValidation(outputProfileRawFromProfile(profile)).errors.forEach",
+        "const detail = String(image?.detail || \"\");",
+    ]
+    for snippet in extracted_snippets:
+        assert snippet not in source
+
+
+def test_app_js_tracks_restored_session_snapshot_as_explicit_state():
+    source = APP_PATH.read_text(encoding="utf-8")
+
+    assert "let restoredSessionSnapshot = false;" in source
+    assert "const restoredSessionSnapshot = restoreSessionSnapshot();" not in source
 
 
 def test_app_js_delegates_browser_interaction_wiring():

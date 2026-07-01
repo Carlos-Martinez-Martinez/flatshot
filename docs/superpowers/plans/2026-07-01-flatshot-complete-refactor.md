@@ -4,7 +4,7 @@
 
 **Goal:** Close the remaining maintenance refactor so FlatShot has no known follow-up cleanup batch for the current architecture.
 
-**Architecture:** Keep `apps/flatshot-desktop/frontend/app.js` as the composition root for app state and workflow decisions. Move reusable/pure behavior and browser wiring into focused helpers, and enforce the boundary with tests so future work does not drift back into a monolith.
+**Architecture:** Keep `apps/flatshot-desktop/frontend/app.js` as a small bootstrap for initial state and DOM selectors. Move reusable helpers, browser wiring, workflow, bridge/export, rendering, output settings, actions, and startup wiring into bounded domain scripts, and enforce the boundary with tests so future work does not drift back into a monolith.
 
 **Tech Stack:** Python 3.14, pytest, ruff, vanilla browser JavaScript, Node-based frontend helper tests, PowerShell on Windows.
 
@@ -12,7 +12,9 @@
 
 ## Ideal State Contract
 
-- `app.js` owns state, workflow orchestration, rendering calls, and domain decisions that genuinely need the live state object.
+- `app.js` is capped at 250 lines and owns only initial state/bootstrap data plus shared DOM selectors.
+- Domain scripts are capped at 1,800 lines each so the monolith cannot be recreated under a different filename.
+- Workflow orchestration, bridge/export, rendering, output settings, actions, and startup wiring live in `app-*.js` domain scripts loaded explicitly from `index.html`.
 - Reusable frontend helpers live in separate files loaded before `app.js`, expose browser globals, and are importable from Node tests.
 - Browser event/listener wiring lives outside `app.js` in `interaction-bindings.js`; `app.js` calls a single wiring function and passes explicit dependencies.
 - Session snapshot serialization and restoration normalization live in `session-snapshot.js`; `app.js` only applies live side effects such as selecting an image or requesting a preview.
@@ -142,7 +144,55 @@ python -m pytest tests\test_frontend_app_cleanup.py tests\test_frontend_backgrou
 
 Expected: all selected tests pass.
 
-## Phase 4: Final Architecture Audit and Verification
+## Phase 4: Full `app.js` File Split
+
+**Files:**
+- Create: `apps/flatshot-desktop/frontend/app-core.js`
+- Create: `apps/flatshot-desktop/frontend/app-workflow.js`
+- Create: `apps/flatshot-desktop/frontend/app-bridge-export.js`
+- Create: `apps/flatshot-desktop/frontend/app-render-shell-gallery.js`
+- Create: `apps/flatshot-desktop/frontend/app-render-preview-inspector.js`
+- Create: `apps/flatshot-desktop/frontend/app-render-export-settings.js`
+- Create: `apps/flatshot-desktop/frontend/app-actions.js`
+- Create: `apps/flatshot-desktop/frontend/app-startup.js`
+- Modify: `apps/flatshot-desktop/frontend/app.js`
+- Modify: `apps/flatshot-desktop/frontend/index.html`
+- Test: `tests/test_frontend_app_cleanup.py`
+- Test: existing frontend contract tests that reference app-domain code
+
+- [ ] **Step 1: Write failing architecture tests**
+
+Require `app.js` to stay at or below 250 lines, require domain scripts to load in order, and require each domain script to stay at or below 1,800 lines.
+
+- [ ] **Step 2: Verify red**
+
+Run:
+
+```powershell
+python -m pytest tests\test_frontend_app_cleanup.py -q
+```
+
+Expected: failure while `app.js` still contains the full domain implementation.
+
+- [ ] **Step 3: Split classic-script domains**
+
+Move contiguous, already-audited blocks from `app.js` into the `app-*.js` domain scripts without rewriting function bodies. Load `mock-data.js`, domain scripts, the small `app.js` bootstrap, and `app-startup.js` in that order.
+
+- [ ] **Step 4: Update tests that inspect app-domain code**
+
+Keep behavior assertions intact, but read app-domain code from `app.js` plus `app-*.js` instead of assuming every function lives in `app.js`.
+
+- [ ] **Step 5: Verify green**
+
+Run:
+
+```powershell
+$frontendTests = Get-ChildItem tests -Filter 'test_frontend_*.py' | ForEach-Object { $_.FullName }; python -m pytest @frontendTests tests\test_architecture_boundaries.py -q
+```
+
+Expected: all selected frontend and architecture tests pass.
+
+## Phase 5: Final Architecture Audit and Verification
 
 **Files:**
 - Modify only if the audit exposes a real gap.
@@ -153,10 +203,10 @@ Run:
 
 ```powershell
 rg -n "function readPersistentValue|function writePersistentValue|function clampNumber|task\\[|cached\\[|outputProfileHelpers\\.outputProfileHelpers" apps src scripts tests
-rg -n "document\\.addEventListener|window\\.addEventListener|\\$\\([^\\n]+\\)\\.addEventListener" apps/flatshot-desktop/frontend/app.js
+rg -n "document\\.addEventListener|window\\.addEventListener|\\$\\([^\\n]+\\)\\.addEventListener" apps/flatshot-desktop/frontend/app*.js
 ```
 
-Expected: no obsolete helper duplication and no top-level browser wiring left in `app.js` except the single call into `interaction-bindings.js`.
+Expected: no obsolete helper duplication and no top-level browser wiring left in app-domain scripts except the delegated call into `interaction-bindings.js` from `app-startup.js`.
 
 - [ ] **Step 2: Run complete verification**
 

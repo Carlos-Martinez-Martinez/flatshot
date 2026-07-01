@@ -4,6 +4,75 @@ import re
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend" / "app.js"
+INDEX_PATH = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend" / "index.html"
+FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
+
+
+def app_domain_source():
+    parts = [APP_PATH.read_text(encoding="utf-8")]
+    parts.extend(
+        path.read_text(encoding="utf-8")
+        for path in sorted(FRONTEND_DIR.glob("app-*.js"))
+        if path.name != "app-state.js"
+    )
+    return "\n".join(parts)
+
+
+def test_app_js_is_bootstrap_sized_after_full_split():
+    lines = APP_PATH.read_text(encoding="utf-8").splitlines()
+
+    assert len(lines) <= 250
+
+
+def test_app_domain_scripts_stay_bounded():
+    oversized = {
+        path.name: len(path.read_text(encoding="utf-8").splitlines())
+        for path in FRONTEND_DIR.glob("app-*.js")
+        if path.name != "app-state.js"
+        and len(path.read_text(encoding="utf-8").splitlines()) > 1800
+    }
+
+    assert oversized == {}
+
+
+def test_app_js_no_longer_contains_domain_sections():
+    source = APP_PATH.read_text(encoding="utf-8")
+
+    moved_domain_functions = [
+        "function setScenario(",
+        "function startExport(",
+        "function checkBridge(",
+        "function render(",
+        "function renderPreview(",
+        "function renderOutputProfileModalState(",
+        "const actionDispatcher =",
+        "function handleDocumentClick(",
+        "function startFlatShotApp(",
+    ]
+
+    for function_signature in moved_domain_functions:
+        assert function_signature not in source
+
+
+def test_app_domain_scripts_are_loaded_in_order():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+
+    expected_order = [
+        "mock-data.js",
+        "app-core.js",
+        "app-workflow.js",
+        "app-bridge-export.js",
+        "app-render-shell-gallery.js",
+        "app-render-preview-inspector.js",
+        "app-render-export-settings.js",
+        "app-actions.js",
+        "app.js",
+        "app-startup.js",
+    ]
+
+    positions = [html.index(script) for script in expected_order]
+
+    assert positions == sorted(positions)
 
 
 def test_app_js_does_not_reintroduce_extracted_wrapper_helpers():
@@ -47,7 +116,8 @@ def test_app_js_does_not_reintroduce_extracted_wrapper_helpers():
 
 
 def test_app_js_uses_shared_storage_and_number_helpers():
-    source = APP_PATH.read_text(encoding="utf-8")
+    app_source = APP_PATH.read_text(encoding="utf-8")
+    source = app_domain_source()
 
     removed_helpers = [
         "function readPersistentValue(",
@@ -60,15 +130,15 @@ def test_app_js_uses_shared_storage_and_number_helpers():
     for helper in removed_helpers:
         assert helper not in source
 
-    assert "storageHelpers.readValue(" in source
-    assert "storageHelpers.readJson(" in source
+    assert "storageHelpers.readValue(" in app_source
+    assert "storageHelpers.readJson(" in app_source
     assert "storageHelpers.writeValue(" in source
     assert "storageHelpers.writeJson(" in source
     assert "numberHelpers.clampNumber(" in source
 
 
 def test_app_js_does_not_keep_output_profile_passthrough_wrappers():
-    source = APP_PATH.read_text(encoding="utf-8")
+    source = app_domain_source()
 
     passthrough_wrappers = [
         "function normalizeOutputProfile(",
@@ -94,7 +164,7 @@ def test_app_js_does_not_keep_output_profile_passthrough_wrappers():
 
 
 def test_app_js_does_not_keep_pure_helper_passthrough_wrappers():
-    source = APP_PATH.read_text(encoding="utf-8")
+    source = app_domain_source()
 
     pure_passthrough_wrappers = [
         "function countText(",
@@ -126,7 +196,7 @@ def test_app_js_does_not_keep_pure_helper_passthrough_wrappers():
 
 
 def test_app_js_does_not_keep_extracted_background_or_snapshot_helpers():
-    source = APP_PATH.read_text(encoding="utf-8")
+    source = app_domain_source()
 
     extracted_helpers = [
         "function buildSessionSnapshot(",
@@ -151,7 +221,7 @@ def test_app_js_does_not_keep_extracted_background_or_snapshot_helpers():
 
 
 def test_app_js_uses_explicit_helper_references_after_wrapper_removal():
-    source = APP_PATH.read_text(encoding="utf-8")
+    source = app_domain_source()
 
     forbidden_bare_calls = [
         r"(?<!exportStateHelpers\.)\bnormalizeBridgeIssue\(",
@@ -166,7 +236,7 @@ def test_app_js_uses_explicit_helper_references_after_wrapper_removal():
 
 
 def test_app_js_delegates_derived_state_algorithms():
-    source = APP_PATH.read_text(encoding="utf-8")
+    source = app_domain_source()
 
     assert "appStateHelpers.exportItemState(" in source
     assert "appStateHelpers.validationIssues(" in source
@@ -183,14 +253,14 @@ def test_app_js_delegates_derived_state_algorithms():
 
 
 def test_app_js_tracks_restored_session_snapshot_as_explicit_state():
-    source = APP_PATH.read_text(encoding="utf-8")
+    source = app_domain_source()
 
     assert "let restoredSessionSnapshot = false;" in source
     assert "const restoredSessionSnapshot = restoreSessionSnapshot();" not in source
 
 
 def test_app_js_delegates_browser_interaction_wiring():
-    source = APP_PATH.read_text(encoding="utf-8")
+    source = app_domain_source()
 
     forbidden_wiring = [
         r"\bdocument\.addEventListener\(",

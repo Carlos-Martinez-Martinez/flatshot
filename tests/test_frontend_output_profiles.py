@@ -7,8 +7,17 @@ import pytest
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-HELPER_PATH = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend" / "output-profiles.js"
-INDEX_PATH = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend" / "index.html"
+FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
+HELPER_PATH = FRONTEND_DIR / "output-profiles.js"
+INDEX_PATH = FRONTEND_DIR / "index.html"
+
+
+def app_domain_source():
+    return "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in [FRONTEND_DIR / "app.js", *sorted(FRONTEND_DIR.glob("app-*.js"))]
+        if path.name != "app-state.js"
+    )
 
 
 def test_output_profile_helper_loads_before_app_script():
@@ -21,7 +30,7 @@ def test_output_profile_helper_loads_before_app_script():
 
 
 def test_output_profiles_are_synced_with_bridge_ui_preferences():
-    app_js = (PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend" / "app.js").read_text(encoding="utf-8")
+    app_js = app_domain_source()
 
     persist_start = app_js.index("function persistOutputProfiles()")
     persist_end = app_js.index("function persistImageAdjustmentSelection()", persist_start)

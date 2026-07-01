@@ -13,6 +13,14 @@ INDEX_PATH = FRONTEND_DIR / "index.html"
 APP_PATH = FRONTEND_DIR / "app.js"
 
 
+def app_domain_source():
+    return "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in [APP_PATH, *sorted(FRONTEND_DIR.glob("app-*.js"))]
+        if path.name != "app-state.js"
+    )
+
+
 def test_output_profile_view_helper_loads_before_app_script():
     html = INDEX_PATH.read_text(encoding="utf-8")
 
@@ -24,7 +32,7 @@ def test_output_profile_view_helper_loads_before_app_script():
 
 def test_output_profile_delete_uses_in_app_confirmation():
     html = INDEX_PATH.read_text(encoding="utf-8")
-    app_js = APP_PATH.read_text(encoding="utf-8")
+    app_js = app_domain_source()
 
     delete_start = app_js.index("function deleteManagedOutputProfile()")
     delete_end = app_js.index("function resetOutputProfileDraft()", delete_start)
@@ -40,7 +48,7 @@ def test_output_profile_delete_uses_in_app_confirmation():
 
 def test_background_preset_editor_stays_with_background_controls():
     html = INDEX_PATH.read_text(encoding="utf-8")
-    app_js = APP_PATH.read_text(encoding="utf-8")
+    app_js = app_domain_source()
 
     image_section_index = html.index('class="format-form-section format-section-image"')
     editor_index = html.index('id="background-preset-editor"')
@@ -66,7 +74,7 @@ def test_background_preset_editor_stays_with_background_controls():
 
 
 def test_transparent_background_switches_output_type_before_validation():
-    app_js = APP_PATH.read_text(encoding="utf-8")
+    app_js = app_domain_source()
 
     update_start = app_js.index("function updateOutputProfileDraftFromForm()")
     update_end = app_js.index("function setOutputProfileDraftEnabled", update_start)
@@ -78,7 +86,7 @@ def test_transparent_background_switches_output_type_before_validation():
 
 
 def test_destination_mode_clears_custom_path_before_validation():
-    app_js = APP_PATH.read_text(encoding="utf-8")
+    app_js = app_domain_source()
 
     update_start = app_js.index("function updateOutputProfileDraftFromForm()")
     update_end = app_js.index("function setOutputProfileDraftEnabled", update_start)
@@ -93,7 +101,7 @@ def test_destination_mode_clears_custom_path_before_validation():
 
 def test_custom_destination_can_pick_folder_from_bridge():
     html = INDEX_PATH.read_text(encoding="utf-8")
-    app_js = APP_PATH.read_text(encoding="utf-8")
+    app_js = app_domain_source()
 
     assert 'id="profile-destination-value-label"' in html
     assert 'data-action="pick-output-profile-destination"' in html

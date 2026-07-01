@@ -17,6 +17,14 @@ BUTTONS_CSS_PATH = FRONTEND_DIR / "css" / "03-components" / "buttons.css"
 STATES_CSS_PATH = FRONTEND_DIR / "css" / "08-states-responsive" / "states.css"
 
 
+def app_domain_source():
+    return "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in [APP_PATH, *sorted(FRONTEND_DIR.glob("app-*.js"))]
+        if path.name != "app-state.js"
+    )
+
+
 def test_settings_view_helper_loads_before_app_script():
     html = INDEX_PATH.read_text(encoding="utf-8")
 
@@ -121,7 +129,7 @@ def test_inspector_navigation_does_not_grid_advanced_disclosures():
 
 
 def test_studio_lighting_preset_selection_state_is_explicit():
-    js = APP_PATH.read_text(encoding="utf-8")
+    js = app_domain_source()
 
     assert 'lightingPresetId: ""' in js
     assert "const rememberedPresetId =" in js

@@ -13,6 +13,14 @@ INDEX_PATH = FRONTEND_DIR / "index.html"
 APP_PATH = FRONTEND_DIR / "app.js"
 
 
+def app_domain_source():
+    return "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in [APP_PATH, *sorted(FRONTEND_DIR.glob("app-*.js"))]
+        if path.name != "app-state.js"
+    )
+
+
 def test_preview_view_helper_loads_before_app_script():
     html = INDEX_PATH.read_text(encoding="utf-8")
 
@@ -24,7 +32,7 @@ def test_preview_view_helper_loads_before_app_script():
 
 def test_preview_toolbar_keeps_compact_context_labels():
     html = INDEX_PATH.read_text(encoding="utf-8")
-    app_js = APP_PATH.read_text(encoding="utf-8")
+    app_js = app_domain_source()
 
     for label in ("Fondo", "Imagen", "Encajar", "Zoom"):
         assert f'class="viewer-control-label">{label}</span>' in html

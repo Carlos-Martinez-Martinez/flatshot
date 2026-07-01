@@ -13,6 +13,10 @@ def test_render_cache_uses_configured_portable_cache_dir(tmp_path, monkeypatch):
     assert cache.cache_dir.exists()
 
 
+def test_render_cache_version_tracks_export_quality_pipeline():
+    assert RenderCache.CACHE_VERSION >= 5
+
+
 def test_render_cache_key_changes_with_local_override(tmp_path):
     source = tmp_path / "source.png"
     Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(source)

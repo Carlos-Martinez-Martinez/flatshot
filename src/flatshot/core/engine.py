@@ -152,11 +152,9 @@ class ShadowEngine:
             empty = Image.new("RGB", target_size, settings.bg_color)
             return empty, RenderDiagnostics(settings.shadow_engine, settings.shadow_engine)
         
-        # Prepare subject for processing
-        # Working at a reasonable resolution ensures speed and quality
-        # In preview mode we use a smaller resolution for better interactivity
-        max_work_w = 1200 if is_preview else 2000
-        if original_trimmed.width > max_work_w:
+        # Keep preview responsive, but preserve full source detail for export.
+        max_work_w = 1200
+        if is_preview and original_trimmed.width > max_work_w:
             w_ratio = max_work_w / original_trimmed.width
             subject_working = original_trimmed.resize(
                 (max_work_w, int(original_trimmed.height * w_ratio)), 
@@ -208,7 +206,13 @@ class ShadowEngine:
             
             subject_working.putalpha(alpha_contracted)
 
-        subject_resized = subject_working.resize((new_w, new_h), Image.Resampling.BICUBIC)
+        is_downscale = new_w < subject_working.width or new_h < subject_working.height
+        subject_resample = (
+            Image.Resampling.LANCZOS
+            if is_downscale and not is_preview
+            else Image.Resampling.BICUBIC
+        )
+        subject_resized = subject_working.resize((new_w, new_h), subject_resample)
         
         cx, cy = ShadowEngine._calcular_centro_masa(subject_resized)
         opt_y = int(canvas_h * 0.015) 

@@ -11,7 +11,7 @@ from PIL import Image, UnidentifiedImageError
 class RenderCache:
     """Manages cached full-resolution renders to speed up export."""
 
-    CACHE_VERSION = 3
+    CACHE_VERSION = 5
     CACHE_DIR_ENV_VAR = "FLATSHOT_RENDER_CACHE_DIR"
     
     def __init__(self):

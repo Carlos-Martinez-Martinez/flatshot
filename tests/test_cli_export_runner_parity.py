@@ -145,6 +145,28 @@ def test_cli_and_export_runner_preserve_basic_jpg_output_metadata(monkeypatch, t
     _assert_dpi_close(runner_metadata["dpi"])
 
 
+def test_cli_jpg_save_quality_matches_export_runner(monkeypatch, tmp_path, capsys):
+    source = tmp_path / "cli-source"
+    _write_png(source)
+    _patch_cli_user_state(monkeypatch)
+    save_calls = []
+    original_save = Image.Image.save
+
+    def capture_save(image, fp, *args, **kwargs):
+        if str(fp).endswith("product_PRO.jpg"):
+            save_calls.append(dict(kwargs))
+        return original_save(image, fp, *args, **kwargs)
+
+    monkeypatch.setattr(Image.Image, "save", capture_save)
+
+    cli.process_folder(_cli_args(source))
+    capsys.readouterr()
+
+    assert save_calls
+    assert save_calls[-1]["quality"] == 100
+    assert save_calls[-1]["subsampling"] == 0
+
+
 def test_cli_dry_run_reports_plan_without_creating_output(monkeypatch, tmp_path, capsys):
     source = tmp_path / "cli-dry-run"
     _write_png(source)

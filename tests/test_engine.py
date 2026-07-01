@@ -194,6 +194,89 @@ class TestAplicarEfectos:
         assert result.size == target_size
         assert isinstance(result, Image.Image)
 
+    def test_export_resize_keeps_detail_for_large_subjects(self):
+        """Full export should not pre-downsample detailed source pixels before final resize."""
+        subject_w, subject_h = 3000, 1000
+        canvas = Image.new("RGBA", (3300, 1300), (0, 0, 0, 0))
+        x = np.arange(subject_w, dtype=np.uint16)
+        y = np.arange(subject_h, dtype=np.uint16)[:, None]
+        pattern = (((x // 3 + y // 3) % 2) * 255).astype(np.uint8)
+        rgb = np.dstack(
+            [
+                pattern,
+                np.roll(pattern, 1, axis=1),
+                np.roll(pattern, 2, axis=0),
+            ]
+        )
+        alpha = np.full((subject_h, subject_w), 255, dtype=np.uint8)
+        canvas.alpha_composite(Image.fromarray(np.dstack([rgb, alpha]), "RGBA"), (150, 150))
+        settings = ShadowSettings(
+            adaptive_zoom=False,
+            padding=0,
+            transparent_bg=True,
+            opacity=0,
+            blur=0,
+            contact_blur=0,
+            noise=0,
+        )
+
+        result = ShadowEngine.aplicar_efectos(canvas, settings, (2400, 800))
+        subject = result.crop(result.getbbox()).convert("RGB")
+        arr = np.asarray(subject, dtype=np.int16)
+        horizontal_detail = float(np.mean(np.abs(arr[:, 1:, :] - arr[:, :-1, :])))
+
+        assert horizontal_detail > 75.0
+
+    def test_export_downscale_uses_lanczos_for_subject_detail(self):
+        size = 101
+        x = np.arange(size, dtype=np.uint16)
+        y = np.arange(size, dtype=np.uint16)[:, None]
+        pattern = ((x * 3 + y * 5 + ((x // 2 + y // 3) % 2) * 90) % 256).astype(np.uint8)
+        rgb = np.dstack(
+            [
+                pattern,
+                np.roll(pattern, 3, axis=1),
+                np.roll(pattern, 5, axis=0),
+            ]
+        )
+        source = Image.fromarray(
+            np.dstack([rgb, np.full((size, size), 255, dtype=np.uint8)]),
+            "RGBA",
+        )
+        settings = ShadowSettings(
+            adaptive_zoom=False,
+            padding=0,
+            transparent_bg=True,
+            opacity=0,
+            blur=0,
+            contact_blur=0,
+            noise=0,
+        )
+
+        result = ShadowEngine.aplicar_efectos(source, settings, (67, 67))
+        subject = result.crop(result.getbbox()).convert("RGB")
+        bicubic = source.resize(result.size, Image.Resampling.BICUBIC).convert("RGB")
+        lanczos = source.resize(result.size, Image.Resampling.LANCZOS).convert("RGB")
+
+        subject_arr = np.asarray(subject, dtype=np.int16)
+
+        def best_delta(reference: Image.Image) -> float:
+            max_left = reference.width - subject.width
+            max_top = reference.height - subject.height
+            deltas = []
+            for left in range(max_left + 1):
+                for top in range(max_top + 1):
+                    crop = reference.crop((left, top, left + subject.width, top + subject.height))
+                    deltas.append(
+                        float(np.mean(np.abs(subject_arr - np.asarray(crop, dtype=np.int16))))
+                    )
+            return min(deltas)
+
+        bicubic_delta = best_delta(bicubic)
+        lanczos_delta = best_delta(lanczos)
+
+        assert lanczos_delta < bicubic_delta
+
     def test_legacy_golden_synthetic_output(self):
         """Legacy renderer keeps the established visual output within tolerance."""
         img = Image.new("RGBA", (80, 120), (0, 0, 0, 0))

@@ -1,5 +1,4 @@
 from pathlib import Path
-from concurrent.futures import Future
 
 import numpy as np
 import pytest
@@ -14,28 +13,7 @@ from flatshot.application.export_runner import (
     variant_target_size,
 )
 from flatshot.core.models import CurveData, ExportConfig, ExportVariant, ShadowSettings, WEB_RGB230, WHITE_RGB255
-
-
-class InlineExecutor:
-    def __init__(self, max_workers=1):
-        self.max_workers = max_workers
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        self.shutdown()
-
-    def submit(self, fn, arg):
-        future = Future()
-        try:
-            future.set_result(fn(arg))
-        except Exception as exc:
-            future.set_exception(exc)
-        return future
-
-    def shutdown(self, wait=True, cancel_futures=False):
-        return None
+from tests.helpers import InlineExecutor
 
 
 def _curve():

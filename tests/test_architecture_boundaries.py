@@ -87,3 +87,16 @@ def test_retired_qt_packages_are_removed():
 
 def test_local_api_package_is_not_active_yet():
     assert not (SRC_ROOT / "api").exists()
+
+
+def test_test_helpers_own_inline_executor():
+    duplicate_definitions: list[str] = []
+
+    for path in PROJECT_ROOT.joinpath("tests").glob("test_*.py"):
+        if path.name == "test_architecture_boundaries.py":
+            continue
+        source = path.read_text(encoding="utf-8")
+        if "class InlineExecutor" in source:
+            duplicate_definitions.append(_relative(path))
+
+    assert duplicate_definitions == []

@@ -5,7 +5,6 @@ import json
 import base64
 import os
 import threading
-from concurrent.futures import Future
 from contextlib import contextmanager
 from io import BytesIO
 from pathlib import Path
@@ -23,33 +22,12 @@ from flatshot.bridge.http_server import (
     create_server,
 )
 from flatshot.bridge.service import FlatShotBridgeService
+from tests.helpers import InlineExecutor
 
 
 def _png(path: Path) -> Path:
     Image.new("RGBA", (4, 4), (255, 0, 0, 255)).save(path)
     return path
-
-
-class InlineExecutor:
-    def __init__(self, max_workers=1):
-        self.max_workers = max_workers
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        self.shutdown()
-
-    def submit(self, fn, arg):
-        future = Future()
-        try:
-            future.set_result(fn(arg))
-        except Exception as exc:
-            future.set_exception(exc)
-        return future
-
-    def shutdown(self, wait=True, cancel_futures=False):
-        return None
 
 
 def _export_runner_factory(**kwargs) -> ExportRunner:

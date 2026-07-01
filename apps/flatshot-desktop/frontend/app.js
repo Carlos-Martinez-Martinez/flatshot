@@ -2627,71 +2627,19 @@ function clearFilter() {
 }
 
 function normalizedBridgeUrl() {
-  return (state.bridgeUrl || defaultBridgeUrl).trim().replace(/\/+$/, "");
+  return bridgeClientHelpers.normalizedBridgeUrl(state.bridgeUrl, defaultBridgeUrl);
 }
 
 function bridgeThumbnailUrl(path, size = 128) {
-  if (!path) {
-    return "";
-  }
-  return `${normalizedBridgeUrl()}/images/thumbnail?path=${encodeURIComponent(path)}&size=${encodeURIComponent(size)}`;
+  return bridgeClientHelpers.thumbnailUrl(normalizedBridgeUrl(), path, size);
 }
 
-const BRIDGE_MAX_RETRIES = 3;
-const BRIDGE_RETRY_DELAY_MS = 500;
-
 async function bridgeRequest(path, options = {}) {
-  const controller = new AbortController();
-  const timeoutMs = options.timeoutMs || 3500;
-  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
-  const headers = options.body
-    ? { "Content-Type": "application/json", ...(options.headers || {}) }
-    : { ...(options.headers || {}) };
-  const { timeoutMs: _timeoutMs, retries: _retries, ...fetchOptions } = options;
-
-  const maxRetries = options.retries ?? BRIDGE_MAX_RETRIES;
-  let lastError = null;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    if (controller.signal.aborted) break;
-
-    try {
-      const response = await fetch(`${normalizedBridgeUrl()}${path}`, {
-        ...fetchOptions,
-        headers,
-        signal: controller.signal,
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(payload.error?.message || `HTTP ${response.status}`);
-      }
-      return payload;
-    } catch (err) {
-      lastError = err;
-      if (controller.signal.aborted) break;
-      if (attempt < maxRetries) {
-        const delay = BRIDGE_RETRY_DELAY_MS * Math.pow(2, attempt);
-        await new Promise((resolve) => { const id = window.setTimeout(resolve, delay); if (controller.signal) controller.signal.addEventListener("abort", () => { window.clearTimeout(id); resolve(); }, { once: true }); });
-      }
-    }
-  }
-
-  window.clearTimeout(timer);
-  throw lastError || new Error("Bridge request failed");
+  return bridgeClientHelpers.request(normalizedBridgeUrl(), path, options);
 }
 
 function bridgeErrorMessage(error) {
-  if (error && error.name === "AbortError") {
-    return "La conexión local tardó demasiado. Verifica que FlatShot esté funcionando.";
-  }
-  const message = (error && error.message) ? String(error.message) : "";
-  if (message.startsWith("HTTP ")) {
-    return `Error del servidor local: ${message}`;
-  }
-  if (message) {
-    return `Conexión local no disponible: ${message}`;
-  }
-  return "Conexión local no disponible. Reinicia la aplicación.";
+  return bridgeClientHelpers.errorMessage(error);
 }
 
 let _previewBlobUrl = null;
@@ -2706,16 +2654,12 @@ async function requestBridgePreview(image) {
   const timer = window.setTimeout(() => controller.abort(), 20000);
 
   try {
-    const response = await fetch(`${normalizedBridgeUrl()}/preview/render-image`, {
-      method: "POST",
-      body: JSON.stringify({
-        imagePath: image.path,
-        ...previewTargetSize(),
-        settings: bridgePreviewSettings(),
-        localOverride: currentImageOverride(image),
-      }),
-      headers: { "Content-Type": "application/json" },
+    const previewImage = await bridgeClientHelpers.requestPreviewImage(normalizedBridgeUrl(), {
       signal: controller.signal,
+      imagePath: image.path,
+      targetSize: previewTargetSize(),
+      settings: bridgePreviewSettings(),
+      localOverride: currentImageOverride(image),
     });
     window.clearTimeout(timer);
 
@@ -2723,28 +2667,18 @@ async function requestBridgePreview(image) {
       return;
     }
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.error?.message || `HTTP ${response.status}`);
-    }
-
-    const blob = await response.blob();
-    if (isStalePreviewResponse(requestId, image)) {
-      return;
-    }
-
     if (_previewBlobUrl) {
       URL.revokeObjectURL(_previewBlobUrl);
     }
-    _previewBlobUrl = URL.createObjectURL(blob);
+    _previewBlobUrl = URL.createObjectURL(previewImage.blob);
 
     const previewData = {
       src: _previewBlobUrl,
-      width: Number(response.headers.get("X-FlatShot-Width")) || 0,
-      height: Number(response.headers.get("X-FlatShot-Height")) || 0,
+      width: previewImage.width,
+      height: previewImage.height,
       sourceName: image.name,
       sourcePath: image.path,
-      warning: response.headers.get("X-FlatShot-Warning") || "",
+      warning: previewImage.warning,
       renderTimeMs: 0,
     };
 
@@ -7298,183 +7232,137 @@ function previewFooterLabel() {
   });
 }
 
-function handleAction(action, target = null) {
-  if (action === "load-batch") {
-    loadBatch();
-  } else if (action === "load-mock-batch") {
-    loadMockBatch();
-  } else if (action === "check-bridge") {
-    void checkBridge();
-  } else if (action === "toggle-inspector") {
+const actionDispatcher = actionHandlerHelpers.createActionDispatcher({
+  "load-batch": () => loadBatch(),
+  "load-mock-batch": () => loadMockBatch(),
+  "check-bridge": () => { void checkBridge(); },
+  "toggle-inspector": () => {
     state.inspectorCollapsed = !state.inspectorCollapsed;
     state.statusText = state.inspectorCollapsed ? "Inspector oculto" : "Inspector visible";
     render();
-  } else if (action === "pick-bridge-folder") {
-    void pickBridgeFolder();
-  } else if (action === "pick-output-profile-destination") {
-    void pickOutputProfileDestination();
-  } else if (action === "scan-bridge-folder") {
-    void scanBridgeFolder();
-  } else if (action === "clear-batch") {
-    clearBatch();
-  } else if (action === "show-empty-folder") {
-    showEmptyFolder();
-  } else if (action === "force-preview-error") {
+  },
+  "pick-bridge-folder": () => { void pickBridgeFolder(); },
+  "pick-output-profile-destination": () => { void pickOutputProfileDestination(); },
+  "scan-bridge-folder": () => { void scanBridgeFolder(); },
+  "clear-batch": () => clearBatch(),
+  "show-empty-folder": () => showEmptyFolder(),
+  "force-preview-error": () => {
     if (hasBatch()) {
       state.previewStatus = "error";
       state.statusText = "Vista no disponible";
       render();
     }
-  } else if (action === "previous-image") {
-    selectAdjacentImage(-1);
-  } else if (action === "next-image") {
-    selectAdjacentImage(1);
-  } else if (action === "clear-filter") {
-    clearFilter();
-  } else if (action === "clear-search") {
+  },
+  "previous-image": () => selectAdjacentImage(-1),
+  "next-image": () => selectAdjacentImage(1),
+  "clear-filter": () => clearFilter(),
+  "clear-search": () => {
     state.search = "";
     state.statusText = filterStatusText(state.filter);
-    if (ensureGallerySelectionForFilter()) {
-      return;
+    if (!ensureGallerySelectionForFilter()) {
+      render();
     }
-    render();
-  } else if (action === "select-first-image") {
+  },
+  "select-first-image": () => {
     const image = filteredImages()[0] || activeImages()[0];
     if (image) {
       selectImage(image.id);
     }
-  } else if (action === "select-image-id") {
+  },
+  "select-image-id": (target) => {
     const imageId = target?.dataset?.imageId;
     if (imageId) {
       state.inspectorTab = "review";
       selectImage(imageId);
     }
-  } else if (action === "open-advanced") {
+  },
+  "open-advanced": () => {
     state.inspectorTab = "advanced";
     pendingAdvancedDisclosure = "appearance-section";
     state.statusText = "Ajustes";
     render();
-  } else if (action === "open-image-adjustment") {
+  },
+  "open-image-adjustment": () => {
     state.inspectorTab = "advanced";
     state.presetEditorOpen = false;
     pendingAdvancedDisclosure = "local-adjustment";
     state.statusText = "Ajuste de esta imagen";
     render();
-  } else if (action === "apply-global-adjustment-to-overrides") {
-    resetAllImageOverrides();
-  } else if (action === "close-inspector-subview") {
+  },
+  "apply-global-adjustment-to-overrides": () => resetAllImageOverrides(),
+  "close-inspector-subview": () => {
     state.inspectorTab = "review";
     state.statusText = getVisibleAppState().nextStep || state.statusText;
     render();
-  } else if (action === "edit-output") {
-    beginOutputEdit();
-  } else if (action === "select-output-profile") {
+  },
+  "edit-output": () => beginOutputEdit(),
+  "select-output-profile": (target) => {
     const profileId = target?.dataset?.outputProfileId;
     if (profileId) {
       applyOutputProfile(profileId);
     }
-  } else if (action === "apply-output-edit") {
-    applyOutputEdit();
-  } else if (action === "cancel-output-edit") {
-    cancelOutputEdit();
-  } else if (action === "save-output-current-profile") {
-    saveCurrentOutputProfile();
-  } else if (action === "save-output-as-new") {
-    saveCurrentOutputAsNewProfile();
-  } else if (action === "discard-output-overrides") {
-    discardOutputOverrides();
-  } else if (action === "open-app-settings") {
-    openAppSettings();
-  } else if (action === "close-app-settings") {
-    closeAppSettings();
-  } else if (action === "cancel-output-profile-draft") {
-    cancelOutputProfileDraft();
-  } else if (action === "open-batch-detail") {
-    openBatchDetail();
-  } else if (action === "close-batch-detail") {
-    closeBatchDetail();
-  } else if (action === "cancel-export-confirm") {
-    closeExportConfirm();
-  } else if (action === "confirm-export") {
-    confirmExportFromModal();
-  } else if (action === "new-output-profile") {
-    newOutputProfile();
-  } else if (action === "duplicate-output-profile") {
-    duplicateOutputProfile();
-  } else if (action === "reset-output-profile-draft") {
-    resetOutputProfileDraft();
-  } else if (action === "delete-output-profile") {
-    deleteManagedOutputProfile();
-  } else if (action === "cancel-output-delete") {
-    cancelDeleteManagedOutputProfile();
-  } else if (action === "confirm-output-delete") {
-    confirmDeleteManagedOutputProfile();
-  } else if (action === "save-output-profile") {
-    saveOutputProfile();
-  } else if (action === "edit-background-preset") {
-    beginBackgroundPresetEdit("edit");
-  } else if (action === "new-background-preset") {
-    beginBackgroundPresetEdit("new");
-  } else if (action === "delete-background-preset") {
-    deleteBackgroundPreset();
-  } else if (action === "save-background-preset") {
-    saveBackgroundPreset();
-  } else if (action === "cancel-background-preset-edit") {
+  },
+  "apply-output-edit": () => applyOutputEdit(),
+  "cancel-output-edit": () => cancelOutputEdit(),
+  "save-output-current-profile": () => saveCurrentOutputProfile(),
+  "save-output-as-new": () => saveCurrentOutputAsNewProfile(),
+  "discard-output-overrides": () => discardOutputOverrides(),
+  "open-app-settings": () => openAppSettings(),
+  "close-app-settings": () => closeAppSettings(),
+  "cancel-output-profile-draft": () => cancelOutputProfileDraft(),
+  "open-batch-detail": () => openBatchDetail(),
+  "close-batch-detail": () => closeBatchDetail(),
+  "cancel-export-confirm": () => closeExportConfirm(),
+  "confirm-export": () => confirmExportFromModal(),
+  "new-output-profile": () => newOutputProfile(),
+  "duplicate-output-profile": () => duplicateOutputProfile(),
+  "reset-output-profile-draft": () => resetOutputProfileDraft(),
+  "delete-output-profile": () => deleteManagedOutputProfile(),
+  "cancel-output-delete": () => cancelDeleteManagedOutputProfile(),
+  "confirm-output-delete": () => confirmDeleteManagedOutputProfile(),
+  "save-output-profile": () => saveOutputProfile(),
+  "edit-background-preset": () => beginBackgroundPresetEdit("edit"),
+  "new-background-preset": () => beginBackgroundPresetEdit("new"),
+  "delete-background-preset": () => deleteBackgroundPreset(),
+  "save-background-preset": () => saveBackgroundPreset(),
+  "cancel-background-preset-edit": () => {
     state.backgroundPresetEditor = null;
     renderOutputProfileModalState();
-  } else if (action === "open-preset-editor") {
-    openPresetEditor();
-  } else if (action === "close-preset-editor") {
-    closePresetEditor();
-  } else if (action === "zoom-height") {
-    setViewerMode("height");
-  } else if (action === "zoom-width") {
-    setViewerMode("width");
-  } else if (action === "zoom-in") {
-    setViewerZoom(Math.round(currentViewerZoom() / 10) * 10 + 10);
-  } else if (action === "zoom-out") {
-    setViewerZoom(Math.round(currentViewerZoom() / 10) * 10 - 10);
-  } else if (action === "reset-settings") {
-    resetActivePresetSettings();
-  } else if (action === "cancel-adjustment-edit") {
-    cancelAdjustmentEdit();
-  } else if (action === "apply-global-adjustment") {
-    applyGlobalAdjustmentWithoutSaving();
-  } else if (action === "save-preset") {
-    void saveCurrentPreset();
-  } else if (action === "save-preset-as-new") {
-    saveCurrentPresetAsNew();
-  } else if (action === "apply-local-adjustment") {
-    applyLocalAdjustmentOnly();
-  } else if (action === "save-local-adjustment-as-new") {
-    saveCurrentLocalAdjustmentAsNew();
-  } else if (action === "export-presets") {
-    exportPresetCollection();
-  } else if (action === "delete-preset") {
-    void deleteActivePreset();
-  } else if (action === "toggle-local-adjustment") {
+  },
+  "open-preset-editor": () => openPresetEditor(),
+  "close-preset-editor": () => closePresetEditor(),
+  "zoom-height": () => setViewerMode("height"),
+  "zoom-width": () => setViewerMode("width"),
+  "zoom-in": () => setViewerZoom(Math.round(currentViewerZoom() / 10) * 10 + 10),
+  "zoom-out": () => setViewerZoom(Math.round(currentViewerZoom() / 10) * 10 - 10),
+  "reset-settings": () => resetActivePresetSettings(),
+  "cancel-adjustment-edit": () => cancelAdjustmentEdit(),
+  "apply-global-adjustment": () => applyGlobalAdjustmentWithoutSaving(),
+  "save-preset": () => { void saveCurrentPreset(); },
+  "save-preset-as-new": () => saveCurrentPresetAsNew(),
+  "apply-local-adjustment": () => applyLocalAdjustmentOnly(),
+  "save-local-adjustment-as-new": () => saveCurrentLocalAdjustmentAsNew(),
+  "export-presets": () => exportPresetCollection(),
+  "delete-preset": () => { void deleteActivePreset(); },
+  "toggle-local-adjustment": () => {
     state.localOverride = !state.localOverride;
     state.statusText = state.localOverride ? "Ajuste personalizado" : "Igual que el lote";
     render();
-  } else if (action === "reset-local-adjustment") {
-    resetCurrentImageOverride();
-  } else if (action === "pause-export") {
-    pauseExport();
-  } else if (action === "stop-export") {
-    stopExport();
-  } else if (action === "start-export") {
-    startExport();
-  } else if (action === "review-errors" || action === "review-warnings") {
-    reviewWarnings();
-  } else if (action === "review-output") {
-    beginOutputEdit();
-  } else if (action === "open-output") {
-    openOutputFolder();
-  } else if (action === "primary") {
-    primaryAction();
-  } else if (action === "secondary-primary") {
-    runVisibleAction(getVisibleAppState().secondaryAction?.action);
-  }
+  },
+  "reset-local-adjustment": () => resetCurrentImageOverride(),
+  "pause-export": () => pauseExport(),
+  "stop-export": () => stopExport(),
+  "start-export": () => startExport(),
+  "review-errors": () => reviewWarnings(),
+  "review-warnings": () => reviewWarnings(),
+  "review-output": () => beginOutputEdit(),
+  "open-output": () => openOutputFolder(),
+  "primary": () => primaryAction(),
+  "secondary-primary": () => runVisibleAction(getVisibleAppState().secondaryAction?.action),
+});
+
+function handleAction(action, target = null) {
+  actionDispatcher(action, target);
 }
 
 function closeTransientDetails(event) {

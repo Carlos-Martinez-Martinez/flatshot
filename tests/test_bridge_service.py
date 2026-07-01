@@ -1,6 +1,5 @@
 from pathlib import Path
 import base64
-from concurrent.futures import Future
 from io import BytesIO
 from time import sleep
 
@@ -14,6 +13,7 @@ from flatshot.bridge.errors import BridgeError, InvalidRequestError, error_respo
 from flatshot.bridge.serialization import image_file_info_to_dict
 from flatshot.bridge.service import FlatShotBridgeService
 from flatshot.application.contracts import ExportJobResult, ImageFileInfo, PreviewResult
+from tests.helpers import InlineExecutor
 
 
 def _png(path: Path) -> Path:
@@ -23,28 +23,6 @@ def _png(path: Path) -> Path:
 
 def _service(config_dir: Path) -> FlatShotBridgeService:
     return FlatShotBridgeService(config_resolver=ConfigPathResolver(config_dir))
-
-
-class InlineExecutor:
-    def __init__(self, max_workers=1):
-        self.max_workers = max_workers
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        self.shutdown()
-
-    def submit(self, fn, arg):
-        future = Future()
-        try:
-            future.set_result(fn(arg))
-        except Exception as exc:
-            future.set_exception(exc)
-        return future
-
-    def shutdown(self, wait=True, cancel_futures=False):
-        return None
 
 
 def _export_runner_factory(**kwargs) -> ExportRunner:

@@ -1,33 +1,10 @@
-from concurrent.futures import Future
-
 from PIL import Image
 
 from flatshot.application.contracts import ExportJobRequest
 from flatshot.application.export_runner import ExportRunner
 from flatshot.core.models import CurveData, ExportConfig, ShadowSettings
 from flatshot.utils.render_cache import RenderCache
-
-
-class InlineExecutor:
-    def __init__(self, max_workers=1):
-        self.max_workers = max_workers
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        self.shutdown()
-
-    def submit(self, fn, arg):
-        future = Future()
-        try:
-            future.set_result(fn(arg))
-        except Exception as exc:
-            future.set_exception(exc)
-        return future
-
-    def shutdown(self, wait=True, cancel_futures=False):
-        return None
+from tests.helpers import InlineExecutor
 
 
 def _use_isolated_cache(monkeypatch, cache_dir):

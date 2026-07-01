@@ -77,6 +77,8 @@ global.mockPresets = [
 global.urlParams = new URLSearchParams(window.location.search);
 global.defaultBridgeUrl = "http://127.0.0.1:8765";
 global.bridgeUrlHelpers = window.FlatShotBridgeUrl;
+global.bridgeClientHelpers = window.FlatShotBridgeClient;
+global.actionHandlerHelpers = window.FlatShotActionHandlers;
 global.initialBridgeUrl = global.bridgeUrlHelpers.initialBridgeUrlFromSearch(window.location.search, global.defaultBridgeUrl);
 global.devMode = global.urlParams.get("dev") === "1";
 global.SOFT_BLACK_PREVIEW_BG = "soft-black";

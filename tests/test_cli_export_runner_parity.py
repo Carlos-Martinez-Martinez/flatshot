@@ -1,5 +1,4 @@
 from argparse import Namespace
-from concurrent.futures import Future
 from pathlib import Path
 
 import pytest
@@ -10,28 +9,7 @@ from flatshot.application.contracts import ExportJobRequest
 from flatshot.application.export_runner import ExportRunner
 from flatshot.core.models import ExportConfig, ShadowSettings
 from flatshot.core.scaling import DEFAULT_SCALE_CURVE, normalize_curve_data
-
-
-class InlineExecutor:
-    def __init__(self, max_workers=1):
-        self.max_workers = max_workers
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        self.shutdown()
-
-    def submit(self, fn, arg):
-        future = Future()
-        try:
-            future.set_result(fn(arg))
-        except Exception as exc:
-            future.set_exception(exc)
-        return future
-
-    def shutdown(self, wait=True, cancel_futures=False):
-        pass
+from tests.helpers import InlineExecutor
 
 
 class StubLogger:

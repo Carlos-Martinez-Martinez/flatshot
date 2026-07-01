@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import shutil
 import subprocess
@@ -13,14 +12,22 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+from portable.manifest import (  # noqa: E402
+    PORTABLE_DEPENDENCIES,
+    dependency_manifest_hash,
+    iter_runtime_source_files,
+    iter_source_files,
+    runtime_manifest_hash,
+    source_manifest_hash,
+)
+
 DEFAULT_TARGET = PROJECT_ROOT / "release" / "FlatShotPortable"
 LAUNCHER_TEMPLATE = PROJECT_ROOT / "scripts" / "portable" / "FlatShot.pyw"
-RUNTIME_SOURCE_DIRS = (
-    Path("src") / "flatshot",
-    Path("apps") / "flatshot-desktop" / "frontend",
-)
-DEPENDENCY_FILES = ("pyproject.toml", "requirements.txt")
-PORTABLE_DEPENDENCIES = ("pywebview>=6.0",)
+MANIFEST_TEMPLATE = PROJECT_ROOT / "scripts" / "portable" / "manifest.py"
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -78,6 +85,7 @@ def sync_portable_app(source_root: Path, target: Path) -> None:
 
 def copy_launcher_files(target: Path) -> None:
     shutil.copy2(LAUNCHER_TEMPLATE, target / "FlatShot.pyw")
+    shutil.copy2(MANIFEST_TEMPLATE, target / "manifest.py")
     (target / "Abrir FlatShot.vbs").write_text(VBS_LAUNCHER, encoding="utf-8")
     (target / "Diagnostico FlatShot.bat").write_text(DIAGNOSTIC_BAT, encoding="utf-8")
     (target / "README_PORTABLE.txt").write_text(README_PORTABLE, encoding="utf-8")
@@ -122,60 +130,6 @@ def copy_tree(source: Path, destination: Path) -> None:
 def ignore_generated(_directory: str, names: list[str]) -> set[str]:
     ignored = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "node_modules", "build", "dist"}
     return {name for name in names if name in ignored or name.endswith((".pyc", ".pyo", ".tsbuildinfo"))}
-
-
-def source_manifest_hash(source_root: Path) -> str:
-    return files_manifest_hash(iter_source_files(source_root), source_root)
-
-
-def runtime_manifest_hash(source_root: Path) -> str:
-    return files_manifest_hash(iter_runtime_source_files(source_root), source_root)
-
-
-def dependency_manifest_hash(source_root: Path) -> str:
-    digest = hashlib.sha256()
-    digest.update(files_manifest_hash(iter_dependency_files(source_root), source_root).encode("utf-8"))
-    for dependency in PORTABLE_DEPENDENCIES:
-        digest.update(f"\0portable:{dependency}\n".encode("utf-8"))
-    return digest.hexdigest()
-
-
-def files_manifest_hash(files, source_root: Path) -> str:
-    digest = hashlib.sha256()
-    for file in files:
-        stat = file.stat()
-        rel = file.relative_to(source_root).as_posix()
-        digest.update(f"{rel}\0{stat.st_size}\0{stat.st_mtime_ns}\n".encode("utf-8"))
-    return digest.hexdigest()
-
-
-def iter_source_files(source_root: Path):
-    yield from iter_runtime_source_files(source_root)
-    yield from iter_dependency_files(source_root)
-
-
-def iter_runtime_source_files(source_root: Path):
-    for source_dir in RUNTIME_SOURCE_DIRS:
-        root = source_root / source_dir
-        for file in root.rglob("*"):
-            if should_skip_source_file(file):
-                continue
-            if file.is_file():
-                yield file
-
-
-def iter_dependency_files(source_root: Path):
-    for file_name in DEPENDENCY_FILES:
-        file = source_root / file_name
-        if file.exists() and file.is_file():
-            yield file
-
-
-def should_skip_source_file(file: Path) -> bool:
-    parts = set(file.parts)
-    if {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "release", "venv", ".venv"} & parts:
-        return True
-    return file.suffix in {".pyc", ".pyo"} or file.name.endswith(".tsbuildinfo")
 
 
 def write_sync_stamp(source_root: Path, target: Path) -> None:

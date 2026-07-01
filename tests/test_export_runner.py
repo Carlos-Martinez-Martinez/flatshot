@@ -1,5 +1,4 @@
 import threading
-from concurrent.futures import Future
 
 import pytest
 from PIL import Image
@@ -15,40 +14,12 @@ from flatshot.application.execution_control import CancellationToken, PauseToken
 from flatshot.application.export_runner import (
     ExportRunner,
     OutputPathValidationError,
+    build_export_plan,
     validate_export_requests_outputs,
 )
 from flatshot.core.models import CurveData, ExportConfig, ShadowSettings
-
-
-class InlineExecutor:
-    def __init__(self, max_workers=1):
-        self.max_workers = max_workers
-        self.shutdown_called = False
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        self.shutdown()
-
-    def submit(self, fn, arg):
-        future = Future()
-        try:
-            future.set_result(fn(arg))
-        except Exception as exc:
-            future.set_exception(exc)
-        return future
-
-    def shutdown(self, wait=True, cancel_futures=False):
-        self.shutdown_called = True
-
-
-class CollectingSink:
-    def __init__(self):
-        self.events = []
-
-    def emit(self, event):
-        self.events.append(event)
+from flatshot.utils.render_cache import RenderCache
+from tests.helpers import CollectingSink, InlineExecutor
 
 
 class RecordingExecutor(InlineExecutor):
@@ -88,12 +59,42 @@ def _request_with_files(folder, files, config=None, settings=None):
     )
 
 
+def _use_isolated_cache(monkeypatch, cache_dir):
+    def init(self):
+        self.cache_dir = cache_dir
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr(RenderCache, "__init__", init)
+
+
 def test_export_runner_does_not_import_pyqt():
     source = export_runner_module.Path(export_runner_module.__file__).read_text(encoding="utf-8")
 
     assert "PyQt6" not in source
     assert "QThread" not in source
     assert "pyqtSignal" not in source
+
+
+def test_build_export_plan_splits_cached_and_render_tasks(monkeypatch, tmp_path):
+    cache_dir = tmp_path / "cache"
+    _use_isolated_cache(monkeypatch, cache_dir)
+    source = _source(tmp_path)
+    settings = ShadowSettings(opacity=0, blur=0, noise=0)
+    config = ExportConfig(format="PNG", output_width=8, output_height=8)
+    request = _request(tmp_path, config=config, settings=settings)
+    cache = RenderCache()
+    image_items = [(source, str(source), source)]
+    first_plan = build_export_plan(request, image_items, cache)
+    cache_path = first_plan.render_tasks[0]["cache_path"]
+    Image.new("RGBA", (8, 8), (1, 2, 3, 255)).save(cache_path)
+
+    plan = build_export_plan(request, image_items, cache)
+
+    assert plan.source_total == 1
+    assert plan.total == 1
+    assert plan.render_tasks == []
+    assert len(plan.cached_tasks) == 1
+    assert plan.planned_outputs[0]["save_path"].name == "source_PRO.png"
 
 
 def test_export_runner_empty_folder_returns_success(tmp_path):
@@ -123,6 +124,22 @@ def test_export_runner_exports_one_png_to_subfolder(tmp_path):
     assert output.parent in result.destinations
     assert any(isinstance(event, ExportProgressEvent) and event.percent == 100 for event in sink.events)
     assert any(isinstance(event, ExportImageCompletedEvent) and event.success for event in sink.events)
+
+
+def test_export_runner_writes_render_cache_after_normal_render(monkeypatch, tmp_path):
+    cache_dir = tmp_path / "cache"
+    _use_isolated_cache(monkeypatch, cache_dir)
+    _source(tmp_path)
+    settings = ShadowSettings(opacity=0, blur=0, noise=0)
+    config = ExportConfig(format="PNG", output_width=8, output_height=8)
+    runner = ExportRunner(executor_factory=InlineExecutor)
+
+    result = runner.run(_request(tmp_path, config=config, settings=settings))
+
+    assert result.success
+    cache_files = list(cache_dir.glob("*.png"))
+    assert len(cache_files) == 1
+    assert cache_files[0].stat().st_size > 0
 
 
 def test_export_runner_honors_configured_max_workers(tmp_path):

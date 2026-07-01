@@ -24,6 +24,7 @@ def test_build_portable_without_venv_copies_runtime_files(tmp_path):
     assert (target / "source_path.txt").read_text(encoding="utf-8") == str(PROJECT_ROOT)
     assert (target / ".autosync.json").exists()
     assert (target / "FlatShot.pyw").exists()
+    assert (target / "manifest.py").exists()
     assert (target / "Abrir FlatShot.vbs").exists()
     assert (target / "Diagnostico FlatShot.bat").exists()
     assert (target / "app" / "flatshot" / "bridge" / "service.py").exists()

@@ -5,9 +5,11 @@ import os
 import shutil
 import tempfile
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
+from dataclasses import dataclass
 from pathlib import Path
 from time import time
 from typing import Callable, Protocol
+from uuid import uuid4
 
 from PIL import Image
 
@@ -70,6 +72,16 @@ class OutputPathValidationError(ValueError):
 class ExportEventSink(Protocol):
     def emit(self, event: ExportEvent) -> None:
         ...
+
+
+@dataclass
+class ExportPlan:
+    source_total: int
+    total: int
+    enabled_variants: list[ExportVariant]
+    planned_outputs: list[dict]
+    render_tasks: list[dict]
+    cached_tasks: list[dict]
 
 
 def apply_naming_template(
@@ -279,6 +291,91 @@ def validate_export_requests_outputs(
     return planned_outputs
 
 
+def build_export_plan(
+    request: ExportJobRequest,
+    image_items: list[tuple[Path, str, Path]],
+    cache: RenderCache,
+) -> ExportPlan:
+    enabled_variants = get_enabled_export_variants(request.export_config)
+    curve_data_dict = request.curve_data.model_dump() if request.curve_data else None
+    parent_folder_name = request.input_folder.name
+    render_tasks: list[dict] = []
+    cached_tasks: list[dict] = []
+    planned_outputs: list[dict] = []
+
+    for index, (img_path, local_key, cache_identity_path) in enumerate(
+        sorted(image_items, key=lambda item: item[0].name),
+        start=1,
+    ):
+        local_override = dict(request.image_overrides or {}).get(local_key, {})
+
+        for variant in enabled_variants:
+            variant_settings = build_variant_settings(request.settings, variant)
+            settings_dict = variant_settings.model_dump()
+            target_size = variant_target_size(request.export_config, variant)
+            variant_base_folder = variant_base_output_folder(
+                request.input_folder,
+                request.export_config,
+                variant,
+            )
+            save_path, fmt = build_variant_output_path(
+                variant_base_folder,
+                request.export_config,
+                variant,
+                img_path.stem,
+                parent_folder_name,
+                index,
+            )
+            display_name = f"{img_path.name} · {variant.label}"
+            task_args = (
+                img_path,
+                save_path,
+                settings_dict,
+                target_size,
+                fmt,
+                curve_data_dict,
+                local_override,
+                display_name,
+            )
+            key = cache.get_cache_key(
+                str(cache_identity_path),
+                settings_dict,
+                curve_data_dict,
+                target_size,
+                local_override,
+                fmt,
+            )
+            render_task = {
+                "img_path": img_path,
+                "key": key,
+                "fmt": fmt,
+                "save_path": save_path,
+                "cache_path": cache.get_cached_path(key, fmt),
+                "task_args": task_args,
+                "display_name": display_name,
+            }
+            planned_outputs.append(
+                {
+                    "save_path": save_path,
+                    "variant": variant,
+                    "image_path": img_path,
+                }
+            )
+            if cache.exists(key, fmt, validate=True):
+                cached_tasks.append(render_task)
+            else:
+                render_tasks.append(render_task)
+
+    return ExportPlan(
+        source_total=len(image_items),
+        total=len(image_items) * len(enabled_variants),
+        enabled_variants=enabled_variants,
+        planned_outputs=planned_outputs,
+        render_tasks=render_tasks,
+        cached_tasks=cached_tasks,
+    )
+
+
 def process_single_image(args):
     """Process a single image in a worker process."""
     (
@@ -387,16 +484,16 @@ class ExportRunner:
 
         try:
             image_items = self._snapshot_image_items(request)
-            source_total = len(image_items)
-            if source_total == 0:
+            cache = RenderCache()
+            plan = build_export_plan(request, image_items, cache)
+            if plan.source_total == 0:
                 result = ExportJobResult(True, 0, 0, 0, 0.0, destinations)
                 self._emit(ExportFinishedEvent(True, 0, 0, 0, 0.0))
                 return result
 
-            enabled_variants = get_enabled_export_variants(request.export_config)
-            total = source_total * len(enabled_variants)
-            self._emit(ExportStartedEvent(source_total, total))
-            if not enabled_variants:
+            total = plan.total
+            self._emit(ExportStartedEvent(plan.source_total, total))
+            if not plan.enabled_variants:
                 self._emit(ExportLogEvent("No hay variantes de salida activas. Activa al menos una salida."))
                 duration = time() - start_time
                 result = ExportJobResult(False, 0, 0, 0, duration, destinations)
@@ -404,84 +501,13 @@ class ExportRunner:
                 return result
 
             self._emit(
-                ExportLogEvent("Salidas activas: " + ", ".join(variant.label for variant in enabled_variants))
+                ExportLogEvent("Salidas activas: " + ", ".join(variant.label for variant in plan.enabled_variants))
             )
 
-            curve_data_dict = request.curve_data.model_dump() if request.curve_data else None
-            parent_folder_name = request.input_folder.name
-            cache = RenderCache()
-
-            tasks = []
-            cached_tasks = []
-            planned_outputs = []
-
-            for index, (img_path, local_key, cache_identity_path) in enumerate(
-                sorted(image_items, key=lambda item: item[0].name),
-                start=1,
-            ):
-                local_override = dict(request.image_overrides or {}).get(local_key, {})
-
-                for variant in enabled_variants:
-                    variant_settings = build_variant_settings(request.settings, variant)
-                    settings_dict = variant_settings.model_dump()
-                    target_size = variant_target_size(request.export_config, variant)
-                    variant_base_folder = variant_base_output_folder(
-                        request.input_folder,
-                        request.export_config,
-                        variant,
-                    )
-                    save_path, fmt = build_variant_output_path(
-                        variant_base_folder,
-                        request.export_config,
-                        variant,
-                        img_path.stem,
-                        parent_folder_name,
-                        index,
-                    )
-                    display_name = f"{img_path.name} · {variant.label}"
-                    task_args = (
-                        img_path,
-                        save_path,
-                        settings_dict,
-                        target_size,
-                        fmt,
-                        curve_data_dict,
-                        local_override,
-                        display_name,
-                    )
-                    key = cache.get_cache_key(
-                        str(cache_identity_path),
-                        settings_dict,
-                        curve_data_dict,
-                        target_size,
-                        local_override,
-                        fmt,
-                    )
-                    planned_outputs.append(
-                        {
-                            "save_path": save_path,
-                            "variant": variant,
-                            "image_path": img_path,
-                        }
-                    )
-                    if cache.exists(key, fmt, validate=True):
-                        cached_tasks.append(
-                            {
-                                "img_path": img_path,
-                                "key": key,
-                                "fmt": fmt,
-                                "save_path": save_path,
-                                "task_args": task_args,
-                                "display_name": display_name,
-                            }
-                        )
-                    else:
-                        tasks.append(task_args)
-
             try:
-                validate_output_path_collisions(planned_outputs)
+                validate_output_path_collisions(plan.planned_outputs)
                 destinations = sorted(
-                    {Path(item["save_path"]).parent for item in planned_outputs},
+                    {Path(item["save_path"]).parent for item in plan.planned_outputs},
                     key=lambda path: str(path),
                 )
                 for folder in destinations:
@@ -497,13 +523,14 @@ class ExportRunner:
                 return result
 
             completed_count, error_count, fallback = self._export_cached_tasks(
-                cached_tasks,
+                plan.cached_tasks,
                 cache,
                 completed_count,
                 error_count,
                 total,
             )
 
+            tasks = list(plan.render_tasks)
             if fallback:
                 tasks.extend(fallback)
 
@@ -513,11 +540,12 @@ class ExportRunner:
                     self._emit(ExportLogEvent("Exportación cancelada."))
                 else:
                     completed_count, error_count = self._export_render_tasks(
-                    tasks,
-                    completed_count,
-                    error_count,
-                    total,
-                )
+                        tasks,
+                        cache,
+                        completed_count,
+                        error_count,
+                        total,
+                    )
 
         except Exception as exc:
             self._emit(ExportLogEvent(f"Error crítico en ExportRunner: {exc}"))
@@ -565,11 +593,11 @@ class ExportRunner:
         completed_count: int,
         error_count: int,
         total: int,
-    ) -> tuple[int, int, list]:
+    ) -> tuple[int, int, list[dict]]:
         if not cached_tasks:
             return completed_count, error_count, []
 
-        fallback_tasks: list[tuple] = []
+        fallback_tasks: list[dict] = []
         self._emit(ExportLogEvent(f"Exportando {len(cached_tasks)} archivos desde caché..."))
         for cached in cached_tasks:
             if self.cancellation_token.cancelled:
@@ -591,13 +619,14 @@ class ExportRunner:
                         f"Caché no válida para {cached['display_name']}; renderizando normal ({e})"
                     )
                 )
-                fallback_tasks.append(cached["task_args"])
+                fallback_tasks.append(cached)
 
         return completed_count, error_count, fallback_tasks
 
     def _export_render_tasks(
         self,
-        tasks: list[tuple],
+        tasks: list[dict],
+        cache: RenderCache,
         completed_count: int,
         error_count: int,
         total: int,
@@ -609,11 +638,13 @@ class ExportRunner:
             with self.executor_factory(max_workers=max_workers) as executor:
                 self.executor = executor
                 pending_tasks = iter(tasks)
-                in_flight = set()
+                in_flight = {}
 
                 for _ in range(min(max_workers, len(tasks))):
                     try:
-                        in_flight.add(executor.submit(self.image_processor, next(pending_tasks)))
+                        task = next(pending_tasks)
+                        future = executor.submit(self.image_processor, task["task_args"])
+                        in_flight[future] = task
                     except StopIteration:
                         break
 
@@ -622,18 +653,19 @@ class ExportRunner:
                     if self.cancellation_token.cancelled:
                         break
 
-                    done, _ = wait(in_flight, timeout=0.2, return_when=FIRST_COMPLETED)
+                    done, _ = wait(set(in_flight), timeout=0.2, return_when=FIRST_COMPLETED)
                     if not done:
                         continue
 
                     for future in done:
-                        in_flight.discard(future)
+                        task = in_flight.pop(future)
                         try:
                             success, msg, warning = future.result()
                         except Exception as exc:
                             success, msg, warning = False, f"Worker error: {exc}", None
 
                         if success:
+                            self._store_render_cache(task, cache)
                             if warning:
                                 self._emit(ExportLogEvent(f"Aviso: {msg}: {warning}"))
                             self._emit(ExportImageCompletedEvent(msg, True))
@@ -647,13 +679,30 @@ class ExportRunner:
 
                         if not self.cancellation_token.cancelled and not self.pause_token.paused:
                             try:
-                                in_flight.add(executor.submit(self.image_processor, next(pending_tasks)))
+                                task = next(pending_tasks)
+                                future = executor.submit(self.image_processor, task["task_args"])
+                                in_flight[future] = task
                             except StopIteration:
                                 pass
         except Exception as exc:
             self._emit(ExportLogEvent(f"Error en el proceso de exportación: {exc}"))
 
         return completed_count, error_count
+
+    def _store_render_cache(self, task: dict, cache: RenderCache) -> None:
+        cache_path = Path(task["cache_path"])
+        save_path = Path(task["save_path"])
+        temp_path = cache.get_temp_path(cache_path, str(uuid4()))
+        try:
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            self.copy_file(save_path, temp_path)
+            os.replace(temp_path, cache_path)
+        except Exception as exc:
+            try:
+                temp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            self._emit(ExportLogEvent(f"Aviso: no se pudo actualizar la caché de {task['display_name']}: {exc}"))
 
     def _emit_progress(self, completed_count: int, total: int) -> None:
         self._emit(ExportProgressEvent(completed_count, total, int((completed_count / total) * 100)))

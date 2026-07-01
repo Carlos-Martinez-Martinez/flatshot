@@ -422,7 +422,7 @@ function previewCustomRgbChannels(value) {
   if (value === SOFT_BLACK_PREVIEW_BG) {
     return [32, 34, 37];
   }
-  return backgroundColorTuple(value || "rgb230");
+  return outputProfileHelpers.backgroundColorTuple(value || "rgb230");
 }
 
 function previewCustomBackgroundValue() {
@@ -442,7 +442,7 @@ function previewBackgroundLabel(value) {
   if (value === SOFT_BLACK_PREVIEW_BG) {
     return "negro suave";
   }
-  return backgroundLabel(value);
+  return settingsViewHelpers.backgroundLabel(value);
 }
 
 function normalizeBackgroundPreset(preset, index = 0) {
@@ -526,7 +526,7 @@ function backgroundSelectOptionsHtml(selectedValue) {
   if (state.backgroundPresets.some((preset) => outputProfileHelpers.normalizeBackgroundValue(backgroundPresetValue(preset)) === selected)) {
     return presetOptions;
   }
-  return `${presetOptions}<option value="${escapeHtml(selected)}">${escapeHtml(`Actual · ${backgroundLabel(selected)}`)}</option>`;
+  return `${presetOptions}<option value="${escapeHtml(selected)}">${escapeHtml(`Actual · ${settingsViewHelpers.backgroundLabel(selected)}`)}</option>`;
 }
 
 function activeOutputProfile() {
@@ -972,14 +972,6 @@ function exportableImages() {
   return activeImages().filter((image) => image.exportable);
 }
 
-function countText(count, singular, plural = `${singular}s`) {
-  return preflightHelpers.countText(count, singular, plural);
-}
-
-function readyImagesText(count) {
-  return preflightHelpers.readyImagesText(count);
-}
-
 function ignoredNeutralText(count = batchCounts().ignoredFiles) {
   return preflightHelpers.ignoredNeutralText(count);
 }
@@ -1079,10 +1071,6 @@ function filteredImages() {
   });
 }
 
-function filterStatusText(filter = state.filter) {
-  return galleryHelpers.filterStatusText(filter);
-}
-
 function validationIssues() {
   const issues = [];
   if (state.batch === "none") {
@@ -1169,7 +1157,7 @@ function exportConfirmationRisks() {
     risks.push({
       id: "image-warnings",
       level: "warning",
-      title: `${countText(exportableWarningImages, "imagen", "imágenes")} con aviso`,
+      title: `${preflightHelpers.countText(exportableWarningImages, "imagen", "imágenes")} con aviso`,
       detail: "Se exportarán, pero conviene revisarlas si el lote es de producción.",
     });
   }
@@ -1178,7 +1166,7 @@ function exportConfirmationRisks() {
     risks.push({
       id: "non-exportable-images",
       level: "warning",
-      title: `${countText(counts.nonExportableImages, "imagen", "imágenes")} excluida${counts.nonExportableImages === 1 ? "" : "s"}`,
+      title: `${preflightHelpers.countText(counts.nonExportableImages, "imagen", "imágenes")} excluida${counts.nonExportableImages === 1 ? "" : "s"}`,
       detail: "No se incluirán en la exportación.",
     });
   }
@@ -1206,7 +1194,7 @@ function exportConfirmationRisks() {
     risks.push({
       id: "low-resolution",
       level: "warning",
-      title: `${countText(lowResolutionCount, "imagen", "imágenes")} por debajo del tamaño de salida`,
+      title: `${preflightHelpers.countText(lowResolutionCount, "imagen", "imágenes")} por debajo del tamaño de salida`,
       detail: "La imagen puede ampliarse para llegar al tamaño configurado.",
     });
   }
@@ -1220,7 +1208,7 @@ function exportConfirmationRisks() {
     });
   }
 
-  if (state.exportStatus === "failed" && state.errors.some((issue) => issue.level === "error" && !issueMentionsExistingOutput(issue))) {
+  if (state.exportStatus === "failed" && state.errors.some((issue) => issue.level === "error" && !preflightHelpers.issueMentionsExistingOutput(issue))) {
     risks.push({
       id: "previous-export-errors",
       level: "warning",
@@ -1230,7 +1218,7 @@ function exportConfirmationRisks() {
   }
 
   state.errors
-    .filter((issue) => issue.level !== "error" && !issueMentionsExistingOutput(issue))
+    .filter((issue) => issue.level !== "error" && !preflightHelpers.issueMentionsExistingOutput(issue))
     .slice(0, 2)
     .forEach((issue, index) => {
       risks.push({
@@ -1241,15 +1229,7 @@ function exportConfirmationRisks() {
       });
     });
 
-  return dedupeExportRisks(risks);
-}
-
-function dedupeExportRisks(risks) {
   return preflightHelpers.dedupeExportRisks(risks);
-}
-
-function issueMentionsExistingOutput(issue) {
-  return preflightHelpers.issueMentionsExistingOutput(issue);
 }
 
 function hasPreviousExportDestination() {
@@ -1332,7 +1312,7 @@ function firstActionableIssue() {
       level: "warning",
       title: "Archivo a revisar",
       file: omitted.name || "Archivo",
-      detail: omissionReasonLabel(omitted.reason),
+      detail: batchViewHelpers.omissionReasonLabel(omitted.reason),
       path: omitted.path || omitted.folder || "",
     };
   }
@@ -1465,7 +1445,7 @@ function getVisibleAppState() {
       tone: "warning",
       title: "No hay PNG válidos",
       subtitle: hasFoundFiles
-        ? `${countText(counts.filesFound, "archivo encontrado", "archivos encontrados")}${counts.ignoredFiles ? ` · ${ignoredNeutralText(counts.ignoredFiles)}` : ""}`
+        ? `${preflightHelpers.countText(counts.filesFound, "archivo encontrado", "archivos encontrados")}${counts.ignoredFiles ? ` · ${ignoredNeutralText(counts.ignoredFiles)}` : ""}`
         : "No hay archivos compatibles en esta carpeta.",
       topSummary: compactHeaderStatusText(),
       primaryAction: { label: "Elegir otra carpeta", action: "pick-bridge-folder", enabled: state.bridgeStatus !== "checking" },
@@ -1495,7 +1475,7 @@ function getVisibleAppState() {
       id: "ready_with_warnings",
       tone: "warning",
       title: "Lote listo",
-      subtitle: `${summary} · ${countText(counts.nonBlockingWarnings, "aviso", "avisos")}`,
+      subtitle: `${summary} · ${preflightHelpers.countText(counts.nonBlockingWarnings, "aviso", "avisos")}`,
       topSummary: compactHeaderStatusText(),
       primaryAction: { label: exportActionLabel(counts.exportableImages), action: "start-export", enabled: isExportReady() },
       secondaryAction: { label: "Revisar avisos", action: "review-warnings", enabled: true },
@@ -1518,7 +1498,7 @@ function getVisibleAppState() {
 }
 
 function readyBatchSummaryText(counts = batchCounts()) {
-  const readyText = readyImagesText(counts.filesFound > 0 || counts.exportableImages > 0 ? counts.exportableImages : 0);
+  const readyText = preflightHelpers.readyImagesText(counts.filesFound > 0 || counts.exportableImages > 0 ? counts.exportableImages : 0);
   return batchViewHelpers.readyBatchSummaryText(counts, batchViewHelpers.detectedFormatLabel(activeImages()), readyText);
 }
 
@@ -1860,7 +1840,7 @@ function ensureGallerySelectionForFilter() {
 
 function applyGalleryFilter(filter) {
   state.filter = filter || BATCH_FILTERS.all;
-  state.statusText = filterStatusText(state.filter);
+  state.statusText = galleryHelpers.filterStatusText(state.filter);
   if (ensureGallerySelectionForFilter()) {
     return;
   }
@@ -2040,28 +2020,16 @@ function canViewerPan() {
   return bounds.minX !== 0 || bounds.maxX !== 0 || bounds.minY !== 0 || bounds.maxY !== 0;
 }
 
-function isAutoViewerMode(mode = state.fitMode) {
-  return previewStateHelpers.isAutoViewerMode(mode);
-}
-
 function viewerModeLabel(mode = state.fitMode) {
   return previewStateHelpers.viewerModeLabel(mode, VIEW_MODE_LABELS);
 }
 
-function viewerModeClass(mode = state.fitMode) {
-  return previewStateHelpers.viewerModeClass(mode);
-}
-
 function currentViewerZoom() {
-  return isAutoViewerMode() ? state.fitZoom : state.zoom;
-}
-
-function clampViewerZoom(value) {
-  return previewStateHelpers.clampViewerZoom(value);
+  return previewStateHelpers.isAutoViewerMode() ? state.fitZoom : state.zoom;
 }
 
 function setViewerZoom(nextZoom, anchorEvent = null) {
-  const zoom = clampViewerZoom(nextZoom);
+  const zoom = previewStateHelpers.clampViewerZoom(nextZoom);
   const previousZoom = Math.max(1, currentViewerZoom());
   if (anchorEvent) {
     const canvas = $("#preview-canvas");
@@ -2401,10 +2369,6 @@ function applyBridgeExportStatus(payload) {
   state.errors = exportStateHelpers.bridgeStatusErrors(payload, state.exportCompletedItems, state.exportIssues);
 }
 
-function normalizeBridgeIssue(issue) {
-  return exportStateHelpers.normalizeBridgeIssue(issue);
-}
-
 function scheduleExportStep() {
   setTimer(() => {
     if (state.exportStatus !== "running") {
@@ -2592,7 +2556,7 @@ function bridgePreviewSettings() {
     ...normalizeSettings(state.settings),
     presetName: state.activePreset,
     transparentBg: state.background === "transparent",
-    bgColor: backgroundColorTuple(state.background),
+    bgColor: outputProfileHelpers.backgroundColorTuple(state.background),
   };
 }
 
@@ -2608,10 +2572,6 @@ function previewTargetSize() {
     targetWidth: Math.max(1, Math.round(width * scale)),
     targetHeight: Math.max(1, Math.round(height * scale)),
   };
-}
-
-function backgroundColorTuple(value) {
-  return outputProfileHelpers.backgroundColorTuple(value);
 }
 
 async function checkBridge() {
@@ -2858,10 +2818,6 @@ function parseFolderInput(value) {
     .filter(Boolean);
 }
 
-function omissionReasonLabel(reason) {
-  return batchViewHelpers.omissionReasonLabel(reason);
-}
-
 function actionableOmissionSummaryText() {
   return batchViewHelpers.omissionSummaryText(actionableOmissions(), "Sin avisos de archivos");
 }
@@ -2886,7 +2842,7 @@ function bridgeFolderToItem(folder, index) {
     : actionableOmitted ? "warning" : count ? "ready" : exists && isDir ? "empty" : "error";
   return {
     id: `bridge-folder-${index}`,
-    name: basename(folder.path) || `Carpeta ${index + 1}`,
+    name: formatterHelpers.basename(folder.path) || `Carpeta ${index + 1}`,
     path: folder.path,
     count,
     source: "bridge",
@@ -2907,7 +2863,7 @@ function bridgeFolderToItem(folder, index) {
 
 function bridgeImageToItem(image, folderIndex, imageIndex) {
   const suffix = String(image.suffix || "").replace(".", "").toUpperCase() || "PNG";
-  const detail = `${suffix} · ${formatBytes(image.sizeBytes)}`;
+  const detail = `${suffix} · ${formatterHelpers.formatBytes(image.sizeBytes)}`;
   return {
     id: `bridge-${folderIndex}-${imageIndex}`,
     folderId: `bridge-folder-${folderIndex}`,
@@ -2922,20 +2878,8 @@ function bridgeImageToItem(image, folderIndex, imageIndex) {
   };
 }
 
-function basename(path) {
-  return formatterHelpers.basename(path);
-}
-
-function imageFileStem(name) {
-  return formatterHelpers.imageFileStem(name);
-}
-
 function imageFileType(image) {
   return formatterHelpers.imageFileType(image, state.format || "Imagen");
-}
-
-function formatBytes(bytes) {
-  return formatterHelpers.formatBytes(bytes);
 }
 
 function capabilitiesSummary(capabilities) {
@@ -2987,7 +2931,7 @@ function reviewWarnings() {
   ensureGallerySelectionForFilter();
   const issueCount = counts.reviewIssues + blockingCount;
   state.statusText = issueCount
-    ? `${countText(issueCount, "aviso", "avisos")} para revisar`
+    ? `${preflightHelpers.countText(issueCount, "aviso", "avisos")} para revisar`
     : "Sin avisos";
   render();
 }
@@ -3012,13 +2956,9 @@ function openOutputFolder() {
     render();
     return;
   }
-  const opened = window.open(pathToFileUrl(destination), "_blank", "noopener");
+  const opened = window.open(formatterHelpers.pathToFileUrl(destination), "_blank", "noopener");
   state.statusText = opened ? "Carpeta de salida abierta" : "No se pudo abrir la carpeta de salida";
   render();
-}
-
-function pathToFileUrl(path) {
-  return formatterHelpers.pathToFileUrl(path);
 }
 
 function statusMode() {
@@ -3284,7 +3224,7 @@ function updatePreviewDebugPanel() {
   const stats = thumbnailStats();
 
   setDebugText("debug-original-url", image?.originalUrl || image?.path || "-");
-  setDebugText("debug-preview-url", state.previewData?.src ? debugUrlLabel(state.previewData.src) : "-");
+  setDebugText("debug-preview-url", state.previewData?.src ? formatterHelpers.debugUrlLabel(state.previewData.src) : "-");
   setDebugText("debug-thumbnail-url", thumbSrc || "-");
   setDebugText("debug-natural-size", naturalWidth && naturalHeight ? `${naturalWidth} x ${naturalHeight}` : "-");
   setDebugText("debug-rendered-size", rendered ? `${Math.round(rendered.width)} x ${Math.round(rendered.height)}` : "-");
@@ -3299,10 +3239,6 @@ function setDebugText(id, value) {
     target.textContent = value;
     target.title = value;
   }
-}
-
-function debugUrlLabel(value) {
-  return formatterHelpers.debugUrlLabel(value);
 }
 
 function thumbnailStats() {
@@ -3423,7 +3359,7 @@ function compactHeaderStatusText() {
     paused: state.paused,
     plannedTotal: plannedExportTotal(),
     processed: state.processed,
-    readyLabel: readyImagesText(counts.exportableImages),
+    readyLabel: preflightHelpers.readyImagesText(counts.exportableImages),
   });
 }
 
@@ -3526,11 +3462,11 @@ function sourceFoldersForDisplay() {
 
 function persistedScanFolderName() {
   const persistedPath = parseFolderInput(state.bridgeScanPath)[0];
-  return persistedPath ? basename(persistedPath) || "Carpeta actual" : "";
+  return persistedPath ? formatterHelpers.basename(persistedPath) || "Carpeta actual" : "";
 }
 
 function scanningScanFolderName() {
-  return basename(parseFolderInput(state.bridgeScanPath)[0]);
+  return formatterHelpers.basename(parseFolderInput(state.bridgeScanPath)[0]);
 }
 
 function sourceFolderName() {
@@ -3599,8 +3535,8 @@ function renderBatchSummary() {
       : state.bridgeScanPath;
   const outputLine = batchOutputLine();
   const destinationLine = batchDestinationLine();
-  const warningsLabel = counts.nonBlockingWarnings ? countText(counts.nonBlockingWarnings, "aviso", "avisos") : "Sin avisos";
-  const ignoredLabel = counts.ignoredFiles ? countText(counts.ignoredFiles, "ignorado", "ignorados") : "Sin ignorados";
+  const warningsLabel = counts.nonBlockingWarnings ? preflightHelpers.countText(counts.nonBlockingWarnings, "aviso", "avisos") : "Sin avisos";
+  const ignoredLabel = counts.ignoredFiles ? preflightHelpers.countText(counts.ignoredFiles, "ignorado", "ignorados") : "Sin ignorados";
 
   summary.innerHTML = batchViewHelpers.batchSummaryHtml({
     batch: state.batch,
@@ -3640,7 +3576,7 @@ function outputProfilesSummaryLabel(profiles = exportOutputProfiles()) {
     return "Sin formatos activos";
   }
   return batchViewHelpers.outputProfilesSummaryLabel({
-    backgroundLabel: backgroundLabel(state.background),
+    backgroundLabel: settingsViewHelpers.backgroundLabel(state.background),
     format: state.format,
     profileLabels: profiles.length > 1 ? profiles.map((profile) => `${profile.name} (${profile.format})`) : [],
     sizeLabel: outputSizeDisplay(),
@@ -3729,7 +3665,7 @@ function batchDetailHtml() {
   const valid = counts.validImages === null ? "Leyendo" : counts.validImages;
   const ignoredItems = ignoredOmissions();
   const ignoredRowsHtml = ignoredItems.slice(0, 8).map((item) => batchDetailViewHelpers.batchDetailProblemHtml({
-    detail: item.detail || omissionReasonLabel(item.reason),
+    detail: item.detail || batchViewHelpers.omissionReasonLabel(item.reason),
     title: item.name || "Archivo ignorado",
     titleAttr: item.path || item.name,
     tone: "clear",
@@ -3742,7 +3678,7 @@ function batchDetailHtml() {
   })).join("");
   const outputRowsHtml = exportOutputProfiles().map((profile, index) => batchDetailViewHelpers.batchDetailOutputHtml({
     active: profile.id === state.activeOutputProfileId,
-    destination: profileDestinationPreviewLabel(profile),
+    destination: outputProfileViewHelpers.profileDestinationPreviewLabel(profile),
     example: outputNameForProfile(profile),
     index,
     name: profile.name,
@@ -3818,7 +3754,7 @@ function renderBatch() {
     batch: state.batch,
     hasBatch: hasBatch(),
     nonBlockingWarnings: counts.nonBlockingWarnings,
-    readyLabel: readyImagesText(counts.exportableImages),
+    readyLabel: preflightHelpers.readyImagesText(counts.exportableImages),
     scanStatus: state.scanStatus,
   });
 
@@ -3830,7 +3766,7 @@ function renderBatch() {
     $("#batch-visible-count").textContent = sidebarSummaryText;
     $("#folder-list").innerHTML = batchDetailViewHelpers.folderItemHtml({
       id: "scan",
-      name: isBridgeBatch() || !devMode ? basename(parseFolderInput(state.bridgeScanPath)[0]) || "Ruta" : "Camisetas Mayo",
+      name: isBridgeBatch() || !devMode ? formatterHelpers.basename(parseFolderInput(state.bridgeScanPath)[0]) || "Ruta" : "Camisetas Mayo",
       path: state.bridgeScanPath,
       detail: "Leyendo imágenes",
       count: "...",
@@ -3871,7 +3807,7 @@ function renderBatch() {
   }
 
   const exportable = exportableImages().length;
-  $("#batch-count").textContent = exportable ? readyImagesText(exportable) : "Sin exportables";
+  $("#batch-count").textContent = exportable ? preflightHelpers.readyImagesText(exportable) : "Sin exportables";
   const batchPillState = batchViewHelpers.batchPillState({
     adjustedCount: adjusted,
     issueCount,
@@ -3900,7 +3836,7 @@ function renderBatch() {
 function setGalleryTitle(count, label = "") {
   const title = $("#gallery-title");
   if (title) {
-    title.textContent = label || readyImagesText(Number(count) || 0);
+    title.textContent = label || preflightHelpers.readyImagesText(Number(count) || 0);
   }
 }
 
@@ -4132,7 +4068,7 @@ function commitThumbnailError(imageId, src, detail = "") {
     ...state.thumbnailErrors.filter((item) => item.imageId !== imageId),
   ].slice(0, 20);
   applyThumbnailDomStatus(imageId, "error");
-  state.bridgeLastResponse = `thumbnail error: ${basename(src) || imageId}`;
+  state.bridgeLastResponse = `thumbnail error: ${formatterHelpers.basename(src) || imageId}`;
   updatePreviewDebugPanel();
 }
 
@@ -4393,8 +4329,8 @@ function renderPreview() {
     previewPanel.className = `preview-panel preview-panel--${previewOrientation()}`;
   }
   const canvas = $("#preview-canvas");
-  canvas.className = `preview-canvas ${state.previewMode} bg-${previewBackgroundMode} ${viewerModeClass()}`;
-  canvas.style.setProperty("--preview-scale", isAutoViewerMode() ? "1" : String(state.zoom / 100));
+  canvas.className = `preview-canvas ${state.previewMode} bg-${previewBackgroundMode} ${previewStateHelpers.viewerModeClass()}`;
+  canvas.style.setProperty("--preview-scale", previewStateHelpers.isAutoViewerMode() ? "1" : String(state.zoom / 100));
   applyViewerPanDom();
 
   if (state.batch === "none") {
@@ -4410,7 +4346,7 @@ function renderPreview() {
   }
 
   if (state.batch === "empty") {
-    canvas.innerHTML = emptyStateHtml({
+    canvas.innerHTML = emptyStateViewHelpers.emptyStateHtml({
       variant: "warning",
       title: "No se encontraron imágenes compatibles",
       detail: state.scanDiagnostics.totalOmitted
@@ -4425,7 +4361,7 @@ function renderPreview() {
   }
 
   if (filterIsEmpty) {
-    canvas.innerHTML = emptyStateHtml({
+    canvas.innerHTML = emptyStateViewHelpers.emptyStateHtml({
       variant: "inline",
       title: "No hay imágenes en este filtro",
       detail: filterEmptyDetail(),
@@ -4438,7 +4374,7 @@ function renderPreview() {
   }
 
   if (!image || state.previewStatus === "empty") {
-    canvas.innerHTML = emptyStateHtml({
+    canvas.innerHTML = emptyStateViewHelpers.emptyStateHtml({
       variant: "inline",
       title: "Selecciona una imagen",
       detail: "Elige una miniatura para revisar.",
@@ -4489,7 +4425,7 @@ function updateFitZoomReadout() {
   if (!label) {
     return;
   }
-  if (!isAutoViewerMode()) {
+  if (!previewStateHelpers.isAutoViewerMode()) {
     label.textContent = `${state.zoom}%`;
     return;
   }
@@ -4544,7 +4480,7 @@ function realPreviewHtml(image) {
       width: state.previewData.width,
       height: state.previewData.height,
       zoom: state.zoom,
-      inlineSize: !isAutoViewerMode(),
+      inlineSize: !previewStateHelpers.isAutoViewerMode(),
       warning: state.previewData.warning,
     });
   }
@@ -4580,18 +4516,14 @@ function outputSizeDisplay() {
 
 function viewerOutputCompactLabel() {
   return previewViewHelpers.viewerOutputCompactLabel({
-    backgroundLabel: backgroundLabel(state.background),
+    backgroundLabel: settingsViewHelpers.backgroundLabel(state.background),
     format: state.format,
     sizeLabel: outputSizeDisplay(),
   });
 }
 
 function previewStateHtml(title, detail) {
-  return emptyStateHtml({ variant: "inline", title, detail });
-}
-
-function emptyStateHtml({ variant = "inline", title, detail, actionLabel = "", action = "", meta = "" }) {
-  return emptyStateViewHelpers.emptyStateHtml({ variant, title, detail, actionLabel, action, meta });
+  return emptyStateViewHelpers.emptyStateHtml({ variant: "inline", title, detail });
 }
 
 function initialStateHtml() {
@@ -4824,7 +4756,7 @@ function reviewPanelHtml() {
   if (!image) {
     return inspectorReviewViewHelpers.reviewPanelHtml({
       lotSummaryHtml: lotInspectorSummaryHtml(),
-      emptyStateHtml: emptyStateHtml({
+      emptyStateHtml: emptyStateViewHelpers.emptyStateHtml({
       variant: "inline",
       title: "Selecciona una imagen",
       detail: "Elige una miniatura para revisar la imagen.",
@@ -5110,8 +5042,8 @@ function lotInspectorCardHtml() {
   const customCount = imageAdjustmentOverrideCount();
   const custom = customCount ? `${customCount} personalizada${customCount === 1 ? "" : "s"}` : "";
   const meta = state.batch === "empty"
-    ? `${readyImagesText(0)}${ignored ? ` · ${ignored}` : ""}`
-    : `${readyImagesText(counts.exportableImages)}${custom ? ` · ${custom}` : ""}${ignored ? ` · ${ignored}` : ""}`;
+    ? `${preflightHelpers.readyImagesText(0)}${ignored ? ` · ${ignored}` : ""}`
+    : `${preflightHelpers.readyImagesText(counts.exportableImages)}${custom ? ` · ${custom}` : ""}${ignored ? ` · ${ignored}` : ""}`;
   const tone = counts.blockingErrors ? "error" : counts.nonBlockingWarnings ? "warning" : "";
   return inspectorReviewViewHelpers.lotInspectorCardHtml({
     meta,
@@ -5252,7 +5184,7 @@ function contextualInspectorHtml() {
       preflightHtml: exportPreflightViewHelpers.preflightListHtml(inspectorContextViewHelpers.contextualPreflightRows({
         batch: state.batch,
       })),
-      outputSummary: `${state.format} · ${state.size} · ${backgroundLabel(state.background)}`,
+      outputSummary: `${state.format} · ${state.size} · ${settingsViewHelpers.backgroundLabel(state.background)}`,
       activePreset: state.activePreset,
     });
   }
@@ -5325,13 +5257,13 @@ function renderExport() {
       format: profile.format,
       name: profile.name,
       size: outputProfileHelpers.outputProfileSize(profile),
-      destinationLabel: profileDestinationLabel(profile),
+      destinationLabel: outputProfileViewHelpers.profileDestinationLabel(profile),
     })),
     formatLabel: activeOutputProfiles.length
       ? hasMultipleOutputs ? batchViewHelpers.outputCountLabel(activeOutputProfiles.length) : state.format
       : "Sin formato activo",
     sizeLabel: activeOutputProfiles.length ? hasMultipleOutputs ? "Por formato" : state.size.replace("x", " × ") : "-",
-    backgroundLabel: activeOutputProfiles.length ? hasMultipleOutputs ? "Por formato" : backgroundLabel(state.background) : "-",
+    backgroundLabel: activeOutputProfiles.length ? hasMultipleOutputs ? "Por formato" : settingsViewHelpers.backgroundLabel(state.background) : "-",
     destinationText,
     namingLabel: activeOutputProfiles.length ? hasMultipleOutputs ? "Por formato" : namingHumanLabel() : "-",
     example: activeOutputProfiles.length ? hasMultipleOutputs ? outputNameForProfile(activeOutputProfiles[0]) : namingExample() : "-",
@@ -5383,7 +5315,7 @@ function outputProfileSummaryLine(profile) {
   if (!profile) {
     return "Formato sin configurar";
   }
-  return `${profile.format} · ${outputProfileHelpers.outputProfileSize(profile).replace("x", " × ")} · ${backgroundLabel(profile.background)}`;
+  return `${profile.format} · ${outputProfileHelpers.outputProfileSize(profile).replace("x", " × ")} · ${settingsViewHelpers.backgroundLabel(profile.background)}`;
 }
 
 function syncBackgroundSelectValue(select, background) {
@@ -5400,7 +5332,7 @@ function selectedBackgroundPresetFromForm(raw = outputProfileFormRawData()) {
 }
 
 function backgroundRgbFromValue(value) {
-  return outputProfileHelpers.parseRgbBackground(outputProfileHelpers.normalizeBackgroundValue(value)) || backgroundColorTuple(value);
+  return outputProfileHelpers.parseRgbBackground(outputProfileHelpers.normalizeBackgroundValue(value)) || outputProfileHelpers.backgroundColorTuple(value);
 }
 
 function positionBackgroundPresetEditor() {
@@ -5614,15 +5546,7 @@ function outputProfileCompactLabel(profile) {
   if (!profile) {
     return "Sin salida";
   }
-  return `${profile.format} · ${backgroundLabel(profile.background)}`;
-}
-
-function profileDestinationLabel(profile) {
-  return outputProfileViewHelpers.profileDestinationLabel(profile);
-}
-
-function profileDestinationPreviewLabel(profile) {
-  return outputProfileViewHelpers.profileDestinationPreviewLabel(profile);
+  return `${profile.format} · ${settingsViewHelpers.backgroundLabel(profile.background)}`;
 }
 
 function ensureOutputProfileDraft() {
@@ -6020,7 +5944,7 @@ function openExportConfirm(risks, options = {}) {
   state.outputDeleteConfirmId = "";
   state.batchDetailOpen = false;
   state.exportConfirmOpen = true;
-  state.exportConfirmRisks = dedupeExportRisks(risks);
+  state.exportConfirmRisks = preflightHelpers.dedupeExportRisks(risks);
   state.exportConfirmOptions = { ...options };
   state.statusText = state.exportConfirmRisks.some((risk) => risk.blocking)
     ? "Resuelve problemas antes de exportar"
@@ -6219,7 +6143,7 @@ function outputProfilePreviewHtml(profile, validation = {}) {
   const image = selectedImage();
   const originalName = image?.name || "imagen_original.png";
   const resultName = outputNameForProfile(profile, image);
-  const destination = profileDestinationPreviewLabel(profile);
+  const destination = outputProfileViewHelpers.profileDestinationPreviewLabel(profile);
   const resultPath = destination && destination !== "junto al origen"
     ? `${destination.replace(/[\\/]$/, "")}/${resultName}`
     : resultName;
@@ -6239,10 +6163,6 @@ function outputNameForProfile(profile, image = selectedImage(), index = 1) {
     image,
     index,
   });
-}
-
-function outputProfileValidationHtml(validation) {
-  return outputProfileViewHelpers.outputProfileValidationHtml(validation);
 }
 
 function renderOutputProfileModalState() {
@@ -6482,7 +6402,7 @@ function issueRows() {
   return exportPreflightViewHelpers.issueRows({
     scanOmissions: scanOmissions().map((item) => ({
       ...item,
-      reasonLabel: omissionReasonLabel(item.reason),
+      reasonLabel: batchViewHelpers.omissionReasonLabel(item.reason),
       severity: omissionSeverity(item),
     })),
     images: activeImages().map((image) => ({
@@ -6609,7 +6529,7 @@ function currentExportFileLabel() {
 
 function exportIssueActionText(issue) {
   return exportResultViewHelpers.exportIssueActionText(issue, {
-    existingOutput: issueMentionsExistingOutput(issue),
+    existingOutput: preflightHelpers.issueMentionsExistingOutput(issue),
   });
 }
 
@@ -6945,10 +6865,6 @@ function exportStatusLabel(ready) {
   });
 }
 
-function backgroundLabel(value) {
-  return settingsViewHelpers.backgroundLabel(value);
-}
-
 function renderFooter() {
   const issues = [...validationIssues(), ...state.errors];
   const visible = getVisibleAppState();
@@ -7132,7 +7048,7 @@ const actionDispatcher = actionHandlerHelpers.createActionDispatcher({
   "clear-filter": () => clearFilter(),
   "clear-search": () => {
     state.search = "";
-    state.statusText = filterStatusText(state.filter);
+    state.statusText = galleryHelpers.filterStatusText(state.filter);
     if (!ensureGallerySelectionForFilter()) {
       render();
     }
@@ -7248,7 +7164,7 @@ function closeTransientDetails(event) {
   });
 }
 
-document.addEventListener("load", (event) => {
+function handleDocumentImageLoad(event) {
   const target = event.target;
   if (target instanceof HTMLImageElement && target.classList.contains("thumb-image")) {
     recordThumbnailLoad(target);
@@ -7256,9 +7172,9 @@ document.addEventListener("load", (event) => {
   if (target instanceof HTMLImageElement && target.classList.contains("preview-image")) {
     updatePreviewDebugPanel();
   }
-}, true);
+}
 
-document.addEventListener("error", (event) => {
+function handleDocumentImageError(event) {
   const target = event.target;
   if (target instanceof HTMLImageElement && target.classList.contains("thumb-image")) {
     recordThumbnailError(target);
@@ -7269,7 +7185,7 @@ document.addEventListener("error", (event) => {
     state.statusText = "Vista no disponible";
     render();
   }
-}, true);
+}
 
 function recordThumbnailLoad(imageElement) {
   const imageId = imageElement.dataset.imageId;
@@ -7296,13 +7212,13 @@ function recordThumbnailError(imageElement) {
   markThumbnailError(imageId, src);
 }
 
-document.addEventListener("pointerdown", (event) => {
+function handleDocumentPointerDown(event) {
   if (event.target.closest?.(".settings-panel details > summary")) {
     inspectorScrollTopBeforeToggle = $(".settings-panel")?.scrollTop || 0;
   }
-}, true);
+}
 
-document.addEventListener("click", (event) => {
+function handleInspectorDisclosureClick(event) {
   const disclosureSummary = event.target.closest?.(".settings-panel details.inspector-disclosure > summary");
   if (!disclosureSummary) {
     return;
@@ -7314,9 +7230,9 @@ document.addEventListener("click", (event) => {
   event.stopImmediatePropagation();
   toggleInspectorDisclosure(details);
   disclosureSummary.blur();
-}, true);
+}
 
-document.addEventListener("click", (event) => {
+function handleDocumentClick(event) {
   closeTransientDetails(event);
 
   const disclosureSummary = event.target.closest(".settings-panel details > summary");
@@ -7413,9 +7329,9 @@ document.addEventListener("click", (event) => {
     }
     render();
   }
-});
+}
 
-document.addEventListener("toggle", (event) => {
+function handleDocumentToggle(event) {
   if (!event.target.matches?.(".settings-panel details.inspector-disclosure")) {
     return;
   }
@@ -7433,18 +7349,18 @@ document.addEventListener("toggle", (event) => {
     window.setTimeout(restoreScroll, 80);
     window.setTimeout(restoreScroll, 180);
   });
-}, true);
+}
 
-$("#demo-scenario").addEventListener("change", (event) => {
+function handleDemoScenarioChange(event) {
   if (!devMode) {
     return;
   }
   state.bridgeMode = "mock";
   state.bridgeLastResponse = `Estado mock: ${scenarioLabels[event.target.value] || event.target.value}`;
   setScenario(event.target.value);
-});
+}
 
-$("#app-mode").addEventListener("change", (event) => {
+function handleAppModeChange(event) {
   if (!devMode && event.target.value !== "bridge") {
     event.target.value = "bridge";
     state.bridgeMode = "bridge";
@@ -7456,22 +7372,22 @@ $("#app-mode").addEventListener("change", (event) => {
   state.bridgeLastResponse = state.bridgeMode === "bridge" ? "Conexión pendiente" : "Demo activo";
   state.scanStatus = state.bridgeMode === "bridge" ? "Sin lote" : "Escenarios mock activos.";
   render();
-});
+}
 
-$("#bridge-url").addEventListener("input", (event) => {
+function handleBridgeUrlInput(event) {
   state.bridgeUrl = event.target.value || defaultBridgeUrl;
   state.bridgeStatus = "idle";
   state.bridgeMessage = "Comprueba conexión";
   state.bridgeLastResponse = "URL pendiente";
   state.scanStatus = "Comprueba bridge";
   render();
-});
+}
 
-$("#bridge-scan-path").addEventListener("input", (event) => {
+function handleBridgeScanPathInput(event) {
   state.bridgeScanPath = event.target.value;
-});
+}
 
-document.addEventListener("input", (event) => {
+function handleDocumentInput(event) {
   if (event.target?.matches?.("input[type='range']")) {
     syncRangeFill(event.target);
   }
@@ -7500,9 +7416,9 @@ document.addEventListener("input", (event) => {
     updateOutputProfileDraftFromForm();
     renderOutputProfileModalState();
   }
-});
+}
 
-document.addEventListener("change", (event) => {
+function handleDocumentChange(event) {
   if (event.target.matches?.("[data-preview-bg-channel]")) {
     state.previewBg = normalizePreviewBackgroundValue(previewCustomBackgroundValue());
     state.statusText = `Fondo: ${previewBackgroundLabel(state.previewBg)}`;
@@ -7544,106 +7460,51 @@ document.addEventListener("change", (event) => {
     updateOutputProfileDraftFromForm();
     renderOutputProfileModalState();
   }
-});
+}
 
-document.addEventListener("submit", (event) => {
+function handleDocumentSubmit(event) {
   if (event.target.id === "output-profile-form") {
     event.preventDefault();
     saveOutputProfile();
   }
-});
+}
 
-$("#image-search").addEventListener("input", (event) => {
+function handleImageSearchInput(event) {
   state.search = event.target.value;
   if (ensureGallerySelectionForFilter()) {
     return;
   }
   render();
-});
+}
 
-$$("[data-setting]").forEach((input) => {
-  const updateSetting = (event) => {
-    const key = event.target.dataset.setting;
-    const nextValue = settingInputValue(event.target);
-    if (state.settings[key] === nextValue) {
-      return;
-    }
-    state.settings[key] = nextValue;
-    markPresetDirty();
-  };
-  input.addEventListener("input", updateSetting);
-  input.addEventListener("change", updateSetting);
-});
+function handleSettingInput(event) {
+  const key = event.target.dataset.setting;
+  const nextValue = settingInputValue(event.target);
+  if (state.settings[key] === nextValue) {
+    return;
+  }
+  state.settings[key] = nextValue;
+  markPresetDirty();
+}
 
-$$("[data-lighting-field]").forEach((input) => {
-  const updateLighting = (event) => {
-    updateLightingSceneField(event.target.dataset.lightingField, event.target.value);
-  };
-  input.addEventListener("input", updateLighting);
-  input.addEventListener("change", updateLighting);
-});
+function handleLightingFieldInput(event) {
+  updateLightingSceneField(event.target.dataset.lightingField, event.target.value);
+}
 
-$$("[data-lighting-number-field]").forEach((input) => {
-  const updateLighting = (event) => {
-    updateLightingSceneField(event.target.dataset.lightingNumberField, event.target.value);
-  };
-  input.addEventListener("input", updateLighting);
-  input.addEventListener("change", updateLighting);
-});
+function handleLightingNumberFieldInput(event) {
+  updateLightingSceneField(event.target.dataset.lightingNumberField, event.target.value);
+}
 
-$$("[data-lighting-preset]").forEach((button) => {
-  button.addEventListener("click", () => {
-    const presetId = button.dataset.lightingPreset;
-    const preset = lightingScenePresets[presetId];
-    if (!preset) {
-      return;
-    }
-    state.settings.shadow_engine = "studio_2_5d";
-    state.settings.lighting_scene = cloneLightingScene(preset);
-    state.lightingPresetId = presetId;
-    markPresetDirty();
-  });
-});
-
-const lightingStage = $("#lighting-stage");
-if (lightingStage) {
-  let lightingDragActive = false;
-  let lightingDragChanged = false;
-  let lightingPointerId = null;
-  const finishLightingDrag = (event) => {
-    if (!lightingDragActive || (lightingPointerId !== null && event.pointerId !== lightingPointerId)) {
-      return;
-    }
-    lightingDragActive = false;
-    lightingPointerId = null;
-    lightingStage.releasePointerCapture?.(event.pointerId);
-    if (lightingDragChanged) {
-      lightingDragChanged = false;
-      refreshPreviewAfterSettingChange();
-    }
-  };
-  lightingStage.addEventListener("pointerdown", (event) => {
-    event.preventDefault();
-    lightingDragActive = true;
-    lightingDragChanged = false;
-    lightingPointerId = event.pointerId;
-    lightingStage.setPointerCapture?.(event.pointerId);
-    lightingDragChanged = updateLightingScenePosition(event.clientX, event.clientY, { deferRender: true });
-  });
-  lightingStage.addEventListener("pointermove", (event) => {
-    if (lightingDragActive && event.pointerId === lightingPointerId) {
-      event.preventDefault();
-      lightingDragChanged = updateLightingScenePosition(event.clientX, event.clientY, { deferRender: true })
-        || lightingDragChanged;
-    }
-  });
-  lightingStage.addEventListener("pointerup", (event) => {
-    event.preventDefault();
-    finishLightingDrag(event);
-  });
-  lightingStage.addEventListener("pointercancel", (event) => {
-    finishLightingDrag(event);
-  });
+function handleLightingPresetClick(button) {
+  const presetId = button.dataset.lightingPreset;
+  const preset = lightingScenePresets[presetId];
+  if (!preset) {
+    return;
+  }
+  state.settings.shadow_engine = "studio_2_5d";
+  state.settings.lighting_scene = cloneLightingScene(preset);
+  state.lightingPresetId = presetId;
+  markPresetDirty();
 }
 
 function settingInputValue(input) {
@@ -7766,25 +7627,25 @@ function updateLocalOverrideFromNumberInput(input, options = {}) {
   setCurrentImageOverrideValue(key, value);
 }
 
-$("#format-select").addEventListener("change", (event) => {
+function handleFormatSelectChange(event) {
   state.format = outputProfileHelpers.normalizeExportFormat(event.target.value);
   state.statusText = `Formato: ${state.format}`;
   persistExportPreferences();
   render();
-});
+}
 
-$("#output-profile-select").addEventListener("change", (event) => {
+function handleOutputProfileSelectChange(event) {
   if (event.target.value === "__custom") {
     return;
   }
   applyOutputProfile(event.target.value);
-});
+}
 
-$("#size-select").addEventListener("input", (event) => {
+function handleSizeSelectInput(event) {
   state.size = event.target.value;
-});
+}
 
-$("#size-select").addEventListener("change", (event) => {
+function handleSizeSelectChange(event) {
   state.size = outputProfileHelpers.parseOutputSize(event.target.value).normalized;
   state.statusText = `Tamaño: ${state.size}`;
   persistExportPreferences();
@@ -7794,12 +7655,12 @@ $("#size-select").addEventListener("change", (event) => {
     return;
   }
   render();
-});
+}
 
-$("#background-select").addEventListener("change", (event) => {
+function handleBackgroundSelectChange(event) {
   state.background = outputProfileHelpers.normalizeBackgroundValue(event.target.value, state.background);
   state.previewBg = state.background;
-  state.statusText = `Fondo: ${backgroundLabel(state.background)}`;
+  state.statusText = `Fondo: ${settingsViewHelpers.backgroundLabel(state.background)}`;
   persistExportPreferences();
   const image = selectedImage();
   if (image?.source === "bridge") {
@@ -7807,34 +7668,34 @@ $("#background-select").addEventListener("change", (event) => {
     return;
   }
   render();
-});
+}
 
-$("#destination-mode").addEventListener("change", (event) => {
+function handleDestinationModeChange(event) {
   state.destinationMode = event.target.value;
   state.destinationValue = state.destinationMode === "custom" ? "" : "Salida";
   state.exportStatus = isExportReady() ? "ready" : "blocked";
   state.statusText = state.destinationMode === "custom" ? "Carpeta de salida sin configurar" : "Destino junto al origen";
   persistExportPreferences();
   render();
-});
+}
 
-$("#destination-input").addEventListener("input", (event) => {
+function handleDestinationInput(event) {
   state.destinationValue = event.target.value;
   state.exportStatus = isExportReady() ? "ready" : "blocked";
   state.statusText = state.destinationValue.trim() ? "Carpeta de salida configurada" : "Carpeta de salida sin configurar";
   persistExportPreferences();
   render();
-});
+}
 
-$("#naming-input").addEventListener("input", (event) => {
+function handleNamingInput(event) {
   state.naming = event.target.value;
   state.exportStatus = isExportReady() ? "ready" : "blocked";
   state.statusText = state.naming.trim() ? "Nombre de archivo actualizado" : "Nombre de archivo vacío";
   persistExportPreferences();
   render();
-});
+}
 
-document.addEventListener("keydown", (event) => {
+function handleDocumentKeydown(event) {
   const target = event.target;
   const isTyping = target instanceof HTMLInputElement
     || target instanceof HTMLTextAreaElement
@@ -7912,7 +7773,7 @@ document.addEventListener("keydown", (event) => {
     event.preventDefault();
     selectEdgeImage("last", { focus: true });
   }
-});
+}
 
 function handleViewerWheel(event) {
   if (!isViewerNavigationAvailable()) {
@@ -7978,23 +7839,12 @@ function handleViewerPointerEnd(event) {
   viewerPanState.pointerId = null;
 }
 
-function initViewerCanvasNavigation() {
-  const canvas = $("#preview-canvas");
-  if (!canvas) {
+function handleViewerDoubleClick(event) {
+  if (event.target.closest("button, input, textarea, select, summary, a")) {
     return;
   }
-  canvas.addEventListener("wheel", handleViewerWheel, { passive: false });
-  canvas.addEventListener("dblclick", (event) => {
-    if (event.target.closest("button, input, textarea, select, summary, a")) {
-      return;
-    }
-    event.preventDefault();
-    toggleViewerZoomMode();
-  });
-  canvas.addEventListener("pointerdown", handleViewerPointerDown);
-  document.addEventListener("pointermove", handleViewerPointerMove);
-  document.addEventListener("pointerup", handleViewerPointerEnd);
-  document.addEventListener("pointercancel", handleViewerPointerEnd);
+  event.preventDefault();
+  toggleViewerZoomMode();
 }
 
 function initViewerResizeObserver() {
@@ -8012,24 +7862,67 @@ function restorePersistentBridgeSession() {
     return;
   }
   state.bridgeScanPath = path;
-  state.scanStatus = `Última carpeta: ${basename(path)}`;
+  state.scanStatus = `Última carpeta: ${formatterHelpers.basename(path)}`;
   state.statusText = "Restaurando último lote";
   render();
   void scanBridgeFolder();
 }
 
-initViewerCanvasNavigation();
-initViewerResizeObserver();
-const restoredSessionSnapshot = restoreSessionSnapshot();
-sessionSnapshotPersistenceEnabled = true;
-if (restoredSessionSnapshot) {
-  render();
-} else {
+function startFlatShotApp() {
+  const restoredSessionSnapshot = restoreSessionSnapshot();
+  sessionSnapshotPersistenceEnabled = true;
+  if (restoredSessionSnapshot) {
+    render();
+    return;
+  }
   setScenario("initial");
   void restoreBridgeUiPreferences({ skipSessionSnapshot: true });
   restorePersistentBridgeSession();
 }
-window.addEventListener("flatshot:before-live-reload", writeSessionSnapshot);
-window.addEventListener("beforeunload", writeSessionSnapshot);
-window.addEventListener("resize", positionBackgroundPresetEditor);
-document.addEventListener("scroll", positionBackgroundPresetEditor, true);
+
+interactionBindingHelpers.wireFlatShotInteractions({
+  document,
+  window,
+  $,
+  $$,
+  handlers: {
+    appModeChange: handleAppModeChange,
+    backgroundSelectChange: handleBackgroundSelectChange,
+    bridgeScanPathInput: handleBridgeScanPathInput,
+    bridgeUrlInput: handleBridgeUrlInput,
+    demoScenarioChange: handleDemoScenarioChange,
+    destinationInput: handleDestinationInput,
+    destinationModeChange: handleDestinationModeChange,
+    documentChange: handleDocumentChange,
+    documentClick: handleDocumentClick,
+    documentError: handleDocumentImageError,
+    documentInput: handleDocumentInput,
+    documentKeydown: handleDocumentKeydown,
+    documentLoad: handleDocumentImageLoad,
+    documentPointerDown: handleDocumentPointerDown,
+    documentSubmit: handleDocumentSubmit,
+    documentToggle: handleDocumentToggle,
+    formatSelectChange: handleFormatSelectChange,
+    imageSearchInput: handleImageSearchInput,
+    initViewerResizeObserver,
+    inspectorDisclosureClick: handleInspectorDisclosureClick,
+    lightingFieldInput: handleLightingFieldInput,
+    lightingNumberFieldInput: handleLightingNumberFieldInput,
+    lightingPresetClick: handleLightingPresetClick,
+    namingInput: handleNamingInput,
+    outputProfileSelectChange: handleOutputProfileSelectChange,
+    positionBackgroundPresetEditor,
+    refreshPreviewAfterSettingChange,
+    settingInput: handleSettingInput,
+    sizeSelectChange: handleSizeSelectChange,
+    sizeSelectInput: handleSizeSelectInput,
+    startup: startFlatShotApp,
+    updateLightingScenePosition,
+    viewerDoubleClick: handleViewerDoubleClick,
+    viewerPointerDown: handleViewerPointerDown,
+    viewerPointerEnd: handleViewerPointerEnd,
+    viewerPointerMove: handleViewerPointerMove,
+    viewerWheel: handleViewerWheel,
+    writeSessionSnapshot,
+  },
+});

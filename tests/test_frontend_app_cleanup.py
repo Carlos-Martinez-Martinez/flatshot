@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -90,3 +91,49 @@ def test_app_js_does_not_keep_output_profile_passthrough_wrappers():
     assert "outputProfileHelpers.normalizeOutputProfile(" in source
     assert "outputProfileHelpers.parseOutputSize(" in source
     assert "outputProfileHelpers.normalizeBackgroundValue(" in source
+
+
+def test_app_js_does_not_keep_pure_helper_passthrough_wrappers():
+    source = APP_PATH.read_text(encoding="utf-8")
+
+    pure_passthrough_wrappers = [
+        "function countText(",
+        "function readyImagesText(",
+        "function filterStatusText(",
+        "function dedupeExportRisks(",
+        "function issueMentionsExistingOutput(",
+        "function isAutoViewerMode(",
+        "function viewerModeClass(",
+        "function clampViewerZoom(",
+        "function normalizeBridgeIssue(",
+        "function backgroundColorTuple(",
+        "function omissionReasonLabel(",
+        "function basename(",
+        "function imageFileStem(",
+        "function formatBytes(",
+        "function pathToFileUrl(",
+        "function debugUrlLabel(",
+        "function emptyStateHtml(",
+        "function profileDestinationLabel(",
+        "function profileDestinationPreviewLabel(",
+        "function outputProfileValidationHtml(",
+        "function backgroundLabel(",
+    ]
+
+    for wrapper in pure_passthrough_wrappers:
+        assert wrapper not in source
+
+
+def test_app_js_delegates_browser_interaction_wiring():
+    source = APP_PATH.read_text(encoding="utf-8")
+
+    forbidden_wiring = [
+        r"\bdocument\.addEventListener\(",
+        r"\bwindow\.addEventListener\(",
+        r"\$\([^)]*\)\.addEventListener\(",
+    ]
+
+    for pattern in forbidden_wiring:
+        assert not re.search(pattern, source)
+
+    assert "interactionBindingHelpers.wireFlatShotInteractions(" in source

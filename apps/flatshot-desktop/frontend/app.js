@@ -1,6 +1,6 @@
-const initialImageAdjustmentPreset = readPersistentValue(STORAGE_KEYS.imageAdjustmentPreset) || "Luz cenital";
-const initialOutputProfileId = readPersistentValue(STORAGE_KEYS.activeOutputProfile);
-const initialExportPreferences = readPersistentJson(STORAGE_KEYS.exportPreferences, {});
+const initialImageAdjustmentPreset = storageHelpers.readValue(window.localStorage, STORAGE_KEYS.imageAdjustmentPreset) || "Luz cenital";
+const initialOutputProfileId = storageHelpers.readValue(window.localStorage, STORAGE_KEYS.activeOutputProfile);
+const initialExportPreferences = storageHelpers.readJson(window.localStorage, STORAGE_KEYS.exportPreferences, {});
 const initialBackgroundPresets = readBackgroundPresets();
 const initialOutputProfiles = readOutputProfiles(initialOutputProfileId);
 const initialEnabledOutputProfiles = initialOutputProfiles.filter((profile) => profile.enabled);
@@ -14,13 +14,13 @@ const initialDestinationMode = initialExportPreferences.destinationMode === "cus
   : initialOutputProfile.destinationMode;
 const initialDestinationValue = String(
   initialExportPreferences.destinationValue
-  || readPersistentValue(STORAGE_KEYS.lastOutputFolder)
+  || storageHelpers.readValue(window.localStorage, STORAGE_KEYS.lastOutputFolder)
   || initialOutputProfile.destinationValue
   || (initialDestinationMode === "custom" ? "" : "Salida")
 );
-const initialFormat = normalizeExportFormat(initialExportPreferences.format || initialOutputProfile.format);
-const initialSize = parseOutputSize(initialExportPreferences.size || outputProfileSize(initialOutputProfile)).normalized;
-const initialBackground = normalizeBackgroundValue(initialExportPreferences.background, initialOutputProfile.background);
+const initialFormat = outputProfileHelpers.normalizeExportFormat(initialExportPreferences.format || initialOutputProfile.format);
+const initialSize = outputProfileHelpers.parseOutputSize(initialExportPreferences.size || outputProfileHelpers.outputProfileSize(initialOutputProfile)).normalized;
+const initialBackground = outputProfileHelpers.normalizeBackgroundValue(initialExportPreferences.background, initialOutputProfile.background);
 const initialNaming = String(initialExportPreferences.naming || initialOutputProfile.naming || "{original}{suffix}");
 const initialSuffix = initialExportPreferences.suffix === undefined || initialExportPreferences.suffix === null
   ? initialOutputProfile.suffix
@@ -102,7 +102,7 @@ const state = {
   bridgePresets: [],
   bridgePresetSource: "unavailable",
   bridgePresetWarning: "",
-  bridgeScanPath: readPersistentValue(STORAGE_KEYS.bridgeScanPath),
+  bridgeScanPath: storageHelpers.readValue(window.localStorage, STORAGE_KEYS.bridgeScanPath),
   scanStatus: "Sin lote",
   scanIssues: [],
   scanDiagnostics: {
@@ -144,73 +144,15 @@ const viewerPanState = {
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
-function readPersistentValue(key) {
-  try {
-    return window.localStorage.getItem(key) || "";
-  } catch (error) {
-    return "";
-  }
-}
-
-function readPersistentJson(key, fallback) {
-  const raw = readPersistentValue(key);
-  if (!raw) {
-    return fallback;
-  }
-  try {
-    return JSON.parse(raw);
-  } catch (error) {
-    return fallback;
-  }
-}
-
-function writePersistentValue(key, value) {
-  const normalized = String(value || "").trim();
-  try {
-    if (normalized) {
-      window.localStorage.setItem(key, normalized);
-    } else {
-      window.localStorage.removeItem(key);
-    }
-  } catch (error) {
-    // Persistence is a convenience; the app must still work if storage is blocked.
-  }
-}
-
-function writePersistentJson(key, value) {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch (error) {
-    // Settings persistence is local convenience; runtime state remains usable.
-  }
-}
-
 function readSessionSnapshot() {
-  let raw = "";
-  try {
-    raw = window.sessionStorage.getItem(STORAGE_KEYS.sessionSnapshot) || "";
-  } catch (error) {
-    return null;
-  }
-  if (!raw) {
-    return null;
-  }
-  try {
-    const snapshot = JSON.parse(raw);
-    return snapshot?.version === 1 && snapshot.state && typeof snapshot.state === "object"
-      ? snapshot
-      : null;
-  } catch (error) {
-    return null;
-  }
+  const snapshot = storageHelpers.readJson(window.sessionStorage, STORAGE_KEYS.sessionSnapshot, null);
+  return snapshot?.version === 1 && snapshot.state && typeof snapshot.state === "object"
+    ? snapshot
+    : null;
 }
 
 function writeSessionSnapshot() {
-  try {
-    window.sessionStorage.setItem(STORAGE_KEYS.sessionSnapshot, JSON.stringify(buildSessionSnapshot()));
-  } catch (error) {
-    // Live-reload state is best effort; the app still works without session storage.
-  }
+  storageHelpers.writeJson(window.sessionStorage, STORAGE_KEYS.sessionSnapshot, buildSessionSnapshot());
 }
 
 function buildSessionSnapshot() {
@@ -222,7 +164,7 @@ function buildSessionSnapshot() {
       batch: state.batch,
       batchSource: state.batchSource,
       selectedImageId: state.selectedImageId,
-      selectedImagePath: selected?.path || readPersistentValue(STORAGE_KEYS.selectedImagePath),
+      selectedImagePath: selected?.path || storageHelpers.readValue(window.localStorage, STORAGE_KEYS.selectedImagePath),
       previewMode: state.previewMode,
       previewBg: state.previewBg,
       zoom: state.zoom,
@@ -285,7 +227,7 @@ function restoreSessionSnapshot() {
   const restored = snapshot.state;
   const restoredBackgroundPresets = normalizeBackgroundPresetList(restored.backgroundPresets || state.backgroundPresets);
   const outputProfiles = Array.isArray(restored.outputProfiles)
-    ? normalizeOutputProfileList(restored.outputProfiles, restored.activeOutputProfileId)
+    ? outputProfileHelpers.normalizeOutputProfileList(restored.outputProfiles, restored.activeOutputProfileId)
     : state.outputProfiles;
   const restoredActiveOutputProfile = outputProfiles.find((profile) => profile.id === restored.activeOutputProfileId && profile.enabled)
     || outputProfiles.find((profile) => profile.enabled)
@@ -304,11 +246,11 @@ function restoreSessionSnapshot() {
     previewError: "",
     previewMode: ["processed", "original", "compare"].includes(restored.previewMode) ? restored.previewMode : "processed",
     previewBg: normalizePreviewBackgroundValue(restored.previewBg || state.previewBg),
-    zoom: clampNumber(restored.zoom, 25, 400, 100),
-    fitZoom: clampNumber(restored.fitZoom, 25, 400, 100),
+    zoom: numberHelpers.clampNumber(restored.zoom, 25, 400, 100),
+    fitZoom: numberHelpers.clampNumber(restored.fitZoom, 25, 400, 100),
     fitMode: VIEW_MODE_LABELS[restored.fitMode] ? restored.fitMode : DEFAULT_VIEW_MODE,
-    panX: clampNumber(restored.panX, -10000, 10000, 0),
-    panY: clampNumber(restored.panY, -10000, 10000, 0),
+    panX: numberHelpers.clampNumber(restored.panX, -10000, 10000, 0),
+    panY: numberHelpers.clampNumber(restored.panY, -10000, 10000, 0),
     filter: Object.values(BATCH_FILTERS).includes(restored.filter) ? restored.filter : BATCH_FILTERS.all,
     search: String(restored.search || ""),
     galleryView: restored.galleryView === "list" ? "list" : "thumbs",
@@ -332,9 +274,9 @@ function restoreSessionSnapshot() {
       : null,
     destinationMode: restored.destinationMode === "custom" ? "custom" : "source",
     destinationValue: String(restored.destinationValue || "Salida"),
-    format: normalizeExportFormat(restored.format),
-    size: parseOutputSize(restored.size).normalized,
-    background: normalizeBackgroundValue(restored.background),
+    format: outputProfileHelpers.normalizeExportFormat(restored.format),
+    size: outputProfileHelpers.parseOutputSize(restored.size).normalized,
+    background: outputProfileHelpers.normalizeBackgroundValue(restored.background),
     naming: String(restored.naming || "{original}{suffix}"),
     suffix: restored.suffix === undefined || restored.suffix === null ? "_PRO" : String(restored.suffix),
     appSettingsOpen: Boolean(restored.appSettingsOpen),
@@ -388,7 +330,7 @@ function restoreSessionSnapshot() {
     state.localOverride = hasImageAdjustmentOverride(nextImage);
     state.exportStatus = isExportReady() ? "ready" : "blocked";
     if (nextImage?.path) {
-      writePersistentValue(STORAGE_KEYS.selectedImagePath, nextImage.path);
+      storageHelpers.writeValue(window.localStorage, STORAGE_KEYS.selectedImagePath, nextImage.path);
       Object.assign(state, previewStateHelpers.previewLoadingState({ statusText: "Restaurando vista" }));
       setTimer(() => requestBridgePreview(nextImage), 0);
     }
@@ -402,14 +344,6 @@ function restoreSessionSnapshot() {
 
 function safeObject(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
-}
-
-function clampNumber(value, min, max, fallback) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) {
-    return fallback;
-  }
-  return Math.min(max, Math.max(min, numeric));
 }
 
 function setTimer(callback, delay) {
@@ -426,68 +360,20 @@ function clearTimers() {
   timers.clear();
 }
 
-function normalizeOutputProfile(profile, index = 0) {
-  return outputProfileHelpers.normalizeOutputProfile(profile, index);
-}
-
-function outputProfileNameForDisplay(name) {
-  return outputProfileHelpers.outputProfileNameForDisplay(name);
-}
-
-function normalizeExportFormat(value) {
-  return outputProfileHelpers.normalizeExportFormat(value);
-}
-
 function readOutputProfiles(activeProfileId = "") {
-  const saved = readPersistentJson(STORAGE_KEYS.outputProfiles, null);
+  const saved = storageHelpers.readJson(window.localStorage, STORAGE_KEYS.outputProfiles, null);
   const profiles = Array.isArray(saved) ? saved : defaultOutputProfiles;
-  const activeFormatIds = readPersistentJson(STORAGE_KEYS.activeOutputFormats, null);
-  const normalized = normalizeOutputProfileList(profiles, activeProfileId).map((profile) => (
+  const activeFormatIds = storageHelpers.readJson(window.localStorage, STORAGE_KEYS.activeOutputFormats, null);
+  const normalized = outputProfileHelpers.normalizeOutputProfileList(profiles, activeProfileId).map((profile) => (
     Array.isArray(activeFormatIds)
       ? { ...profile, enabled: activeFormatIds.includes(profile.id) }
       : profile
   ));
-  return normalized.length ? normalized : normalizeOutputProfileList(defaultOutputProfiles, activeProfileId);
-}
-
-function normalizeOutputProfileList(profiles, activeProfileId = "") {
-  return outputProfileHelpers.normalizeOutputProfileList(profiles, activeProfileId);
-}
-
-function dedupeOutputProfileIds(profiles) {
-  return outputProfileHelpers.dedupeOutputProfileIds(profiles);
-}
-
-function uniqueOutputProfileId(name = "formato", seed = Date.now()) {
-  return outputProfileHelpers.uniqueOutputProfileId(name, seed);
-}
-
-function outputProfileSize(profile) {
-  return outputProfileHelpers.outputProfileSize(profile);
-}
-
-function parseOutputSize(value) {
-  return outputProfileHelpers.parseOutputSize(value);
-}
-
-function normalizeBackgroundValue(value, fallback = "rgb230") {
-  return outputProfileHelpers.normalizeBackgroundValue(value, fallback);
-}
-
-function parseRgbBackground(value) {
-  return outputProfileHelpers.parseRgbBackground(value);
-}
-
-function backgroundCustomText(value) {
-  return outputProfileHelpers.backgroundCustomText(value);
-}
-
-function customRgbBackgroundValue(value) {
-  return outputProfileHelpers.customRgbBackgroundValue(value);
+  return normalized.length ? normalized : outputProfileHelpers.normalizeOutputProfileList(defaultOutputProfiles, activeProfileId);
 }
 
 function backgroundSelectMode(value) {
-  return parseRgbBackground(value) ? "custom" : normalizeBackgroundValue(value);
+  return outputProfileHelpers.parseRgbBackground(value) ? "custom" : outputProfileHelpers.normalizeBackgroundValue(value);
 }
 
 function normalizePreviewBackgroundValue(value) {
@@ -497,12 +383,12 @@ function normalizePreviewBackgroundValue(value) {
   if (value === "white" || value === "transparent" || value === "rgb230") {
     return value;
   }
-  const custom = parseRgbBackground(value);
+  const custom = outputProfileHelpers.parseRgbBackground(value);
   return custom ? `rgb:${custom.join(",")}` : "rgb230";
 }
 
 function backgroundCssColor(value) {
-  const custom = parseRgbBackground(value);
+  const custom = outputProfileHelpers.parseRgbBackground(value);
   if (custom) {
     return `rgb(${custom.join(", ")})`;
   }
@@ -525,11 +411,11 @@ function backgroundVisualMode(value) {
   if (value === "white" || value === "transparent") {
     return value;
   }
-  return parseRgbBackground(value) ? "custom" : "rgb230";
+  return outputProfileHelpers.parseRgbBackground(value) ? "custom" : "rgb230";
 }
 
 function previewCustomRgbChannels(value) {
-  const custom = parseRgbBackground(value);
+  const custom = outputProfileHelpers.parseRgbBackground(value);
   if (custom) {
     return custom;
   }
@@ -543,13 +429,13 @@ function previewCustomBackgroundValue() {
   const fallback = previewCustomRgbChannels(state.previewBg);
   const channels = ["r", "g", "b"].map((channel, index) => {
     const input = $(`[data-preview-bg-channel="${channel}"]`);
-    return Math.round(clampNumber(input?.value, 0, 255, fallback[index]));
+    return Math.round(numberHelpers.clampNumber(input?.value, 0, 255, fallback[index]));
   });
   return `rgb:${channels.join(",")}`;
 }
 
 function previewBackgroundLabel(value) {
-  const custom = parseRgbBackground(value);
+  const custom = outputProfileHelpers.parseRgbBackground(value);
   if (custom) {
     return `RGB ${custom.join(", ")}`;
   }
@@ -564,12 +450,12 @@ function normalizeBackgroundPreset(preset, index = 0) {
   const kind = source.kind === "transparent" || source.value === "transparent" ? "transparent" : "rgb";
   const parsed = Array.isArray(source.rgb)
     ? source.rgb
-    : parseRgbBackground(source.value || source.background);
+    : outputProfileHelpers.parseRgbBackground(source.value || source.background);
   const fallbackRgb = defaultBackgroundPresets[index % defaultBackgroundPresets.length]?.rgb || [230, 230, 230];
   const rgb = kind === "transparent"
     ? fallbackRgb
     : (parsed || fallbackRgb).map((channel) => Math.max(0, Math.min(255, Number.parseInt(channel, 10) || 0)));
-  const id = String(source.id || uniqueOutputProfileId(source.name || "fondo", index)).trim();
+  const id = String(source.id || outputProfileHelpers.uniqueOutputProfileId(source.name || "fondo", index)).trim();
   return {
     id,
     kind,
@@ -593,11 +479,11 @@ function normalizeBackgroundPresetList(presets) {
 }
 
 function readBackgroundPresets() {
-  return normalizeBackgroundPresetList(readPersistentJson(STORAGE_KEYS.backgroundPresets, null));
+  return normalizeBackgroundPresetList(storageHelpers.readJson(window.localStorage, STORAGE_KEYS.backgroundPresets, null));
 }
 
 function persistBackgroundPresets() {
-  writePersistentJson(STORAGE_KEYS.backgroundPresets, state.backgroundPresets);
+  storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.backgroundPresets, state.backgroundPresets);
   scheduleBridgeUiPreferencesSave();
 }
 
@@ -627,17 +513,17 @@ function backgroundPresetById(presetId) {
 }
 
 function backgroundPresetByValue(value) {
-  const normalized = normalizeBackgroundValue(value);
-  return state.backgroundPresets.find((preset) => normalizeBackgroundValue(backgroundPresetValue(preset)) === normalized) || null;
+  const normalized = outputProfileHelpers.normalizeBackgroundValue(value);
+  return state.backgroundPresets.find((preset) => outputProfileHelpers.normalizeBackgroundValue(backgroundPresetValue(preset)) === normalized) || null;
 }
 
 function backgroundSelectOptionsHtml(selectedValue) {
-  const selected = normalizeBackgroundValue(selectedValue);
+  const selected = outputProfileHelpers.normalizeBackgroundValue(selectedValue);
   const presetOptions = state.backgroundPresets.map((preset) => {
     const value = backgroundPresetValue(preset);
     return `<option value="${escapeHtml(value)}">${escapeHtml(backgroundPresetLabel(preset))}</option>`;
   }).join("");
-  if (state.backgroundPresets.some((preset) => normalizeBackgroundValue(backgroundPresetValue(preset)) === selected)) {
+  if (state.backgroundPresets.some((preset) => outputProfileHelpers.normalizeBackgroundValue(backgroundPresetValue(preset)) === selected)) {
     return presetOptions;
   }
   return `${presetOptions}<option value="${escapeHtml(selected)}">${escapeHtml(`Actual · ${backgroundLabel(selected)}`)}</option>`;
@@ -684,7 +570,7 @@ function syncOutputProfileState(profile) {
     return;
   }
   state.format = profile.format;
-  state.size = outputProfileSize(profile);
+  state.size = outputProfileHelpers.outputProfileSize(profile);
   state.background = profile.background;
   state.previewBg = profile.background;
   state.destinationMode = profile.destinationMode;
@@ -761,9 +647,9 @@ function exportOutputCount() {
 }
 
 function currentOutputProfileData() {
-  const size = parseOutputSize(state.size);
-  return normalizeOutputProfile({
-    id: state.activeOutputProfileId || uniqueOutputProfileId("actual"),
+  const size = outputProfileHelpers.parseOutputSize(state.size);
+  return outputProfileHelpers.normalizeOutputProfile({
+    id: state.activeOutputProfileId || outputProfileHelpers.uniqueOutputProfileId("actual"),
     name: activeOutputProfile()?.name || "Formato actual",
     enabled: Boolean(activeOutputProfile()?.enabled),
     format: state.format,
@@ -793,15 +679,15 @@ function outputMatchesProfile(profile = activeOutputProfile()) {
 }
 
 function persistOutputProfiles() {
-  writePersistentJson(STORAGE_KEYS.outputProfiles, state.outputProfiles);
-  writePersistentValue(STORAGE_KEYS.activeOutputProfile, state.activeOutputProfileId);
-  writePersistentJson(STORAGE_KEYS.activeOutputFormats, enabledOutputProfiles().map((profile) => profile.id));
+  storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.outputProfiles, state.outputProfiles);
+  storageHelpers.writeValue(window.localStorage, STORAGE_KEYS.activeOutputProfile, state.activeOutputProfileId);
+  storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.activeOutputFormats, enabledOutputProfiles().map((profile) => profile.id));
   persistExportPreferences({ saveBridge: false });
   scheduleBridgeUiPreferencesSave(0);
 }
 
 function persistImageAdjustmentSelection() {
-  writePersistentValue(STORAGE_KEYS.imageAdjustmentPreset, state.activePreset);
+  storageHelpers.writeValue(window.localStorage, STORAGE_KEYS.imageAdjustmentPreset, state.activePreset);
   scheduleBridgeUiPreferencesSave();
 }
 
@@ -817,9 +703,9 @@ function persistExportPreferences(options = {}) {
     naming: state.naming,
     suffix: state.suffix,
   };
-  writePersistentJson(STORAGE_KEYS.exportPreferences, preferences);
+  storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.exportPreferences, preferences);
   if (String(state.destinationValue || "").trim()) {
-    writePersistentValue(STORAGE_KEYS.lastOutputFolder, state.destinationValue);
+    storageHelpers.writeValue(window.localStorage, STORAGE_KEYS.lastOutputFolder, state.destinationValue);
   }
   if (options.saveBridge !== false) {
     scheduleBridgeUiPreferencesSave();
@@ -834,7 +720,7 @@ function uiPreferencesPayload() {
     activeOutputFormats: enabledOutputProfiles().map((profile) => profile.id),
     imageAdjustmentPreset: state.activePreset,
     bridgeScanPath: state.bridgeScanPath,
-    lastOutputFolder: readPersistentValue(STORAGE_KEYS.lastOutputFolder),
+    lastOutputFolder: storageHelpers.readValue(window.localStorage, STORAGE_KEYS.lastOutputFolder),
     exportPreferences: {
       activeOutputProfileId: state.activeOutputProfileId,
       activeOutputFormatIds: enabledOutputProfiles().map((profile) => profile.id),
@@ -852,28 +738,28 @@ function uiPreferencesPayload() {
 function cacheUiPreferences(preferences = uiPreferencesPayload()) {
   const source = safeObject(preferences);
   if (Array.isArray(source.outputProfiles)) {
-    writePersistentJson(STORAGE_KEYS.outputProfiles, source.outputProfiles);
+    storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.outputProfiles, source.outputProfiles);
   }
   if (Array.isArray(source.backgroundPresets)) {
-    writePersistentJson(STORAGE_KEYS.backgroundPresets, source.backgroundPresets);
+    storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.backgroundPresets, source.backgroundPresets);
   }
   if (source.activeOutputProfile !== undefined) {
-    writePersistentValue(STORAGE_KEYS.activeOutputProfile, source.activeOutputProfile);
+    storageHelpers.writeValue(window.localStorage, STORAGE_KEYS.activeOutputProfile, source.activeOutputProfile);
   }
   if (Array.isArray(source.activeOutputFormats)) {
-    writePersistentJson(STORAGE_KEYS.activeOutputFormats, source.activeOutputFormats);
+    storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.activeOutputFormats, source.activeOutputFormats);
   }
   if (source.imageAdjustmentPreset !== undefined) {
-    writePersistentValue(STORAGE_KEYS.imageAdjustmentPreset, source.imageAdjustmentPreset);
+    storageHelpers.writeValue(window.localStorage, STORAGE_KEYS.imageAdjustmentPreset, source.imageAdjustmentPreset);
   }
   if (source.bridgeScanPath !== undefined) {
-    writePersistentValue(STORAGE_KEYS.bridgeScanPath, source.bridgeScanPath);
+    storageHelpers.writeValue(window.localStorage, STORAGE_KEYS.bridgeScanPath, source.bridgeScanPath);
   }
   if (source.lastOutputFolder !== undefined) {
-    writePersistentValue(STORAGE_KEYS.lastOutputFolder, source.lastOutputFolder);
+    storageHelpers.writeValue(window.localStorage, STORAGE_KEYS.lastOutputFolder, source.lastOutputFolder);
   }
   if (source.exportPreferences && typeof source.exportPreferences === "object") {
-    writePersistentJson(STORAGE_KEYS.exportPreferences, source.exportPreferences);
+    storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.exportPreferences, source.exportPreferences);
   }
 }
 
@@ -892,7 +778,7 @@ function applyBridgeUiPreferences(preferences) {
   const activeProfileId = String(source.activeOutputProfile || exportPreferences.activeOutputProfileId || "");
 
   if (Array.isArray(source.outputProfiles)) {
-    const normalized = normalizeOutputProfileList(source.outputProfiles, activeProfileId).map((profile) => (
+    const normalized = outputProfileHelpers.normalizeOutputProfileList(source.outputProfiles, activeProfileId).map((profile) => (
       activeFormatIds ? { ...profile, enabled: activeFormatIds.includes(profile.id) } : profile
     ));
     if (normalized.length) {
@@ -925,9 +811,9 @@ function applyBridgeUiPreferences(preferences) {
     || profileForDefaults.destinationValue
     || (state.destinationMode === "custom" ? "" : "Salida")
   );
-  state.format = normalizeExportFormat(exportPreferences.format || profileForDefaults.format);
-  state.size = parseOutputSize(exportPreferences.size || outputProfileSize(profileForDefaults)).normalized;
-  state.background = normalizeBackgroundValue(exportPreferences.background, profileForDefaults.background);
+  state.format = outputProfileHelpers.normalizeExportFormat(exportPreferences.format || profileForDefaults.format);
+  state.size = outputProfileHelpers.parseOutputSize(exportPreferences.size || outputProfileHelpers.outputProfileSize(profileForDefaults)).normalized;
+  state.background = outputProfileHelpers.normalizeBackgroundValue(exportPreferences.background, profileForDefaults.background);
   state.previewBg = state.background;
   state.naming = String(exportPreferences.naming || profileForDefaults.naming || "{original}{suffix}");
   state.suffix = exportPreferences.suffix === undefined || exportPreferences.suffix === null
@@ -1388,7 +1274,7 @@ function imageDimensions(image) {
 }
 
 function lowResolutionImageCount() {
-  const targets = exportOutputProfiles().map((profile) => parseOutputSize(outputProfileSize(profile)));
+  const targets = exportOutputProfiles().map((profile) => outputProfileHelpers.parseOutputSize(outputProfileHelpers.outputProfileSize(profile)));
   return exportableImages().filter((image) => {
     const dimensions = imageDimensions(image);
     return dimensions && targets.some((target) => dimensions.width < target.width || dimensions.height < target.height);
@@ -1917,7 +1803,7 @@ function selectImage(imageId) {
 
 function rememberSelectedImage(image) {
   if (image?.source === "bridge" && image.path) {
-    writePersistentValue(STORAGE_KEYS.selectedImagePath, image.path);
+    storageHelpers.writeValue(window.localStorage, STORAGE_KEYS.selectedImagePath, image.path);
   }
 }
 
@@ -2215,18 +2101,6 @@ function toggleViewerZoomMode() {
   setViewerMode(DEFAULT_VIEW_MODE);
 }
 
-function clampNumber(value, min, max, fallback) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) {
-    return fallback;
-  }
-  return Math.max(min, Math.min(max, numeric));
-}
-
-function roundedSceneValue(value, min, max, fallback) {
-  return Math.round(clampNumber(value, min, max, fallback) * 1000) / 1000;
-}
-
 function normalizeLightingScene(scene = {}) {
   const source = scene && typeof scene === "object" ? scene : {};
   const sourceMain = source.main && typeof source.main === "object" ? source.main : {};
@@ -2235,13 +2109,13 @@ function normalizeLightingScene(scene = {}) {
   return {
     main: {
       type,
-      x: roundedSceneValue(sourceMain.x, -1, 1, defaultMain.x),
-      y: roundedSceneValue(sourceMain.y, -1, 1, defaultMain.y),
-      height: roundedSceneValue(sourceMain.height, 0, 1, defaultMain.height),
-      size: roundedSceneValue(sourceMain.size, 0, 1, defaultMain.size),
-      intensity: roundedSceneValue(sourceMain.intensity, 0, 1.5, defaultMain.intensity),
+      x: numberHelpers.roundedSceneValue(sourceMain.x, -1, 1, defaultMain.x),
+      y: numberHelpers.roundedSceneValue(sourceMain.y, -1, 1, defaultMain.y),
+      height: numberHelpers.roundedSceneValue(sourceMain.height, 0, 1, defaultMain.height),
+      size: numberHelpers.roundedSceneValue(sourceMain.size, 0, 1, defaultMain.size),
+      intensity: numberHelpers.roundedSceneValue(sourceMain.intensity, 0, 1.5, defaultMain.intensity),
     },
-    ambient_intensity: roundedSceneValue(source.ambient_intensity, 0, 1, defaultLightingScene.ambient_intensity),
+    ambient_intensity: numberHelpers.roundedSceneValue(source.ambient_intensity, 0, 1, defaultLightingScene.ambient_intensity),
   };
 }
 
@@ -2820,7 +2694,7 @@ async function pickOutputProfileDestination() {
   const raw = outputProfileFormRawData();
   const initialPath = raw.destinationMode === "custom" && raw.destinationValue
     ? raw.destinationValue
-    : readPersistentValue(STORAGE_KEYS.lastOutputFolder);
+    : storageHelpers.readValue(window.localStorage, STORAGE_KEYS.lastOutputFolder);
   state.statusText = "Eligiendo carpeta de salida";
   try {
     const selected = await bridgeRequest("/folders/pick", {
@@ -2841,7 +2715,7 @@ async function pickOutputProfileDestination() {
     if (destinationInput) {
       destinationInput.value = selected.path;
     }
-    writePersistentValue(STORAGE_KEYS.lastOutputFolder, selected.path);
+    storageHelpers.writeValue(window.localStorage, STORAGE_KEYS.lastOutputFolder, selected.path);
     updateOutputProfileDraftFromForm();
     state.statusText = "Carpeta de salida configurada";
     renderOutputProfileModalState();
@@ -2922,7 +2796,7 @@ async function scanBridgeFolder() {
 }
 
 function persistBridgeScanPath(path = parseFolderInput(state.bridgeScanPath)[0] || "") {
-  writePersistentValue(STORAGE_KEYS.bridgeScanPath, path);
+  storageHelpers.writeValue(window.localStorage, STORAGE_KEYS.bridgeScanPath, path);
   scheduleBridgeUiPreferencesSave();
 }
 
@@ -2957,7 +2831,7 @@ function applyBridgeScanResult(response) {
   }
 
   if (state.realImages.length) {
-    const rememberedPath = readPersistentValue(STORAGE_KEYS.selectedImagePath);
+    const rememberedPath = storageHelpers.readValue(window.localStorage, STORAGE_KEYS.selectedImagePath);
     const rememberedImage = rememberedPath
       ? state.realImages.find((image) => image.path === rememberedPath)
       : null;
@@ -3755,7 +3629,7 @@ function batchOutputLine() {
     background: state.background,
     format: state.format,
     profileLines: profiles.length > 1
-      ? profiles.map((profile) => `${profile.format} ${outputProfileSize(profile).replace("x", "×")}`)
+      ? profiles.map((profile) => `${profile.format} ${outputProfileHelpers.outputProfileSize(profile).replace("x", "×")}`)
       : [],
     size: state.size,
   });
@@ -4479,7 +4353,7 @@ function renderPreview() {
   $$(".background-switch [data-preview-bg]").forEach((button) => {
     const previewBg = normalizePreviewBackgroundValue(state.previewBg);
     const isCustom = button.dataset.previewBg === "custom";
-    const isActive = isCustom ? Boolean(parseRgbBackground(previewBg)) : button.dataset.previewBg === previewBg;
+    const isActive = isCustom ? Boolean(outputProfileHelpers.parseRgbBackground(previewBg)) : button.dataset.previewBg === previewBg;
     button.classList.toggle("active", isActive);
     button.disabled = previewControlsDisabled;
   });
@@ -4497,7 +4371,7 @@ function renderPreview() {
   }
   const customFields = $(".viewer-bg-custom-fields");
   if (customFields) {
-    customFields.classList.toggle("active", Boolean(parseRgbBackground(state.previewBg)));
+    customFields.classList.toggle("active", Boolean(outputProfileHelpers.parseRgbBackground(state.previewBg)));
   }
   $$("[data-action='zoom-height'], [data-action='zoom-width'], [data-action='zoom-out'], [data-action='zoom-in'], [data-action='force-preview-error']").forEach((button) => {
     button.disabled = previewControlsDisabled;
@@ -4700,7 +4574,7 @@ function previewSettingsLabel() {
 }
 
 function outputSizeDisplay() {
-  const size = parseOutputSize(state.size);
+  const size = outputProfileHelpers.parseOutputSize(state.size);
   return `${size.width}×${size.height}`;
 }
 
@@ -4852,9 +4726,9 @@ function lightingOutputId(field) {
 
 function lightingSliderValue(field, value) {
   if (field === "main.intensity") {
-    return Math.round(clampNumber(value, 0, 1.5, defaultLightingScene.main.intensity) * 100);
+    return Math.round(numberHelpers.clampNumber(value, 0, 1.5, defaultLightingScene.main.intensity) * 100);
   }
-  return Math.round(clampNumber(value, 0, 1, 0) * 100);
+  return Math.round(numberHelpers.clampNumber(value, 0, 1, 0) * 100);
 }
 
 function renderLightingSceneControls() {
@@ -5450,7 +5324,7 @@ function renderExport() {
     profileRows: activeOutputProfiles.map((profile) => ({
       format: profile.format,
       name: profile.name,
-      size: outputProfileSize(profile),
+      size: outputProfileHelpers.outputProfileSize(profile),
       destinationLabel: profileDestinationLabel(profile),
     })),
     formatLabel: activeOutputProfiles.length
@@ -5509,14 +5383,14 @@ function outputProfileSummaryLine(profile) {
   if (!profile) {
     return "Formato sin configurar";
   }
-  return `${profile.format} · ${outputProfileSize(profile).replace("x", " × ")} · ${backgroundLabel(profile.background)}`;
+  return `${profile.format} · ${outputProfileHelpers.outputProfileSize(profile).replace("x", " × ")} · ${backgroundLabel(profile.background)}`;
 }
 
 function syncBackgroundSelectValue(select, background) {
   if (!select) {
     return;
   }
-  const normalized = normalizeBackgroundValue(background);
+  const normalized = outputProfileHelpers.normalizeBackgroundValue(background);
   select.innerHTML = backgroundSelectOptionsHtml(normalized);
   select.value = normalized;
 }
@@ -5526,7 +5400,7 @@ function selectedBackgroundPresetFromForm(raw = outputProfileFormRawData()) {
 }
 
 function backgroundRgbFromValue(value) {
-  return parseRgbBackground(normalizeBackgroundValue(value)) || backgroundColorTuple(value);
+  return outputProfileHelpers.parseRgbBackground(outputProfileHelpers.normalizeBackgroundValue(value)) || backgroundColorTuple(value);
 }
 
 function positionBackgroundPresetEditor() {
@@ -5547,11 +5421,11 @@ function positionBackgroundPresetEditor() {
   const maxWidth = Math.max(280, Math.min(486, window.innerWidth - margin * 2, dialogRect.width - margin * 2));
   editor.style.width = `${maxWidth}px`;
   const editorHeight = editor.offsetHeight || 0;
-  const left = clampNumber(anchorRect.left, dialogRect.left + margin, dialogRect.right - maxWidth - margin);
+  const left = numberHelpers.clampNumber(anchorRect.left, dialogRect.left + margin, dialogRect.right - maxWidth - margin);
   const footerTop = footerRect?.top || dialogRect.bottom;
   const preferredTop = anchorRect.bottom + 8;
   const maxTop = Math.max(dialogRect.top + margin, footerTop - editorHeight - 8);
-  const top = clampNumber(preferredTop, dialogRect.top + margin, maxTop);
+  const top = numberHelpers.clampNumber(preferredTop, dialogRect.top + margin, maxTop);
   editor.style.left = `${left}px`;
   editor.style.top = `${top}px`;
 }
@@ -5599,7 +5473,7 @@ function renderBackgroundPresetControls(raw = outputProfileFormRawData()) {
   editor.classList.toggle("is-transparent", editorState.kind === "transparent");
   const swatch = $("#background-preset-swatch");
   if (swatch) {
-    const rgb = editorState.kind === "transparent" ? null : parseRgbBackground(customRgbBackgroundValue(editorState.rgbText));
+    const rgb = editorState.kind === "transparent" ? null : outputProfileHelpers.parseRgbBackground(outputProfileHelpers.customRgbBackgroundValue(editorState.rgbText));
     const isInvalidRgb = editorState.kind !== "transparent" && !rgb;
     swatch.classList.toggle("is-transparent", editorState.kind === "transparent");
     swatch.classList.toggle("is-invalid", isInvalidRgb);
@@ -5640,13 +5514,13 @@ function beginBackgroundPresetEdit(mode = "edit") {
   const raw = outputProfileFormRawData();
   const preset = mode === "edit" ? selectedBackgroundPresetFromForm(raw) : null;
   const source = preset || {
-    id: uniqueOutputProfileId("fondo", Date.now()),
+    id: outputProfileHelpers.uniqueOutputProfileId("fondo", Date.now()),
     kind: raw.background === "transparent" ? "transparent" : "rgb",
     name: preset ? preset.name : "Nuevo fondo",
     rgb: backgroundRgbFromValue(raw.background),
   };
   state.backgroundPresetEditor = {
-    id: mode === "edit" && preset ? preset.id : uniqueOutputProfileId(source.name || "fondo", Date.now()),
+    id: mode === "edit" && preset ? preset.id : outputProfileHelpers.uniqueOutputProfileId(source.name || "fondo", Date.now()),
     mode: mode === "edit" && preset ? "edit" : "new",
     sourceValue: preset ? backgroundPresetValue(preset) : "",
     kind: source.kind === "transparent" ? "transparent" : "rgb",
@@ -5664,7 +5538,7 @@ function saveBackgroundPreset() {
     return;
   }
   const name = editor.name.trim();
-  const rgb = customRgbBackgroundValue(editor.rgbText);
+  const rgb = outputProfileHelpers.customRgbBackgroundValue(editor.rgbText);
   if (!name) {
     state.backgroundPresetEditor = { ...editor, error: "Pon un nombre al fondo." };
     renderBackgroundPresetControls();
@@ -5679,7 +5553,7 @@ function saveBackgroundPreset() {
     id: editor.id,
     kind: editor.kind,
     name,
-    rgb: editor.kind === "transparent" ? [230, 230, 230] : parseRgbBackground(rgb),
+    rgb: editor.kind === "transparent" ? [230, 230, 230] : outputProfileHelpers.parseRgbBackground(rgb),
   });
   const previousValue = editor.mode === "edit" ? editor.sourceValue : "";
   const index = state.backgroundPresets.findIndex((preset) => preset.id === editor.id);
@@ -5703,18 +5577,18 @@ function saveBackgroundPreset() {
 }
 
 function replaceBackgroundValue(previousValue, nextValue) {
-  const previous = normalizeBackgroundValue(previousValue);
-  const next = normalizeBackgroundValue(nextValue);
+  const previous = outputProfileHelpers.normalizeBackgroundValue(previousValue);
+  const next = outputProfileHelpers.normalizeBackgroundValue(nextValue);
   state.outputProfiles = state.outputProfiles.map((profile) => (
-    normalizeBackgroundValue(profile.background) === previous ? { ...profile, background: next } : profile
+    outputProfileHelpers.normalizeBackgroundValue(profile.background) === previous ? { ...profile, background: next } : profile
   ));
-  if (state.outputProfileDraft && normalizeBackgroundValue(state.outputProfileDraft.background) === previous) {
+  if (state.outputProfileDraft && outputProfileHelpers.normalizeBackgroundValue(state.outputProfileDraft.background) === previous) {
     state.outputProfileDraft = { ...state.outputProfileDraft, background: next };
   }
-  if (normalizeBackgroundValue(state.background) === previous) {
+  if (outputProfileHelpers.normalizeBackgroundValue(state.background) === previous) {
     state.background = next;
   }
-  if (normalizeBackgroundValue(state.previewBg) === previous) {
+  if (outputProfileHelpers.normalizeBackgroundValue(state.previewBg) === previous) {
     state.previewBg = next;
   }
   persistOutputProfiles();
@@ -5755,7 +5629,7 @@ function ensureOutputProfileDraft() {
   const current = state.outputProfiles.find((profile) => profile.id === state.outputProfileEditorId)
     || state.outputProfileDraft
     || activeOutputProfile()
-    || normalizeOutputProfile(defaultOutputProfiles[0]);
+    || outputProfileHelpers.normalizeOutputProfile(defaultOutputProfiles[0]);
   if (!state.outputProfileEditorId) {
     state.outputProfileEditorId = current.id;
   }
@@ -5796,7 +5670,7 @@ function outputProfileFormRawData() {
     id: current.id,
     name: value("profile-name-input", current.name),
     format: value("profile-format-input", current.format),
-    background: normalizeBackgroundValue(backgroundMode, current.background),
+    background: outputProfileHelpers.normalizeBackgroundValue(backgroundMode, current.background),
     width: value("profile-width-input", current.width),
     height: value("profile-height-input", current.height),
     destinationMode: value("profile-destination-mode-input", current.destinationMode),
@@ -5813,7 +5687,7 @@ function outputProfileRawFromProfile(profile) {
     name: profile.name,
     format: profile.format,
     background: profile.background,
-    backgroundCustom: backgroundCustomText(profile.background),
+    backgroundCustom: outputProfileHelpers.backgroundCustomText(profile.background),
     backgroundMode: backgroundSelectMode(profile.background),
     width: String(profile.width),
     height: String(profile.height),
@@ -5827,7 +5701,7 @@ function outputProfileRawFromProfile(profile) {
 function outputProfileDraftFromForm() {
   const current = ensureOutputProfileDraft();
   const raw = outputProfileFormRawData();
-  return normalizeOutputProfile({
+  return outputProfileHelpers.normalizeOutputProfile({
     id: current.id,
     name: raw.name,
     enabled: Boolean(raw.enabled),
@@ -5859,7 +5733,7 @@ function syncTransparentBackgroundFormat() {
   if (!backgroundInput || !formatInput) {
     return;
   }
-  if (normalizeBackgroundValue(backgroundInput.value) === "transparent" && normalizeExportFormat(formatInput.value) !== "PNG") {
+  if (outputProfileHelpers.normalizeBackgroundValue(backgroundInput.value) === "transparent" && outputProfileHelpers.normalizeExportFormat(formatInput.value) !== "PNG") {
     formatInput.value = "PNG";
   }
 }
@@ -5882,7 +5756,7 @@ function syncOutputProfileDestinationMode() {
     return;
   }
   if (mode === "custom" && (!value || value === "Salida")) {
-    destinationInput.value = readPersistentValue(STORAGE_KEYS.lastOutputFolder) || "";
+    destinationInput.value = storageHelpers.readValue(window.localStorage, STORAGE_KEYS.lastOutputFolder) || "";
   }
 }
 
@@ -5920,7 +5794,7 @@ function newOutputProfile() {
     return;
   }
   const source = currentOutputProfileData();
-  const id = uniqueOutputProfileId("formato", Date.now());
+  const id = outputProfileHelpers.uniqueOutputProfileId("formato", Date.now());
   state.outputProfileEditorId = id;
   state.outputProfileDraft = {
     ...source,
@@ -5941,7 +5815,7 @@ function duplicateOutputProfile() {
     return;
   }
   const source = state.outputProfileDraft || activeOutputProfile() || currentOutputProfileData();
-  const id = uniqueOutputProfileId(source.name || "formato", Date.now());
+  const id = outputProfileHelpers.uniqueOutputProfileId(source.name || "formato", Date.now());
   state.outputProfileEditorId = id;
   state.outputProfileDraft = {
     ...source,
@@ -5964,7 +5838,7 @@ function commitOutputProfileDraft() {
     return null;
   }
   const draft = outputProfileDraftFromForm();
-  const saved = normalizeOutputProfile({
+  const saved = outputProfileHelpers.normalizeOutputProfile({
     ...draft,
     name: draft.name.trim() || "Formato sin nombre",
   });
@@ -5974,7 +5848,7 @@ function commitOutputProfileDraft() {
   } else {
     state.outputProfiles.push(saved);
   }
-  state.outputProfiles = normalizeOutputProfileList(state.outputProfiles, saved.id);
+  state.outputProfiles = outputProfileHelpers.normalizeOutputProfileList(state.outputProfiles, saved.id);
   state.outputProfileEditorId = saved.id;
   state.outputProfileDraft = { ...saved };
   state.outputProfileNotice = "";
@@ -6065,7 +5939,7 @@ function confirmDeleteManagedOutputProfile() {
 function resetOutputProfileDraft() {
   const original = state.outputProfiles.find((profile) => profile.id === state.outputProfileEditorId)
     || activeOutputProfile()
-    || normalizeOutputProfile(defaultOutputProfiles[0]);
+    || outputProfileHelpers.normalizeOutputProfile(defaultOutputProfiles[0]);
   state.outputProfileDraft = { ...original };
   state.outputProfileEditorId = original.id;
   state.outputProfileNotice = "";
@@ -6083,7 +5957,7 @@ function openAppSettings() {
     ? activeProfile
     : {
       ...currentOutputProfileData(),
-      id: uniqueOutputProfileId("formato-personalizado", Date.now()),
+      id: outputProfileHelpers.uniqueOutputProfileId("formato-personalizado", Date.now()),
       name: "Formato personalizado",
     };
   state.appSettingsOpen = true;
@@ -6292,7 +6166,7 @@ function sameOutputProfileRaw(profile, raw) {
   }
   const destinationMode = raw.destinationMode === "custom" ? "custom" : "source";
   return String(profile.name || "").trim() === String(raw.name || "").trim()
-    && profile.format === normalizeExportFormat(raw.format)
+    && profile.format === outputProfileHelpers.normalizeExportFormat(raw.format)
     && profile.background === raw.background
     && String(profile.width) === String(raw.width || "").trim()
     && String(profile.height) === String(raw.height || "").trim()
@@ -6312,7 +6186,7 @@ function outputProfileChangeCount() {
   const destinationMode = raw.destinationMode === "custom" ? "custom" : "source";
   const checks = [
     String(saved.name || "").trim() !== String(raw.name || "").trim(),
-    saved.format !== normalizeExportFormat(raw.format),
+    saved.format !== outputProfileHelpers.normalizeExportFormat(raw.format),
     saved.background !== raw.background,
     String(saved.width) !== String(raw.width || "").trim(),
     String(saved.height) !== String(raw.height || "").trim(),
@@ -6813,7 +6687,7 @@ function saveCurrentOutputProfile() {
       enabled: Boolean(state.outputProfiles[index].enabled),
     };
   }
-  state.outputProfiles = normalizeOutputProfileList(state.outputProfiles, state.activeOutputProfileId);
+  state.outputProfiles = outputProfileHelpers.normalizeOutputProfileList(state.outputProfiles, state.activeOutputProfileId);
   state.outputDraft = null;
   state.outputEditMode = false;
   state.exportStatus = isExportReady() ? "ready" : "blocked";
@@ -6828,13 +6702,13 @@ function saveCurrentOutputAsNewProfile() {
   if (name === null) {
     return;
   }
-  const profile = normalizeOutputProfile({
+  const profile = outputProfileHelpers.normalizeOutputProfile({
     ...currentOutputProfileData(),
-    id: uniqueOutputProfileId(name || "formato", Date.now()),
+    id: outputProfileHelpers.uniqueOutputProfileId(name || "formato", Date.now()),
     name: name.trim() || "Nuevo formato",
     enabled: true,
   });
-  state.outputProfiles = normalizeOutputProfileList([...state.outputProfiles, profile], profile.id);
+  state.outputProfiles = outputProfileHelpers.normalizeOutputProfileList([...state.outputProfiles, profile], profile.id);
   state.activeOutputProfileId = profile.id;
   state.outputProfileEditorId = profile.id;
   state.outputProfileDraft = { ...profile };
@@ -7787,13 +7661,13 @@ function updateLightingSceneField(field, rawValue) {
   if (field === "main.type") {
     scene.main.type = ["softbox", "spot", "strip"].includes(rawValue) ? rawValue : scene.main.type;
   } else if (field === "main.height") {
-    scene.main.height = roundedSceneValue(Number(rawValue) / 100, 0, 1, scene.main.height);
+    scene.main.height = numberHelpers.roundedSceneValue(Number(rawValue) / 100, 0, 1, scene.main.height);
   } else if (field === "main.size") {
-    scene.main.size = roundedSceneValue(Number(rawValue) / 100, 0, 1, scene.main.size);
+    scene.main.size = numberHelpers.roundedSceneValue(Number(rawValue) / 100, 0, 1, scene.main.size);
   } else if (field === "main.intensity") {
-    scene.main.intensity = roundedSceneValue(Number(rawValue) / 100, 0, 1.5, scene.main.intensity);
+    scene.main.intensity = numberHelpers.roundedSceneValue(Number(rawValue) / 100, 0, 1.5, scene.main.intensity);
   } else if (field === "ambient_intensity") {
-    scene.ambient_intensity = roundedSceneValue(Number(rawValue) / 100, 0, 1, scene.ambient_intensity);
+    scene.ambient_intensity = numberHelpers.roundedSceneValue(Number(rawValue) / 100, 0, 1, scene.ambient_intensity);
   } else {
     return;
   }
@@ -7813,8 +7687,8 @@ function updateLightingScenePosition(clientX, clientY, options = {}) {
   if (!rect.width || !rect.height) {
     return false;
   }
-  const x = roundedSceneValue(((clientX - rect.left) / rect.width) * 2 - 1, -1, 1, defaultLightingScene.main.x);
-  const y = roundedSceneValue(((clientY - rect.top) / rect.height) * 2 - 1, -1, 1, defaultLightingScene.main.y);
+  const x = numberHelpers.roundedSceneValue(((clientX - rect.left) / rect.width) * 2 - 1, -1, 1, defaultLightingScene.main.x);
+  const y = numberHelpers.roundedSceneValue(((clientY - rect.top) / rect.height) * 2 - 1, -1, 1, defaultLightingScene.main.y);
   const scene = cloneLightingScene(state.settings.lighting_scene);
   if (scene.main.x === x && scene.main.y === y) {
     return false;
@@ -7893,7 +7767,7 @@ function updateLocalOverrideFromNumberInput(input, options = {}) {
 }
 
 $("#format-select").addEventListener("change", (event) => {
-  state.format = normalizeExportFormat(event.target.value);
+  state.format = outputProfileHelpers.normalizeExportFormat(event.target.value);
   state.statusText = `Formato: ${state.format}`;
   persistExportPreferences();
   render();
@@ -7911,7 +7785,7 @@ $("#size-select").addEventListener("input", (event) => {
 });
 
 $("#size-select").addEventListener("change", (event) => {
-  state.size = parseOutputSize(event.target.value).normalized;
+  state.size = outputProfileHelpers.parseOutputSize(event.target.value).normalized;
   state.statusText = `Tamaño: ${state.size}`;
   persistExportPreferences();
   const image = selectedImage();
@@ -7923,7 +7797,7 @@ $("#size-select").addEventListener("change", (event) => {
 });
 
 $("#background-select").addEventListener("change", (event) => {
-  state.background = normalizeBackgroundValue(event.target.value, state.background);
+  state.background = outputProfileHelpers.normalizeBackgroundValue(event.target.value, state.background);
   state.previewBg = state.background;
   state.statusText = `Fondo: ${backgroundLabel(state.background)}`;
   persistExportPreferences();

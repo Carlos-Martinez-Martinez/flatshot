@@ -43,3 +43,50 @@ def test_app_js_does_not_reintroduce_extracted_wrapper_helpers():
 
     for wrapper in obsolete_wrappers:
         assert wrapper not in source
+
+
+def test_app_js_uses_shared_storage_and_number_helpers():
+    source = APP_PATH.read_text(encoding="utf-8")
+
+    removed_helpers = [
+        "function readPersistentValue(",
+        "function readPersistentJson(",
+        "function writePersistentValue(",
+        "function writePersistentJson(",
+        "function clampNumber(",
+    ]
+
+    for helper in removed_helpers:
+        assert helper not in source
+
+    assert "storageHelpers.readValue(" in source
+    assert "storageHelpers.readJson(" in source
+    assert "storageHelpers.writeValue(" in source
+    assert "storageHelpers.writeJson(" in source
+    assert "numberHelpers.clampNumber(" in source
+
+
+def test_app_js_does_not_keep_output_profile_passthrough_wrappers():
+    source = APP_PATH.read_text(encoding="utf-8")
+
+    passthrough_wrappers = [
+        "function normalizeOutputProfile(",
+        "function outputProfileNameForDisplay(",
+        "function normalizeExportFormat(",
+        "function normalizeOutputProfileList(",
+        "function dedupeOutputProfileIds(",
+        "function uniqueOutputProfileId(",
+        "function outputProfileSize(",
+        "function parseOutputSize(",
+        "function normalizeBackgroundValue(",
+        "function parseRgbBackground(",
+        "function backgroundCustomText(",
+        "function customRgbBackgroundValue(",
+    ]
+
+    for wrapper in passthrough_wrappers:
+        assert wrapper not in source
+
+    assert "outputProfileHelpers.normalizeOutputProfile(" in source
+    assert "outputProfileHelpers.parseOutputSize(" in source
+    assert "outputProfileHelpers.normalizeBackgroundValue(" in source

@@ -75,13 +75,24 @@ class ExportEventSink(Protocol):
 
 
 @dataclass
+class ExportRenderTask:
+    img_path: Path
+    key: str
+    fmt: str
+    save_path: Path
+    cache_path: Path
+    task_args: tuple
+    display_name: str
+
+
+@dataclass
 class ExportPlan:
     source_total: int
     total: int
     enabled_variants: list[ExportVariant]
     planned_outputs: list[dict]
-    render_tasks: list[dict]
-    cached_tasks: list[dict]
+    render_tasks: list[ExportRenderTask]
+    cached_tasks: list[ExportRenderTask]
 
 
 def apply_naming_template(
@@ -299,8 +310,8 @@ def build_export_plan(
     enabled_variants = get_enabled_export_variants(request.export_config)
     curve_data_dict = request.curve_data.model_dump() if request.curve_data else None
     parent_folder_name = request.input_folder.name
-    render_tasks: list[dict] = []
-    cached_tasks: list[dict] = []
+    render_tasks: list[ExportRenderTask] = []
+    cached_tasks: list[ExportRenderTask] = []
     planned_outputs: list[dict] = []
 
     for index, (img_path, local_key, cache_identity_path) in enumerate(
@@ -345,15 +356,15 @@ def build_export_plan(
                 local_override,
                 fmt,
             )
-            render_task = {
-                "img_path": img_path,
-                "key": key,
-                "fmt": fmt,
-                "save_path": save_path,
-                "cache_path": cache.get_cached_path(key, fmt),
-                "task_args": task_args,
-                "display_name": display_name,
-            }
+            render_task = ExportRenderTask(
+                img_path=img_path,
+                key=key,
+                fmt=fmt,
+                save_path=save_path,
+                cache_path=cache.get_cached_path(key, fmt),
+                task_args=task_args,
+                display_name=display_name,
+            )
             planned_outputs.append(
                 {
                     "save_path": save_path,
@@ -588,16 +599,16 @@ class ExportRunner:
 
     def _export_cached_tasks(
         self,
-        cached_tasks: list[dict],
+        cached_tasks: list[ExportRenderTask],
         cache: RenderCache,
         completed_count: int,
         error_count: int,
         total: int,
-    ) -> tuple[int, int, list[dict]]:
+    ) -> tuple[int, int, list[ExportRenderTask]]:
         if not cached_tasks:
             return completed_count, error_count, []
 
-        fallback_tasks: list[dict] = []
+        fallback_tasks: list[ExportRenderTask] = []
         self._emit(ExportLogEvent(f"Exportando {len(cached_tasks)} archivos desde caché..."))
         for cached in cached_tasks:
             if self.cancellation_token.cancelled:
@@ -605,18 +616,18 @@ class ExportRunner:
             self.pause_token.wait_if_paused()
 
             try:
-                cache_path = cache.get_cached_path(cached["key"], cached["fmt"])
-                save_path = Path(cached["save_path"])
+                cache_path = cache.get_cached_path(cached.key, cached.fmt)
+                save_path = Path(cached.save_path)
                 save_path.parent.mkdir(parents=True, exist_ok=True)
                 self.copy_file(cache_path, save_path)
 
                 completed_count += 1
-                self._emit(ExportImageCompletedEvent(cached["display_name"], True))
+                self._emit(ExportImageCompletedEvent(cached.display_name, True))
                 self._emit_progress(completed_count, total)
             except Exception as e:
                 self._emit(
                     ExportLogEvent(
-                        f"Caché no válida para {cached['display_name']}; renderizando normal ({e})"
+                        f"Caché no válida para {cached.display_name}; renderizando normal ({e})"
                     )
                 )
                 fallback_tasks.append(cached)
@@ -625,7 +636,7 @@ class ExportRunner:
 
     def _export_render_tasks(
         self,
-        tasks: list[dict],
+        tasks: list[ExportRenderTask],
         cache: RenderCache,
         completed_count: int,
         error_count: int,
@@ -643,7 +654,7 @@ class ExportRunner:
                 for _ in range(min(max_workers, len(tasks))):
                     try:
                         task = next(pending_tasks)
-                        future = executor.submit(self.image_processor, task["task_args"])
+                        future = executor.submit(self.image_processor, task.task_args)
                         in_flight[future] = task
                     except StopIteration:
                         break
@@ -680,7 +691,7 @@ class ExportRunner:
                         if not self.cancellation_token.cancelled and not self.pause_token.paused:
                             try:
                                 task = next(pending_tasks)
-                                future = executor.submit(self.image_processor, task["task_args"])
+                                future = executor.submit(self.image_processor, task.task_args)
                                 in_flight[future] = task
                             except StopIteration:
                                 pass
@@ -689,9 +700,9 @@ class ExportRunner:
 
         return completed_count, error_count
 
-    def _store_render_cache(self, task: dict, cache: RenderCache) -> None:
-        cache_path = Path(task["cache_path"])
-        save_path = Path(task["save_path"])
+    def _store_render_cache(self, task: ExportRenderTask, cache: RenderCache) -> None:
+        cache_path = Path(task.cache_path)
+        save_path = Path(task.save_path)
         temp_path = cache.get_temp_path(cache_path, str(uuid4()))
         try:
             cache_path.parent.mkdir(parents=True, exist_ok=True)
@@ -702,7 +713,7 @@ class ExportRunner:
                 temp_path.unlink(missing_ok=True)
             except OSError:
                 pass
-            self._emit(ExportLogEvent(f"Aviso: no se pudo actualizar la caché de {task['display_name']}: {exc}"))
+            self._emit(ExportLogEvent(f"Aviso: no se pudo actualizar la caché de {task.display_name}: {exc}"))
 
     def _emit_progress(self, completed_count: int, total: int) -> None:
         self._emit(ExportProgressEvent(completed_count, total, int((completed_count / total) * 100)))

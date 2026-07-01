@@ -88,7 +88,7 @@ def test_destination_mode_clears_custom_path_before_validation():
     assert update_block.index("syncOutputProfileDestinationMode();") < update_block.index("outputProfileDraftFromForm();")
     assert "function looksLikeAbsoluteOutputPath" in update_block
     assert 'destinationInput.value = "Salida";' in update_block
-    assert "readPersistentValue(STORAGE_KEYS.lastOutputFolder)" in update_block
+    assert "storageHelpers.readValue(window.localStorage, STORAGE_KEYS.lastOutputFolder)" in update_block
 
 
 def test_custom_destination_can_pick_folder_from_bridge():

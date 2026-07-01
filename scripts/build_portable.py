@@ -24,10 +24,12 @@ from portable.manifest import (  # noqa: E402
     runtime_manifest_hash,
     source_manifest_hash,
 )
+from portable.runtime_sync import sync_runtime_app  # noqa: E402
 
 DEFAULT_TARGET = PROJECT_ROOT / "release" / "FlatShotPortable"
 LAUNCHER_TEMPLATE = PROJECT_ROOT / "scripts" / "portable" / "FlatShot.pyw"
 MANIFEST_TEMPLATE = PROJECT_ROOT / "scripts" / "portable" / "manifest.py"
+RUNTIME_SYNC_TEMPLATE = PROJECT_ROOT / "scripts" / "portable" / "runtime_sync.py"
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -77,15 +79,13 @@ def validate_source_root(source_root: Path) -> None:
 
 
 def sync_portable_app(source_root: Path, target: Path) -> None:
-    app_dir = target / "app"
-    app_dir.mkdir(parents=True, exist_ok=True)
-    copy_tree(source_root / "src" / "flatshot", app_dir / "flatshot")
-    copy_tree(source_root / "apps" / "flatshot-desktop" / "frontend", app_dir / "frontend")
+    sync_runtime_app(source_root, target / "app")
 
 
 def copy_launcher_files(target: Path) -> None:
     shutil.copy2(LAUNCHER_TEMPLATE, target / "FlatShot.pyw")
     shutil.copy2(MANIFEST_TEMPLATE, target / "manifest.py")
+    shutil.copy2(RUNTIME_SYNC_TEMPLATE, target / "runtime_sync.py")
     (target / "Abrir FlatShot.vbs").write_text(VBS_LAUNCHER, encoding="utf-8")
     (target / "Diagnostico FlatShot.bat").write_text(DIAGNOSTIC_BAT, encoding="utf-8")
     (target / "README_PORTABLE.txt").write_text(README_PORTABLE, encoding="utf-8")
@@ -119,17 +119,6 @@ def run_command(command: list[str], cwd: Path, *, timeout: int) -> None:
     if completed.returncode != 0:
         output = (completed.stdout or "").strip()[-4000:]
         raise RuntimeError(f"Comando fallido ({' '.join(command)}):\n{output}")
-
-
-def copy_tree(source: Path, destination: Path) -> None:
-    if destination.exists():
-        shutil.rmtree(destination)
-    shutil.copytree(source, destination, ignore=ignore_generated)
-
-
-def ignore_generated(_directory: str, names: list[str]) -> set[str]:
-    ignored = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "node_modules", "build", "dist"}
-    return {name for name in names if name in ignored or name.endswith((".pyc", ".pyo", ".tsbuildinfo"))}
 
 
 def write_sync_stamp(source_root: Path, target: Path) -> None:

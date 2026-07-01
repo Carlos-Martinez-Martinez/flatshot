@@ -85,7 +85,8 @@ def test_build_export_plan_splits_cached_and_render_tasks(monkeypatch, tmp_path)
     cache = RenderCache()
     image_items = [(source, str(source), source)]
     first_plan = build_export_plan(request, image_items, cache)
-    cache_path = first_plan.render_tasks[0]["cache_path"]
+    assert first_plan.render_tasks[0].display_name == "source.png · Web RGB230"
+    cache_path = first_plan.render_tasks[0].cache_path
     Image.new("RGBA", (8, 8), (1, 2, 3, 255)).save(cache_path)
 
     plan = build_export_plan(request, image_items, cache)
@@ -94,6 +95,7 @@ def test_build_export_plan_splits_cached_and_render_tasks(monkeypatch, tmp_path)
     assert plan.total == 1
     assert plan.render_tasks == []
     assert len(plan.cached_tasks) == 1
+    assert plan.cached_tasks[0].save_path.name == "source_PRO.png"
     assert plan.planned_outputs[0]["save_path"].name == "source_PRO.png"
 
 

@@ -3,7 +3,6 @@ from __future__ import annotations
 import ctypes
 import json
 import os
-import shutil
 import socket
 import sys
 import threading
@@ -32,6 +31,7 @@ from manifest import (  # noqa: E402
     runtime_manifest_hash,
     source_manifest_hash,
 )
+from runtime_sync import sync_runtime_app  # noqa: E402
 
 APP_PARENT = ROOT / "app"
 APP_PACKAGE = APP_PARENT / "flatshot"
@@ -143,20 +143,7 @@ def write_sync_stamp(source_root: Path, runtime_hash: str, dependency_hash: str,
 
 
 def sync_package(source_root: Path) -> None:
-    APP_PARENT.mkdir(parents=True, exist_ok=True)
-    copy_tree(source_root / "src" / "flatshot", APP_PACKAGE)
-    copy_tree(source_root / "apps" / "flatshot-desktop" / "frontend", FRONTEND_DIR)
-
-
-def copy_tree(source: Path, destination: Path) -> None:
-    if destination.exists():
-        shutil.rmtree(destination)
-    shutil.copytree(source, destination, ignore=ignore_generated)
-
-
-def ignore_generated(_directory: str, names: list[str]) -> set[str]:
-    ignored = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "node_modules", "build", "dist"}
-    return {name for name in names if name in ignored or name.endswith((".pyc", ".pyo", ".tsbuildinfo"))}
+    sync_runtime_app(source_root, APP_PARENT)
 
 
 def write_launcher_log(context: str, details: str) -> None:

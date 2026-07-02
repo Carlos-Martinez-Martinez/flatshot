@@ -13,6 +13,14 @@ const initialActiveGuideSystemIds = guideHelpers.normalizeActiveGuideSystemIds(
   storageHelpers.readJson(window.localStorage, STORAGE_KEYS.activeGuideSystems, ["center"]),
   initialGuideSystems
 );
+const initialGuideSystemOrderIds = guideHelpers.normalizeGuideSystemOrderIds(
+  storageHelpers.readJson(window.localStorage, STORAGE_KEYS.guideSystemOrder, []),
+  initialGuideSystems
+);
+const initialHiddenGuideSystemIds = guideHelpers.normalizeHiddenGuideSystemIds(
+  storageHelpers.readJson(window.localStorage, STORAGE_KEYS.hiddenGuideSystems, []),
+  initialGuideSystems
+);
 const initialGuidesVisible = storageHelpers.readValue(window.localStorage, STORAGE_KEYS.guidesVisible) !== "0";
 const initialOutputProfiles = readOutputProfiles(initialOutputProfileId);
 const initialEnabledOutputProfiles = initialOutputProfiles.filter((profile) => profile.enabled);
@@ -56,8 +64,11 @@ const state = {
   previewBg: initialBackground,
   guidesVisible: initialGuidesVisible,
   activeGuideSystemIds: initialActiveGuideSystemIds,
+  guideSystemOrderIds: initialGuideSystemOrderIds,
+  hiddenGuideSystemIds: initialHiddenGuideSystemIds,
   guideSystems: initialGuideSystems,
   guideManagerOpen: false,
+  selectedGuideSystemId: null,
   guideDraft: null,
   zoom: 100,
   fitZoom: 100,

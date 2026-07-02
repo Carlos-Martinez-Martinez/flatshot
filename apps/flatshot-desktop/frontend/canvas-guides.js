@@ -219,6 +219,36 @@
     ));
   }
 
+  function normalizeGuideSystemOrderIds(ids = [], systems = []) {
+    const available = new Set(systems.map((system) => system.id));
+    const ordered = Array.isArray(ids)
+      ? ids.map(String).filter((id, index, list) => available.has(id) && list.indexOf(id) === index)
+      : [];
+    systems.forEach((system) => {
+      if (!ordered.includes(system.id)) {
+        ordered.push(system.id);
+      }
+    });
+    return ordered;
+  }
+
+  function normalizeHiddenGuideSystemIds(ids = [], systems = []) {
+    const available = new Set(systems.map((system) => system.id));
+    return Array.isArray(ids)
+      ? ids.map(String).filter((id, index, list) => available.has(id) && list.indexOf(id) === index)
+      : [];
+  }
+
+  function orderGuideSystems(systems = [], orderIds = []) {
+    const byId = new Map(systems.map((system) => [system.id, system]));
+    return normalizeGuideSystemOrderIds(orderIds, systems).map((id) => byId.get(id)).filter(Boolean);
+  }
+
+  function pickerGuideSystems(systems = [], orderIds = [], hiddenIds = []) {
+    const hidden = new Set(normalizeHiddenGuideSystemIds(hiddenIds, systems));
+    return orderGuideSystems(systems, orderIds).filter((system) => !hidden.has(system.id));
+  }
+
   function normalizeActiveGuideSystemIds(ids = [], systems = []) {
     const available = new Set(systems.map((system) => system.id));
     return Array.isArray(ids)
@@ -244,9 +274,13 @@
     formatPercent,
     guideLinesForSystems,
     guideSystemsForStorage,
+    normalizeGuideSystemOrderIds,
     normalizeActiveGuideSystemIds,
     normalizeGuideSystemList,
+    normalizeHiddenGuideSystemIds,
+    orderGuideSystems,
     parsePercent,
+    pickerGuideSystems,
     readGuideSystems,
   };
 });

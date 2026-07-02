@@ -33,6 +33,8 @@ function restoreSessionSnapshot() {
     normalizeBackgroundPresetList: (presets) => backgroundPresetHelpers.normalizeBackgroundPresetList(presets, backgroundPresetOptions()),
     normalizeGuideSystemList: (systems) => guideHelpers.normalizeGuideSystemList(systems),
     normalizeActiveGuideSystemIds: guideHelpers.normalizeActiveGuideSystemIds,
+    normalizeGuideSystemOrderIds: guideHelpers.normalizeGuideSystemOrderIds,
+    normalizeHiddenGuideSystemIds: guideHelpers.normalizeHiddenGuideSystemIds,
     normalizeOutputProfileList: outputProfileHelpers.normalizeOutputProfileList,
     normalizePreviewBackgroundValue: (value) => backgroundPresetHelpers.normalizePreviewBackgroundValue(value, backgroundHelperOptions()),
     normalizeSettings,

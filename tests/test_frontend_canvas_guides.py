@@ -9,6 +9,7 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
 HELPER_PATH = FRONTEND_DIR / "canvas-guides.js"
+VIEW_HELPER_PATH = FRONTEND_DIR / "canvas-guides-view.js"
 INDEX_PATH = FRONTEND_DIR / "index.html"
 APP_GLOBALS_PATH = FRONTEND_DIR / "app-globals.js"
 
@@ -17,16 +18,18 @@ def test_canvas_guides_helper_loads_before_mock_data_and_app():
     html = INDEX_PATH.read_text(encoding="utf-8")
 
     helper_index = html.index("canvas-guides.js")
+    view_helper_index = html.index("canvas-guides-view.js")
     mock_data_index = html.index("mock-data.js")
     app_index = html.index("app.js")
 
-    assert helper_index < mock_data_index < app_index
+    assert helper_index < view_helper_index < mock_data_index < app_index
 
 
 def test_app_globals_exposes_canvas_guide_helpers():
     source = APP_GLOBALS_PATH.read_text(encoding="utf-8")
 
     assert "global.guideHelpers = window.FlatShotCanvasGuides;" in source
+    assert "global.guideViewHelpers = window.FlatShotCanvasGuideView;" in source
 
 
 def test_canvas_guides_storage_keys_are_defined():
@@ -34,6 +37,8 @@ def test_canvas_guides_storage_keys_are_defined():
 
     assert 'guideSystems: "flatshot.guideSystems"' in source
     assert 'activeGuideSystems: "flatshot.activeGuideSystemIds"' in source
+    assert 'guideSystemOrder: "flatshot.guideSystemOrderIds"' in source
+    assert 'hiddenGuideSystems: "flatshot.hiddenGuideSystemIds"' in source
     assert 'guidesVisible: "flatshot.guidesVisible"' in source
 
 
@@ -48,9 +53,13 @@ def test_guide_preferences_are_ui_preferences_not_export_preferences():
 
     assert "guideSystems:" in payload_block
     assert "activeGuideSystemIds:" in payload_block
+    assert "guideSystemOrderIds:" in payload_block
+    assert "hiddenGuideSystemIds:" in payload_block
     assert "guidesVisible:" in payload_block
     assert "guideSystems:" not in export_block
     assert "activeGuideSystemIds:" not in export_block
+    assert "guideSystemOrderIds:" not in export_block
+    assert "hiddenGuideSystemIds:" not in export_block
     assert "guidesVisible:" not in export_block
 
 
@@ -78,6 +87,7 @@ def test_canvas_guide_actions_are_registered_and_popover_closes_transiently():
     assert '"open-guide-manager": () => openGuideManager()' in dispatcher
     assert 'details.viewer-guides-menu[open]' in document_events
     assert "handleGuideSystemToggle" in document_events
+    assert "handleGuideSystemPickerToggle" in document_events
 
 
 def test_canvas_guide_controller_persists_after_mutations():
@@ -85,6 +95,8 @@ def test_canvas_guide_controller_persists_after_mutations():
 
     assert "function persistGuidePreferences()" in source
     assert "storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.activeGuideSystems" in source
+    assert "storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.guideSystemOrder" in source
+    assert "storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.hiddenGuideSystems" in source
     assert "scheduleBridgeUiPreferencesSave();" in source
 
 
@@ -98,9 +110,12 @@ def test_canvas_guide_manager_supports_system_and_rule_actions():
     for function_name in [
         "renderGuideManager",
         "newGuideSystem",
+        "selectGuideSystem",
         "editGuideSystem",
         "duplicateGuideSystem",
         "deleteGuideSystem",
+        "setGuideSystemInPicker",
+        "moveGuideSystem",
         "saveGuideDraft",
         "guideDraftFromSystem",
         "editableGuideRulesFromSystem",
@@ -111,9 +126,12 @@ def test_canvas_guide_manager_supports_system_and_rule_actions():
 
     for action in [
         "new-guide-system",
+        "select-guide-system",
         "edit-guide-system",
         "duplicate-guide-system",
         "delete-guide-system",
+        "move-guide-system-up",
+        "move-guide-system-down",
         "save-guide-draft",
         "add-guide-line",
         "remove-guide-rule",
@@ -122,56 +140,91 @@ def test_canvas_guide_manager_supports_system_and_rule_actions():
 
     assert "updateGuideDraftFromFields" in document_events
     assert '!event.target?.dataset?.guideNewField' in document_events
+    assert 'event.target?.matches?.("[data-guide-system-picker-toggle]")' in document_events
     assert "renderGuideManager();" in render_source
     assert "closeGuideManager();" in keydown_source
 
 
 def test_canvas_guide_manager_uses_existing_modal_shell():
     controller = (FRONTEND_DIR / "app-canvas-guides-controller.js").read_text(encoding="utf-8")
+    view = VIEW_HELPER_PATH.read_text(encoding="utf-8")
+    source = f"{controller}\n{view}"
 
     assert 'modal.className = "app-settings-backdrop guide-manager-modal"' in controller
-    assert 'class="app-settings-dialog guide-manager-panel"' in controller
-    assert 'class="app-settings-header"' in controller
-    assert 'class="guide-system-list-heading"' in controller
-    assert 'class="guide-system-list-scroll"' in controller
-    assert 'class="guide-empty-state"' in controller
-    assert 'class="guide-system-actions"' in controller
-    assert 'disabled' not in controller[controller.index("function guideSystemManagerRow"):controller.index("function guideDraftFormHtml")]
-    assert "modal-backdrop" not in controller
-    assert "modal-panel" not in controller
-    assert "modal-header" not in controller
+    assert "guideViewHelpers.guideManagerHtml" in controller
+    assert 'class="app-settings-dialog guide-manager-panel"' in source
+    assert 'class="app-settings-header"' in source
+    assert 'class="guide-system-list-heading"' in source
+    assert 'class="guide-system-list-scroll"' in source
+    assert 'class="guide-empty-state"' in source
+    assert 'class="guide-system-controls"' in source
+    assert 'class="guide-system-picker ${inSelector ? "is-selected" : ""}"' in source
+    assert 'class="guide-icon-button' in source
+    assert 'data-guide-system-picker-toggle="' in source
+    assert 'aria-label="${inSelector ? "Ocultar del selector" : "Mostrar en selector"}' in source
+    assert 'action: "move-guide-system-up"' in source
+    assert 'action: "move-guide-system-down"' in source
+    assert 'data-action="select-guide-system"' in source
+    assert 'aria-pressed="${selected ? "true" : "false"}"' in source
+    assert 'class="guide-system-row ${selected ? "is-selected" : ""} ${inSelector ? "" : "is-inactive"}"' in source
+    assert 'class="guide-system-actions"' in source
+    assert '<svg viewBox="0 0 24 24"' in source
+    assert 'class="guide-readonly-panel"' in source
+    assert 'class="guide-readonly-swatch"' in source
+    assert 'class="guide-rule-row guide-line-row guide-line-row--readonly"' in source
+    assert "modal-backdrop" not in source
+    assert "modal-panel" not in source
+    assert "modal-header" not in source
 
 
 def test_canvas_guide_manager_uses_bounded_editor_layout():
     controller = (FRONTEND_DIR / "app-canvas-guides-controller.js").read_text(encoding="utf-8")
+    view = VIEW_HELPER_PATH.read_text(encoding="utf-8")
+    source = f"{controller}\n{view}"
     toolbar_css = (FRONTEND_DIR / "css" / "05-viewer" / "viewer-toolbar.css").read_text(encoding="utf-8")
 
-    assert 'id="guide-draft-form" class="guide-draft-form"' in controller
-    assert 'class="guide-add-row"' in controller
-    assert 'data-guide-new-field="position"' in controller
-    assert 'data-guide-new-field="mirror"' in controller
+    assert 'id="guide-draft-form" class="guide-draft-form"' in source
+    assert 'class="guide-add-row"' in source
+    assert 'data-guide-new-field="position"' in source
+    assert 'data-guide-new-field="mirror"' in source
     assert "const reflected = 1 - position" in controller
     assert "Math.abs(reflected - position) > 0.0001" in controller
-    assert 'class="guide-list-heading"' in controller
-    assert 'class="guide-rule-title"' in controller
-    assert 'class="guide-rule-fields"' in controller
-    assert 'guide-line-row' in controller
-    assert "Par simétrico" not in controller[controller.index("function guideDraftFormHtml"):controller.index("function guidePercentNumber")]
-    assert "División" not in controller[controller.index("function guideDraftFormHtml"):controller.index("function guidePercentNumber")]
+    assert 'class="guide-list-heading"' in source
+    assert 'class="guide-rule-title"' in source
+    assert 'class="guide-rule-fields"' in source
+    assert 'guide-line-row' in source
+    editor_block = view[view.index("function guideDraftFormHtml"):view.index("function guidePercentNumber")]
+    assert "Par simétrico" not in editor_block
+    assert "División" not in editor_block
 
     assert ".guide-manager-panel" in toolbar_css and "height: min(" in toolbar_css
-    assert "width: min(1120px, calc(100vw - 72px))" in toolbar_css
-    assert "max-width: min(1120px, calc(100vw - 72px))" in toolbar_css
-    assert "grid-template-columns: 260px minmax(0, 1fr)" in toolbar_css
+    assert "width: min(1280px, calc(100vw - 72px))" in toolbar_css
+    assert "max-width: min(1280px, calc(100vw - 72px))" in toolbar_css
+    assert "grid-template-columns: 340px minmax(0, 1fr)" in toolbar_css
+    assert ".guide-system-row .viewer-guide-system-swatch" in toolbar_css
+    assert "grid-template-columns: 24px minmax(0, 1fr)" in toolbar_css
+    assert ".guide-system-controls" in toolbar_css
+    assert ".guide-system-picker" in toolbar_css
+    assert ".guide-icon-button" in toolbar_css
+    assert "width: 30px" in toolbar_css
+    assert ".guide-system-row.is-inactive" in toolbar_css
+    assert ".guide-system-row.is-selected" in toolbar_css
     assert ".guide-draft-form" in toolbar_css and "grid-template-rows: auto auto auto auto minmax(0, 1fr) auto" in toolbar_css
+    assert ".guide-readonly-panel" in toolbar_css and "grid-template-rows: auto auto auto minmax(0, 1fr) auto" in toolbar_css
+    assert ".guide-readonly-swatch" in toolbar_css
     assert ".guide-draft-panel" in toolbar_css and "overflow: hidden" in toolbar_css
     assert ".guide-rule-list" in toolbar_css and "overflow-y: auto" in toolbar_css
+    assert '.guide-draft-fields input[type="color"]' in toolbar_css
+    assert "::-webkit-color-swatch-wrapper" in toolbar_css
+    assert "::-moz-color-swatch" in toolbar_css
     assert ".guide-add-row" in toolbar_css
-    assert "grid-template-columns: minmax(170px, 1fr) 140px 128px 92px 150px" in toolbar_css
+    assert "grid-template-columns: minmax(190px, 1fr) 180px 150px 96px 160px" in toolbar_css
     assert "padding: var(--space-3) var(--space-5)" in toolbar_css
     assert ".guide-rule-fields" in toolbar_css
+    assert "display: contents" in toolbar_css
     assert ".guide-line-row" in toolbar_css
-    assert "grid-template-columns: minmax(180px, 1fr) minmax(300px, 360px) 104px" in toolbar_css
+    assert "grid-template-columns: minmax(160px, 1fr) minmax(180px, 220px) minmax(150px, 190px) 132px" in toolbar_css
+    assert ".guide-line-row--readonly" in toolbar_css
     assert "padding-inline: var(--space-4)" in toolbar_css
     assert ".guide-rule-row--division" not in toolbar_css
 
@@ -244,6 +297,12 @@ assert.equal(systems.at(-1).rules.length, 3);
 
 const activeIds = helpers.normalizeActiveGuideSystemIds(["market", "missing", "market"], systems);
 assert.deepEqual(activeIds, ["market"]);
+
+const orderIds = helpers.normalizeGuideSystemOrderIds(["market", "center"], systems);
+assert.deepEqual(orderIds.slice(0, 2), ["market", "center"]);
+assert.deepEqual(helpers.orderGuideSystems(systems, orderIds).map((system) => system.id).slice(0, 2), ["market", "center"]);
+assert.deepEqual(helpers.normalizeHiddenGuideSystemIds(["center", "missing", "center"], systems), ["center"]);
+assert.deepEqual(helpers.pickerGuideSystems(systems, ["market", "center"], ["center"]).map((system) => system.id)[0], "market");
 
 const lines = helpers.guideLinesForSystems(systems, activeIds).map((line) => `${{line.axis}}:${{line.position}}`);
 assert.deepEqual(lines, ["y:0.12", "y:0.88", "x:0.3333", "x:0.6667", "y:0.22", "y:0.78"]);

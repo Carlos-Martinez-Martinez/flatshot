@@ -93,6 +93,15 @@ function handleGuideSystemToggle(target) {
   return true;
 }
 
+function handleGuideSystemPickerToggle(target) {
+  const systemId = target.dataset.guideSystemPickerToggle;
+  if (!systemId) {
+    return false;
+  }
+  setGuideSystemInPicker(systemId, target.checked);
+  return true;
+}
+
 function handleInspectorDisclosureClick(event) {
   const disclosureSummary = event.target.closest?.(".settings-panel details.inspector-disclosure > summary");
   if (!disclosureSummary) {
@@ -296,6 +305,10 @@ function handleDocumentInput(event) {
 function handleDocumentChange(event) {
   if (event.target?.matches?.("[data-guide-system-toggle]")) {
     handleGuideSystemToggle(event.target);
+    return;
+  }
+  if (event.target?.matches?.("[data-guide-system-picker-toggle]")) {
+    handleGuideSystemPickerToggle(event.target);
     return;
   }
   if (event.target.matches?.("[data-preview-bg-channel]")) {

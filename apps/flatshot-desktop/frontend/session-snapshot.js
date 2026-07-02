@@ -13,6 +13,8 @@
     "previewBg",
     "guidesVisible",
     "activeGuideSystemIds",
+    "guideSystemOrderIds",
+    "hiddenGuideSystemIds",
     "guideSystems",
     "zoom",
     "fitZoom",
@@ -128,6 +130,12 @@
       restored.activeGuideSystemIds || currentState.activeGuideSystemIds || [],
       restoredGuideSystems
     );
+    const restoredGuideSystemOrderIds = options.normalizeGuideSystemOrderIds
+      ? options.normalizeGuideSystemOrderIds(restored.guideSystemOrderIds || currentState.guideSystemOrderIds || [], restoredGuideSystems)
+      : restoredGuideSystems.map((system) => system.id);
+    const restoredHiddenGuideSystemIds = options.normalizeHiddenGuideSystemIds
+      ? options.normalizeHiddenGuideSystemIds(restored.hiddenGuideSystemIds || currentState.hiddenGuideSystemIds || [], restoredGuideSystems)
+      : [];
     const outputProfiles = Array.isArray(restored.outputProfiles)
       ? normalizeOutputProfileList(restored.outputProfiles, restored.activeOutputProfileId)
       : currentState.outputProfiles;
@@ -156,6 +164,8 @@
         previewBg: normalizePreviewBackgroundValue(restored.previewBg || currentState.previewBg),
         guidesVisible: restored.guidesVisible === undefined ? currentState.guidesVisible !== false : Boolean(restored.guidesVisible),
         activeGuideSystemIds: restoredActiveGuideSystemIds,
+        guideSystemOrderIds: restoredGuideSystemOrderIds,
+        hiddenGuideSystemIds: restoredHiddenGuideSystemIds,
         guideSystems: restoredGuideSystems,
         guideManagerOpen: false,
         guideDraft: null,

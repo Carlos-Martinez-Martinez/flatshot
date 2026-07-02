@@ -82,6 +82,8 @@ global.STORAGE_KEYS = {
   backgroundPresets: "flatshot.backgroundPresets",
   guideSystems: "flatshot.guideSystems",
   activeGuideSystems: "flatshot.activeGuideSystemIds",
+  guideSystemOrder: "flatshot.guideSystemOrderIds",
+  hiddenGuideSystems: "flatshot.hiddenGuideSystemIds",
   guidesVisible: "flatshot.guidesVisible",
   activeOutputProfile: "flatshot.activeOutputProfile",
   activeOutputFormats: "flatshot.activeOutputFormatIds",

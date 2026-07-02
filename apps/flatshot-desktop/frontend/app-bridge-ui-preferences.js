@@ -4,6 +4,8 @@ function uiPreferencesPayload() {
     backgroundPresets: backgroundPresetHelpers.backgroundPresetsForStorage(state.backgroundPresets, backgroundPresetOptions()),
     guideSystems: guideHelpers.guideSystemsForStorage(state.guideSystems),
     activeGuideSystemIds: state.activeGuideSystemIds,
+    guideSystemOrderIds: state.guideSystemOrderIds,
+    hiddenGuideSystemIds: state.hiddenGuideSystemIds,
     guidesVisible: state.guidesVisible,
     activeOutputProfile: state.activeOutputProfileId,
     activeOutputFormats: enabledOutputProfiles().map((profile) => profile.id),
@@ -42,6 +44,12 @@ function cacheUiPreferences(preferences = uiPreferencesPayload()) {
   }
   if (Array.isArray(source.activeGuideSystemIds)) {
     storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.activeGuideSystems, source.activeGuideSystemIds);
+  }
+  if (Array.isArray(source.guideSystemOrderIds)) {
+    storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.guideSystemOrder, source.guideSystemOrderIds);
+  }
+  if (Array.isArray(source.hiddenGuideSystemIds)) {
+    storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.hiddenGuideSystems, source.hiddenGuideSystemIds);
   }
   if (source.guidesVisible !== undefined) {
     storageHelpers.writeValue(window.localStorage, STORAGE_KEYS.guidesVisible, source.guidesVisible === false ? "0" : "1");
@@ -97,6 +105,12 @@ function applyBridgeUiPreferences(preferences) {
   }
   if (Array.isArray(source.activeGuideSystemIds)) {
     state.activeGuideSystemIds = guideHelpers.normalizeActiveGuideSystemIds(source.activeGuideSystemIds, state.guideSystems);
+  }
+  if (Array.isArray(source.guideSystemOrderIds)) {
+    state.guideSystemOrderIds = guideHelpers.normalizeGuideSystemOrderIds(source.guideSystemOrderIds, state.guideSystems);
+  }
+  if (Array.isArray(source.hiddenGuideSystemIds)) {
+    state.hiddenGuideSystemIds = guideHelpers.normalizeHiddenGuideSystemIds(source.hiddenGuideSystemIds, state.guideSystems);
   }
   if (source.guidesVisible !== undefined) {
     state.guidesVisible = Boolean(source.guidesVisible);

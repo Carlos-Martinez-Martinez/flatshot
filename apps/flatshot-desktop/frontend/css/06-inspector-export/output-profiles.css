@@ -393,7 +393,7 @@
   border: 0;
   background: transparent;
   padding: 0;
-  color: inherit;
+  color: inherit; font-weight: var(--font-weight-regular);
   line-height: 1.25;
   text-align: left;
   box-shadow: none;
@@ -424,7 +424,7 @@ button.active-output-row__main:focus-visible {
   overflow: visible;
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
-  line-height: 1.35;
+  line-height: 1.35; font-weight: var(--font-weight-regular);
   white-space: normal;
 }
 .active-output-row__edit {

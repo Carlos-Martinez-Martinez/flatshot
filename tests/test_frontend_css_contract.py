@@ -165,3 +165,5 @@ def test_active_output_row_main_keeps_grid_layout_when_selectable():
     assert ":not(.active-output-row__main)" in buttons_css
     assert "button.active-output-row__main {\n  cursor: pointer;" in output_profiles_css
     assert ".active-output-row__main {\n  min-width: 0;\n  width: 100%;\n  display: grid;" in output_profiles_css
+    assert "font-weight: var(--font-weight-regular);" in output_profiles_css
+    assert ".active-output-row__main small {\n  overflow: visible;" in output_profiles_css

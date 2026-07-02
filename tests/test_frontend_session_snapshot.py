@@ -42,6 +42,8 @@ const state = {{
   previewBg: "rgb:12,34,56",
   guidesVisible: true,
   activeGuideSystemIds: ["center"],
+  guideSystemOrderIds: ["center"],
+  hiddenGuideSystemIds: ["margins"],
   guideSystems: [{{ id: "center", name: "Centro" }}],
   zoom: 125,
   fitZoom: 80,
@@ -104,6 +106,8 @@ assert.equal(snapshot.savedAt, 123);
 assert.equal(snapshot.state.selectedImagePath, "C:/selected.png");
 assert.equal(snapshot.state.guidesVisible, true);
 assert.deepEqual(snapshot.state.activeGuideSystemIds, ["center"]);
+assert.deepEqual(snapshot.state.guideSystemOrderIds, ["center"]);
+assert.deepEqual(snapshot.state.hiddenGuideSystemIds, ["margins"]);
 assert.deepEqual(snapshot.state.guideSystems, [{{ id: "center", name: "Centro" }}]);
 assert.equal(snapshot.state.omitted, undefined);
 assert.equal(snapshot.state.realImages.length, 1);
@@ -124,6 +128,8 @@ const restored = helpers.restoreSessionState(snapshot.state, {{
   normalizeBackgroundPresetList: (items) => items,
   normalizeGuideSystemList: (items) => items,
   normalizeActiveGuideSystemIds: (ids) => ids,
+  normalizeGuideSystemOrderIds: (ids) => ids,
+  normalizeHiddenGuideSystemIds: (ids) => ids,
   normalizeOutputProfileList: (items) => items,
   normalizePreviewBackgroundValue: (value) => value,
   normalizeSettings: (settings) => ({{ normalized: settings }}),
@@ -145,6 +151,8 @@ assert.equal(restored.patch.batchSource, "bridge");
 assert.equal(restored.patch.previewBg, "rgb:12,34,56");
 assert.equal(restored.patch.guidesVisible, true);
 assert.deepEqual(restored.patch.activeGuideSystemIds, ["center"]);
+assert.deepEqual(restored.patch.guideSystemOrderIds, ["center"]);
+assert.deepEqual(restored.patch.hiddenGuideSystemIds, ["margins"]);
 assert.deepEqual(restored.patch.guideSystems, [{{ id: "center", name: "Centro" }}]);
 assert.equal(restored.patch.settings.normalized.opacity, 20);
 assert.equal(restored.patch.bridgeUrl, "http://127.0.0.1:8765");

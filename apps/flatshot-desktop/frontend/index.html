@@ -243,6 +243,19 @@
                   <input type="number" min="0" max="255" step="1" value="230" data-preview-bg-channel="b" aria-label="Azul del fondo personalizado" />
                 </div>
               </div>
+              <div class="viewer-control-group viewer-guides" aria-label="Guías del lienzo">
+                <span class="viewer-control-label">Guías</span>
+                <button type="button" id="guides-toggle" data-action="toggle-guides" aria-pressed="true" title="Mostrar u ocultar guías">On</button>
+                <details class="viewer-guides-menu" id="viewer-guides-menu">
+                  <summary aria-label="Sistemas de guías" title="Sistemas de guías">
+                    <span id="guides-active-count" class="viewer-guides-count">0</span>
+                  </summary>
+                  <div class="viewer-guides-popover" role="menu" aria-label="Sistemas de guías">
+                    <div data-guide-system-list></div>
+                    <button type="button" data-action="open-guide-manager">Gestionar guías</button>
+                  </div>
+                </details>
+              </div>
               <div class="zoom-controls" aria-label="Zoom">
                 <div class="viewer-control-group viewer-nav" aria-label="Navegación">
                   <span class="viewer-control-label">Imagen</span>
@@ -267,6 +280,7 @@
 
           <div class="canvas-area" id="canvas-area">
             <div class="preview-output-context" id="preview-output-context" aria-live="polite"></div>
+            <div class="guide-overlay" id="guide-overlay" aria-hidden="true" hidden></div>
             <div class="preview-canvas" id="preview-canvas" tabindex="0" aria-live="polite" aria-label="Visor de revisión. Arrastra para mover la imagen cuando haya zoom; usa la rueda o los botones de zoom para acercar y alejar."></div>
           </div>
 
@@ -900,6 +914,7 @@
         "app-gallery-controller.js",
         "app-thumbnail-controller.js",
         "app-modal-render-controller.js",
+        "app-canvas-guides-controller.js",
         "app-preview-controller.js",
         "app-range-fill-controller.js",
         "app-review-panel-controller.js",

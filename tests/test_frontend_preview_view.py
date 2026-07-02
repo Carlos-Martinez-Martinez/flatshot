@@ -34,7 +34,7 @@ def test_preview_toolbar_keeps_compact_context_labels():
     html = INDEX_PATH.read_text(encoding="utf-8")
     app_js = app_domain_source()
 
-    for label in ("Fondo", "Imagen", "Encajar", "Zoom"):
+    for label in ("Fondo", "Guías", "Imagen", "Encajar", "Zoom"):
         assert f'class="viewer-control-label">{label}</span>' in html
     assert 'data-preview-bg="soft-black"' in html
     assert 'data-preview-bg="custom"' in html

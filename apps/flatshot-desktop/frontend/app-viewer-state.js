@@ -12,6 +12,9 @@ function applyViewerPanDom() {
   }
   canvas.style.setProperty("--canvas-pan-x", `${Math.round(state.panX)}px`);
   canvas.style.setProperty("--canvas-pan-y", `${Math.round(state.panY)}px`);
+  if (typeof updateGuideOverlayLayout === "function") {
+    updateGuideOverlayLayout();
+  }
 }
 
 function resetViewerPan() {
@@ -58,7 +61,7 @@ function viewerModeLabel(mode = state.fitMode) {
 }
 
 function currentViewerZoom() {
-  return previewStateHelpers.isAutoViewerMode() ? state.fitZoom : state.zoom;
+  return previewStateHelpers.isAutoViewerMode(state.fitMode) ? state.fitZoom : state.zoom;
 }
 
 function setViewerZoom(nextZoom, anchorEvent = null) {

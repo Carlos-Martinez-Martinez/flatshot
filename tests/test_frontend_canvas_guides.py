@@ -54,6 +54,18 @@ def test_guide_preferences_are_ui_preferences_not_export_preferences():
     assert "guidesVisible:" not in export_block
 
 
+def test_canvas_guides_toolbar_overlay_and_controller_are_wired():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+    loader = (FRONTEND_DIR / "app-loader.js").read_text(encoding="utf-8")
+
+    assert 'class="viewer-control-group viewer-guides"' in html
+    assert 'id="guide-overlay"' in html
+    assert 'data-action="toggle-guides"' in html
+    assert 'data-guide-system-list' in html
+    assert 'class="viewer-guides-menu"' in html
+    assert loader.index("app-canvas-guides-controller.js") < loader.index("app-preview-controller.js")
+
+
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
 def test_canvas_guide_helpers_normalize_and_expand_rules():
     script = f"""

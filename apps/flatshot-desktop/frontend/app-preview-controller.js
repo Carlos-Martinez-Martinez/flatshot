@@ -71,6 +71,7 @@ function renderPreview() {
   if (customFields) {
     customFields.classList.toggle("active", Boolean(outputProfileHelpers.parseRgbBackground(state.previewBg)));
   }
+  renderGuideToolbarState();
   $$("[data-action='zoom-height'], [data-action='zoom-width'], [data-action='zoom-out'], [data-action='zoom-in'], [data-action='force-preview-error']").forEach((button) => {
     button.disabled = previewControlsDisabled;
   });
@@ -91,19 +92,19 @@ function renderPreview() {
     previewPanel.className = `preview-panel preview-panel--${previewOrientation()}`;
   }
   const canvas = $("#preview-canvas");
-  canvas.className = `preview-canvas ${state.previewMode} bg-${previewBackgroundMode} ${previewStateHelpers.viewerModeClass()}`;
-  canvas.style.setProperty("--preview-scale", previewStateHelpers.isAutoViewerMode() ? "1" : String(state.zoom / 100));
+  canvas.className = `preview-canvas ${state.previewMode} bg-${previewBackgroundMode} ${previewStateHelpers.viewerModeClass(state.fitMode)}`;
+  canvas.style.setProperty("--preview-scale", previewStateHelpers.isAutoViewerMode(state.fitMode) ? "1" : String(state.zoom / 100));
   applyViewerPanDom();
 
   if (state.batch === "none") {
     canvas.innerHTML = initialStateHtml();
-    queueFitZoomRefresh();
+    finishPreviewRender();
     return;
   }
 
   if (state.batch === "scanning") {
     canvas.innerHTML = scanningStateHtml();
-    queueFitZoomRefresh();
+    finishPreviewRender();
     return;
   }
 
@@ -118,7 +119,7 @@ function renderPreview() {
       action: "",
       meta: state.scanStatus || "",
     });
-    queueFitZoomRefresh();
+    finishPreviewRender();
     return;
   }
 
@@ -131,7 +132,7 @@ function renderPreview() {
       action: "clear-filter",
       meta: `${activeImages().length} imágenes en el lote`,
     });
-    queueFitZoomRefresh();
+    finishPreviewRender();
     return;
   }
 
@@ -144,31 +145,36 @@ function renderPreview() {
       action: activeImages().length ? "select-first-image" : "",
       meta: activeImages().length ? `${activeImages().length} imágenes en el lote` : "",
     });
-    queueFitZoomRefresh();
+    finishPreviewRender();
     return;
   }
 
   if (isBridgeImage) {
     canvas.innerHTML = realPreviewHtml(image);
-    queueFitZoomRefresh();
+    finishPreviewRender();
     return;
   }
 
   if (state.previewStatus === "loading") {
     canvas.innerHTML = previewViewHelpers.previewLoadingHtml(image.name);
-    queueFitZoomRefresh();
+    finishPreviewRender();
     return;
   }
 
   if (state.previewStatus === "error") {
     canvas.innerHTML = previewStateHtml("Vista no disponible", "Revisa alpha o archivo fuente.");
-    queueFitZoomRefresh();
+    finishPreviewRender();
     return;
   }
 
   canvas.innerHTML = previewViewHelpers.mockPreviewHtml({
     warning: state.previewStatus === "warning" ? "Render con fallback. Revisa antes de exportar." : "",
   });
+  finishPreviewRender();
+}
+
+function finishPreviewRender() {
+  renderGuideOverlay();
   queueFitZoomRefresh();
 }
 
@@ -187,8 +193,9 @@ function updateFitZoomReadout() {
   if (!label) {
     return;
   }
-  if (!previewStateHelpers.isAutoViewerMode()) {
+  if (!previewStateHelpers.isAutoViewerMode(state.fitMode)) {
     label.textContent = `${state.zoom}%`;
+    renderGuideOverlay();
     return;
   }
 
@@ -199,6 +206,7 @@ function updateFitZoomReadout() {
     clampViewerPan();
     applyViewerPanDom();
   }
+  renderGuideOverlay();
 }
 
 function calculateFitZoom() {
@@ -242,7 +250,7 @@ function realPreviewHtml(image) {
       width: state.previewData.width,
       height: state.previewData.height,
       zoom: state.zoom,
-      inlineSize: !previewStateHelpers.isAutoViewerMode(),
+      inlineSize: !previewStateHelpers.isAutoViewerMode(state.fitMode),
       warning: state.previewData.warning,
     });
   }

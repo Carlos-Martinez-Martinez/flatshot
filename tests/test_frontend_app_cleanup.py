@@ -102,6 +102,7 @@ def test_app_domain_scripts_are_loaded_in_order():
         "app-gallery-controller.js",
         "app-thumbnail-controller.js",
         "app-modal-render-controller.js",
+        "app-canvas-guides-controller.js",
         "app-preview-controller.js",
         "app-range-fill-controller.js",
         "app-review-panel-controller.js",

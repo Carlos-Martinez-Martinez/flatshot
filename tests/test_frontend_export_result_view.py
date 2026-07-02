@@ -106,10 +106,22 @@ const manyDestinations = helpers.exportResultActionsHtml({{
   status: "completed",
   issues: [],
   destinations: ["a", "b", "c", "d", "e"],
-  canOpenOutput: false,
+  canOpenOutput: true,
   canRetry: false,
 }});
 assert.equal(manyDestinations.includes("2 carpetas más"), true);
+assert.equal(manyDestinations.includes(">Abrir carpeta principal</button>"), true);
+assert.equal(manyDestinations.includes('data-action="copy-output-path"'), true);
+
+const singleDestination = helpers.exportResultActionsHtml({{
+  status: "completed",
+  issues: [],
+  destinations: ["a"],
+  canOpenOutput: true,
+  canRetry: false,
+}});
+assert.equal(singleDestination.includes(">Abrir carpeta</button>"), true);
+assert.equal(singleDestination.includes(">Copiar ruta</button>"), true);
 
 const html = helpers.exportResultHtml({{
   status: "running",

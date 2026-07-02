@@ -29,7 +29,9 @@ function renderPreview() {
     : image ? state.activePreset : "Sin lote";
   const outputContext = $("#preview-output-context");
   if (outputContext) {
-    outputContext.innerHTML = "";
+    outputContext.innerHTML = image && hasBatch()
+      ? previewViewHelpers.viewerOutputContextHtml(galleryActiveOutputContext())
+      : "";
   }
   const previewBackgroundMode = backgroundPresetHelpers.backgroundVisualMode(state.previewBg, backgroundHelperOptions());
   const previewBackgroundColor = backgroundPresetHelpers.backgroundCssColor(state.previewBg, backgroundHelperOptions());

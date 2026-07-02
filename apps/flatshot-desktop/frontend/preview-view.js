@@ -83,6 +83,20 @@
     return `${options.format || "JPG"} · ${options.sizeLabel || "1800×2400"} · ${options.backgroundLabel || "gris claro"}`;
   }
 
+  function viewerOutputContextHtml(options = {}) {
+    const name = options.name || "";
+    if (!name) {
+      return "";
+    }
+    const summary = options.summary || "";
+    const summaryHtml = summary ? `<small title="${escapeHtml(summary)}">${escapeHtml(summary)}</small>` : "";
+    return `
+      <span>Previsualizando</span>
+      <strong>${escapeHtml(name)}</strong>
+      ${summaryHtml}
+    `;
+  }
+
   return {
     escapeHtml,
     mockPreviewHtml,
@@ -90,6 +104,7 @@
     realPreviewImageHtml,
     realPreviewPlaceholderHtml,
     scanningStateHtml,
+    viewerOutputContextHtml,
     viewerOutputCompactLabel,
   };
 });

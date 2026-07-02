@@ -32,6 +32,7 @@
     documentRef.addEventListener("toggle", handlers.documentToggle, true);
     documentRef.addEventListener("input", handlers.documentInput);
     documentRef.addEventListener("change", handlers.documentChange);
+    documentRef.addEventListener("focusout", handlers.documentFocusOut);
     documentRef.addEventListener("submit", handlers.documentSubmit);
     documentRef.addEventListener("keydown", handlers.documentKeydown);
     documentRef.addEventListener("scroll", handlers.positionBackgroundPresetEditor, true);

@@ -130,6 +130,15 @@ assert.equal(helpers.viewerOutputCompactLabel({{
   backgroundLabel: "transparente",
 }}), "PNG · 1200×1600 · transparente");
 assert.equal(helpers.viewerOutputCompactLabel({{}}), "JPG · 1800×2400 · gris claro");
+
+const outputContext = helpers.viewerOutputContextHtml({{
+  name: 'Web <gris>',
+  summary: 'JPG · 1800×2400 · "RGB230"',
+}});
+assert.equal(outputContext.includes("<span>Previsualizando</span>"), true);
+assert.equal(outputContext.includes("<strong>Web &lt;gris&gt;</strong>"), true);
+assert.equal(outputContext.includes("JPG · 1800×2400 · &quot;RGB230&quot;"), true);
+assert.equal(helpers.viewerOutputContextHtml({{ name: "", summary: "" }}), "");
 """
     result = subprocess.run(
         ["node", "-e", script],

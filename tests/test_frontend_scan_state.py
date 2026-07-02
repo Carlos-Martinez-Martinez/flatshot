@@ -49,10 +49,10 @@ assert.deepEqual(helpers.folderPickCancelledState(), {{
 assert.deepEqual(helpers.folderPickSelectedState("C:/lote"), {{
   bridgeStatus: "connected",
   bridgeScanPath: "C:/lote",
-  bridgeMessage: "Carpeta seleccionada",
+  bridgeMessage: "Ruta lista",
   bridgeLastResponse: "folder pick OK",
-  scanStatus: "Carpeta lista para escanear",
-  statusText: "Carpeta lista para escanear",
+  scanStatus: "Ruta lista para escanear",
+  statusText: "Ruta lista para escanear",
 }});
 
 assert.deepEqual(helpers.folderPickErrorState("offline"), {{
@@ -68,7 +68,7 @@ assert.deepEqual(helpers.emptyScanPathState(true), {{
   bridgeStatus: "connected",
   bridgeMessage: "Ruta vacía",
   scanStatus: "Ruta vacía",
-  scanIssues: [{{ level: "warning", title: "Ruta vacía", detail: "Pega una carpeta para escanear." }}],
+  scanIssues: [{{ level: "warning", title: "Ruta vacía", detail: "Introduce o selecciona una carpeta para escanear." }}],
   statusText: "Ruta vacía",
 }});
 
@@ -253,7 +253,7 @@ assert.equal(helpers.sourceLabel({{ bridgeMode: "mock", devMode: true }}), "Demo
 assert.equal(helpers.sourceTitle({{ hasBatch: true, batch: "ready" }}), "Entrada");
 assert.equal(helpers.sourceTitle({{ hasBatch: false, batch: "none" }}), "Seleccionar carpeta");
 assert.equal(helpers.sourcePickButtonLabel({{ hasBatch: true, batch: "ready" }}), "Cambiar");
-assert.equal(helpers.sourcePickButtonLabel({{ hasBatch: false, batch: "none" }}), "Seleccionar carpeta");
+assert.equal(helpers.sourcePickButtonLabel({{ hasBatch: false, batch: "none" }}), "Buscar carpeta");
 assert.equal(helpers.sourceScanButtonLabel({{ hasBatch: true, batch: "ready" }}), "↻");
 assert.equal(helpers.sourceScanButtonLabel({{ hasBatch: false, batch: "none" }}), "Escanear");
 assert.equal(helpers.sourceScanButtonTitle({{ hasBatch: true, batch: "ready" }}), "Actualizar lote");
@@ -361,7 +361,7 @@ assert.deepEqual(helpers.sourcePanelViewState({{
   title: "Seleccionar carpeta",
   folderName: "Entrada",
   scanStatus: "Leyendo imágenes",
-  pickButtonLabel: "Seleccionar carpeta",
+  pickButtonLabel: "Buscar carpeta",
   scanButtonLabel: "Escanear",
   scanButtonTitle: "Escanear carpeta",
   controlsDisabled: true,

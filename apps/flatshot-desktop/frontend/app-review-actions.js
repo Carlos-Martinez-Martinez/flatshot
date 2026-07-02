@@ -36,6 +36,8 @@ function runVisibleAction(action) {
     startExport();
   } else if (action === "open-output") {
     openOutputFolder();
+  } else if (action === "copy-output-path") {
+    void copyOutputPath();
   } else if (action === "stop-export") {
     stopExport();
   }
@@ -80,6 +82,28 @@ function openOutputFolder() {
   }
   const opened = window.open(formatterHelpers.pathToFileUrl(destination), "_blank", "noopener");
   state.statusText = opened ? "Carpeta de salida abierta" : "No se pudo abrir la carpeta de salida";
+  render();
+}
+
+async function copyOutputPath() {
+  const destination = outputDestinationToOpen();
+  if (!destination) {
+    state.statusText = "No hay carpeta de salida registrada";
+    render();
+    return;
+  }
+  const clipboard = typeof navigator !== "undefined" ? navigator.clipboard : null;
+  if (!clipboard?.writeText) {
+    state.statusText = `Ruta de salida: ${destination}`;
+    render();
+    return;
+  }
+  try {
+    await clipboard.writeText(destination);
+    state.statusText = "Ruta de salida copiada";
+  } catch (error) {
+    state.statusText = "No se pudo copiar la ruta de salida";
+  }
   render();
 }
 

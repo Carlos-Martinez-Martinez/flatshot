@@ -32,10 +32,10 @@
     return {
       bridgeStatus: "connected",
       bridgeScanPath: path,
-      bridgeMessage: "Carpeta seleccionada",
+      bridgeMessage: "Ruta lista",
       bridgeLastResponse: "folder pick OK",
-      scanStatus: "Carpeta lista para escanear",
-      statusText: "Carpeta lista para escanear",
+      scanStatus: "Ruta lista para escanear",
+      statusText: "Ruta lista para escanear",
     };
   }
 
@@ -55,7 +55,7 @@
       bridgeStatus: isConnected ? "connected" : "disconnected",
       bridgeMessage: "Ruta vacía",
       scanStatus: "Ruta vacía",
-      scanIssues: [{ level: "warning", title: "Ruta vacía", detail: "Pega una carpeta para escanear." }],
+      scanIssues: [{ level: "warning", title: "Ruta vacía", detail: "Introduce o selecciona una carpeta para escanear." }],
       statusText: "Ruta vacía",
     };
   }
@@ -243,7 +243,7 @@
   }
 
   function sourcePickButtonLabel(options = {}) {
-    return options.hasBatch || options.batch === "empty" ? "Cambiar" : "Seleccionar carpeta";
+    return options.hasBatch || options.batch === "empty" ? "Cambiar" : "Buscar carpeta";
   }
 
   function sourceScanButtonLabel(options = {}) {

@@ -35,7 +35,7 @@
         <span></span>
       </label>
       ${mainHtml}
-      <button type="button" class="active-output-row__edit" data-action="edit-output-profile" data-output-profile-id="${escapeHtml(row.id)}">Editar</button>
+      <button type="button" class="active-output-row__edit" data-action="edit-output-profile" data-output-profile-id="${escapeHtml(row.id)}">Editar formato</button>
     </div>
   `;
   }

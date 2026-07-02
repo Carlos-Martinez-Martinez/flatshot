@@ -43,7 +43,7 @@ assert.equal(currentRow.includes("&quot;RGB230&quot;"), true);
 assert.equal(currentRow.includes("active-output-row__edit"), true);
 assert.equal(currentRow.includes('data-action="edit-output-profile"'), true);
 assert.equal(currentRow.includes('data-action="select-output-profile"'), false);
-assert.equal(currentRow.includes(">Editar</button>"), true);
+assert.equal(currentRow.includes(">Editar formato</button>"), true);
 assert.equal(currentRow.includes("Principal"), false);
 assert.equal(currentRow.includes("disabled"), true);
 

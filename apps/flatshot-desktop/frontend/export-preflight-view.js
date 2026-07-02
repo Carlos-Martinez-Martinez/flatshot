@@ -179,19 +179,26 @@
     if (status === "partial") {
       return "Exportado con avisos";
     }
+    const issueLabel = firstActionableIssueLabel(issues);
     if (status === "failed") {
-      return "Revisar antes de exportar";
+      return issueLabel ? `Revisar: ${issueLabel}` : "Revisar antes de exportar";
     }
     if (issues.some((issue) => issue.level === "error")) {
-      return "Revisar antes de exportar";
+      return issueLabel ? `Revisar: ${issueLabel}` : "Revisar antes de exportar";
     }
     if (options.batch === "empty" || (options.hasActiveBatch && !ready)) {
-      return "Pendiente";
+      return issueLabel ? `Pendiente: ${issueLabel}` : "Pendiente";
     }
     if (ready && issues.length) {
       return `${issues.length} aviso${issues.length === 1 ? "" : "s"} antes de exportar`;
     }
     return ready ? "Listo para exportar" : "Configura salida";
+  }
+
+  function firstActionableIssueLabel(issues = []) {
+    const issue = issues.find((item) => item.level === "error") || issues[0];
+    const label = issue?.title || issue?.detail || "";
+    return label.length > 40 ? `${label.slice(0, 37)}...` : label;
   }
 
   function exportPreflightSummary(options = {}) {

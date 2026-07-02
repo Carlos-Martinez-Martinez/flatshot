@@ -45,6 +45,7 @@ interactionBindingHelpers.wireFlatShotInteractions({
     documentChange: handleDocumentChange,
     documentClick: handleDocumentClick,
     documentError: handleDocumentImageError,
+    documentFocusOut: handleDocumentFocusOut,
     documentInput: handleDocumentInput,
     documentKeydown: handleDocumentKeydown,
     documentLoad: handleDocumentImageLoad,

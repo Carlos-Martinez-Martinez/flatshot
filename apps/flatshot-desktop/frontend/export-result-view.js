@@ -80,7 +80,9 @@
     const destinations = Array.isArray(options.destinations) ? options.destinations : [];
     const actions = [];
     if ((status === "completed" || status === "partial") && options.canOpenOutput) {
-      actions.push('<button type="button" data-action="open-output">Abrir carpeta</button>');
+      const openLabel = destinations.length > 1 ? "Abrir carpeta principal" : "Abrir carpeta";
+      actions.push(`<button type="button" data-action="open-output">${openLabel}</button>`);
+      actions.push('<button type="button" data-action="copy-output-path">Copiar ruta</button>');
     }
     if (issues.length || status === "failed" || status === "partial") {
       actions.push('<button type="button" data-action="review-errors">Revisar avisos</button>');

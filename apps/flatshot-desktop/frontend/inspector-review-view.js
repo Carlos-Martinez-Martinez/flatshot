@@ -105,7 +105,7 @@
       <button type="button" data-action="previous-image"${canNavigate ? "" : " disabled"}>Anterior</button>
       <button type="button" data-action="next-image"${canNavigate ? "" : " disabled"}>Siguiente</button>
       ${issues.length ? '<button type="button" data-action="review-errors">Revisar avisos</button>' : ""}
-      <button type="button" data-action="open-app-settings">Cambiar formato</button>
+      <button type="button" data-action="open-app-settings">Formatos</button>
       ${hasLocal ? '<button type="button" data-action="reset-local-adjustment">Restablecer al lote</button>' : '<button type="button" data-action="open-advanced">Editar ajuste</button>'}
     </div>
   `;
@@ -139,7 +139,7 @@
           <small class="selected-image-card__state">${escapeHtml(hasLocal ? "Ajuste personalizado" : "Ajuste del lote")}</small>
         </header>
         <div class="selected-image-card__actions">
-          <button type="button" data-action="open-image-adjustment">${escapeHtml(hasLocal ? "Editar ajuste" : "Personalizar")}</button>
+          <button type="button" data-action="open-image-adjustment">${escapeHtml(hasLocal ? "Editar ajuste" : "Personalizar imagen")}</button>
           ${hasLocal ? '<button type="button" data-action="reset-local-adjustment">Restablecer</button>' : ""}
         </div>
     </section>
@@ -203,7 +203,7 @@
           </select>
         </label>
         <div class="processing-card__actions">
-          <button type="button" data-action="open-advanced">Editar</button>
+          <button type="button" data-action="open-advanced">Editar ajuste</button>
           <button type="button" data-action="open-preset-editor">Ajustes</button>
         </div>
       </div>

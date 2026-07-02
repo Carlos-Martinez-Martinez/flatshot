@@ -322,6 +322,28 @@ function handleDocumentChange(event) {
   }
 }
 
+function handleDocumentFocusOut(event) {
+  const target = event.target;
+  if (target?.id === "onboarding-scan-path" || target?.id === "bridge-scan-path") {
+    state.bridgeScanPath = target.value || "";
+    const otherInput = target.id === "onboarding-scan-path" ? $("#bridge-scan-path") : $("#onboarding-scan-path");
+    if (otherInput) {
+      otherInput.value = state.bridgeScanPath;
+    }
+  }
+  if (target?.dataset?.settingNumber) {
+    updateSettingFromNumberInput(target, { commit: true });
+    return;
+  }
+  if (target?.dataset?.localSettingNumber) {
+    updateLocalOverrideFromNumberInput(target, { commit: true });
+    return;
+  }
+  if (target?.dataset?.lightingNumberField && typeof handleLightingNumberFieldInput === "function") {
+    handleLightingNumberFieldInput({ type: "change", target });
+  }
+}
+
 function handleDocumentSubmit(event) {
   if (event.target.id === "output-profile-form") {
     event.preventDefault();

@@ -10,6 +10,12 @@ function handleDocumentKeydown(event) {
     return;
   }
 
+  if (event.key === "Enter" && (target?.id === "onboarding-scan-path" || target?.id === "bridge-scan-path")) {
+    event.preventDefault();
+    void scanBridgeFolder();
+    return;
+  }
+
   if (typeof isNumericControlInput === "function" && isNumericControlInput(target)) {
     if (event.key === "Enter") {
       commitNumericControlInput(target);

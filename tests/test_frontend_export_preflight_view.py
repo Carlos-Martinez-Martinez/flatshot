@@ -193,6 +193,17 @@ assert.equal(helpers.exportPanelStatusLabel({{
 }}), "1 aviso antes de exportar");
 assert.equal(helpers.exportPanelStatusLabel({{
   status: "idle",
+  ready: false,
+  issues: [{{ level: "error", title: "Carpeta de salida" }}],
+}}), "Revisar: Carpeta de salida");
+assert.equal(helpers.exportPanelStatusLabel({{
+  status: "idle",
+  ready: false,
+  hasActiveBatch: true,
+  issues: [{{ level: "warning", title: "Aviso de alpha" }}],
+}}), "Pendiente: Aviso de alpha");
+assert.equal(helpers.exportPanelStatusLabel({{
+  status: "idle",
   ready: true,
   issues: [],
 }}), "Listo para exportar");

@@ -42,6 +42,12 @@ assert.equal(typeof helpers.createFlatShotInteractionHandlers, "function");
     assert result.returncode == 0, result.stderr or result.stdout
 
 
+def test_interaction_bindings_wire_focusout_for_commit_on_blur():
+    source = HELPER_PATH.read_text(encoding="utf-8")
+
+    assert 'documentRef.addEventListener("focusout", handlers.documentFocusOut);' in source
+
+
 def test_document_click_normalizes_non_element_targets_for_action_buttons():
     source = APP_DOCUMENT_EVENTS_PATH.read_text(encoding="utf-8")
 

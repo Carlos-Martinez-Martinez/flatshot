@@ -61,6 +61,8 @@ assert.equal(initial.includes("Carga un lote de imágenes PNG o JPG"), true);
 assert.equal(initial.includes('data-action="pick-bridge-folder"'), true);
 assert.equal(initial.includes('class="primary" data-action="pick-bridge-folder"'), false);
 assert.equal(initial.includes('class="ghost-action" data-action="pick-bridge-folder"'), true);
+assert.equal(initial.includes(">Buscar carpeta</button>"), true);
+assert.equal(initial.includes(">Seleccionar carpeta</button>"), false);
 assert.equal(initial.includes('data-action="open-app-settings"'), true);
 assert.equal(initial.includes("Gestionar formatos"), true);
 assert.equal(initial.includes('data-action="open-qa-lab"'), false);
@@ -71,6 +73,8 @@ assert.equal(initial.includes("Carpeta de entrada"), true);
 assert.equal(initial.includes('id="onboarding-scan-path"'), true);
 assert.equal(initial.includes('class="folder-entry-inline__scan primary"'), true);
 assert.equal(initial.includes('data-action="scan-bridge-folder"'), true);
+assert.equal(initial.includes('title="Escanear carpeta"'), true);
+assert.ok(initial.indexOf('class="folder-entry-inline"') < initial.indexOf('class="empty-state__actions"'));
 assert.equal(initial.includes("<svg"), true);
 
 const devInitial = helpers.initialStateHtml({{

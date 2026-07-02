@@ -129,6 +129,7 @@ const actionDispatcher = actionHandlerHelpers.createActionDispatcher({
   "review-warnings": () => reviewWarnings(),
   "review-output": () => beginOutputEdit(),
   "open-output": () => openOutputFolder(),
+  "copy-output-path": () => { void copyOutputPath(); },
   "primary": () => primaryAction(),
   "secondary-primary": () => runVisibleAction(getVisibleAppState().secondaryAction?.action),
 });

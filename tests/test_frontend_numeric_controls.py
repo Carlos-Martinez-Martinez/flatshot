@@ -164,6 +164,130 @@ assert.equal(openDetails.open, true);
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend event checks")
+def test_scan_path_enter_starts_scan_without_global_keyboard_handling():
+    script = f"""
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const vm = require("node:vm");
+const path = require("node:path");
+const frontend = {json.dumps(str(FRONTEND_DIR))};
+
+class HTMLInputElement {{}}
+class HTMLTextAreaElement {{}}
+class HTMLSelectElement {{}}
+global.HTMLInputElement = HTMLInputElement;
+global.HTMLTextAreaElement = HTMLTextAreaElement;
+global.HTMLSelectElement = HTMLSelectElement;
+global.trapOpenModalFocus = () => false;
+global.$ = () => null;
+global.state = {{
+  appSettingsOpen: false,
+  batchDetailOpen: false,
+  exportConfirmOpen: false,
+  exportStatus: "idle",
+}};
+global.isExportReady = () => false;
+global.startExport = () => {{}};
+global.closeExportConfirm = () => {{}};
+global.closeBatchDetail = () => {{}};
+global.closeAppSettings = () => {{}};
+global.confirmExportFromModal = () => {{}};
+global.selectAdjacentImage = () => {{}};
+global.selectEdgeImage = () => {{}};
+global.isNumericControlInput = () => false;
+global.document = {{ querySelectorAll: () => [] }};
+let scans = 0;
+global.scanBridgeFolder = () => {{
+  scans += 1;
+}};
+
+vm.runInThisContext(fs.readFileSync(path.join(frontend, "app-viewer-events.js"), "utf8"));
+
+const pathTarget = new HTMLInputElement();
+pathTarget.id = "onboarding-scan-path";
+pathTarget.dataset = {{}};
+pathTarget.isContentEditable = false;
+
+let prevented = false;
+handleDocumentKeydown({{
+  key: "Enter",
+  target: pathTarget,
+  ctrlKey: false,
+  metaKey: false,
+  preventDefault: () => {{ prevented = true; }},
+}});
+assert.equal(scans, 1);
+assert.equal(prevented, true);
+"""
+    result = subprocess.run(
+        ["node", "-e", script],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend event checks")
+def test_document_focusout_commits_numeric_controls():
+    script = f"""
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const vm = require("node:vm");
+const path = require("node:path");
+const frontend = {json.dumps(str(FRONTEND_DIR))};
+
+let settingCommits = [];
+let localCommits = [];
+let lightingCommits = [];
+global.isNumericControlInput = (target) => Boolean(target?.dataset?.settingNumber || target?.dataset?.localSettingNumber);
+global.updateSettingFromNumberInput = (target, options = {{}}) => {{
+  settingCommits.push({{ value: target.value, commit: Boolean(options.commit) }});
+}};
+global.updateLocalOverrideFromNumberInput = (target, options = {{}}) => {{
+  localCommits.push({{ value: target.value, commit: Boolean(options.commit) }});
+}};
+global.handleLightingNumberFieldInput = (event) => {{
+  lightingCommits.push({{ type: event.type, value: event.target.value }});
+}};
+global.$ = () => null;
+global.state = {{ bridgeScanPath: "" }};
+global.syncRangeFill = () => {{}};
+global.updateBackgroundPresetEditorFromFields = () => {{}};
+global.updateOutputProfileDraftFromForm = () => {{}};
+global.renderOutputProfileModalState = () => {{}};
+global.applyOutputProfile = () => {{}};
+global.applyPresetSettings = () => {{}};
+global.backgroundPresetHelpers = {{ normalizePreviewBackgroundValue: () => "rgb230", previewBackgroundLabel: () => "gris claro" }};
+global.backgroundHelperOptions = () => {{}};
+global.previewCustomBackgroundValue = () => "rgb230";
+global.settingsViewHelpers = {{ backgroundLabel: () => "gris claro" }};
+global.render = () => {{}};
+
+vm.runInThisContext(fs.readFileSync(path.join(frontend, "app-document-events.js"), "utf8"));
+
+handleDocumentFocusOut({{ target: {{ value: "33", dataset: {{ settingNumber: "opacity" }} }} }});
+handleDocumentFocusOut({{ target: {{ value: "-2", dataset: {{ localSettingNumber: "size_delta" }} }} }});
+handleDocumentFocusOut({{ target: {{ value: "81", dataset: {{ lightingNumberField: "main.height" }} }} }});
+
+assert.deepEqual(settingCommits, [{{ value: "33", commit: true }}]);
+assert.deepEqual(localCommits, [{{ value: "-2", commit: true }}]);
+assert.deepEqual(lightingCommits, [{{ type: "change", value: "81" }}]);
+"""
+    result = subprocess.run(
+        ["node", "-e", script],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend event checks")
 def test_lighting_number_input_defers_commit_until_change():
     script = f"""
 const assert = require("node:assert/strict");

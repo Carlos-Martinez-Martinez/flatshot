@@ -9,6 +9,7 @@
   global.interactionBindingHelpers = window.FlatShotInteractionBindings;
   global.sessionSnapshotHelpers = window.FlatShotSessionSnapshot;
   global.backgroundPresetHelpers = window.FlatShotBackgroundPresets;
+  global.guideHelpers = window.FlatShotCanvasGuides;
   global.appStateHelpers = window.FlatShotAppState;
   global.initialBridgeUrl = global.bridgeUrlHelpers.initialBridgeUrlFromSearch(window.location.search, global.defaultBridgeUrl);
   global.devMode = global.urlParams.get("dev") === "1";

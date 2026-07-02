@@ -17,19 +17,24 @@
     const active = Boolean(row.active);
     const enabled = Boolean(row.enabled);
     const canToggle = Boolean(row.canToggle);
+    const selectable = enabled && canToggle;
     const summary = row.summary || "";
+    const mainContent = `
+        <span class="active-output-row__title">
+          <strong>${escapeHtml(row.name)}</strong>
+        </span>
+        <small>${escapeHtml(summary)}</small>
+    `;
+    const mainHtml = selectable
+      ? `<button type="button" class="active-output-row__main" data-action="select-output-profile" data-output-profile-id="${escapeHtml(row.id)}" aria-pressed="${active ? "true" : "false"}" title="${escapeHtml(`Seleccionar ${row.name} para previsualizar`)}">${mainContent}</button>`
+      : `<div class="active-output-row__main" title="${escapeHtml(`${row.name} · ${summary}`)}">${mainContent}</div>`;
     return `
     <div class="active-output-row${active ? " is-current" : ""}${enabled ? " is-enabled" : " is-disabled"}">
       <label class="output-toggle" title="${escapeHtml(canToggle ? "Activar o desactivar formato" : "Guarda el formato para activarlo")}">
         <input type="checkbox" data-output-profile-enabled-id="${escapeHtml(row.id)}" ${enabled ? "checked" : ""} ${canToggle ? "" : "disabled"} />
         <span></span>
       </label>
-      <div class="active-output-row__main" title="${escapeHtml(`${row.name} · ${summary}`)}">
-        <span class="active-output-row__title">
-          <strong>${escapeHtml(row.name)}</strong>
-        </span>
-        <small>${escapeHtml(summary)}</small>
-      </div>
+      ${mainHtml}
       <button type="button" class="active-output-row__edit" data-action="edit-output-profile" data-output-profile-id="${escapeHtml(row.id)}">Editar</button>
     </div>
   `;

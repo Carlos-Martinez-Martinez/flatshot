@@ -390,7 +390,23 @@
   display: grid;
   align-items: start;
   gap: 3px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
   line-height: 1.25;
+  text-align: left;
+  box-shadow: none;
+}
+button.active-output-row__main {
+  cursor: pointer;
+}
+button.active-output-row__main:hover:not(:disabled) {
+  color: var(--color-text-strong);
+}
+button.active-output-row__main:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
 }
 .active-output-row__title {
   width: 100%;

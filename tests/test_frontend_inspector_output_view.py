@@ -59,6 +59,21 @@ assert.equal(disabledRow.includes("active-output-row is-disabled"), true);
 assert.equal(disabledRow.includes("checked"), false);
 assert.equal(disabledRow.includes(' disabled />'), false);
 
+const selectableRow = helpers.outputProfileInlineRowHtml({{
+  id: "zalando",
+  name: "Zalando",
+  enabled: true,
+  active: false,
+  canToggle: true,
+  summary: "PNG · 1800x2400 · blanco",
+}});
+assert.equal(selectableRow.includes('class="active-output-row__main"'), true);
+assert.equal(selectableRow.includes('data-action="select-output-profile"'), true);
+assert.equal(selectableRow.includes('data-output-profile-id="zalando"'), true);
+assert.equal(selectableRow.includes('aria-pressed="false"'), true);
+assert.equal(selectableRow.includes('title="Seleccionar Zalando para previsualizar"'), true);
+assert.equal(selectableRow.includes('class="active-output-row__edit" data-action="edit-output-profile"'), true);
+
 const notice = helpers.outputTemporaryNoticeHtml();
 assert.equal(notice.includes("Cambios sin guardar en este formato"), true);
 assert.equal(notice.includes('data-action="save-output-current-profile"'), true);

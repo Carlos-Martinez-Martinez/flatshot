@@ -63,6 +63,10 @@ def test_canvas_guides_toolbar_overlay_and_controller_are_wired():
     assert 'data-action="toggle-guides"' in html
     assert 'data-guide-system-list' in html
     assert 'class="viewer-guides-menu"' in html
+    assert 'class="viewer-guides-menu-trigger"' in html
+    assert 'class="visually-hidden">Sistemas de guías</span>' in html
+    guide_block = html[html.index('class="viewer-control-group viewer-guides"'):html.index('class="zoom-controls"', html.index('class="viewer-control-group viewer-guides"'))]
+    assert guide_block.index('class="button-icon"') < guide_block.index('id="guides-active-count"')
     assert loader.index("app-canvas-guides-controller.js") < loader.index("app-preview-controller.js")
 
 
@@ -98,9 +102,8 @@ def test_canvas_guide_manager_supports_system_and_rule_actions():
         "duplicateGuideSystem",
         "deleteGuideSystem",
         "saveGuideDraft",
-        "addGuideCenterRule",
-        "addGuideMirrorPairRule",
-        "addGuideDivisionRule",
+        "guideDraftFromSystem",
+        "editableGuideRulesFromSystem",
         "addGuideLineRule",
         "removeGuideRule",
     ]:
@@ -112,17 +115,76 @@ def test_canvas_guide_manager_supports_system_and_rule_actions():
         "duplicate-guide-system",
         "delete-guide-system",
         "save-guide-draft",
-        "add-guide-center",
-        "add-guide-pair",
-        "add-guide-division",
         "add-guide-line",
         "remove-guide-rule",
     ]:
         assert f'"{action}"' in dispatcher
 
     assert "updateGuideDraftFromFields" in document_events
+    assert '!event.target?.dataset?.guideNewField' in document_events
     assert "renderGuideManager();" in render_source
     assert "closeGuideManager();" in keydown_source
+
+
+def test_canvas_guide_manager_uses_existing_modal_shell():
+    controller = (FRONTEND_DIR / "app-canvas-guides-controller.js").read_text(encoding="utf-8")
+
+    assert 'modal.className = "app-settings-backdrop guide-manager-modal"' in controller
+    assert 'class="app-settings-dialog guide-manager-panel"' in controller
+    assert 'class="app-settings-header"' in controller
+    assert 'class="guide-system-list-heading"' in controller
+    assert 'class="guide-system-list-scroll"' in controller
+    assert 'class="guide-empty-state"' in controller
+    assert 'class="guide-system-actions"' in controller
+    assert 'disabled' not in controller[controller.index("function guideSystemManagerRow"):controller.index("function guideDraftFormHtml")]
+    assert "modal-backdrop" not in controller
+    assert "modal-panel" not in controller
+    assert "modal-header" not in controller
+
+
+def test_canvas_guide_manager_uses_bounded_editor_layout():
+    controller = (FRONTEND_DIR / "app-canvas-guides-controller.js").read_text(encoding="utf-8")
+    toolbar_css = (FRONTEND_DIR / "css" / "05-viewer" / "viewer-toolbar.css").read_text(encoding="utf-8")
+
+    assert 'id="guide-draft-form" class="guide-draft-form"' in controller
+    assert 'class="guide-add-row"' in controller
+    assert 'data-guide-new-field="position"' in controller
+    assert 'data-guide-new-field="mirror"' in controller
+    assert "const reflected = 1 - position" in controller
+    assert "Math.abs(reflected - position) > 0.0001" in controller
+    assert 'class="guide-list-heading"' in controller
+    assert 'class="guide-rule-title"' in controller
+    assert 'class="guide-rule-fields"' in controller
+    assert 'guide-line-row' in controller
+    assert "Par simétrico" not in controller[controller.index("function guideDraftFormHtml"):controller.index("function guidePercentNumber")]
+    assert "División" not in controller[controller.index("function guideDraftFormHtml"):controller.index("function guidePercentNumber")]
+
+    assert ".guide-manager-panel" in toolbar_css and "height: min(" in toolbar_css
+    assert "width: min(1120px, calc(100vw - 72px))" in toolbar_css
+    assert "max-width: min(1120px, calc(100vw - 72px))" in toolbar_css
+    assert "grid-template-columns: 260px minmax(0, 1fr)" in toolbar_css
+    assert ".guide-draft-form" in toolbar_css and "grid-template-rows: auto auto auto auto minmax(0, 1fr) auto" in toolbar_css
+    assert ".guide-draft-panel" in toolbar_css and "overflow: hidden" in toolbar_css
+    assert ".guide-rule-list" in toolbar_css and "overflow-y: auto" in toolbar_css
+    assert ".guide-add-row" in toolbar_css
+    assert "grid-template-columns: minmax(170px, 1fr) 140px 128px 92px 150px" in toolbar_css
+    assert "padding: var(--space-3) var(--space-5)" in toolbar_css
+    assert ".guide-rule-fields" in toolbar_css
+    assert ".guide-line-row" in toolbar_css
+    assert "grid-template-columns: minmax(180px, 1fr) minmax(300px, 360px) 104px" in toolbar_css
+    assert "padding-inline: var(--space-4)" in toolbar_css
+    assert ".guide-rule-row--division" not in toolbar_css
+
+
+def test_canvas_guide_manager_converts_presets_to_editable_exact_guides():
+    controller = (FRONTEND_DIR / "app-canvas-guides-controller.js").read_text(encoding="utf-8")
+
+    copy_block = controller[controller.index("function editableGuideRulesFromSystem"):controller.index("function newGuideSystem")]
+
+    assert "guideHelpers.expandRule(rule)" in copy_block
+    assert 'type: "line"' in copy_block
+    assert "position: line.position" in copy_block
+    assert "system: false" in copy_block
 
 
 def test_canvas_guides_css_lives_in_viewer_modules():
@@ -130,8 +192,14 @@ def test_canvas_guides_css_lives_in_viewer_modules():
     canvas_css = (FRONTEND_DIR / "css" / "05-viewer" / "canvas.css").read_text(encoding="utf-8")
 
     assert ".viewer-guides" in toolbar_css
+    assert "#guides-toggle { width:" in toolbar_css
+    assert ".viewer-guides-menu-trigger" in toolbar_css
     assert ".viewer-guides-popover" in toolbar_css
     assert ".guide-manager-panel" in toolbar_css
+    assert ".guide-system-list-scroll" in toolbar_css
+    assert ".guide-system-actions" in toolbar_css
+    assert ".guide-empty-state" in toolbar_css
+    assert ".viewer-guide-system-option, .viewer-guide-system-option *" in toolbar_css
     assert ".guide-overlay" in canvas_css
     assert ".guide-line--x" in canvas_css
     assert ".guide-line--y" in canvas_css

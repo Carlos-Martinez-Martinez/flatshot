@@ -57,6 +57,7 @@ htmlcov/
 playwright-report/
 test-results/
 output/playwright/
+tmp-*.png
 .cache/
 node_modules/
 npm-debug.log*

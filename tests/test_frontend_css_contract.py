@@ -146,3 +146,22 @@ def test_advanced_disclosures_keep_content_sized_rows():
     assert "overflow-y: auto" in css
     assert "flex: 1 1 auto" not in css
     assert "height: 100%" not in css
+
+
+def test_active_output_row_main_keeps_grid_layout_when_selectable():
+    buttons_css = (
+        FRONTEND_DIR
+        / "css"
+        / "03-components"
+        / "buttons.css"
+    ).read_text(encoding="utf-8")
+    output_profiles_css = (
+        FRONTEND_DIR
+        / "css"
+        / "06-inspector-export"
+        / "output-profiles.css"
+    ).read_text(encoding="utf-8")
+
+    assert ":not(.active-output-row__main)" in buttons_css
+    assert "button.active-output-row__main {\n  cursor: pointer;" in output_profiles_css
+    assert ".active-output-row__main {\n  min-width: 0;\n  width: 100%;\n  display: grid;" in output_profiles_css

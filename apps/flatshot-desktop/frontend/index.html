@@ -51,7 +51,7 @@
     <link rel="stylesheet" href="./css/99-legacy-compat.css?v=20260616-inspector-fit-height" />
   </head>
   <body>
-    <main class="app-shell" aria-label="FlatShot nueva app">
+    <main class="app-shell no-selected-image" data-ui-state="no_folder" data-batch-context="false" data-status-footer="false" data-output-editing="false" aria-label="FlatShot nueva app">
       <header class="top-bar">
         <div class="top-bar-main">
           <div class="brand-block">
@@ -247,7 +247,9 @@
                 <span class="viewer-control-label">Guías</span>
                 <button type="button" id="guides-toggle" data-action="toggle-guides" aria-pressed="true" title="Mostrar u ocultar guías">On</button>
                 <details class="viewer-guides-menu" id="viewer-guides-menu">
-                  <summary aria-label="Sistemas de guías" title="Sistemas de guías">
+                  <summary class="viewer-guides-menu-trigger" aria-label="Sistemas de guías" title="Sistemas de guías">
+                    <span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h8M16 7h4M4 17h4M12 17h8"></path><path d="M12 5v4M8 15v4"></path></svg></span>
+                    <span class="visually-hidden">Sistemas de guías</span>
                     <span id="guides-active-count" class="viewer-guides-count">0</span>
                   </summary>
                   <div class="viewer-guides-popover" role="menu" aria-label="Sistemas de guías">

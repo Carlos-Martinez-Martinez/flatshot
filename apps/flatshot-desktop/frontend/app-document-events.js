@@ -283,7 +283,7 @@ function handleDocumentInput(event) {
     updateBackgroundPresetEditorFromFields();
     return;
   }
-  if (event.target.closest?.("#guide-draft-form")) {
+  if (event.target.closest?.("#guide-draft-form") && !event.target?.dataset?.guideNewField) {
     updateGuideDraftFromFields();
     return;
   }
@@ -334,7 +334,7 @@ function handleDocumentChange(event) {
     renderBackgroundPresetControls();
     return;
   }
-  if (event.target.closest?.("#guide-draft-form")) {
+  if (event.target.closest?.("#guide-draft-form") && !event.target?.dataset?.guideNewField) {
     updateGuideDraftFromFields();
     renderGuideManager();
     return;

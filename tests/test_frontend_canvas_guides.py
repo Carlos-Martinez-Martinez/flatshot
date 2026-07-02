@@ -66,6 +66,24 @@ def test_canvas_guides_toolbar_overlay_and_controller_are_wired():
     assert loader.index("app-canvas-guides-controller.js") < loader.index("app-preview-controller.js")
 
 
+def test_canvas_guide_actions_are_registered_and_popover_closes_transiently():
+    dispatcher = (FRONTEND_DIR / "app-action-dispatcher.js").read_text(encoding="utf-8")
+    document_events = (FRONTEND_DIR / "app-document-events.js").read_text(encoding="utf-8")
+
+    assert '"toggle-guides": () => toggleGuidesVisible()' in dispatcher
+    assert '"open-guide-manager": () => openGuideManager()' in dispatcher
+    assert 'details.viewer-guides-menu[open]' in document_events
+    assert "handleGuideSystemToggle" in document_events
+
+
+def test_canvas_guide_controller_persists_after_mutations():
+    source = (FRONTEND_DIR / "app-canvas-guides-controller.js").read_text(encoding="utf-8")
+
+    assert "function persistGuidePreferences()" in source
+    assert "storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.activeGuideSystems" in source
+    assert "scheduleBridgeUiPreferencesSave();" in source
+
+
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
 def test_canvas_guide_helpers_normalize_and_expand_rules():
     script = f"""

@@ -78,3 +78,47 @@ function updateGuideOverlayLayout() {
   overlay.style.width = `${Math.round(targetRect.width)}px`;
   overlay.style.height = `${Math.round(targetRect.height)}px`;
 }
+
+function persistGuidePreferences() {
+  storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.guideSystems, guideHelpers.guideSystemsForStorage(state.guideSystems));
+  storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.activeGuideSystems, state.activeGuideSystemIds);
+  storageHelpers.writeValue(window.localStorage, STORAGE_KEYS.guidesVisible, state.guidesVisible ? "1" : "0");
+  scheduleBridgeUiPreferencesSave();
+}
+
+function toggleGuidesVisible() {
+  state.guidesVisible = !state.guidesVisible;
+  state.statusText = state.guidesVisible ? "Guías visibles" : "Guías ocultas";
+  persistGuidePreferences();
+  render();
+}
+
+function setGuideSystemActive(systemId, active) {
+  const ids = new Set(state.activeGuideSystemIds);
+  if (active) {
+    ids.add(systemId);
+  } else {
+    ids.delete(systemId);
+  }
+  state.activeGuideSystemIds = guideHelpers.normalizeActiveGuideSystemIds([...ids], state.guideSystems);
+  state.statusText = `${activeGuideSystems().length} sistemas de guías activos`;
+  persistGuidePreferences();
+  render();
+}
+
+function openGuideManager() {
+  state.guideManagerOpen = true;
+  state.guideDraft = null;
+  state.statusText = "Gestionar guías";
+  const menu = $("#viewer-guides-menu");
+  if (menu) {
+    menu.open = false;
+  }
+  render();
+}
+
+function closeGuideManager() {
+  state.guideManagerOpen = false;
+  state.guideDraft = null;
+  render();
+}

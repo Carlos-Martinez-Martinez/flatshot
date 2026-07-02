@@ -1,6 +1,6 @@
 function closeTransientDetails(event) {
   const target = event.target;
-  document.querySelectorAll("details.format-more-menu[open], details.debug-panel[open]").forEach((details) => {
+  document.querySelectorAll("details.format-more-menu[open], details.debug-panel[open], details.viewer-guides-menu[open]").forEach((details) => {
     if (!details.contains(target)) {
       details.open = false;
     }
@@ -81,6 +81,15 @@ function closeBackgroundPresetEditorOnOutsideClick(event) {
     return false;
   }
   state.backgroundPresetEditor = null;
+  return true;
+}
+
+function handleGuideSystemToggle(target) {
+  const systemId = target.dataset.guideSystemToggle;
+  if (!systemId) {
+    return false;
+  }
+  setGuideSystemActive(systemId, target.checked);
   return true;
 }
 
@@ -276,6 +285,10 @@ function handleDocumentInput(event) {
 }
 
 function handleDocumentChange(event) {
+  if (event.target?.matches?.("[data-guide-system-toggle]")) {
+    handleGuideSystemToggle(event.target);
+    return;
+  }
   if (event.target.matches?.("[data-preview-bg-channel]")) {
     state.previewBg = backgroundPresetHelpers.normalizePreviewBackgroundValue(previewCustomBackgroundValue(), backgroundHelperOptions());
     state.statusText = `Fondo: ${backgroundPresetHelpers.previewBackgroundLabel(state.previewBg, {

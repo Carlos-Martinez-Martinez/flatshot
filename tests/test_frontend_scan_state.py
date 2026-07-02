@@ -51,8 +51,8 @@ assert.deepEqual(helpers.folderPickSelectedState("C:/lote"), {{
   bridgeScanPath: "C:/lote",
   bridgeMessage: "Carpeta seleccionada",
   bridgeLastResponse: "folder pick OK",
-  scanStatus: "Carpeta seleccionada",
-  statusText: "Carpeta seleccionada",
+  scanStatus: "Carpeta lista para escanear",
+  statusText: "Carpeta lista para escanear",
 }});
 
 assert.deepEqual(helpers.folderPickErrorState("offline"), {{

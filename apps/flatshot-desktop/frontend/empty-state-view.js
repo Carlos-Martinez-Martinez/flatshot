@@ -33,15 +33,14 @@
     const qaLabActionHtml = options.devMode
       ? `<button type="button" class="ghost-action dev-only" data-action="open-qa-lab">QA Lab</button>`
       : "";
-    const manualPathHtml = `
-      <details class="manual-path-inline">
-        <summary>Ruta manual</summary>
+    const folderEntryHtml = `
+      <div class="folder-entry-inline" aria-label="Carpeta de entrada">
         <label class="text-field">
-          <span>Carpeta</span>
-          <input id="onboarding-scan-path" type="text" value="${escapeHtml(options.bridgeScanPath || "")}" placeholder="C:/ruta/lote" />
+          <span>Carpeta de entrada</span>
+          <input id="onboarding-scan-path" type="text" value="${escapeHtml(options.bridgeScanPath || "")}" placeholder="C:/ruta/lote" autocomplete="off" spellcheck="false" />
         </label>
-        <button type="button" data-action="scan-bridge-folder">Escanear carpeta</button>
-      </details>
+        <button type="button" class="folder-entry-inline__scan" data-action="scan-bridge-folder">Escanear</button>
+      </div>
   `;
     return `
     <div class="empty-state onboarding initial-onboarding">
@@ -58,7 +57,7 @@
         <button type="button" class="ghost-action" data-action="open-app-settings">Gestionar formatos</button>
         ${qaLabActionHtml}
       </div>
-      ${manualPathHtml}
+      ${folderEntryHtml}
     </div>
   `;
   }

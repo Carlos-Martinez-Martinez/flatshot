@@ -17,7 +17,6 @@ async function pickBridgeFolder() {
     Object.assign(state, scanStateHelpers.folderPickSelectedState(selected.path));
     persistBridgeScanPath();
     render();
-    await scanBridgeFolder();
   } catch (error) {
     const message = bridgeErrorMessage(error);
     Object.assign(state, scanStateHelpers.folderPickErrorState(message));

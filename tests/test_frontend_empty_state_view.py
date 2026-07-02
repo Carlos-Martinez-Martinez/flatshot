@@ -10,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
 HELPER_PATH = FRONTEND_DIR / "empty-state-view.js"
 INDEX_PATH = FRONTEND_DIR / "index.html"
+WORKFLOW_CSS_PATH = FRONTEND_DIR / "css" / "03-components" / "workflow-panels.css"
 
 
 def test_empty_state_view_helper_loads_before_app_script():
@@ -60,8 +61,10 @@ assert.equal(initial.includes('data-action="pick-bridge-folder"'), true);
 assert.equal(initial.includes('data-action="open-app-settings"'), true);
 assert.equal(initial.includes("Gestionar formatos"), true);
 assert.equal(initial.includes('data-action="open-qa-lab"'), false);
-assert.equal(initial.includes('class="manual-path-inline"'), true);
-assert.equal(initial.includes("Ruta manual"), true);
+assert.equal(initial.includes('class="folder-entry-inline"'), true);
+assert.equal(initial.includes('class="manual-path-inline"'), false);
+assert.equal(initial.includes("Ruta manual"), false);
+assert.equal(initial.includes("Carpeta de entrada"), true);
 assert.equal(initial.includes('id="onboarding-scan-path"'), true);
 assert.equal(initial.includes('data-action="scan-bridge-folder"'), true);
 assert.equal(initial.includes("<svg"), true);
@@ -70,8 +73,9 @@ const devInitial = helpers.initialStateHtml({{
   devMode: true,
   bridgeScanPath: 'C:/Entrada/"uno"&<dos>',
 }});
-assert.equal(devInitial.includes('class="manual-path-inline"'), true);
-assert.equal(devInitial.includes("Ruta manual"), true);
+assert.equal(devInitial.includes('class="folder-entry-inline"'), true);
+assert.equal(devInitial.includes('class="manual-path-inline"'), false);
+assert.equal(devInitial.includes("Ruta manual"), false);
 assert.equal(devInitial.includes('id="onboarding-scan-path"'), true);
 assert.equal(devInitial.includes('value="C:/Entrada/&quot;uno&quot;&amp;&lt;dos&gt;"'), true);
 assert.equal(devInitial.includes('data-action="scan-bridge-folder"'), true);
@@ -86,3 +90,17 @@ assert.equal(devInitial.includes('data-action="open-qa-lab"'), true);
     )
 
     assert result.returncode == 0, result.stderr or result.stdout
+
+
+def test_initial_folder_entry_keeps_stable_layout_styles():
+    css = WORKFLOW_CSS_PATH.read_text(encoding="utf-8")
+
+    entry_rule = css.split(".folder-entry-inline {", 1)[1].split("}", 1)[0]
+    input_rule = css.split(".folder-entry-inline input {", 1)[1].split("}", 1)[0]
+
+    assert "width: min(520px, 100%);" in entry_rule
+    assert "display: grid;" in entry_rule
+    assert "grid-template-columns: minmax(0, 1fr) auto;" in entry_rule
+    assert "align-items: end;" in entry_rule
+    assert "min-width: 0;" in input_rule
+    assert "width: 100%;" in input_rule

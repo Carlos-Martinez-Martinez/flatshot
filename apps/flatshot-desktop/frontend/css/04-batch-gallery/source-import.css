@@ -10,7 +10,7 @@
   font-size: var(--text-sm);
 }
 
-.app-shell[data-batch-context="true"] .source-panel .manual-path-panel, .app-shell[data-batch-context="true"] .source-panel .bridge-message {
+.app-shell[data-batch-context="true"] .source-panel .bridge-message {
   display: none;
 }
 
@@ -106,7 +106,7 @@
   background: var(--bg-panel);
 }
 
-.manual-path-panel, .app-shell[data-batch-context="true"] .source-panel .manual-path-panel, .bridge-message, .import-requirements {
+.bridge-message, .import-requirements {
   display: none;
 }
 
@@ -124,7 +124,7 @@
   gap: 6px;
 }
 
-.batch-source__actions button, .batch-source__toolbar button, .batch-source__refresh {
+.batch-source__actions button, .batch-source__toolbar button, .source-path-panel__scan, .batch-source__refresh {
   min-height: 26px;
   border-color: var(--rail-border);
   border-radius: 8px;
@@ -135,10 +135,32 @@
   font-weight: 750;
 }
 
-.batch-source__actions button:hover:not(:disabled), .batch-source__toolbar button:hover:not(:disabled), .batch-source__refresh:hover:not(:disabled) {
+.batch-source__actions button:hover:not(:disabled), .batch-source__toolbar button:hover:not(:disabled), .source-path-panel__scan:hover:not(:disabled), .batch-source__refresh:hover:not(:disabled) {
   border-color: rgba(15, 143, 114, 0.28);
   background: var(--rail-accent-soft);
   color: var(--rail-accent);
+}
+
+.source-path-panel {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-2);
+}
+
+.source-path-panel .text-field {
+  min-width: 0;
+}
+
+.source-path-panel input {
+  min-width: 0;
+  width: 100%;
+}
+
+.source-path-panel__scan {
+  align-self: end;
+  white-space: nowrap;
 }
 
 .batch-rail__header, .source-panel.batch-rail__source, .batch-rail__summary {
@@ -236,13 +258,10 @@
   padding: 0;
 }
 
-.manual-path-panel summary, .batch-diagnostics summary, .advanced-block summary {
+.batch-diagnostics summary, .advanced-block summary {
   color: var(--color-accent);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
 }
 
-.bridge-message, .import-requirements {
-  display: none;
-}
 }

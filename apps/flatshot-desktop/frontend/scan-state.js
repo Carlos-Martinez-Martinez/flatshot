@@ -34,8 +34,8 @@
       bridgeScanPath: path,
       bridgeMessage: "Carpeta seleccionada",
       bridgeLastResponse: "folder pick OK",
-      scanStatus: "Carpeta seleccionada",
-      statusText: "Carpeta seleccionada",
+      scanStatus: "Carpeta lista para escanear",
+      statusText: "Carpeta lista para escanear",
     };
   }
 

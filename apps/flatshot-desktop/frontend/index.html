@@ -145,17 +145,16 @@
               </div>
               <div class="batch-source__toolbar">
                 <button type="button" id="bridge-pick-folder" data-action="pick-bridge-folder">Elegir carpeta</button>
-                <button type="button" class="batch-source__refresh" id="bridge-scan-folder" data-action="scan-bridge-folder" aria-label="Actualizar lote" title="Actualizar lote">↻</button>
               </div>
               <span class="state-chip" id="scan-source-badge">Sin lote</span>
             </div>
-            <details class="manual-path-panel">
-              <summary>Ruta manual</summary>
+            <div class="source-path-panel" aria-label="Carpeta de entrada">
               <label class="text-field">
-                <span>Carpeta</span>
-                <input id="bridge-scan-path" type="text" placeholder="C:/ruta/lote" />
+                <span>Carpeta de entrada</span>
+                <input id="bridge-scan-path" type="text" placeholder="C:/ruta/lote" autocomplete="off" spellcheck="false" />
               </label>
-            </details>
+              <button type="button" class="source-path-panel__scan" id="bridge-scan-folder" data-action="scan-bridge-folder" aria-label="Escanear carpeta" title="Escanear carpeta">Escanear</button>
+            </div>
             <div class="bridge-message" id="bridge-message">Sin lote.</div>
             <ul class="import-requirements" aria-label="Requisitos de importación">
               <li>Carpeta local</li>

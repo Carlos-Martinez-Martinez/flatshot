@@ -168,4 +168,10 @@
 .preview-canvas.original .mock-body {
   background: linear-gradient(180deg, #f7f7f4, #e9eeec);
 }
+
+.guide-overlay { position: absolute; z-index: 2; overflow: hidden; pointer-events: none; }
+.guide-overlay[hidden] { display: none; }
+.guide-line { position: absolute; background: var(--guide-color); opacity: var(--guide-opacity); }
+.guide-line--x { top: 0; bottom: 0; left: calc(var(--guide-position) * 100%); width: var(--guide-thickness); transform: translateX(-50%); }
+.guide-line--y { right: 0; left: 0; top: calc(var(--guide-position) * 100%); height: var(--guide-thickness); transform: translateY(-50%); }
 }

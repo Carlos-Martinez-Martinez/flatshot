@@ -125,6 +125,18 @@ def test_canvas_guide_manager_supports_system_and_rule_actions():
     assert "closeGuideManager();" in keydown_source
 
 
+def test_canvas_guides_css_lives_in_viewer_modules():
+    toolbar_css = (FRONTEND_DIR / "css" / "05-viewer" / "viewer-toolbar.css").read_text(encoding="utf-8")
+    canvas_css = (FRONTEND_DIR / "css" / "05-viewer" / "canvas.css").read_text(encoding="utf-8")
+
+    assert ".viewer-guides" in toolbar_css
+    assert ".viewer-guides-popover" in toolbar_css
+    assert ".guide-manager-panel" in toolbar_css
+    assert ".guide-overlay" in canvas_css
+    assert ".guide-line--x" in canvas_css
+    assert ".guide-line--y" in canvas_css
+
+
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
 def test_canvas_guide_helpers_normalize_and_expand_rules():
     script = f"""

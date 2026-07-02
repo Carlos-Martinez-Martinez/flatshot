@@ -283,12 +283,6 @@ function handleDocumentInput(event) {
   if (localKey) {
     setCurrentImageOverrideValue(localKey, event.target.value);
   }
-  if (event.target?.dataset?.settingNumber) {
-    updateSettingFromNumberInput(event.target);
-  }
-  if (event.target?.dataset?.localSettingNumber) {
-    updateLocalOverrideFromNumberInput(event.target);
-  }
   if (event.target.closest?.("#background-preset-editor")) {
     updateBackgroundPresetEditorFromFields();
     return;

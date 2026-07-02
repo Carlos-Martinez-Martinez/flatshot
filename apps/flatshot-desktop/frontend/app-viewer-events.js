@@ -10,6 +10,19 @@ function handleDocumentKeydown(event) {
     return;
   }
 
+  if (typeof isNumericControlInput === "function" && isNumericControlInput(target)) {
+    if (event.key === "Enter") {
+      commitNumericControlInput(target);
+      event.preventDefault();
+      return;
+    }
+    if (event.key === "Escape") {
+      cancelNumericControlInput(target);
+      event.preventDefault();
+      return;
+    }
+  }
+
   if (command && event.key.toLowerCase() === "f") {
     event.preventDefault();
     const search = $("#image-search");

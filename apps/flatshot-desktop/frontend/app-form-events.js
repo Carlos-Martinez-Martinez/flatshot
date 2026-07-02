@@ -21,7 +21,10 @@ function handleLightingFieldInput(event) {
 }
 
 function handleLightingNumberFieldInput(event) {
-  updateLightingSceneField(event.target.dataset.lightingNumberField, event.target.value);
+  if (event.type !== "change") {
+    return;
+  }
+  updateLightingNumberFieldFromInput(event.target, { commit: true });
 }
 
 function handleLightingPresetClick(button) {
@@ -59,13 +62,14 @@ function updateLightingSceneField(field, rawValue) {
   } else if (field === "ambient_intensity") {
     scene.ambient_intensity = numberHelpers.roundedSceneValue(Number(rawValue) / 100, 0, 1, scene.ambient_intensity);
   } else {
-    return;
+    return false;
   }
   if (lightingScenesEqual(scene, state.settings.lighting_scene)) {
-    return;
+    return false;
   }
   state.settings.lighting_scene = scene;
   markPresetDirty();
+  return true;
 }
 
 function updateLightingScenePosition(clientX, clientY, options = {}) {
@@ -93,38 +97,113 @@ function updateLightingScenePosition(clientX, clientY, options = {}) {
   return true;
 }
 
+function numberInputBound(input, name, fallback) {
+  const raw = input?.[name];
+  if (raw === "" || raw === null || raw === undefined) {
+    return fallback;
+  }
+  const numeric = Number(raw);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
 function numericInputValue(input, fallback = 0) {
-  const raw = String(input.value ?? "").trim();
-  if (!raw || raw === "-" || raw === "+") {
-    return { valid: false, value: fallback };
+  return numberHelpers.parseIntegerInput(input?.value, {
+    fallback,
+    min: numberInputBound(input, "min", -Infinity),
+    max: numberInputBound(input, "max", Infinity),
+  });
+}
+
+function currentSettingNumberValue(key) {
+  return Number(state.settings?.[key] ?? 0);
+}
+
+function currentLocalNumberValue(key) {
+  return clampLocalOverrideValue(key, currentImageOverride()[key] ?? 0);
+}
+
+function currentLightingNumberValue(field) {
+  if (typeof lightingSliderValue === "function" && typeof lightingSceneFieldValue === "function") {
+    return lightingSliderValue(field, lightingSceneFieldValue(state.settings.lighting_scene, field));
   }
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed)) {
-    return { valid: false, value: fallback };
+  const scene = state.settings?.lighting_scene || {};
+  const sceneValue = field === "ambient_intensity"
+    ? scene.ambient_intensity
+    : field?.startsWith?.("main.")
+      ? scene.main?.[field.slice(5)]
+      : 0;
+  const max = field === "main.intensity" ? 1.5 : 1;
+  return Math.round(numberHelpers.clampNumber(sceneValue, 0, max, 0) * 100);
+}
+
+function committedNumericControlValue(input) {
+  if (input?.dataset?.settingNumber) {
+    return currentSettingNumberValue(input.dataset.settingNumber);
   }
-  const min = input.min === "" ? -Infinity : Number(input.min);
-  const max = input.max === "" ? Infinity : Number(input.max);
-  const rounded = Math.round(parsed);
-  return {
-    valid: true,
-    value: Math.max(min, Math.min(max, rounded)),
-  };
+  if (input?.dataset?.localSettingNumber) {
+    return currentLocalNumberValue(input.dataset.localSettingNumber);
+  }
+  if (input?.dataset?.lightingNumberField) {
+    return currentLightingNumberValue(input.dataset.lightingNumberField);
+  }
+  return undefined;
+}
+
+function isNumericControlInput(input) {
+  return Boolean(
+    input?.dataset?.settingNumber
+    || input?.dataset?.localSettingNumber
+    || input?.dataset?.lightingNumberField
+  );
+}
+
+function cancelNumericControlInput(input) {
+  if (!isNumericControlInput(input)) {
+    return false;
+  }
+  const value = committedNumericControlValue(input);
+  if (value === undefined) {
+    return false;
+  }
+  input.value = String(value);
+  return true;
+}
+
+function commitNumericControlInput(input, options = {}) {
+  if (!isNumericControlInput(input) || input.disabled) {
+    return false;
+  }
+  const commitOptions = { ...options, commit: true };
+  if (input.dataset.settingNumber) {
+    return updateSettingFromNumberInput(input, commitOptions);
+  }
+  if (input.dataset.localSettingNumber) {
+    return updateLocalOverrideFromNumberInput(input, commitOptions);
+  }
+  if (input.dataset.lightingNumberField) {
+    return updateLightingNumberFieldFromInput(input, commitOptions);
+  }
+  return false;
 }
 
 function updateSettingFromNumberInput(input, options = {}) {
   const key = input?.dataset?.settingNumber;
   if (!key || !(key in state.settings)) {
-    return;
+    return false;
   }
-  const parsed = numericInputValue(input, state.settings[key]);
+  const fallback = currentSettingNumberValue(key);
+  const parsed = numericInputValue(input, fallback);
   if (!parsed.valid) {
-    return;
+    if (options.commit) {
+      input.value = String(fallback);
+    }
+    return false;
   }
   if (options.commit) {
-    input.value = parsed.value;
+    input.value = String(parsed.value);
   }
   if (state.settings[key] === parsed.value) {
-    return;
+    return true;
   }
   state.settings[key] = parsed.value;
   const range = $(`[data-setting="${key}"]`);
@@ -133,27 +212,55 @@ function updateSettingFromNumberInput(input, options = {}) {
     syncRangeFill(range);
   }
   markPresetDirty();
+  return true;
 }
 
 function updateLocalOverrideFromNumberInput(input, options = {}) {
   const key = input?.dataset?.localSettingNumber;
   if (!key || !localOverrideKeys.includes(key)) {
-    return;
+    return false;
   }
-  const parsed = numericInputValue(input, currentImageOverride()[key] || 0);
+  const fallback = currentLocalNumberValue(key);
+  const parsed = numericInputValue(input, fallback);
   if (!parsed.valid) {
-    return;
+    if (options.commit) {
+      input.value = String(fallback);
+    }
+    return false;
   }
   const value = clampLocalOverrideValue(key, parsed.value);
   if (options.commit) {
-    input.value = value;
+    input.value = String(value);
   }
   const range = $(`[data-local-setting="${key}"]`);
   if (range) {
     range.value = value;
     syncRangeFill(range);
   }
+  if (fallback === value) {
+    return true;
+  }
   setCurrentImageOverrideValue(key, value);
+  return true;
+}
+
+function updateLightingNumberFieldFromInput(input, options = {}) {
+  const field = input?.dataset?.lightingNumberField;
+  if (!field || input.disabled) {
+    return false;
+  }
+  const fallback = currentLightingNumberValue(field);
+  const parsed = numericInputValue(input, fallback);
+  if (!parsed.valid) {
+    if (options.commit) {
+      input.value = String(fallback);
+    }
+    return false;
+  }
+  if (options.commit) {
+    input.value = String(parsed.value);
+  }
+  return updateLightingSceneField(field, parsed.value);
 }
 
 function handleFormatSelectChange(event) {

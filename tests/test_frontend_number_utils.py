@@ -36,6 +36,34 @@ assert.equal(helpers.clampNumber(Infinity, 0, 10, 3), 3);
 assert.equal(helpers.roundedSceneValue(0.12349, 0, 1, 0), 0.123);
 assert.equal(helpers.roundedSceneValue(2, 0, 1, 0), 1);
 assert.equal(helpers.roundedSceneValue("bad", -1, 1, 0.4567), 0.457);
+
+assert.deepEqual(helpers.parseIntegerInput("", {{ min: 0, max: 100, fallback: 20 }}), {{
+  valid: false,
+  partial: true,
+  value: 20,
+}});
+assert.deepEqual(helpers.parseIntegerInput("-", {{ min: 0, max: 100, fallback: 20 }}), {{
+  valid: false,
+  partial: true,
+  value: 20,
+}});
+assert.deepEqual(helpers.parseIntegerInput("45.6", {{ min: 0, max: 100, fallback: 20 }}), {{
+  valid: true,
+  partial: false,
+  value: 46,
+}});
+assert.deepEqual(helpers.parseIntegerInput("999", {{ min: 0, max: 100, fallback: 20 }}), {{
+  valid: true,
+  partial: false,
+  value: 100,
+}});
+assert.deepEqual(helpers.parseIntegerInput("bad", {{ min: 0, max: 100, fallback: 20 }}), {{
+  valid: false,
+  partial: false,
+  value: 20,
+}});
+assert.equal(helpers.isPartialNumericInput("+"), true);
+assert.equal(helpers.isPartialNumericInput("12"), false);
 """
     result = subprocess.run(
         ["node", "-e", script],

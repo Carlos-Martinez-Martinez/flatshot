@@ -57,6 +57,7 @@ const profiles = [
     suffix: "_PRO",
     width: 1800,
     height: 2400,
+    maxFileSizeKb: 140,
   }},
   {{
     id: "web_rgb230",
@@ -69,6 +70,7 @@ const profiles = [
     suffix: "_PNG",
     width: 1000,
     height: 1200,
+    maxFileSizeKb: 80,
   }},
 ];
 const settings = {{ opacity: 20, blur: 14 }};
@@ -119,6 +121,7 @@ assert.deepEqual(payload, {{
         custom_output_path: null,
         output_width: 1800,
         output_height: 2400,
+        max_file_size_kb: 140,
       }},
       {{
         id: "web_rgb230_2",
@@ -134,6 +137,7 @@ assert.deepEqual(payload, {{
         custom_output_path: "C:/salida",
         output_width: 1000,
         output_height: 1200,
+        max_file_size_kb: null,
       }},
     ],
   }},

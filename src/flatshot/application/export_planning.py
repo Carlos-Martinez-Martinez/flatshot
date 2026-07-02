@@ -69,8 +69,13 @@ def build_export_plan(
                 parent_folder_name,
                 index,
             )
+            export_options = (
+                {"max_file_size_kb": variant.max_file_size_kb}
+                if fmt == "jpg" and variant.max_file_size_kb
+                else {}
+            )
             display_name = f"{img_path.name} · {variant.label}"
-            task_args = (
+            base_task_args = (
                 img_path,
                 save_path,
                 settings_dict,
@@ -80,6 +85,7 @@ def build_export_plan(
                 local_override,
                 display_name,
             )
+            task_args = (*base_task_args, export_options) if export_options else base_task_args
             key = cache.get_cache_key(
                 str(cache_identity_path),
                 settings_dict,
@@ -87,6 +93,7 @@ def build_export_plan(
                 target_size,
                 local_override,
                 fmt,
+                export_options=export_options,
             )
             render_task = ExportRenderTask(
                 img_path=img_path,

@@ -84,6 +84,28 @@ def test_render_cache_key_changes_with_format_size_settings_curve_and_override(t
     )
 
 
+def test_render_cache_key_changes_with_jpg_size_limit(tmp_path):
+    source = tmp_path / "source.png"
+    Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(source)
+
+    cache = RenderCache()
+    settings = {"opacity": 20, "transparent_bg": False}
+    curve = {"xp": [0.0, 1.0], "fp": [1.0, 1.0]}
+
+    base_key = cache.get_cache_key(str(source), settings, curve, (1800, 2400), {}, "jpg")
+    limited_key = cache.get_cache_key(
+        str(source),
+        settings,
+        curve,
+        (1800, 2400),
+        {},
+        "jpg",
+        export_options={"max_file_size_kb": 120},
+    )
+
+    assert base_key != limited_key
+
+
 def test_render_cache_key_changes_with_export_variant_background_and_opacity(tmp_path):
     source = tmp_path / "source.png"
     Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(source)

@@ -37,6 +37,7 @@ function restoreSessionSnapshot() {
     normalizePresetItem,
     normalizeBridgeIssue: exportStateHelpers.normalizeBridgeIssue,
     normalizeExportFormat: outputProfileHelpers.normalizeExportFormat,
+    normalizeMaxFileSizeKb: outputProfileHelpers.normalizeMaxFileSizeKb,
     parseOutputSize: outputProfileHelpers.parseOutputSize,
     normalizeBackgroundValue: outputProfileHelpers.normalizeBackgroundValue,
     clampNumber: numberHelpers.clampNumber,

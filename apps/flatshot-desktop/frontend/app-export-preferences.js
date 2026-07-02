@@ -14,6 +14,7 @@ function persistExportPreferences(options = {}) {
     background: state.background,
     naming: state.naming,
     suffix: state.suffix,
+    maxFileSizeKb: state.format === "JPG" ? state.maxFileSizeKb : null,
   };
   storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.exportPreferences, preferences);
   if (String(state.destinationValue || "").trim()) {

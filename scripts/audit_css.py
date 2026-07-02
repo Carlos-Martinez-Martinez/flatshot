@@ -45,6 +45,7 @@ CSS_MODULE_ORDER = [
     "css/06-inspector-export/advanced-local-overrides.css",
     "css/06-inspector-export/export-panel.css",
     "css/06-inspector-export/output-profiles.css",
+    "css/06-inspector-export/background-presets.css",
     "css/06-inspector-export/review-warnings.css",
     "css/07-modals/app-settings.css",
     "css/07-modals/batch-detail.css",

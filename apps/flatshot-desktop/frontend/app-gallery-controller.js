@@ -66,7 +66,7 @@ function batchDestinationLine() {
   return batchViewHelpers.batchDestinationLine({
     destinationMode: state.destinationMode,
     destinationValue: state.destinationValue,
-    profileDestinations: profiles.length > 1 ? profiles.map(profileDestinationPreviewLabel) : [],
+    profileDestinations: profiles.length > 1 ? profiles.map(outputProfileViewHelpers.profileDestinationPreviewLabel) : [],
   });
 }
 

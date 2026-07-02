@@ -41,11 +41,11 @@ function syncOutputProfileState(profile) {
   state.format = profile.format;
   state.size = outputProfileHelpers.outputProfileSize(profile);
   state.background = profile.background;
-  state.previewBg = profile.background;
   state.destinationMode = profile.destinationMode;
   state.destinationValue = profile.destinationValue;
   state.naming = profile.naming;
   state.suffix = profile.suffix;
+  state.maxFileSizeKb = profile.maxFileSizeKb || null;
   state.exportStatus = isExportReady() ? "ready" : "blocked";
 }
 
@@ -129,6 +129,7 @@ function currentOutputProfileData() {
     destinationValue: state.destinationValue,
     naming: state.naming,
     suffix: state.suffix,
+    maxFileSizeKb: state.format === "JPG" ? state.maxFileSizeKb : null,
   });
 }
 
@@ -144,7 +145,8 @@ function outputMatchesProfile(profile = activeOutputProfile()) {
     && current.destinationMode === profile.destinationMode
     && current.destinationValue === profile.destinationValue
     && current.naming === profile.naming
-    && current.suffix === profile.suffix;
+    && current.suffix === profile.suffix
+    && current.maxFileSizeKb === (profile.maxFileSizeKb || null);
 }
 
 function persistOutputProfiles() {

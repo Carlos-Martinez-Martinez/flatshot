@@ -10,6 +10,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
 HELPER_PATH = FRONTEND_DIR / "gallery.js"
 INDEX_PATH = FRONTEND_DIR / "index.html"
+APP_GALLERY_CONTROLLER_PATH = FRONTEND_DIR / "app-gallery-controller.js"
+APP_EXPORT_VIEW_PATH = FRONTEND_DIR / "app-export-view.js"
 
 
 def test_gallery_helper_loads_before_app_script():
@@ -23,6 +25,16 @@ def test_gallery_helper_loads_before_app_script():
     assert output_index < app_index
     assert preflight_index < app_index
     assert gallery_index < app_index
+
+
+def test_gallery_and_export_views_use_output_profile_destination_helper():
+    gallery_controller = APP_GALLERY_CONTROLLER_PATH.read_text(encoding="utf-8")
+    export_view = APP_EXPORT_VIEW_PATH.read_text(encoding="utf-8")
+
+    assert "profiles.map(outputProfileViewHelpers.profileDestinationPreviewLabel)" in gallery_controller
+    assert "profiles.map(outputProfileViewHelpers.profileDestinationPreviewLabel)" in export_view
+    assert "profiles.map(profileDestinationPreviewLabel)" not in gallery_controller
+    assert "profiles.map(profileDestinationPreviewLabel)" not in export_view
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")

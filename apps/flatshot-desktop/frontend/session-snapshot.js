@@ -39,6 +39,7 @@
     "background",
     "naming",
     "suffix",
+    "maxFileSizeKb",
     "appSettingsOpen",
     "batchDetailOpen",
     "bridgeMode",
@@ -176,6 +177,9 @@
         background: normalizeBackgroundValue(restored.background),
         naming: String(restored.naming || "{original}{suffix}"),
         suffix: restored.suffix === undefined || restored.suffix === null ? "_PRO" : String(restored.suffix),
+        maxFileSizeKb: normalizeExportFormat(restored.format) === "JPG"
+          ? (options.normalizeMaxFileSizeKb || (() => null))(restored.maxFileSizeKb)
+          : null,
         appSettingsOpen: Boolean(restored.appSettingsOpen),
         batchDetailOpen: Boolean(restored.batchDetailOpen),
         exportConfirmOpen: false,

@@ -59,14 +59,35 @@ const normalized = helpers.normalizeBackgroundPresetList([
   {{ name: "Trans", kind: "transparent" }},
 ], {{ defaultPresets }});
 assert.deepEqual(normalized, [
+  {{ id: "rgb230", kind: "rgb", name: "Gris claro", rgb: [230, 230, 230], system: true }},
+  {{ id: "white", kind: "rgb", name: "Blanco", rgb: [255, 255, 255], system: true }},
+  {{ id: "transparent", kind: "transparent", name: "Transparente", rgb: [230, 230, 230], system: true }},
   {{ id: "dup", kind: "rgb", name: "Canal", rgb: [10, 20, 30] }},
   {{ id: "dup-2", kind: "rgb", name: "Canal copia", rgb: [255, 0, 5] }},
   {{ id: "trans-2", kind: "transparent", name: "Trans", rgb: [230, 230, 230] }},
 ]);
 
-assert.equal(helpers.backgroundPresetValue(defaultPresets[0]), "rgb230");
-assert.equal(helpers.backgroundPresetValue(defaultPresets[1]), "white");
-assert.equal(helpers.backgroundPresetValue(defaultPresets[2]), "transparent");
+const restored = helpers.normalizeBackgroundPresetList([
+  {{ id: "white", name: "Blanco roto", kind: "rgb", rgb: [230, 230, 230] }},
+  {{ id: "rgb230", name: "Gris roto", kind: "rgb", rgb: [245, 0, 0] }},
+  {{ id: "transparent", name: "Trans roto", kind: "rgb", rgb: [1, 2, 3] }},
+  {{ id: "marketplace", name: "Marketplace", kind: "rgb", rgb: [248, 248, 248] }},
+], {{ defaultPresets }});
+assert.deepEqual(restored, [
+  {{ id: "rgb230", kind: "rgb", name: "Gris claro", rgb: [230, 230, 230], system: true }},
+  {{ id: "white", kind: "rgb", name: "Blanco", rgb: [255, 255, 255], system: true }},
+  {{ id: "transparent", kind: "transparent", name: "Transparente", rgb: [230, 230, 230], system: true }},
+  {{ id: "marketplace", kind: "rgb", name: "Marketplace", rgb: [248, 248, 248] }},
+]);
+assert.equal(helpers.isSystemBackgroundPreset(restored[0], {{ defaultPresets }}), true);
+assert.equal(helpers.isSystemBackgroundPreset(restored[3], {{ defaultPresets }}), false);
+assert.deepEqual(helpers.backgroundPresetsForStorage(restored, {{ defaultPresets }}), [
+  {{ id: "marketplace", kind: "rgb", name: "Marketplace", rgb: [248, 248, 248] }},
+]);
+
+assert.equal(helpers.backgroundPresetValue(restored[0]), "rgb230");
+assert.equal(helpers.backgroundPresetValue(restored[1]), "white");
+assert.equal(helpers.backgroundPresetValue(restored[2]), "transparent");
 assert.equal(helpers.backgroundPresetValue({{ id: "custom", kind: "rgb", rgb: [12, 34, 56] }}), "rgb:12,34,56");
 assert.equal(helpers.backgroundPresetLabel(null), "Fondo");
 

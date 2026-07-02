@@ -55,10 +55,33 @@ function recordThumbnailError(imageElement) {
   markThumbnailError(imageId, src);
 }
 
+function eventElementTarget(event) {
+  const target = event.target;
+  if (target?.closest) {
+    return target;
+  }
+  return target?.parentElement || null;
+}
+
 function handleDocumentPointerDown(event) {
   if (event.target.closest?.(".settings-panel details > summary")) {
     inspectorScrollTopBeforeToggle = $(".settings-panel")?.scrollTop || 0;
   }
+}
+
+function closeBackgroundPresetEditorOnOutsideClick(event) {
+  if (!state.backgroundPresetEditor) {
+    return false;
+  }
+  const target = event.target;
+  if (
+    target.closest?.("#background-preset-editor")
+    || target.closest?.(".background-preset-actions")
+  ) {
+    return false;
+  }
+  state.backgroundPresetEditor = null;
+  return true;
 }
 
 function handleInspectorDisclosureClick(event) {
@@ -76,9 +99,14 @@ function handleInspectorDisclosureClick(event) {
 }
 
 function handleDocumentClick(event) {
-  closeTransientDetails(event);
+  const target = eventElementTarget(event);
+  if (!target) {
+    return;
+  }
 
-  const disclosureSummary = event.target.closest(".settings-panel details > summary");
+  closeTransientDetails({ target });
+
+  const disclosureSummary = target.closest(".settings-panel details > summary");
   if (disclosureSummary) {
     const details = disclosureSummary.closest("details");
     if (details?.classList.contains("inspector-disclosure")) {
@@ -88,52 +116,54 @@ function handleDocumentClick(event) {
     }
   }
 
-  if (event.target.id === "app-settings-modal") {
+  if (target.id === "app-settings-modal") {
     closeAppSettings();
     return;
   }
 
-  if (event.target.id === "batch-detail-modal") {
+  if (target.id === "batch-detail-modal") {
     closeBatchDetail();
     return;
   }
 
-  if (event.target.id === "export-confirm-modal") {
+  if (target.id === "export-confirm-modal") {
     closeExportConfirm();
     return;
   }
 
-  const actionTarget = event.target.closest("[data-action]");
+  const closedBackgroundPresetEditor = closeBackgroundPresetEditorOnOutsideClick(event);
+
+  const actionTarget = target.closest("[data-action]");
   if (actionTarget) {
     handleAction(actionTarget.dataset.action, actionTarget);
     return;
   }
 
-  const outputProfileTarget = event.target.closest("[data-output-profile-id]");
+  const outputProfileTarget = target.closest("[data-output-profile-id]");
   if (outputProfileTarget) {
     selectOutputProfileDraft(outputProfileTarget.dataset.outputProfileId);
     return;
   }
 
-  const imageTarget = event.target.closest("[data-image-id]");
+  const imageTarget = target.closest("[data-image-id]");
   if (imageTarget) {
     selectImage(imageTarget.dataset.imageId);
     return;
   }
 
-  const reviewTarget = event.target.closest("[data-review-scenario]");
+  const reviewTarget = target.closest("[data-review-scenario]");
   if (reviewTarget) {
     showReviewScenario(reviewTarget.dataset.reviewScenario);
     return;
   }
 
-  const filterTarget = event.target.closest("[data-filter]");
+  const filterTarget = target.closest("[data-filter]");
   if (filterTarget) {
     applyGalleryFilter(filterTarget.dataset.filter);
     return;
   }
 
-  const galleryViewTarget = event.target.closest("[data-gallery-view]");
+  const galleryViewTarget = target.closest("[data-gallery-view]");
   if (galleryViewTarget) {
     state.galleryView = galleryViewTarget.dataset.galleryView === "list" ? "list" : "thumbs";
     state.statusText = state.galleryView === "list" ? "Galería en lista" : "Galería en miniaturas";
@@ -141,7 +171,7 @@ function handleDocumentClick(event) {
     return;
   }
 
-  const modeTarget = event.target.closest("[data-preview-mode]");
+  const modeTarget = target.closest("[data-preview-mode]");
   if (modeTarget) {
     state.previewMode = modeTarget.dataset.previewMode;
     state.statusText = modeTarget.textContent.trim();
@@ -149,7 +179,7 @@ function handleDocumentClick(event) {
     return;
   }
 
-  const bgTarget = event.target.closest("[data-preview-bg]");
+  const bgTarget = target.closest("[data-preview-bg]");
   if (bgTarget) {
     state.previewBg = backgroundPresetHelpers.normalizePreviewBackgroundValue(
       bgTarget.dataset.previewBg === "custom" ? previewCustomBackgroundValue() : bgTarget.dataset.previewBg,
@@ -163,18 +193,22 @@ function handleDocumentClick(event) {
     return;
   }
 
-  const presetTarget = event.target.closest("[data-preset]");
+  const presetTarget = target.closest("[data-preset]");
   if (presetTarget) {
     applyPresetSettings(presetTarget.dataset.preset);
   }
 
-  const inspectorTarget = event.target.closest("[data-inspector-tab]");
+  const inspectorTarget = target.closest("[data-inspector-tab]");
   if (inspectorTarget) {
     state.inspectorTab = inspectorTarget.dataset.inspectorTab;
     if (state.inspectorTab === "output") {
       state.presetEditorOpen = false;
     }
     render();
+  }
+
+  if (closedBackgroundPresetEditor) {
+    renderOutputProfileModalState();
   }
 }
 

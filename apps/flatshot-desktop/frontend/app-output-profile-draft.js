@@ -23,6 +23,7 @@ function setOutputProfileFormValues(profile) {
     ["profile-suffix-input", profile.suffix],
     ["profile-destination-input", profile.destinationValue],
     ["profile-naming-input", profile.naming],
+    ["profile-max-file-size-input", profile.maxFileSizeKb || ""],
   ];
   pairs.forEach(([id, value]) => {
     const input = $(`#${id}`);
@@ -30,6 +31,7 @@ function setOutputProfileFormValues(profile) {
       input.value = value ?? "";
     }
   });
+  syncJpgSizeLimitVisibility();
 }
 
 function outputProfileFormRawData() {
@@ -50,6 +52,7 @@ function outputProfileFormRawData() {
     destinationValue: value("profile-destination-input", current.destinationValue),
     naming: value("profile-naming-input", current.naming),
     suffix: value("profile-suffix-input", current.suffix),
+    maxFileSizeKb: value("profile-max-file-size-input", current.maxFileSizeKb || ""),
     enabled: Boolean(current.enabled),
   };
 }
@@ -68,6 +71,7 @@ function outputProfileRawFromProfile(profile) {
     destinationValue: profile.destinationValue,
     naming: profile.naming,
     suffix: profile.suffix,
+    maxFileSizeKb: profile.maxFileSizeKb || "",
   };
 }
 
@@ -86,6 +90,7 @@ function outputProfileDraftFromForm() {
     destinationValue: raw.destinationValue,
     naming: raw.naming,
     suffix: raw.suffix,
+    maxFileSizeKb: raw.maxFileSizeKb,
   });
 }
 
@@ -96,6 +101,7 @@ function updateOutputProfileDraftFromForm() {
   state.outputProfileNotice = "";
   syncTransparentBackgroundFormat();
   syncOutputProfileDestinationMode();
+  syncJpgSizeLimitVisibility();
   state.outputDeleteConfirmId = "";
   state.outputProfileDraft = outputProfileDraftFromForm();
 }
@@ -108,6 +114,19 @@ function syncTransparentBackgroundFormat() {
   }
   if (outputProfileHelpers.normalizeBackgroundValue(backgroundInput.value) === "transparent" && outputProfileHelpers.normalizeExportFormat(formatInput.value) !== "PNG") {
     formatInput.value = "PNG";
+  }
+}
+
+function syncJpgSizeLimitVisibility() {
+  const sizeLimitField = $("#profile-max-file-size-field");
+  const sizeLimitInput = $("#profile-max-file-size-input");
+  const formatInput = $("#profile-format-input");
+  if (!sizeLimitField || !sizeLimitInput || !formatInput) {
+    return;
+  }
+  sizeLimitField.hidden = outputProfileHelpers.normalizeExportFormat(formatInput.value) !== "JPG";
+  if (sizeLimitField.hidden) {
+    sizeLimitInput.value = "";
   }
 }
 

@@ -126,6 +126,7 @@ class ExportVariant(BaseModel):
     format: Optional[str] = None
     output_width: Optional[int] = Field(None, ge=1)
     output_height: Optional[int] = Field(None, ge=1)
+    max_file_size_kb: Optional[int] = Field(None, ge=1)
 
     # Shadow adjustment for adapting one output version to a different background.
     shadow_opacity_delta: int = Field(0, ge=-100, le=100)
@@ -231,6 +232,21 @@ class ExportVariant(BaseModel):
         if text not in {"JPG", "PNG"}:
             raise ValueError("Variant format must be JPG, PNG or None")
         return text
+
+    @field_validator("max_file_size_kb", mode="before")
+    @classmethod
+    def _validate_max_file_size_kb(cls, value: Any) -> Optional[int]:
+        if value in (None, ""):
+            return None
+        if isinstance(value, bool):
+            raise ValueError("Variant max file size must be a positive integer")
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Variant max file size must be a positive integer") from exc
+        if parsed <= 0:
+            raise ValueError("Variant max file size must be a positive integer")
+        return parsed
 
 class ExportConfig(BaseModel):
     output_folder_name: str = "_SALIDA_PRO"

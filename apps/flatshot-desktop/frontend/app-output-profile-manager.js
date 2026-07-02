@@ -26,6 +26,28 @@ function selectOutputProfileDraft(profileId) {
   render();
 }
 
+function editOutputProfileFromInspector(profileId) {
+  if (state.appSettingsOpen && outputProfileHasUnsavedChanges()) {
+    showOutputProfileUnsavedNotice("Guarda o descarta los cambios antes de cambiar de formato.");
+    return;
+  }
+  const profile = outputProfileManagerRows().find((item) => item.id === profileId);
+  if (!profile) {
+    return;
+  }
+  rememberModalFocusReturn();
+  state.batchDetailOpen = false;
+  state.exportConfirmOpen = false;
+  state.appSettingsOpen = true;
+  state.outputProfileEditorId = profile.id;
+  state.outputProfileDraft = { ...profile };
+  state.outputProfileNotice = "";
+  state.outputDeleteConfirmId = "";
+  state.statusText = `Editando formato: ${profile.name}`;
+  render();
+  queueModalFocus("#app-settings-modal", "[data-action='close-app-settings']");
+}
+
 function newOutputProfile() {
   if (state.appSettingsOpen && outputProfileHasUnsavedChanges()) {
     showOutputProfileUnsavedNotice("Guarda o descarta los cambios antes de crear otro formato.");
@@ -218,6 +240,7 @@ function sameOutputProfileRaw(profile, raw) {
     && String(profile.destinationValue || "") === String(raw.destinationValue || "")
     && String(profile.naming || "") === String(raw.naming || "")
     && String(profile.suffix || "") === String(raw.suffix || "")
+    && String(profile.maxFileSizeKb || "") === String(outputProfileHelpers.normalizeMaxFileSizeKb(raw.maxFileSizeKb) || "")
     && Boolean(profile.enabled) === Boolean(raw.enabled);
 }
 
@@ -238,6 +261,7 @@ function outputProfileChangeCount() {
     String(saved.destinationValue || "") !== String(raw.destinationValue || ""),
     String(saved.naming || "") !== String(raw.naming || ""),
     String(saved.suffix || "") !== String(raw.suffix || ""),
+    String(saved.maxFileSizeKb || "") !== String(outputProfileHelpers.normalizeMaxFileSizeKb(raw.maxFileSizeKb) || ""),
     Boolean(saved.enabled) !== Boolean(raw.enabled),
   ];
   return checks.filter(Boolean).length;

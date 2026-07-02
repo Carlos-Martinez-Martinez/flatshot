@@ -158,6 +158,9 @@ function updateLocalOverrideFromNumberInput(input, options = {}) {
 
 function handleFormatSelectChange(event) {
   state.format = outputProfileHelpers.normalizeExportFormat(event.target.value);
+  if (state.format !== "JPG") {
+    state.maxFileSizeKb = null;
+  }
   state.statusText = `Formato: ${state.format}`;
   persistExportPreferences();
   render();
@@ -188,7 +191,6 @@ function handleSizeSelectChange(event) {
 
 function handleBackgroundSelectChange(event) {
   state.background = outputProfileHelpers.normalizeBackgroundValue(event.target.value, state.background);
-  state.previewBg = state.background;
   state.statusText = `Fondo: ${settingsViewHelpers.backgroundLabel(state.background)}`;
   persistExportPreferences();
   const image = selectedImage();

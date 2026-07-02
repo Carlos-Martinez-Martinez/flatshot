@@ -29,6 +29,9 @@ const initialNaming = String(initialExportPreferences.naming || initialOutputPro
 const initialSuffix = initialExportPreferences.suffix === undefined || initialExportPreferences.suffix === null
   ? initialOutputProfile.suffix
   : String(initialExportPreferences.suffix);
+const initialMaxFileSizeKb = initialFormat === "JPG"
+  ? outputProfileHelpers.normalizeMaxFileSizeKb(initialExportPreferences.maxFileSizeKb ?? initialOutputProfile.maxFileSizeKb)
+  : null;
 
 const state = {
   scenario: "initial",
@@ -53,6 +56,7 @@ const state = {
   galleryView: "thumbs",
   inspectorTab: "review",
   inspectorCollapsed: false,
+  advancedDisclosureKey: "",
   outputEditMode: false,
   presetEditorOpen: false,
   activePreset: initialImageAdjustmentPreset,
@@ -91,6 +95,7 @@ const state = {
   background: initialBackground,
   naming: initialNaming,
   suffix: initialSuffix,
+  maxFileSizeKb: initialMaxFileSizeKb,
   progress: 0,
   processed: 0,
   errors: [],

@@ -46,13 +46,23 @@ function renderBackgroundPresetControls(raw = outputProfileFormRawData()) {
   const selectedPreset = selectedBackgroundPresetFromForm(raw);
   const editor = $("#background-preset-editor");
   const actions = $(".background-preset-actions");
+  const editButton = $("[data-action='edit-background-preset']");
   const deleteButton = $("[data-action='delete-background-preset']");
+  const selectedIsSystemPreset = backgroundPresetHelpers.isSystemBackgroundPreset(selectedPreset, backgroundPresetOptions());
+  if (editButton) {
+    editButton.disabled = !selectedPreset || selectedIsSystemPreset;
+    editButton.title = !selectedPreset
+      ? "Este fondo no está guardado como preset"
+      : selectedIsSystemPreset
+        ? "Los fondos del sistema no se editan. Usa Nuevo para crear una variante."
+        : "Editar fondo";
+  }
   if (deleteButton) {
-    deleteButton.disabled = !selectedPreset || state.backgroundPresets.length <= 1;
+    deleteButton.disabled = !selectedPreset || selectedIsSystemPreset;
     deleteButton.title = !selectedPreset
       ? "Este fondo no está guardado como preset"
-      : state.backgroundPresets.length <= 1
-        ? "Debe quedar al menos un fondo"
+      : selectedIsSystemPreset
+        ? "Los fondos del sistema no se eliminan."
         : "Eliminar fondo";
   }
   if (!editor) {
@@ -125,6 +135,12 @@ function updateBackgroundPresetEditorFromFields() {
 function beginBackgroundPresetEdit(mode = "edit") {
   const raw = outputProfileFormRawData();
   const preset = mode === "edit" ? selectedBackgroundPresetFromForm(raw) : null;
+  if (preset && backgroundPresetHelpers.isSystemBackgroundPreset(preset, backgroundPresetOptions())) {
+    state.backgroundPresetEditor = null;
+    state.statusText = "Los fondos del sistema no se editan. Usa Nuevo para crear una variante.";
+    renderOutputProfileModalState();
+    return;
+  }
   const source = preset || {
     id: outputProfileHelpers.uniqueOutputProfileId("fondo", Date.now()),
     kind: raw.background === "transparent" ? "transparent" : "rgb",
@@ -161,14 +177,16 @@ function saveBackgroundPreset() {
     renderBackgroundPresetControls();
     return;
   }
+  const editingSystemPreset = backgroundPresetHelpers.isSystemBackgroundPreset({ id: editor.id }, backgroundPresetOptions());
+  const savedPresetId = editingSystemPreset ? outputProfileHelpers.uniqueOutputProfileId(name || "fondo", Date.now()) : editor.id;
   const savedPreset = backgroundPresetHelpers.normalizeBackgroundPreset({
-    id: editor.id,
+    id: savedPresetId,
     kind: editor.kind,
     name,
     rgb: editor.kind === "transparent" ? [230, 230, 230] : outputProfileHelpers.parseRgbBackground(rgb),
   }, 0, backgroundPresetOptions());
-  const previousValue = editor.mode === "edit" ? editor.sourceValue : "";
-  const index = state.backgroundPresets.findIndex((preset) => preset.id === editor.id);
+  const previousValue = editor.mode === "edit" && !editingSystemPreset ? editor.sourceValue : "";
+  const index = editingSystemPreset ? -1 : state.backgroundPresets.findIndex((preset) => preset.id === editor.id);
   if (index >= 0) {
     state.backgroundPresets[index] = savedPreset;
   } else {
@@ -208,7 +226,12 @@ function replaceBackgroundValue(previousValue, nextValue) {
 
 function deleteBackgroundPreset() {
   const preset = selectedBackgroundPresetFromForm();
-  if (!preset || state.backgroundPresets.length <= 1) {
+  if (!preset) {
+    return;
+  }
+  if (backgroundPresetHelpers.isSystemBackgroundPreset(preset, backgroundPresetOptions())) {
+    state.statusText = "Los fondos del sistema no se eliminan.";
+    renderOutputProfileModalState();
     return;
   }
   const confirmed = window.confirm(`Eliminar fondo "${preset.name}"?\n\nLos formatos que ya usen ese RGB conservarán el valor actual.`);

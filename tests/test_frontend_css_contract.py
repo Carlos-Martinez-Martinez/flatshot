@@ -16,7 +16,7 @@ def test_frontend_loads_only_modular_css_in_contract_order():
     assert links == audit_css.CSS_MODULE_ORDER
     assert not ({Path(link).name for link in links} & audit_css.LEGACY_STYLESHEETS)
     assert all((FRONTEND_DIR / link).exists() for link in links)
-    assert len(links) == 43
+    assert len(links) == 44
     for legacy_stylesheet in audit_css.LEGACY_STYLESHEETS:
         assert not (FRONTEND_DIR / legacy_stylesheet).exists()
 

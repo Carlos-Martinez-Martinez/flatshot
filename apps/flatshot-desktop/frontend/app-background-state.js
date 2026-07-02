@@ -26,7 +26,11 @@ function previewCustomBackgroundValue() {
 }
 
 function persistBackgroundPresets() {
-  storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.backgroundPresets, state.backgroundPresets);
+  storageHelpers.writeJson(
+    window.localStorage,
+    STORAGE_KEYS.backgroundPresets,
+    backgroundPresetHelpers.backgroundPresetsForStorage(state.backgroundPresets, backgroundPresetOptions())
+  );
   scheduleBridgeUiPreferencesSave();
 }
 

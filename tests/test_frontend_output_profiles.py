@@ -36,6 +36,9 @@ def test_output_profiles_are_synced_with_bridge_ui_preferences():
     assert "function restoreBridgeUiPreferences(" in bridge_preferences
     assert 'bridgeRequest("/ui/preferences", {' in bridge_preferences
     assert bridge_preferences.count('bridgeRequest("/ui/preferences"') >= 2
+    assert "backgroundPresetHelpers.backgroundPresetsForStorage" in bridge_preferences
+    assert 'maxFileSizeKb: state.format === "JPG" ? state.maxFileSizeKb : null' in bridge_preferences
+    assert 'state.maxFileSizeKb = state.format === "JPG"' in bridge_preferences
     assert "scheduleBridgeUiPreferencesSave(0);" in output_state
 
 
@@ -78,6 +81,7 @@ const normalized = helpers.normalizeOutputProfile({{
   destinationValue: "",
   naming: "",
   suffix: null,
+  maxFileSizeKb: "140",
 }});
 assert.deepEqual(normalized, {{
   id: "main",
@@ -91,7 +95,17 @@ assert.deepEqual(normalized, {{
   destinationValue: "Salida",
   naming: "{{original}}{{suffix}}",
   suffix: "_PRO",
+  maxFileSizeKb: 140,
 }});
+
+const pngNormalized = helpers.normalizeOutputProfile({{
+  id: "png",
+  name: "PNG",
+  enabled: true,
+  format: "PNG",
+  maxFileSizeKb: "140",
+}});
+assert.equal(pngNormalized.maxFileSizeKb, null);
 
 const list = helpers.normalizeOutputProfileList([
   {{ id: "dup", name: "Uno", enabled: false }},
@@ -131,6 +145,21 @@ const incompatible = helpers.outputProfileValidation({{
 }});
 assert.equal(incompatible.errors.includes("JPG no admite transparencia. Selecciona fondo blanco, gris claro o cambia el tipo a PNG."), true);
 assert.equal(incompatible.fields.background, "error");
+
+const invalidSizeLimit = helpers.outputProfileValidation({{
+  name: "Canal",
+  format: "JPG",
+  background: "rgb230",
+  width: "1800",
+  height: "2400",
+  suffix: "_WEB",
+  naming: "{{original}}{{suffix}}",
+  destinationMode: "source",
+  destinationValue: "_WEB",
+  maxFileSizeKb: "0",
+}});
+assert.equal(invalidSizeLimit.fields.maxFileSizeKb, "error");
+assert.equal(invalidSizeLimit.errors.includes("El peso máximo debe ser un número mayor que 0 KB."), true);
 
 const customBackground = helpers.outputProfileValidation({{
   name: "Canal",
@@ -173,6 +202,7 @@ const primary = helpers.exportVariantPayloadFromProfile({{
   suffix: "_PRO",
   width: 1800,
   height: 2400,
+  maxFileSizeKb: 140,
 }}, 0, seen);
 const duplicate = helpers.exportVariantPayloadFromProfile({{
   id: "web_rgb230",
@@ -185,6 +215,7 @@ const duplicate = helpers.exportVariantPayloadFromProfile({{
   suffix: "_PNG",
   width: 1000,
   height: 1200,
+  maxFileSizeKb: 90,
 }}, 1, seen);
 const custom = helpers.exportVariantPayloadFromProfile({{
   id: "custom_rgb",
@@ -213,12 +244,14 @@ assert.deepEqual(primary, {{
   custom_output_path: null,
   output_width: 1800,
   output_height: 2400,
+  max_file_size_kb: 140,
 }});
 assert.equal(duplicate.id, "web_rgb230_2");
 assert.equal(duplicate.output_destination, "custom");
 assert.equal(duplicate.custom_output_path, "C:/salida");
 assert.equal(duplicate.transparent_bg, true);
 assert.deepEqual(duplicate.bg_color, [230, 230, 230]);
+assert.equal(duplicate.max_file_size_kb, null);
 assert.deepEqual(custom.bg_color, [245, 246, 247]);
 assert.equal(custom.transparent_bg, false);
 """

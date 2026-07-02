@@ -68,6 +68,12 @@ const actionDispatcher = actionHandlerHelpers.createActionDispatcher({
       applyOutputProfile(profileId);
     }
   },
+  "edit-output-profile": (target) => {
+    const profileId = target?.dataset?.outputProfileId;
+    if (profileId) {
+      editOutputProfileFromInspector(profileId);
+    }
+  },
   "apply-output-edit": () => applyOutputEdit(),
   "cancel-output-edit": () => cancelOutputEdit(),
   "save-output-current-profile": () => saveCurrentOutputProfile(),

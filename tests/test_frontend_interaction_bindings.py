@@ -10,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
 HELPER_PATH = FRONTEND_DIR / "interaction-bindings.js"
 INDEX_PATH = FRONTEND_DIR / "index.html"
+APP_DOCUMENT_EVENTS_PATH = FRONTEND_DIR / "app-document-events.js"
 
 
 def test_interaction_bindings_load_before_app_script():
@@ -39,3 +40,17 @@ assert.equal(typeof helpers.createFlatShotInteractionHandlers, "function");
     )
 
     assert result.returncode == 0, result.stderr or result.stdout
+
+
+def test_document_click_normalizes_non_element_targets_for_action_buttons():
+    source = APP_DOCUMENT_EVENTS_PATH.read_text(encoding="utf-8")
+
+    click_start = source.index("function handleDocumentClick(event)")
+    click_end = source.index("function handleDocumentToggle", click_start)
+    click_block = source[click_start:click_end]
+
+    assert "function eventElementTarget(event)" in source
+    assert "const target = eventElementTarget(event);" in click_block
+    assert "if (!target) {" in click_block
+    assert "target.closest(\"[data-action]\")" in click_block
+    assert "event.target.closest" not in click_block

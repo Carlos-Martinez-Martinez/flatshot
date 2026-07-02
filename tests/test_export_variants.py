@@ -38,6 +38,17 @@ def _source_with_dpi(folder: Path, dpi=(300, 300)):
     return source
 
 
+def _complex_source(folder: Path):
+    source = folder / "camiseta_complex.png"
+    rng = np.random.default_rng(42)
+    noise = rng.integers(0, 255, size=(220, 220, 3), dtype=np.uint8)
+    alpha = np.full((220, 220, 1), 255, dtype=np.uint8)
+    rgba = np.concatenate([noise, alpha], axis=2)
+    img = Image.fromarray(rgba, "RGBA")
+    img.save(source)
+    return source
+
+
 def _assert_dpi_close(actual, expected=(300, 300)):
     assert actual is not None
     assert actual[0] == pytest.approx(expected[0], abs=1)
@@ -344,3 +355,49 @@ def test_export_runner_preserves_output_metadata_transparency_and_source_file(tm
         assert png.getpixel((0, 0))[3] == 0
         assert png.getchannel("A").getbbox() is not None
         _assert_dpi_close(png.info.get("dpi"))
+
+
+def test_jpg_variant_max_file_size_kb_limits_output_without_resizing(tmp_path):
+    _complex_source(tmp_path)
+    max_kb = 18
+    config = ExportConfig(
+        format="JPG",
+        output_width=220,
+        output_height=220,
+        variants=[
+            ExportVariant(
+                id="marketplace_jpg",
+                label="Marketplace JPG",
+                format="JPG",
+                suffix="_MK",
+                output_width=220,
+                output_height=220,
+                max_file_size_kb=max_kb,
+                transparent_bg=False,
+                bg_color=(230, 230, 230),
+            ),
+        ],
+    )
+    settings = ShadowSettings(
+        adaptive_zoom=False,
+        opacity=0,
+        blur=0,
+        noise=0,
+    )
+
+    result = ExportRunner(executor_factory=InlineExecutor).run(
+        ExportJobRequest(
+            input_folder=tmp_path,
+            settings=settings,
+            export_config=config,
+            curve_data=_curve(),
+        )
+    )
+
+    jpg_output = tmp_path / "_SALIDA_PRO" / "camiseta_complex_MK.jpg"
+    assert result.success
+    assert jpg_output.exists()
+    assert jpg_output.stat().st_size <= max_kb * 1024
+    with Image.open(jpg_output) as jpg:
+        assert jpg.format == "JPEG"
+        assert jpg.size == (220, 220)

@@ -111,6 +111,67 @@ def test_custom_destination_can_pick_folder_from_bridge():
     assert 'destinationLabel.textContent = raw.destinationMode === "custom" ? "Carpeta" : "Subcarpeta";' in app_js
 
 
+def test_jpg_size_limit_field_stays_below_background_control():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+    app_js = app_domain_source()
+
+    image_section_index = html.index('class="format-form-section format-section-image"')
+    background_index = html.index('id="profile-background-input"', image_section_index)
+    actions_index = html.index('class="background-preset-actions"', image_section_index)
+    limit_index = html.index('id="profile-max-file-size-input"', image_section_index)
+    destination_index = html.index('class="format-form-section format-section-destination"')
+
+    assert background_index < actions_index < limit_index < destination_index
+    assert '<span>Peso máx.</span>' in html
+    assert 'data-profile-field-message="maxFileSizeKb"' in html
+    assert "function syncJpgSizeLimitVisibility()" in app_js
+    assert 'sizeLimitField.hidden = outputProfileHelpers.normalizeExportFormat(formatInput.value) !== "JPG";' in app_js
+
+
+def test_background_preset_editor_closes_on_outside_click():
+    app_js = app_domain_source()
+
+    click_start = app_js.index("function handleDocumentClick(event)")
+    click_end = app_js.index("function handleDocumentToggle", click_start)
+    click_block = app_js[click_start:click_end]
+
+    close_start = app_js.index("function closeBackgroundPresetEditorOnOutsideClick(event)")
+    close_end = app_js.index("function handleDocumentClick", close_start)
+    close_block = app_js[close_start:close_end]
+
+    assert "const closedBackgroundPresetEditor = closeBackgroundPresetEditorOnOutsideClick(event);" in click_block
+    assert click_block.index("closeBackgroundPresetEditorOnOutsideClick(event)") < click_block.index("const actionTarget")
+    assert "if (closedBackgroundPresetEditor)" in click_block
+    assert 'target.closest?.("#background-preset-editor")' in close_block
+    assert 'target.closest?.(".background-preset-actions")' in close_block
+    assert "state.backgroundPresetEditor = null;" in close_block
+
+
+def test_system_background_presets_are_not_editable_or_deletable():
+    app_js = app_domain_source()
+
+    render_start = app_js.index("function renderBackgroundPresetControls")
+    render_end = app_js.index("function updateBackgroundPresetEditorFromFields", render_start)
+    render_block = app_js[render_start:render_end]
+
+    begin_start = app_js.index("function beginBackgroundPresetEdit")
+    begin_end = app_js.index("function saveBackgroundPreset", begin_start)
+    begin_block = app_js[begin_start:begin_end]
+
+    delete_start = app_js.index("function deleteBackgroundPreset")
+    delete_block = app_js[delete_start:]
+
+    assert "const selectedIsSystemPreset = backgroundPresetHelpers.isSystemBackgroundPreset" in render_block
+    assert "editButton.disabled = !selectedPreset || selectedIsSystemPreset;" in render_block
+    assert "deleteButton.disabled = !selectedPreset || selectedIsSystemPreset;" in render_block
+    assert "Los fondos del sistema no se editan" in render_block
+    assert "Los fondos del sistema no se eliminan" in render_block
+    assert "backgroundPresetHelpers.isSystemBackgroundPreset(preset" in begin_block
+    assert "state.backgroundPresetEditor = null;" in begin_block
+    assert "backgroundPresetHelpers.isSystemBackgroundPreset(preset" in delete_block
+    assert "return;" in delete_block
+
+
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
 def test_output_profile_view_renders_manager_and_editor_contracts():
     script = f"""

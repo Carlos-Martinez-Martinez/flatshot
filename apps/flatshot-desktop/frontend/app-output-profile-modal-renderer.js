@@ -72,6 +72,7 @@ function updateOutputProfileFieldStates(validation, raw) {
     backgroundCustom: "profile-background-custom-input",
     width: "profile-width-input",
     height: "profile-height-input",
+    maxFileSizeKb: "profile-max-file-size-input",
     destinationMode: "profile-destination-mode-input",
     destinationValue: "profile-destination-input",
     naming: "profile-naming-input",

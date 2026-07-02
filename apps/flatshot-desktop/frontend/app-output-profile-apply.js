@@ -7,7 +7,19 @@ function applyOutputProfile(profileId, options = {}) {
   if (state.outputProfileDraft?.id === profile.id) {
     state.outputProfileDraft = { ...state.outputProfileDraft, enabled: true };
   }
-  return setActiveOutputProfileReference(profile.id, options);
+  const applied = setActiveOutputProfileReference(profile.id, options);
+  refreshBridgePreviewForAppliedOutputProfile(options);
+  return applied;
+}
+
+function refreshBridgePreviewForAppliedOutputProfile(options = {}) {
+  if (options.refreshPreview === false || typeof selectedImage !== "function" || typeof requestBridgePreview !== "function") {
+    return;
+  }
+  const image = selectedImage();
+  if (image?.source === "bridge") {
+    void requestBridgePreview(image);
+  }
 }
 
 function setOutputProfileEnabled(profileId, enabled) {

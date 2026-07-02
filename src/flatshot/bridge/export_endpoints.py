@@ -37,6 +37,7 @@ def prepare_export(service, payload: Mapping[str, Any]) -> dict[str, Any]:
                 "customOutputPath": variant.custom_output_path or config.custom_output_path,
                 "namingTemplate": variant.naming_template or config.naming_template,
                 "suffix": variant.suffix,
+                "maxFileSizeKb": variant.max_file_size_kb if (variant.format or config.format) == "JPG" else None,
             }
             for variant in variants
         ],

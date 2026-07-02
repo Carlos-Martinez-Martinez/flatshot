@@ -30,7 +30,7 @@
         </span>
         <small>${escapeHtml(summary)}</small>
       </div>
-      <button type="button" class="active-output-row__edit" data-action="select-output-profile" data-output-profile-id="${escapeHtml(row.id)}">Editar</button>
+      <button type="button" class="active-output-row__edit" data-action="edit-output-profile" data-output-profile-id="${escapeHtml(row.id)}">Editar</button>
     </div>
   `;
   }

@@ -76,6 +76,7 @@ function syncAdvancedInspectorDetails(mode) {
   }
 
   if (state.presetEditorOpen) {
+    state.advancedDisclosureKey = "preset-section";
     detailsItems.forEach((details) => {
       setInspectorDisclosureOpenState(details, details.classList.contains("preset-section"));
     });
@@ -91,16 +92,26 @@ function syncAdvancedInspectorDetails(mode) {
   if (pendingAdvancedDisclosure) {
     const preferred = editableDetails.find((details) => details.classList.contains(pendingAdvancedDisclosure));
     if (preferred) {
+      state.advancedDisclosureKey = pendingAdvancedDisclosure;
       editableDetails.forEach((details) => setInspectorDisclosureOpenState(details, details === preferred));
     }
     pendingAdvancedDisclosure = "";
     return;
   }
 
-  if (editableDetails.some((details) => details.open)) {
+  const remembered = editableDetails.find((details) => details.classList.contains(state.advancedDisclosureKey));
+  if (remembered) {
+    editableDetails.forEach((details) => setInspectorDisclosureOpenState(details, details === remembered));
     return;
   }
 
+  const openDetails = editableDetails.find((details) => details.open);
+  if (openDetails) {
+    state.advancedDisclosureKey = inspectorDisclosurePreferenceKey(openDetails);
+    return;
+  }
+
+  state.advancedDisclosureKey = "appearance-section";
   editableDetails.forEach((details) => {
     setInspectorDisclosureOpenState(details, details.classList.contains("appearance-section"));
   });

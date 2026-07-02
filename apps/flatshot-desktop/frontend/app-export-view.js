@@ -253,7 +253,7 @@ function destinationFallbackLabel() {
   return outputProfileViewHelpers.destinationFallbackLabel({
     destinationMode: state.destinationMode,
     destinationValue: state.destinationValue,
-    destinations: profiles.length > 1 ? profiles.map(profileDestinationPreviewLabel) : [],
+    destinations: profiles.length > 1 ? profiles.map(outputProfileViewHelpers.profileDestinationPreviewLabel) : [],
   });
 }
 
@@ -266,6 +266,7 @@ function beginOutputEdit() {
     destinationValue: state.destinationValue,
     naming: state.naming,
     suffix: state.suffix,
+    maxFileSizeKb: state.maxFileSizeKb,
   };
   state.outputEditMode = true;
   state.presetEditorOpen = false;

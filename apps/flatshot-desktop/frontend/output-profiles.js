@@ -19,6 +19,18 @@
     return text === "PNG" ? "PNG" : "JPG";
   }
 
+  function normalizeMaxFileSizeKb(value) {
+    const text = String(value ?? "").trim();
+    if (!text) {
+      return null;
+    }
+    if (!/^\d+$/.test(text)) {
+      return null;
+    }
+    const parsed = Number.parseInt(text, 10);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  }
+
   function clampRgbChannel(value) {
     const channel = Number.parseInt(String(value).trim(), 10);
     if (!Number.isInteger(channel) || channel < 0 || channel > 255) {
@@ -91,6 +103,9 @@
     const format = normalizeExportFormat(source.format);
     const background = normalizeBackgroundValue(source.background);
     const destinationMode = source.destinationMode === "custom" ? "custom" : "source";
+    const maxFileSizeKb = format === "JPG"
+      ? normalizeMaxFileSizeKb(source.maxFileSizeKb ?? source.max_file_size_kb)
+      : null;
     return {
       id: String(source.id || uniqueOutputProfileId("formato", index)).trim(),
       name: outputProfileNameForDisplay(String(source.name || `Formato ${index + 1}`).trim()),
@@ -103,6 +118,7 @@
       destinationValue: String(source.destinationValue || (destinationMode === "custom" ? "" : "Salida")),
       naming: String(source.naming || "{original}{suffix}"),
       suffix: source.suffix === undefined || source.suffix === null ? "_PRO" : String(source.suffix),
+      maxFileSizeKb,
     };
   }
 
@@ -186,6 +202,7 @@
       custom_output_path: profile.destinationMode === "custom" ? profile.destinationValue : null,
       output_width: size.width,
       output_height: size.height,
+      max_file_size_kb: profile.format === "JPG" ? normalizeMaxFileSizeKb(profile.maxFileSizeKb) : null,
     };
   }
 
@@ -196,6 +213,7 @@
     const fieldMessages = {};
     const width = Number.parseInt(raw.width, 10);
     const height = Number.parseInt(raw.height, 10);
+    const maxFileSizeText = String(raw.maxFileSizeKb ?? "").trim();
     const invalidFilenameChars = /[<>:"/\\|?*]/;
     const rememberFieldMessage = (field, message) => {
       if (!field) {
@@ -230,6 +248,9 @@
     }
     if (normalizeExportFormat(raw.format) === "JPG" && raw.background === "transparent") {
       addError("background", "JPG no admite transparencia. Selecciona fondo blanco, gris claro o cambia el tipo a PNG.");
+    }
+    if (normalizeExportFormat(raw.format) === "JPG" && maxFileSizeText && normalizeMaxFileSizeKb(maxFileSizeText) === null) {
+      addError("maxFileSizeKb", "El peso máximo debe ser un número mayor que 0 KB.");
     }
     if (!String(raw.width || "").trim() || !Number.isInteger(width) || width <= 0) {
       addError("width", "La anchura debe ser un número mayor que 0.");
@@ -277,6 +298,7 @@
     isValidBackgroundValue,
     normalizeBackgroundValue,
     normalizeExportFormat,
+    normalizeMaxFileSizeKb,
     normalizeOutputProfile,
     normalizeOutputProfileList,
     outputProfileNameForDisplay,

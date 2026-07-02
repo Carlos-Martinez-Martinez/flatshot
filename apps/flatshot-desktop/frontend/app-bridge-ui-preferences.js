@@ -1,7 +1,7 @@
 function uiPreferencesPayload() {
   return {
     outputProfiles: state.outputProfiles,
-    backgroundPresets: state.backgroundPresets,
+    backgroundPresets: backgroundPresetHelpers.backgroundPresetsForStorage(state.backgroundPresets, backgroundPresetOptions()),
     activeOutputProfile: state.activeOutputProfileId,
     activeOutputFormats: enabledOutputProfiles().map((profile) => profile.id),
     imageAdjustmentPreset: state.activePreset,
@@ -17,6 +17,7 @@ function uiPreferencesPayload() {
       background: state.background,
       naming: state.naming,
       suffix: state.suffix,
+      maxFileSizeKb: state.format === "JPG" ? state.maxFileSizeKb : null,
     },
   };
 }
@@ -27,7 +28,11 @@ function cacheUiPreferences(preferences = uiPreferencesPayload()) {
     storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.outputProfiles, source.outputProfiles);
   }
   if (Array.isArray(source.backgroundPresets)) {
-    storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.backgroundPresets, source.backgroundPresets);
+    storageHelpers.writeJson(
+      window.localStorage,
+      STORAGE_KEYS.backgroundPresets,
+      backgroundPresetHelpers.backgroundPresetsForStorage(source.backgroundPresets, backgroundPresetOptions())
+    );
   }
   if (source.activeOutputProfile !== undefined) {
     storageHelpers.writeValue(window.localStorage, STORAGE_KEYS.activeOutputProfile, source.activeOutputProfile);
@@ -100,11 +105,13 @@ function applyBridgeUiPreferences(preferences) {
   state.format = outputProfileHelpers.normalizeExportFormat(exportPreferences.format || profileForDefaults.format);
   state.size = outputProfileHelpers.parseOutputSize(exportPreferences.size || outputProfileHelpers.outputProfileSize(profileForDefaults)).normalized;
   state.background = outputProfileHelpers.normalizeBackgroundValue(exportPreferences.background, profileForDefaults.background);
-  state.previewBg = state.background;
   state.naming = String(exportPreferences.naming || profileForDefaults.naming || "{original}{suffix}");
   state.suffix = exportPreferences.suffix === undefined || exportPreferences.suffix === null
     ? profileForDefaults.suffix
     : String(exportPreferences.suffix);
+  state.maxFileSizeKb = state.format === "JPG"
+    ? outputProfileHelpers.normalizeMaxFileSizeKb(exportPreferences.maxFileSizeKb ?? profileForDefaults.maxFileSizeKb)
+    : null;
 
   if (source.imageAdjustmentPreset !== undefined) {
     state.activePreset = String(source.imageAdjustmentPreset || state.activePreset);

@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import tempfile
 import shutil
-from typing import Iterable
+from typing import Any, Iterable, Mapping
 
 from PIL import Image, UnidentifiedImageError
 
@@ -57,6 +57,8 @@ class RenderCache:
         target_size: tuple,
         local_override: dict | None = None,
         export_format: str | None = None,
+        *,
+        export_options: Mapping[str, Any] | None = None,
     ) -> str:
         """Generate a unique key for a specific render configuration."""
         # Use a stable representation of the inputs
@@ -70,6 +72,13 @@ class RenderCache:
             "local_override": local_override or {},
             "format": self.normalize_format(export_format),
         }
+        normalized_export_options = {
+            str(key): value
+            for key, value in dict(export_options or {}).items()
+            if value is not None
+        }
+        if normalized_export_options:
+            data["export_options"] = normalized_export_options
         
         # Normalize floating point values to strings with fixed precision if necessary
         # but pydantic/json should be stable enough here for our purposes.

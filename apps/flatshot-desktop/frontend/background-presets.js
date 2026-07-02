@@ -188,6 +188,29 @@
       : DEFAULT_PRESETS;
   }
 
+  function defaultPresetIds(options = {}) {
+    return new Set(defaultPresets(options).map((preset) => String(preset?.id || "").trim()).filter(Boolean));
+  }
+
+  function isSystemBackgroundPreset(preset, options = {}) {
+    if (!preset || typeof preset !== "object") {
+      return false;
+    }
+    return preset.system === true || defaultPresetIds(options).has(String(preset.id || "").trim());
+  }
+
+  function uniqueBackgroundPresetListId(baseId, seen) {
+    const base = String(baseId || "fondo").trim() || "fondo";
+    let id = base;
+    let suffix = 2;
+    while (seen.has(id)) {
+      id = `${base}-${suffix}`;
+      suffix += 1;
+    }
+    seen.add(id);
+    return id;
+  }
+
   function normalizeBackgroundPreset(preset, index = 0, options = {}) {
     const presets = defaultPresets(options);
     const source = preset && typeof preset === "object" ? preset : {};
@@ -209,17 +232,32 @@
   }
 
   function normalizeBackgroundPresetList(presets, options = {}) {
-    const source = Array.isArray(presets) && presets.length ? presets : defaultPresets(options);
+    const systemIds = defaultPresetIds(options);
     const seen = new Set();
-    const normalized = source.map((preset, index) => normalizeBackgroundPreset(preset, index, options)).filter((preset) => preset.id && preset.name);
-    return normalized.map((preset, index) => {
-      let id = preset.id;
-      while (seen.has(id)) {
-        id = `${preset.id}-${index + seen.size}`;
-      }
-      seen.add(id);
-      return { ...preset, id };
-    });
+    const systemPresets = defaultPresets(options)
+      .map((preset, index) => ({ ...normalizeBackgroundPreset(preset, index, options), system: true }))
+      .filter((preset) => preset.id && preset.name)
+      .map((preset) => ({ ...preset, id: uniqueBackgroundPresetListId(preset.id, seen) }));
+    const source = Array.isArray(presets) ? presets : [];
+    const customPresets = source
+      .filter((preset) => {
+        const id = String(preset?.id || "").trim();
+        return (!id || !systemIds.has(id)) && preset?.system !== true;
+      })
+      .map((preset, index) => normalizeBackgroundPreset(preset, index, options))
+      .filter((preset) => preset.id && preset.name)
+      .map((preset) => ({ ...preset, id: uniqueBackgroundPresetListId(preset.id, seen) }));
+    return [...systemPresets, ...customPresets];
+  }
+
+  function backgroundPresetsForStorage(presets, options = {}) {
+    return normalizeBackgroundPresetList(presets, options)
+      .filter((preset) => !isSystemBackgroundPreset(preset, options))
+      .map((preset) => {
+        const storagePreset = { ...preset };
+        delete storagePreset.system;
+        return storagePreset;
+      });
   }
 
   function readBackgroundPresets(storage, key, options = {}) {
@@ -274,9 +312,11 @@
     backgroundPresetByValue,
     backgroundPresetLabel,
     backgroundPresetValue,
+    backgroundPresetsForStorage,
     backgroundSelectMode,
     backgroundSelectOptionsHtml,
     backgroundVisualMode,
+    isSystemBackgroundPreset,
     normalizeBackgroundPreset,
     normalizeBackgroundPresetList,
     normalizePreviewBackgroundValue,

@@ -8,6 +8,7 @@ from typing import Callable
 
 from PIL import Image
 
+from flatshot.application.image_encoding import save_export_image
 from flatshot.core.engine import ShadowEngine
 from flatshot.core.models import SHADOW_ENGINE_DEFAULT, CurveData, normalize_shadow_settings
 from flatshot.core.overrides import apply_image_override
@@ -24,7 +25,11 @@ def process_single_image(args):
         curve_data_dict,
         local_override,
         display_name,
+        *optional_export_options,
     ) = args
+    export_options = optional_export_options[0] if optional_export_options else {}
+    if not isinstance(export_options, dict):
+        export_options = {}
 
     try:
         settings = apply_image_override(
@@ -51,11 +56,17 @@ def process_single_image(args):
         save_path = Path(save_path)
         save_path.parent.mkdir(parents=True, exist_ok=True)
 
-        if fmt in ["jpg", "jpeg"]:
-            final_img = final_img.convert("RGB")
-            final_img.save(save_path, quality=100, subsampling=0, dpi=dpi)
-        else:
-            final_img.save(save_path, optimize=False, compress_level=0, dpi=dpi)
+        encoding_warning = save_export_image(
+            final_img,
+            save_path,
+            fmt,
+            dpi=dpi,
+            max_file_size_kb=export_options.get("max_file_size_kb"),
+        )
+        if warning and encoding_warning:
+            warning = f"{warning} {encoding_warning}"
+        elif encoding_warning:
+            warning = encoding_warning
 
         return True, display_name, warning
     except Exception as e:

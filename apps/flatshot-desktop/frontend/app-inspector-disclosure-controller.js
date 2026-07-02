@@ -12,6 +12,25 @@ function inspectorDisclosureBody(details) {
   return details?.querySelector?.(".inspector-disclosure__body") || null;
 }
 
+function inspectorDisclosurePreferenceKey(details) {
+  const knownKeys = ["preset-section", "appearance-section", "advanced-block", "local-adjustment"];
+  return knownKeys.find((key) => details?.classList?.contains(key)) || "";
+}
+
+function rememberAdvancedDisclosure(details) {
+  const key = inspectorDisclosurePreferenceKey(details);
+  if (key && state) {
+    state.advancedDisclosureKey = key;
+  }
+}
+
+function forgetAdvancedDisclosure(details) {
+  const key = inspectorDisclosurePreferenceKey(details);
+  if (key && state?.advancedDisclosureKey === key) {
+    state.advancedDisclosureKey = "";
+  }
+}
+
 function setInspectorDisclosureHeight(details, height = null) {
   const body = inspectorDisclosureBody(details);
   if (!body) {
@@ -59,6 +78,11 @@ function setInspectorDisclosureOpenState(details, open) {
     inspectorDisclosureTimers.delete(details);
   }
   details.open = open;
+  if (open) {
+    rememberAdvancedDisclosure(details);
+  } else {
+    forgetAdvancedDisclosure(details);
+  }
   details.classList.remove("is-opening", "is-closing", "is-open");
   inspectorDisclosureBody(details)?.style.removeProperty("--inspector-disclosure-height");
 }
@@ -83,6 +107,7 @@ function closeInspectorDisclosure(details, panel = $(".settings-panel"), scrollT
   if (!details?.open || details.classList.contains("is-closing")) {
     return;
   }
+  forgetAdvancedDisclosure(details);
   const previousTimer = inspectorDisclosureTimers.get(details);
   if (previousTimer) {
     window.clearTimeout(previousTimer);
@@ -123,6 +148,7 @@ function openInspectorDisclosure(details, panel = $(".settings-panel"), scrollTo
     inspectorDisclosureTimers.delete(details);
   }
   details.open = true;
+  rememberAdvancedDisclosure(details);
   details.classList.remove("is-closing", "is-open");
   details.classList.add("is-opening");
   setInspectorDisclosureHeight(details, 0);

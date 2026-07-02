@@ -10,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
 HELPER_PATH = FRONTEND_DIR / "empty-state-view.js"
 INDEX_PATH = FRONTEND_DIR / "index.html"
+EMPTY_CSS_PATH = FRONTEND_DIR / "css" / "03-components" / "empty-states.css"
 WORKFLOW_CSS_PATH = FRONTEND_DIR / "css" / "03-components" / "workflow-panels.css"
 
 
@@ -58,6 +59,8 @@ assert.equal(initial.includes('class="empty-state onboarding initial-onboarding"
 assert.equal(initial.includes("<strong>Selecciona una carpeta</strong>"), true);
 assert.equal(initial.includes("Carga un lote de imágenes PNG o JPG"), true);
 assert.equal(initial.includes('data-action="pick-bridge-folder"'), true);
+assert.equal(initial.includes('class="primary" data-action="pick-bridge-folder"'), false);
+assert.equal(initial.includes('class="ghost-action" data-action="pick-bridge-folder"'), true);
 assert.equal(initial.includes('data-action="open-app-settings"'), true);
 assert.equal(initial.includes("Gestionar formatos"), true);
 assert.equal(initial.includes('data-action="open-qa-lab"'), false);
@@ -66,6 +69,7 @@ assert.equal(initial.includes('class="manual-path-inline"'), false);
 assert.equal(initial.includes("Ruta manual"), false);
 assert.equal(initial.includes("Carpeta de entrada"), true);
 assert.equal(initial.includes('id="onboarding-scan-path"'), true);
+assert.equal(initial.includes('class="folder-entry-inline__scan primary"'), true);
 assert.equal(initial.includes('data-action="scan-bridge-folder"'), true);
 assert.equal(initial.includes("<svg"), true);
 
@@ -98,9 +102,24 @@ def test_initial_folder_entry_keeps_stable_layout_styles():
     entry_rule = css.split(".folder-entry-inline {", 1)[1].split("}", 1)[0]
     input_rule = css.split(".folder-entry-inline input {", 1)[1].split("}", 1)[0]
 
-    assert "width: min(520px, 100%);" in entry_rule
+    assert "width: min(640px, 100%);" in entry_rule
     assert "display: grid;" in entry_rule
     assert "grid-template-columns: minmax(0, 1fr) auto;" in entry_rule
     assert "align-items: end;" in entry_rule
     assert "min-width: 0;" in input_rule
     assert "width: 100%;" in input_rule
+
+
+def test_initial_onboarding_card_uses_deliberate_stable_layout_styles():
+    css = EMPTY_CSS_PATH.read_text(encoding="utf-8")
+
+    card_rule = css.split(".empty-state.onboarding.initial-onboarding {", 1)[1].split("}", 1)[0]
+    actions_rule = css.split(".empty-state.onboarding.initial-onboarding .empty-state__actions {", 1)[1].split("}", 1)[0]
+    action_button_rule = css.split(".empty-state.onboarding.initial-onboarding .empty-state__actions button {", 1)[1].split("}", 1)[0]
+
+    assert "width: min(680px, calc(100% - 48px));" in card_rule
+    assert "gap: var(--space-4);" in card_rule
+    assert "width: auto;" in actions_rule
+    assert "display: inline-flex;" in actions_rule
+    assert "min-width: 170px;" in action_button_rule
+    assert "width: auto;" in action_button_rule

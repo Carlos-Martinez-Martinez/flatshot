@@ -39,7 +39,7 @@
           <span>Carpeta de entrada</span>
           <input id="onboarding-scan-path" type="text" value="${escapeHtml(options.bridgeScanPath || "")}" placeholder="C:/ruta/lote" autocomplete="off" spellcheck="false" />
         </label>
-        <button type="button" class="folder-entry-inline__scan" data-action="scan-bridge-folder">Escanear</button>
+        <button type="button" class="folder-entry-inline__scan primary" data-action="scan-bridge-folder">Escanear</button>
       </div>
   `;
     return `
@@ -53,7 +53,7 @@
       <strong>Selecciona una carpeta</strong>
       <span>Carga un lote de imágenes PNG o JPG para revisar y exportar.</span>
       <div class="empty-state__actions">
-        <button type="button" class="primary" data-action="pick-bridge-folder">Seleccionar carpeta</button>
+        <button type="button" class="ghost-action" data-action="pick-bridge-folder">Seleccionar carpeta</button>
         <button type="button" class="ghost-action" data-action="open-app-settings">Gestionar formatos</button>
         ${qaLabActionHtml}
       </div>

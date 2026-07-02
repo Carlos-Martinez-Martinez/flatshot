@@ -29,6 +29,31 @@ def test_app_globals_exposes_canvas_guide_helpers():
     assert "global.guideHelpers = window.FlatShotCanvasGuides;" in source
 
 
+def test_canvas_guides_storage_keys_are_defined():
+    source = (FRONTEND_DIR / "mock-data.js").read_text(encoding="utf-8")
+
+    assert 'guideSystems: "flatshot.guideSystems"' in source
+    assert 'activeGuideSystems: "flatshot.activeGuideSystemIds"' in source
+    assert 'guidesVisible: "flatshot.guidesVisible"' in source
+
+
+def test_guide_preferences_are_ui_preferences_not_export_preferences():
+    source = (FRONTEND_DIR / "app-bridge-ui-preferences.js").read_text(encoding="utf-8")
+
+    payload_start = source.index("function uiPreferencesPayload()")
+    payload_end = source.index("function cacheUiPreferences", payload_start)
+    payload_block = source[payload_start:payload_end]
+    export_start = payload_block.index("exportPreferences:")
+    export_block = payload_block[export_start:]
+
+    assert "guideSystems:" in payload_block
+    assert "activeGuideSystemIds:" in payload_block
+    assert "guidesVisible:" in payload_block
+    assert "guideSystems:" not in export_block
+    assert "activeGuideSystemIds:" not in export_block
+    assert "guidesVisible:" not in export_block
+
+
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
 def test_canvas_guide_helpers_normalize_and_expand_rules():
     script = f"""

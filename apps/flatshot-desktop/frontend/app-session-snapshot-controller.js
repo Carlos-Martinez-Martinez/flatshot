@@ -31,6 +31,8 @@ function restoreSessionSnapshot() {
     viewModeLabels: VIEW_MODE_LABELS,
     defaultOutputProfiles,
     normalizeBackgroundPresetList: (presets) => backgroundPresetHelpers.normalizeBackgroundPresetList(presets, backgroundPresetOptions()),
+    normalizeGuideSystemList: (systems) => guideHelpers.normalizeGuideSystemList(systems),
+    normalizeActiveGuideSystemIds: guideHelpers.normalizeActiveGuideSystemIds,
     normalizeOutputProfileList: outputProfileHelpers.normalizeOutputProfileList,
     normalizePreviewBackgroundValue: (value) => backgroundPresetHelpers.normalizePreviewBackgroundValue(value, backgroundHelperOptions()),
     normalizeSettings,

@@ -11,6 +11,9 @@
     "selectedImageId",
     "previewMode",
     "previewBg",
+    "guidesVisible",
+    "activeGuideSystemIds",
+    "guideSystems",
     "zoom",
     "fitZoom",
     "fitMode",
@@ -96,6 +99,8 @@
     const restored = safeObject(restoredInput);
     const currentState = safeObject(options.currentState);
     const normalizeBackgroundPresetList = options.normalizeBackgroundPresetList || ((value) => value);
+    const normalizeGuideSystemList = options.normalizeGuideSystemList || ((value) => Array.isArray(value) ? value : []);
+    const normalizeActiveGuideSystemIds = options.normalizeActiveGuideSystemIds || ((ids) => Array.isArray(ids) ? ids : []);
     const normalizeOutputProfileList = options.normalizeOutputProfileList || ((value) => value);
     const normalizePreviewBackgroundValue = options.normalizePreviewBackgroundValue || ((value) => value || "rgb230");
     const normalizeSettings = options.normalizeSettings || ((value) => value);
@@ -118,6 +123,11 @@
     }));
 
     const restoredBackgroundPresets = normalizeBackgroundPresetList(restored.backgroundPresets || currentState.backgroundPresets);
+    const restoredGuideSystems = normalizeGuideSystemList(restored.guideSystems || currentState.guideSystems || []);
+    const restoredActiveGuideSystemIds = normalizeActiveGuideSystemIds(
+      restored.activeGuideSystemIds || currentState.activeGuideSystemIds || [],
+      restoredGuideSystems
+    );
     const outputProfiles = Array.isArray(restored.outputProfiles)
       ? normalizeOutputProfileList(restored.outputProfiles, restored.activeOutputProfileId)
       : currentState.outputProfiles;
@@ -144,6 +154,11 @@
         previewError: "",
         previewMode: ["processed", "original", "compare"].includes(restored.previewMode) ? restored.previewMode : "processed",
         previewBg: normalizePreviewBackgroundValue(restored.previewBg || currentState.previewBg),
+        guidesVisible: restored.guidesVisible === undefined ? currentState.guidesVisible !== false : Boolean(restored.guidesVisible),
+        activeGuideSystemIds: restoredActiveGuideSystemIds,
+        guideSystems: restoredGuideSystems,
+        guideManagerOpen: false,
+        guideDraft: null,
         zoom: clampNumber(restored.zoom, 25, 400, 100),
         fitZoom: clampNumber(restored.fitZoom, 25, 400, 100),
         fitMode: viewModeLabels[restored.fitMode] ? restored.fitMode : defaultViewMode,

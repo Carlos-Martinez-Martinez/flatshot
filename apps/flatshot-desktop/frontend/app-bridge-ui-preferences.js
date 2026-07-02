@@ -2,6 +2,9 @@ function uiPreferencesPayload() {
   return {
     outputProfiles: state.outputProfiles,
     backgroundPresets: backgroundPresetHelpers.backgroundPresetsForStorage(state.backgroundPresets, backgroundPresetOptions()),
+    guideSystems: guideHelpers.guideSystemsForStorage(state.guideSystems),
+    activeGuideSystemIds: state.activeGuideSystemIds,
+    guidesVisible: state.guidesVisible,
     activeOutputProfile: state.activeOutputProfileId,
     activeOutputFormats: enabledOutputProfiles().map((profile) => profile.id),
     imageAdjustmentPreset: state.activePreset,
@@ -33,6 +36,15 @@ function cacheUiPreferences(preferences = uiPreferencesPayload()) {
       STORAGE_KEYS.backgroundPresets,
       backgroundPresetHelpers.backgroundPresetsForStorage(source.backgroundPresets, backgroundPresetOptions())
     );
+  }
+  if (Array.isArray(source.guideSystems)) {
+    storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.guideSystems, guideHelpers.guideSystemsForStorage(source.guideSystems));
+  }
+  if (Array.isArray(source.activeGuideSystemIds)) {
+    storageHelpers.writeJson(window.localStorage, STORAGE_KEYS.activeGuideSystems, source.activeGuideSystemIds);
+  }
+  if (source.guidesVisible !== undefined) {
+    storageHelpers.writeValue(window.localStorage, STORAGE_KEYS.guidesVisible, source.guidesVisible === false ? "0" : "1");
   }
   if (source.activeOutputProfile !== undefined) {
     storageHelpers.writeValue(window.localStorage, STORAGE_KEYS.activeOutputProfile, source.activeOutputProfile);
@@ -79,6 +91,15 @@ function applyBridgeUiPreferences(preferences) {
 
   if (Array.isArray(source.backgroundPresets)) {
     state.backgroundPresets = backgroundPresetHelpers.normalizeBackgroundPresetList(source.backgroundPresets, backgroundPresetOptions());
+  }
+  if (Array.isArray(source.guideSystems)) {
+    state.guideSystems = guideHelpers.normalizeGuideSystemList(source.guideSystems);
+  }
+  if (Array.isArray(source.activeGuideSystemIds)) {
+    state.activeGuideSystemIds = guideHelpers.normalizeActiveGuideSystemIds(source.activeGuideSystemIds, state.guideSystems);
+  }
+  if (source.guidesVisible !== undefined) {
+    state.guidesVisible = Boolean(source.guidesVisible);
   }
 
   const enabledProfiles = enabledOutputProfiles();

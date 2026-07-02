@@ -84,6 +84,47 @@ def test_canvas_guide_controller_persists_after_mutations():
     assert "scheduleBridgeUiPreferencesSave();" in source
 
 
+def test_canvas_guide_manager_supports_system_and_rule_actions():
+    controller = (FRONTEND_DIR / "app-canvas-guides-controller.js").read_text(encoding="utf-8")
+    dispatcher = (FRONTEND_DIR / "app-action-dispatcher.js").read_text(encoding="utf-8")
+    document_events = (FRONTEND_DIR / "app-document-events.js").read_text(encoding="utf-8")
+    render_source = (FRONTEND_DIR / "app-render-shell-gallery.js").read_text(encoding="utf-8")
+    keydown_source = (FRONTEND_DIR / "app-viewer-events.js").read_text(encoding="utf-8")
+
+    for function_name in [
+        "renderGuideManager",
+        "newGuideSystem",
+        "editGuideSystem",
+        "duplicateGuideSystem",
+        "deleteGuideSystem",
+        "saveGuideDraft",
+        "addGuideCenterRule",
+        "addGuideMirrorPairRule",
+        "addGuideDivisionRule",
+        "addGuideLineRule",
+        "removeGuideRule",
+    ]:
+        assert f"function {function_name}" in controller
+
+    for action in [
+        "new-guide-system",
+        "edit-guide-system",
+        "duplicate-guide-system",
+        "delete-guide-system",
+        "save-guide-draft",
+        "add-guide-center",
+        "add-guide-pair",
+        "add-guide-division",
+        "add-guide-line",
+        "remove-guide-rule",
+    ]:
+        assert f'"{action}"' in dispatcher
+
+    assert "updateGuideDraftFromFields" in document_events
+    assert "renderGuideManager();" in render_source
+    assert "closeGuideManager();" in keydown_source
+
+
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
 def test_canvas_guide_helpers_normalize_and_expand_rules():
     script = f"""

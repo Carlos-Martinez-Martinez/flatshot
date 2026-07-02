@@ -10,6 +10,7 @@ function render() {
   renderBatchDetail();
   renderExportConfirm();
   renderQaLab();
+  renderGuideManager();
   renderAppSettings();
   renderInspector();
   renderFooter();

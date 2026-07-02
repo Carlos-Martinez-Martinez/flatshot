@@ -58,6 +58,11 @@ function handleDocumentKeydown(event) {
       event.preventDefault();
       return;
     }
+    if (state.guideManagerOpen) {
+      closeGuideManager();
+      event.preventDefault();
+      return;
+    }
     if (state.appSettingsOpen) {
       closeAppSettings();
       event.preventDefault();

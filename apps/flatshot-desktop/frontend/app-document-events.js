@@ -145,6 +145,11 @@ function handleDocumentClick(event) {
     return;
   }
 
+  if (target.id === "guide-manager-modal") {
+    closeGuideManager();
+    return;
+  }
+
   const closedBackgroundPresetEditor = closeBackgroundPresetEditorOnOutsideClick(event);
 
   const actionTarget = target.closest("[data-action]");
@@ -278,6 +283,10 @@ function handleDocumentInput(event) {
     updateBackgroundPresetEditorFromFields();
     return;
   }
+  if (event.target.closest?.("#guide-draft-form")) {
+    updateGuideDraftFromFields();
+    return;
+  }
   if (event.target.closest?.("#output-profile-form")) {
     updateOutputProfileDraftFromForm();
     renderOutputProfileModalState();
@@ -323,6 +332,11 @@ function handleDocumentChange(event) {
   if (event.target.closest?.("#background-preset-editor")) {
     updateBackgroundPresetEditorFromFields();
     renderBackgroundPresetControls();
+    return;
+  }
+  if (event.target.closest?.("#guide-draft-form")) {
+    updateGuideDraftFromFields();
+    renderGuideManager();
     return;
   }
   if (event.target.matches?.("[data-image-adjustment-select]")) {

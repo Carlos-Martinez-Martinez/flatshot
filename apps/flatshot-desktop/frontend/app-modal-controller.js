@@ -2,6 +2,7 @@ function openAppSettings() {
   rememberModalFocusReturn();
   state.batchDetailOpen = false;
   state.exportConfirmOpen = false;
+  state.qaLabOpen = false;
   const activeProfile = activeOutputProfile();
   const profile = outputMatchesProfile(activeProfile)
     ? activeProfile
@@ -50,6 +51,7 @@ function cancelOutputProfileDraft() {
 function openBatchDetail() {
   rememberModalFocusReturn();
   state.exportConfirmOpen = false;
+  state.qaLabOpen = false;
   state.batchDetailOpen = true;
   state.statusText = "Detalle del lote";
   render();
@@ -66,6 +68,7 @@ function closeBatchDetail() {
 function openExportConfirm(risks, options = {}) {
   rememberModalFocusReturn();
   state.appSettingsOpen = false;
+  state.qaLabOpen = false;
   state.outputProfileDraft = null;
   state.outputDeleteConfirmId = "";
   state.batchDetailOpen = false;
@@ -101,6 +104,27 @@ function confirmExportFromModal() {
   startExport(options);
 }
 
+function openQaLab() {
+  if (typeof devMode !== "undefined" && !devMode) {
+    return;
+  }
+  rememberModalFocusReturn();
+  state.appSettingsOpen = false;
+  state.batchDetailOpen = false;
+  state.exportConfirmOpen = false;
+  state.qaLabOpen = true;
+  state.statusText = "QA Lab";
+  render();
+  queueModalFocus("#qa-lab-modal", "[data-action='close-qa-lab']");
+}
+
+function closeQaLab() {
+  releaseModalFocusBeforeHide();
+  state.qaLabOpen = false;
+  state.statusText = "QA Lab cerrado";
+  render();
+}
+
 function rememberModalFocusReturn() {
   const active = document.activeElement;
   if (
@@ -113,6 +137,9 @@ function rememberModalFocusReturn() {
 }
 
 function restoreModalFocusReturn() {
+  if (typeof modalFocusReturnTarget === "undefined") {
+    return;
+  }
   const target = modalFocusReturnTarget;
   modalFocusReturnTarget = null;
   if (target instanceof HTMLElement && document.contains(target)) {
@@ -129,7 +156,10 @@ function releaseModalFocusBeforeHide() {
 }
 
 function queueModalFocus(modalSelector, preferredSelector = "") {
-  window.requestAnimationFrame(() => {
+  const requestFrame = typeof window !== "undefined" && typeof window.requestAnimationFrame === "function"
+    ? window.requestAnimationFrame.bind(window)
+    : (callback) => callback();
+  requestFrame(() => {
     const modal = $(modalSelector);
     if (!modal || modal.classList.contains("is-hidden")) {
       return;
@@ -147,6 +177,9 @@ function firstFocusableElement(container) {
 }
 
 function currentOpenModal() {
+  if (state.qaLabOpen) {
+    return $("#qa-lab-modal");
+  }
   if (state.exportConfirmOpen) {
     return $("#export-confirm-modal");
   }

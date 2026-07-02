@@ -10,11 +10,6 @@
   font-size: var(--text-sm);
 }
 
-.manual-path-panel summary, .review-panel summary, .batch-diagnostics summary, .advanced-block summary {
-  color: var(--text-secondary);
-  font-weight: 750;
-}
-
 .app-shell[data-batch-context="true"] .source-panel .manual-path-panel, .app-shell[data-batch-context="true"] .source-panel .bridge-message {
   display: none;
 }

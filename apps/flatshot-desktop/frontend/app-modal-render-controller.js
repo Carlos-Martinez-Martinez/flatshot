@@ -45,6 +45,15 @@ function renderExportConfirm() {
   }
 }
 
+function renderQaLab() {
+  const modal = $("#qa-lab-modal");
+  if (!modal) {
+    return;
+  }
+  modal.classList.toggle("is-hidden", !state.qaLabOpen);
+  modal.setAttribute("aria-hidden", state.qaLabOpen ? "false" : "true");
+}
+
 function exportConfirmHtml(risks) {
   const counts = batchCounts();
   const exportable = counts.exportableImages;

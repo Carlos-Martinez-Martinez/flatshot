@@ -38,6 +38,7 @@ logs/
 .pytest_cache/
 pytest-cache-files*/
 tmp-pytest-run*/
+/tmp/
 .tox/
 .nox/
 .mypy_cache/

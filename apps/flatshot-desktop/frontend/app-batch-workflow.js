@@ -173,69 +173,7 @@ function setScenario(scenario) {
 }
 
 function loadBatch() {
-  if (state.bridgeMode === "bridge") {
-    void scanBridgeFolder();
-    return;
-  }
-
-  clearTimers();
-  thumbnailPreloads.clear();
-  thumbnailFallbackQueue.length = 0;
-  thumbnailFallbackInFlight.clear();
-  clearBridgeExportPoll();
-  Object.assign(state, {
-    scenario: "batch-ready",
-    batch: "scanning",
-    batchSource: "mock",
-    selectedImageId: null,
-    previewStatus: "empty",
-    previewData: null,
-    previewError: "",
-    thumbnailStatus: {},
-    thumbnailErrors: [],
-    exportStatus: "blocked",
-    exportJobId: null,
-    exportDestinations: [],
-    exportMessages: [],
-    exportCompletedItems: [],
-    exportIssues: [],
-    exportResult: null,
-    progress: 0,
-    processed: 0,
-    errors: [],
-    scanIssues: [],
-    scanDiagnostics: emptyScanDiagnostics(),
-    scanStatus: "Escaneando lote mock",
-    statusText: "Escaneando carpeta",
-  });
-  render();
-  setTimer(() => {
-    Object.assign(state, {
-      batch: "ready",
-      selectedImageId: "img-001",
-      previewStatus: "loading",
-      exportStatus: "ready",
-      scanDiagnostics: mockScanDiagnostics(),
-      statusText: "Generando vista",
-    });
-    render();
-    setTimer(() => {
-      Object.assign(state, {
-        previewStatus: "ready",
-        statusText: "Listo para exportar",
-      });
-      render();
-    }, 550);
-  }, 450);
-}
-
-function loadMockBatch() {
-  if (!devMode) {
-    return;
-  }
-  state.bridgeMode = "mock";
-  state.bridgeLastResponse = "Estado mock: lote listo";
-  loadBatch();
+  void scanBridgeFolder();
 }
 
 function clearBatch() {

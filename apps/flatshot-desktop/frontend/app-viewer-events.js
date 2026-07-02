@@ -57,6 +57,11 @@ function handleDocumentKeydown(event) {
       event.preventDefault();
       return;
     }
+    if (state.qaLabOpen) {
+      closeQaLab();
+      event.preventDefault();
+      return;
+    }
     const openDetails = Array.from(document.querySelectorAll("details[open]")).reverse()[0];
     if (openDetails) {
       openDetails.open = false;

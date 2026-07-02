@@ -1,6 +1,5 @@
 const actionDispatcher = actionHandlerHelpers.createActionDispatcher({
   "load-batch": () => loadBatch(),
-  "load-mock-batch": () => loadMockBatch(),
   "check-bridge": () => { void checkBridge(); },
   "toggle-inspector": () => {
     state.inspectorCollapsed = !state.inspectorCollapsed;
@@ -11,7 +10,6 @@ const actionDispatcher = actionHandlerHelpers.createActionDispatcher({
   "pick-output-profile-destination": () => { void pickOutputProfileDestination(); },
   "scan-bridge-folder": () => { void scanBridgeFolder(); },
   "clear-batch": () => clearBatch(),
-  "show-empty-folder": () => showEmptyFolder(),
   "force-preview-error": () => {
     if (hasBatch()) {
       state.previewStatus = "error";
@@ -81,6 +79,8 @@ const actionDispatcher = actionHandlerHelpers.createActionDispatcher({
   "discard-output-overrides": () => discardOutputOverrides(),
   "open-app-settings": () => openAppSettings(),
   "close-app-settings": () => closeAppSettings(),
+  "open-qa-lab": () => openQaLab(),
+  "close-qa-lab": () => closeQaLab(),
   "cancel-output-profile-draft": () => cancelOutputProfileDraft(),
   "open-batch-detail": () => openBatchDetail(),
   "close-batch-detail": () => closeBatchDetail(),

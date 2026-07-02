@@ -58,8 +58,6 @@ function thumbnailStats() {
 function renderTop() {
   const visible = getVisibleAppState();
   const counts = batchCounts();
-  $("#demo-scenario").value = scenarioLabels[state.scenario] ? state.scenario : "batch-ready";
-  $("#app-mode").value = state.bridgeMode;
   $("#bridge-url").value = state.bridgeUrl;
   $("#active-batch-label").textContent = "";
   const topStatus = $("#top-status-text");

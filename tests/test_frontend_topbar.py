@@ -75,5 +75,6 @@ def test_dev_review_controls_are_hidden_outside_dev_mode():
 
     assert '<button type="button" class="dev-only" data-action="toggle-inspector">Diagnóstico</button>' in html
     assert '<details class="debug-panel dev-only" id="debug-panel">' in html
-    assert '<details class="review-panel dev-only">' in html
+    assert 'data-action="open-qa-lab"' in html
+    assert '<details class="review-panel dev-only">' not in html
     assert "html:not(.dev-mode) .dev-only" in debug_css

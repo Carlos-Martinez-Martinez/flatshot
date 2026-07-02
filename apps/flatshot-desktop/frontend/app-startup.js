@@ -37,11 +37,9 @@ interactionBindingHelpers.wireFlatShotInteractions({
   $,
   $$,
   handlers: {
-    appModeChange: handleAppModeChange,
     backgroundSelectChange: handleBackgroundSelectChange,
     bridgeScanPathInput: handleBridgeScanPathInput,
     bridgeUrlInput: handleBridgeUrlInput,
-    demoScenarioChange: handleDemoScenarioChange,
     destinationInput: handleDestinationInput,
     destinationModeChange: handleDestinationModeChange,
     documentChange: handleDocumentChange,

@@ -59,7 +59,11 @@ assert.equal(initial.includes("Carga un lote de imágenes PNG o JPG"), true);
 assert.equal(initial.includes('data-action="pick-bridge-folder"'), true);
 assert.equal(initial.includes('data-action="open-app-settings"'), true);
 assert.equal(initial.includes("Gestionar formatos"), true);
-assert.equal(initial.includes("manual-path-inline"), false);
+assert.equal(initial.includes('data-action="open-qa-lab"'), false);
+assert.equal(initial.includes('class="manual-path-inline"'), true);
+assert.equal(initial.includes("Ruta manual"), true);
+assert.equal(initial.includes('id="onboarding-scan-path"'), true);
+assert.equal(initial.includes('data-action="scan-bridge-folder"'), true);
 assert.equal(initial.includes("<svg"), true);
 
 const devInitial = helpers.initialStateHtml({{
@@ -71,6 +75,7 @@ assert.equal(devInitial.includes("Ruta manual"), true);
 assert.equal(devInitial.includes('id="onboarding-scan-path"'), true);
 assert.equal(devInitial.includes('value="C:/Entrada/&quot;uno&quot;&amp;&lt;dos&gt;"'), true);
 assert.equal(devInitial.includes('data-action="scan-bridge-folder"'), true);
+assert.equal(devInitial.includes('data-action="open-qa-lab"'), true);
 """
     result = subprocess.run(
         ["node", "-e", script],

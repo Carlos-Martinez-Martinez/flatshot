@@ -84,16 +84,9 @@
             <details class="debug-panel dev-only" id="debug-panel">
               <summary>Debug</summary>
               <div class="debug-content">
-                <label class="mode-switcher">
-                  <span>Modo</span>
-                  <select id="app-mode" aria-label="Modo de datos">
-                    <option value="mock">Mock</option>
-                    <option value="bridge">Bridge local</option>
-                  </select>
-                </label>
                 <button type="button" data-action="check-bridge">Comprobar bridge</button>
                 <button type="button" data-action="clear-batch">Limpiar lote</button>
-                <button type="button" data-action="load-mock-batch">Lote mock</button>
+                <button type="button" data-action="open-qa-lab">QA Lab</button>
                 <label class="text-field compact-field">
                   <span>URL bridge</span>
                   <input id="bridge-url" type="url" value="http://127.0.0.1:8765" />
@@ -174,43 +167,6 @@
           <section class="batch-summary batch-rail__summary" id="batch-summary" aria-live="polite"></section>
           <div class="folder-list batch-format" id="folder-list" aria-label="Formato del lote" hidden></div>
 
-          <details class="review-panel dev-only">
-            <summary>Revisión</summary>
-            <label class="demo-switcher review-switcher">
-              <span>Escenario</span>
-              <select id="demo-scenario" aria-label="Escenario de demo">
-                <option value="initial">Sin lote</option>
-                <option value="batch-ready">Lote listo</option>
-                <option value="empty-folder">Carpeta vacía</option>
-                <option value="preview-loading">Vista cargando</option>
-                <option value="preview-warning">Vista con aviso</option>
-                <option value="preview-error">Error de vista</option>
-                <option value="export-blocked">Carpeta de salida sin configurar</option>
-                <option value="export-ready">Exportación lista</option>
-                <option value="export-running">Exportación en curso</option>
-                <option value="export-completed">Exportación completada</option>
-                <option value="export-partial">Completada con errores</option>
-                <option value="export-failed">Exportación fallida</option>
-              </select>
-            </label>
-            <div class="review-grid" aria-label="Estados de revisión">
-              <button type="button" data-review-scenario="initial">Sin lote</button>
-              <button type="button" data-review-scenario="batch-ready">Lote listo</button>
-              <button type="button" data-review-scenario="empty-folder">Carpeta vacía</button>
-              <button type="button" data-review-scenario="preview-loading">Vista cargando</button>
-              <button type="button" data-review-scenario="preview-error">Error de vista</button>
-              <button type="button" data-review-scenario="export-ready">Exportación lista</button>
-              <button type="button" data-review-scenario="export-running">En curso</button>
-              <button type="button" data-review-scenario="export-completed">Completada</button>
-              <button type="button" data-review-scenario="export-partial">Con errores</button>
-            </div>
-            <div class="review-actions">
-              <button type="button" data-action="check-bridge">Bridge health</button>
-              <button type="button" data-action="scan-bridge-folder">Escaneo real</button>
-              <button type="button" data-action="force-preview-error">Error de vista</button>
-            </div>
-            <p>Estados simulados salvo health y escaneo por ruta.</p>
-          </details>
         </aside>
 
         <aside class="gallery-column" aria-label="Galería de imágenes">
@@ -640,6 +596,55 @@
           <footer class="app-settings-footer">
             <button type="button" data-action="cancel-export-confirm">Cancelar</button>
             <button type="button" class="primary" id="export-confirm-action" data-action="confirm-export">Exportar</button>
+          </footer>
+        </section>
+      </div>
+
+      <div class="app-settings-backdrop qa-lab-backdrop is-hidden dev-only" id="qa-lab-modal" role="dialog" aria-modal="true" aria-labelledby="qa-lab-title" aria-hidden="true">
+        <section class="app-settings-dialog qa-lab-dialog">
+          <header class="app-settings-header">
+            <div>
+              <span class="eyebrow">Diagnóstico</span>
+              <h2 id="qa-lab-title">QA Lab</h2>
+              <small>Estados visuales simulados fuera del flujo principal.</small>
+            </div>
+            <button type="button" class="icon-button" data-action="close-qa-lab" aria-label="Cerrar QA Lab">×</button>
+          </header>
+          <div class="qa-lab-body" id="qa-lab-body">
+            <section class="qa-lab-section">
+              <div class="qa-lab-section-heading">
+                <h3>Estados visuales</h3>
+                <small>Estados simulados para revisar la interfaz sin depender de archivos reales.</small>
+              </div>
+              <div class="review-grid" aria-label="Estados visuales simulados">
+                <button type="button" data-review-scenario="initial">Sin lote</button>
+                <button type="button" data-review-scenario="batch-ready">Lote listo</button>
+                <button type="button" data-review-scenario="empty-folder">Carpeta vacía</button>
+                <button type="button" data-review-scenario="preview-loading">Vista cargando</button>
+                <button type="button" data-review-scenario="preview-warning">Vista con aviso</button>
+                <button type="button" data-review-scenario="preview-error">Error de vista</button>
+                <button type="button" data-review-scenario="export-blocked">Exportación bloqueada</button>
+                <button type="button" data-review-scenario="export-ready">Exportación lista</button>
+                <button type="button" data-review-scenario="export-running">En curso</button>
+                <button type="button" data-review-scenario="export-completed">Completada</button>
+                <button type="button" data-review-scenario="export-partial">Con errores</button>
+                <button type="button" data-review-scenario="export-failed">Fallida</button>
+              </div>
+            </section>
+            <section class="qa-lab-section">
+              <div class="qa-lab-section-heading">
+                <h3>Bridge real</h3>
+                <small>Comprobaciones que usan la misma ruta local que producción.</small>
+              </div>
+              <div class="review-actions">
+                <button type="button" data-action="check-bridge">Bridge health</button>
+                <button type="button" data-action="scan-bridge-folder">Escaneo real</button>
+                <button type="button" data-action="force-preview-error">Error de vista</button>
+              </div>
+            </section>
+          </div>
+          <footer class="app-settings-footer">
+            <button type="button" data-action="close-qa-lab">Cerrar</button>
           </footer>
         </section>
       </div>

@@ -9,6 +9,7 @@ function render() {
   renderExport();
   renderBatchDetail();
   renderExportConfirm();
+  renderQaLab();
   renderAppSettings();
   renderInspector();
   renderFooter();

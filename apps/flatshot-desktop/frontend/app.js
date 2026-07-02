@@ -78,6 +78,7 @@ const state = {
   appSettingsOpen: false,
   batchDetailOpen: false,
   exportConfirmOpen: false,
+  qaLabOpen: false,
   exportConfirmRisks: [],
   exportConfirmOptions: null,
   outputProfiles: initialOutputProfiles,

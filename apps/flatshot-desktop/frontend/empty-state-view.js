@@ -30,7 +30,10 @@
   }
 
   function initialStateHtml(options = {}) {
-    const manualPathHtml = options.devMode ? `
+    const qaLabActionHtml = options.devMode
+      ? `<button type="button" class="ghost-action dev-only" data-action="open-qa-lab">QA Lab</button>`
+      : "";
+    const manualPathHtml = `
       <details class="manual-path-inline">
         <summary>Ruta manual</summary>
         <label class="text-field">
@@ -39,7 +42,7 @@
         </label>
         <button type="button" data-action="scan-bridge-folder">Escanear carpeta</button>
       </details>
-  ` : "";
+  `;
     return `
     <div class="empty-state onboarding initial-onboarding">
       <span class="empty-icon" aria-hidden="true">
@@ -53,6 +56,7 @@
       <div class="empty-state__actions">
         <button type="button" class="primary" data-action="pick-bridge-folder">Seleccionar carpeta</button>
         <button type="button" class="ghost-action" data-action="open-app-settings">Gestionar formatos</button>
+        ${qaLabActionHtml}
       </div>
       ${manualPathHtml}
     </div>

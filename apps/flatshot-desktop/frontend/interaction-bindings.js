@@ -36,8 +36,6 @@
     documentRef.addEventListener("keydown", handlers.documentKeydown);
     documentRef.addEventListener("scroll", handlers.positionBackgroundPresetEditor, true);
 
-    optionalElement($, "#demo-scenario")?.addEventListener("change", handlers.demoScenarioChange);
-    optionalElement($, "#app-mode")?.addEventListener("change", handlers.appModeChange);
     optionalElement($, "#bridge-url")?.addEventListener("input", handlers.bridgeUrlInput);
     optionalElement($, "#bridge-scan-path")?.addEventListener("input", handlers.bridgeScanPathInput);
     optionalElement($, "#image-search")?.addEventListener("input", handlers.imageSearchInput);

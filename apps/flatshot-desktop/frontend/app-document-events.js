@@ -131,6 +131,11 @@ function handleDocumentClick(event) {
     return;
   }
 
+  if (target.id === "qa-lab-modal") {
+    closeQaLab();
+    return;
+  }
+
   const closedBackgroundPresetEditor = closeBackgroundPresetEditorOnOutsideClick(event);
 
   const actionTarget = target.closest("[data-action]");
@@ -230,29 +235,6 @@ function handleDocumentToggle(event) {
     window.setTimeout(restoreScroll, 80);
     window.setTimeout(restoreScroll, 180);
   });
-}
-
-function handleDemoScenarioChange(event) {
-  if (!devMode) {
-    return;
-  }
-  state.bridgeMode = "mock";
-  state.bridgeLastResponse = `Estado mock: ${scenarioLabels[event.target.value] || event.target.value}`;
-  setScenario(event.target.value);
-}
-
-function handleAppModeChange(event) {
-  if (!devMode && event.target.value !== "bridge") {
-    event.target.value = "bridge";
-    state.bridgeMode = "bridge";
-    render();
-    return;
-  }
-  state.bridgeMode = event.target.value;
-  state.statusText = state.bridgeMode === "bridge" ? "Conexión local" : "Modo demo";
-  state.bridgeLastResponse = state.bridgeMode === "bridge" ? "Conexión pendiente" : "Demo activo";
-  state.scanStatus = state.bridgeMode === "bridge" ? "Sin lote" : "Escenarios mock activos.";
-  render();
 }
 
 function handleBridgeUrlInput(event) {

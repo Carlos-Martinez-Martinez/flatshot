@@ -15,9 +15,9 @@
 }
 
 .app-shell[data-batch-context="true"] .source-panel {
-  padding: 0 0 12px;
+  padding: 0 0 var(--space-3);
   border: 0;
-  border-bottom: 1px solid var(--line-soft);
+  border-bottom: var(--border-width) solid var(--line-soft);
   border-radius: 0;
   background: transparent;
   box-shadow: none;
@@ -28,21 +28,21 @@
 }
 
 .source-panel-heading strong {
-  font-size: 14px;
+  font-size: var(--font-size-base);
 }
 
 .source-panel-heading > div > span, .bridge-message {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .import-requirements {
   display: grid;
-  gap: 6px;
+  gap: var(--space-1-5);
   margin: 2px 0 0;
   padding: 0;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   list-style: none;
 }
 
@@ -56,9 +56,9 @@
   position: absolute;
   left: 0;
   top: 0.48em;
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
+  width: var(--status-dot-size);
+  height: var(--status-dot-size);
+  border-radius: var(--radius-pill);
   background: var(--accent);
 }
 
@@ -78,10 +78,10 @@
   flex: 0 0 auto;
   padding-bottom: var(--space-3);
   display: grid;
-  gap: 10px;
-  margin-top: 10px;
-  border-bottom: 1px solid var(--line-soft);
-  padding: 0 0 12px;
+  gap: var(--space-2-5);
+  margin-top: var(--space-2-5);
+  border-bottom: var(--border-width) solid var(--line-soft);
+  padding: 0 0 var(--space-3);
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -90,7 +90,7 @@
 
 .source-panel-heading {
   align-items: start;
-  gap: 8px;
+  gap: var(--space-2);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
 }
@@ -113,30 +113,30 @@
 .batch-rail__eyebrow, .batch-rail__section-title, .batch-source__copy > span {
   display: block;
   color: var(--rail-muted);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.03em;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-extrabold);
+  letter-spacing: var(--letter-spacing-caps);
   text-transform: uppercase;
 }
 
 .batch-source__actions {
   display: flex;
-  gap: 6px;
+  gap: var(--space-1-5);
 }
 
 .batch-source__actions button, .batch-source__toolbar button, .source-path-panel__scan, .batch-source__refresh {
   min-height: 26px;
   border-color: var(--rail-border);
-  border-radius: 8px;
-  background: #ffffff;
+  border-radius: var(--radius-sm);
+  background: var(--rail-bg);
   color: var(--rail-text);
   padding-inline: 9px;
-  font-size: 12px;
-  font-weight: 750;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .batch-source__actions button:hover:not(:disabled), .batch-source__toolbar button:hover:not(:disabled), .source-path-panel__scan:hover:not(:disabled), .batch-source__refresh:hover:not(:disabled) {
-  border-color: rgba(15, 143, 114, 0.28);
+  border-color: var(--color-accent-border);
   background: var(--rail-accent-soft);
   color: var(--rail-accent);
 }
@@ -169,12 +169,12 @@
 
 .source-panel.batch-rail__source {
   box-shadow: none;
-  padding: 12px;
+  padding: var(--space-3);
   display: grid;
   gap: var(--space-3);
   margin: 0;
   border: 0;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: var(--border-width) solid var(--color-border);
   background: var(--color-bg-panel);
 }
 
@@ -200,7 +200,7 @@
 }
 
 .batch-source__copy strong {
-  line-height: 1.2;
+  line-height: var(--line-height-snug);
   color: var(--color-text-strong);
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-semibold);
@@ -219,7 +219,7 @@
 }
 
 .batch-source__toolbar button {
-  min-height: var(--control-height-sm);
+  min-height: var(--control-height);
 }
 
 .batch-rail > .batch-rail__header, .batch-rail > .source-panel.batch-rail__source, .batch-rail > .batch-rail__summary {
@@ -229,7 +229,7 @@
 }
 
 .batch-rail > .source-panel.batch-rail__source {
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: var(--border-width) solid var(--color-border);
 }
 
 .source-panel.batch-rail__source .source-panel-heading, .source-panel.batch-rail__source .batch-source__row {
@@ -252,9 +252,9 @@
 
 .batch-source__refresh {
   color: var(--rail-muted);
-  font-size: 14px;
-  width: 30px;
-  min-width: 30px;
+  font-size: var(--font-size-base);
+  width: var(--control-size-compact);
+  min-width: var(--control-size-compact);
   padding: 0;
 }
 

@@ -6,7 +6,15 @@ const actionDispatcher = actionHandlerHelpers.createActionDispatcher({
     state.statusText = state.inspectorCollapsed ? "Inspector oculto" : "Inspector visible";
     render();
   },
+  "toggle-responsive-inspector": () => {
+    state.responsiveInspectorOpen = !state.responsiveInspectorOpen;
+    state.statusText = state.responsiveInspectorOpen ? "Inspector visible" : "Inspector oculto";
+    render();
+  },
   "pick-bridge-folder": () => { void pickBridgeFolder(); },
+  "scan-recent-folder": (target) => scanRecentFolder(target),
+  "remove-recent-folder": (target) => removeRecentFolder(target),
+  "clear-folder-drop-message": () => clearFolderDropMessage(),
   "pick-output-profile-destination": () => { void pickOutputProfileDestination(); },
   "scan-bridge-folder": () => { void scanBridgeFolder(); },
   "clear-batch": () => clearBatch(),

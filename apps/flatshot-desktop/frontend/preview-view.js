@@ -23,6 +23,16 @@
     `;
   }
 
+  function previewLoadingOverlayHtml(detail = "") {
+    return `
+      <div class="preview-loading-overlay" role="status" aria-live="polite">
+        <span class="loader" aria-hidden="true"></span>
+        <strong>Generando vista</strong>
+        <span>${escapeHtml(detail)}</span>
+      </div>
+    `;
+  }
+
   function scanningStateHtml(scanStatus = "") {
     return `
     <div class="empty-state inline scanning-state">
@@ -100,6 +110,7 @@
   return {
     escapeHtml,
     mockPreviewHtml,
+    previewLoadingOverlayHtml,
     previewLoadingHtml,
     realPreviewImageHtml,
     realPreviewPlaceholderHtml,

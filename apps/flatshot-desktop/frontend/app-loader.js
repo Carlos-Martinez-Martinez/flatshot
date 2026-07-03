@@ -1,4 +1,7 @@
 (function () {
+  const errorBoundary = window.FlatShotErrorBoundary;
+  errorBoundary?.installGlobalErrorBoundary?.(window, { document });
+
   const APP_SCRIPT_ORDER = [
     "app-globals.js",
     "mock-data.js",
@@ -24,12 +27,14 @@
     "app-export-controller.js",
     "app-bridge-connection-controller.js",
     "app-bridge-scan-controller.js",
+    "app-folder-drop-controller.js",
     "app-review-actions.js",
     "app-inspector-disclosure-controller.js",
     "app-shell.js",
     "app-topbar-bridge.js",
     "app-gallery-controller.js",
     "app-thumbnail-controller.js",
+    "app-modal-visibility.js",
     "app-modal-render-controller.js",
     "app-canvas-guides-controller.js",
     "app-preview-controller.js",
@@ -83,10 +88,6 @@
 
   window.FlatShotAppScriptOrder = APP_SCRIPT_ORDER;
   void loadFlatShotApp().catch((error) => {
-    console.error(error);
-    const shell = document.querySelector(".app-shell");
-    if (shell) {
-      shell.dataset.uiState = "error";
-    }
+    errorBoundary?.renderGlobalError?.(error, { document, source: "app-loader" });
   });
 })();

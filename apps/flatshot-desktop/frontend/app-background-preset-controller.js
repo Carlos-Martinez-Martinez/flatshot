@@ -147,7 +147,7 @@ function positionBackgroundPresetEditor() {
   const anchorRect = anchor.getBoundingClientRect();
   const dialogRect = dialog.getBoundingClientRect();
   const footerRect = footer?.getBoundingClientRect();
-  const maxWidth = Math.max(280, Math.min(486, window.innerWidth - margin * 2, dialogRect.width - margin * 2));
+  const maxWidth = Math.max(320, Math.min(390, window.innerWidth - margin * 2, dialogRect.width - margin * 2));
   editor.style.width = `${maxWidth}px`;
   const editorHeight = editor.offsetHeight || 0;
   const left = numberHelpers.clampNumber(anchorRect.left, dialogRect.left + margin, dialogRect.right - maxWidth - margin);

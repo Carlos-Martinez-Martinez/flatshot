@@ -27,7 +27,7 @@
 }
 
 .batch-panel .empty-note {
-  margin-top: 12px;
+  margin-top: var(--space-3);
 }
 
 .batch-rail__badge:empty {
@@ -58,18 +58,18 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-2-5);
   padding: 2px 14px 5px;
   color: var(--rail-muted);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.03em;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-extrabold);
+  letter-spacing: var(--letter-spacing-caps);
   text-transform: uppercase;
 }
 
 .batch-rail__list-title strong {
   color: var(--rail-faint);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .batch-rail .asset-row {
@@ -77,12 +77,12 @@
   width: 100%;
   min-height: 58px;
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
+  grid-template-columns: var(--thumb-size-rail) minmax(0, 1fr) auto;
   grid-template-rows: none;
   align-items: center;
-  gap: 8px;
-  border: 1px solid transparent;
-  border-radius: 10px;
+  gap: var(--space-2);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-10);
   background: transparent;
   padding: 5px 7px;
   text-align: left;
@@ -94,9 +94,9 @@
 }
 
 .batch-rail .asset-row.active {
-  border-color: rgba(15, 143, 114, 0.24);
+  border-color: color-mix(in srgb, var(--color-primary) 24%, transparent);
   background: var(--rail-accent-soft);
-  box-shadow: inset 3px 0 0 var(--rail-accent);
+  box-shadow: inset var(--border-width-emphasis) 0 0 var(--rail-accent);
 }
 
 .batch-rail .asset-row.warning {
@@ -104,32 +104,32 @@
 }
 
 .batch-rail .asset-row.error {
-  background: rgba(244, 63, 94, 0.08);
+  background: var(--danger-rose-alpha-08);
 }
 
 .batch-rail .empty-note {
-  margin: 0 12px 10px;
-  border-color: rgba(15, 23, 42, 0.1);
-  border-radius: 12px;
+  margin: 0 var(--space-3) 10px;
+  border-color: var(--ink-alpha-10);
+  border-radius: var(--radius-md);
   background: var(--rail-soft);
 }
 
 .batch-rail__header, .batch-rail__source, .batch-rail__summary, .batch-rail__controls {
   flex: 0 0 auto;
-  padding-inline: 12px;
+  padding-inline: var(--space-3);
 }
 
 .batch-rail__badge {
-  min-height: 22px;
+  min-height: var(--control-size-2xs);
   display: inline-flex;
   align-items: center;
-  border: 1px solid transparent;
-  border-radius: 999px;
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-pill);
   background: var(--rail-soft-strong);
   padding: 2px 7px;
   color: var(--rail-muted);
-  font-size: 11px;
-  font-weight: 800;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-extrabold);
   white-space: nowrap;
   justify-self: start;
 }
@@ -137,8 +137,8 @@
 .batch-rail__controls {
   display: grid;
   padding-block: 9px 7px;
-  gap: 8px;
-  padding: 12px;
+  gap: var(--space-2);
+  padding: var(--space-3);
 }
 
 .batch-rail {
@@ -149,21 +149,21 @@
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: rgba(15, 23, 42, 0.16) transparent;
-  background: #ffffff;
+  scrollbar-color: var(--ink-alpha-16) transparent;
+  background: var(--rail-bg);
   width: auto;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--color-border);
+  border-right: var(--border-width) solid var(--color-border);
   padding: 0;
   color: var(--color-text);
 }
 
 .batch-rail__header {
-  padding-top: 12px;
-  padding-bottom: 8px;
-  padding: 13px 12px 11px;
-  border-bottom: 1px solid var(--color-border);
+  padding-top: var(--space-3);
+  padding-bottom: var(--space-2);
+  padding: 13px var(--space-3) 11px;
+  border-bottom: var(--border-width) solid var(--color-border);
 }
 
 .batch-rail__title-row {
@@ -189,11 +189,11 @@
 }
 
 .batch-rail__badge, .bridge-chip, .preflight-chip, .change-chip, .state-chip {
-  min-height: 22px;
+  min-height: var(--control-size-2xs);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid transparent;
+  border: var(--border-width) solid transparent;
   border-radius: var(--radius-pill);
   padding: 2px var(--space-2);
   color: var(--color-text-muted);
@@ -217,7 +217,7 @@
 
 .batch-rail__summary {
   padding-block: 9px;
-  padding: 12px;
+  padding: var(--space-3);
   border-bottom: 0;
 }
 
@@ -226,15 +226,15 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-2) var(--space-3);
-  border-top: 1px solid var(--color-border);
-  border-bottom: 1px solid var(--color-border);
+  border-top: var(--border-width) solid var(--color-border);
+  border-bottom: var(--border-width) solid var(--color-border);
   padding: var(--space-3) 0;
 }
 
 .batch-metric {
   min-width: 0;
   display: grid;
-  gap: 2px;
+  gap: var(--space-0-5);
 }
 
 .batch-metric strong {
@@ -245,8 +245,8 @@
 .batch-next {
   min-width: 0;
   display: grid;
-  gap: 2px;
-  border-top: 1px solid var(--color-border);
+  gap: var(--space-0-5);
+  border-top: var(--border-width) solid var(--color-border);
   padding-top: var(--space-3);
 }
 
@@ -255,9 +255,9 @@
 }
 
 .batch-diagnostics {
-  border-top: 1px solid var(--border-subtle);
+  border-top: var(--border-width) solid var(--border-subtle);
   padding-top: var(--space-2);
-  margin: 4px 0 0;
+  margin: var(--space-1) 0 0;
   margin-top: var(--space-1);
   border: 0;
   padding: 0;
@@ -267,10 +267,10 @@
   display: inline-flex;
   align-items: center;
   color: var(--rail-accent);
-  font-weight: 800;
-  font-size: 12px;
+  font-weight: var(--font-weight-extrabold);
+  font-size: var(--font-size-xs);
   width: fit-content;
-  min-height: 24px;
+  min-height: var(--control-size-xs);
 }
 
 .batch-panel {
@@ -280,13 +280,13 @@
   border-right-color: var(--line-soft);
   gap: 0;
   display: none;
-  border-right: 1px solid var(--color-border);
+  border-right: var(--border-width) solid var(--color-border);
   padding: var(--space-3);
   grid-column: 1;
   grid-row: 1;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: var(--border-width) solid var(--color-border);
 }
 }

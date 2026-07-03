@@ -64,7 +64,7 @@
       previewStatus: "loading",
       statusText: options.statusText || "Generando vista",
     };
-    if (options.clearData !== false) {
+    if (options.clearData === true) {
       patch.previewData = null;
       patch.previewError = "";
     }

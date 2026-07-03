@@ -84,9 +84,9 @@ input:hover:not(:disabled), select:hover:not(:disabled) {
 }
 
 .empty-state.onboarding, .empty-state.warning {
-  border: 1px solid rgba(255, 255, 255, 0.78);
-  border-radius: var(--radius-16);
-  background: rgba(255, 255, 255, 0.78);
+  border: var(--border-width) solid var(--surface-alpha-78);
+  border-radius: var(--radius-lg);
+  background: var(--surface-alpha-78);
   padding: 26px 28px;
   box-shadow: var(--shadow-sm);
 }
@@ -97,7 +97,7 @@ input:hover:not(:disabled), select:hover:not(:disabled) {
 
 .preflight-item.warning {
   border-color: var(--warning-line);
-  background: #fffaf0;
+  background: var(--warning-soft);
 }
 
 .preflight-item.warning > span {
@@ -110,7 +110,7 @@ input:hover:not(:disabled), select:hover:not(:disabled) {
 
 .preflight-item.error {
   border-color: var(--danger-line);
-  background: #fff7f6;
+  background: var(--danger-soft);
 }
 
 .preflight-item.error > span {
@@ -127,12 +127,12 @@ html.dev-mode [data-action="toggle-inspector"] {
 
 .warning-summary strong {
   color: var(--text-strong);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 
 .warning-summary span {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .warning-summary.clear span {
@@ -173,7 +173,7 @@ button.primary:hover:not(:disabled) {
   padding: var(--space-3);
   display: grid;
   gap: var(--space-2);
-  border: 1px solid var(--color-warning-border);
+  border: var(--border-width) solid var(--color-warning-border);
   border-radius: var(--radius-md);
   color: var(--color-warning);
 }
@@ -199,7 +199,7 @@ button.primary:hover:not(:disabled) {
 
 .warning-summary button {
   justify-self: start;
-  min-height: 28px;
+  min-height: var(--control-height);
   border: 0;
   background: transparent;
   padding: 0;
@@ -219,7 +219,7 @@ button.primary:hover:not(:disabled) {
 }
 
 .danger-subtle:hover:not(:disabled) {
-  border-color: rgba(180, 35, 24, 0.32);
+  border-color: var(--danger-deep-alpha-32);
   background: var(--color-error-soft);
 }
 
@@ -250,7 +250,7 @@ button.primary:hover:not(:disabled) {
 }
 
 .status-badge.ready {
-  border-color: rgba(15, 143, 114, 0.28);
+  border-color: var(--color-accent-border);
   color: var(--color-success);
 }
 
@@ -273,12 +273,33 @@ button.primary:hover:not(:disabled) {
   margin-top: var(--space-1);
 }
 
-.top-detail-action[hidden], #top-secondary-action[hidden] {
+.app-shell[data-ui-state="error"] .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+
+.app-shell[data-ui-state="error"] .workspace > :not(.app-error-boundary) {
   display: none !important;
 }
 
-.top-more-menu[hidden] {
-  display: none !important;
+.app-error-boundary { display: grid; place-items: center; min-width: 0; min-height: 0; background: var(--color-bg-soft); padding: var(--space-5); }
+
+.app-error-boundary__card {
+  width: min(560px, 100%); display: grid; gap: var(--space-3);
+  border: var(--border-width) solid var(--color-error-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-panel);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-md);
+}
+
+.app-error-boundary__card strong { color: var(--color-text); font-size: var(--font-size-lg); }
+
+.app-error-boundary__card p, .app-error-boundary__card summary {
+  color: var(--color-text-muted);
+}
+
+.app-error-boundary__card pre {
+  max-height: 180px; overflow: auto; border-radius: var(--radius-sm);
+  background: var(--color-bg-soft); padding: var(--space-3); color: var(--color-text);
+  white-space: pre-wrap; user-select: text;
 }
 
 .top-more-menu__content button:hover:not(:disabled) {

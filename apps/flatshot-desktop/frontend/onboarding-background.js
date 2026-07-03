@@ -5,13 +5,7 @@
   }
   root.FlatShotOnboardingBackground = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function (root) {
-  const ONBOARDING_BACKGROUND_ASSETS = [
-    "./assets/onboarding/flatshot-abstract-01.png",
-    "./assets/onboarding/flatshot-abstract-02.png",
-    "./assets/onboarding/flatshot-abstract-03.png",
-    "./assets/onboarding/flatshot-abstract-04.png",
-    "./assets/onboarding/flatshot-abstract-05.png",
-  ];
+  const ONBOARDING_BACKGROUND_ASSETS = [];
 
   const BACKGROUND_ID = "onboarding-background";
   const SLIDE_INTERVAL_MS = 9000;

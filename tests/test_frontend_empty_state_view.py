@@ -40,9 +40,7 @@ const assert = require("node:assert/strict");
 const helpers = require({json.dumps(str(ONBOARDING_BACKGROUND_PATH))});
 
 assert.equal(Array.isArray(helpers.ONBOARDING_BACKGROUND_ASSETS), true);
-assert.equal(helpers.ONBOARDING_BACKGROUND_ASSETS.length, 5);
-assert.equal(helpers.ONBOARDING_BACKGROUND_ASSETS.every((asset) => asset.startsWith("./assets/onboarding/")), true);
-assert.equal(helpers.ONBOARDING_BACKGROUND_ASSETS.every((asset) => asset.endsWith(".png")), true);
+assert.equal(helpers.ONBOARDING_BACKGROUND_ASSETS.length, 0);
 
 assert.deepEqual(helpers.uniqueLoadedAssets([
   "./assets/onboarding/mesh-01.png",
@@ -214,7 +212,7 @@ def test_initial_folder_entry_keeps_stable_layout_styles():
     entry_rule = css.split(".folder-entry-inline {", 1)[1].split("}", 1)[0]
     input_rule = css.split(".folder-entry-inline input {", 1)[1].split("}", 1)[0]
 
-    assert "width: min(640px, 100%);" in entry_rule
+    assert "width: var(--workflow-inline-width);" in entry_rule
     assert "display: grid;" in entry_rule
     assert "grid-template-columns: minmax(0, 1fr) auto;" in entry_rule
     assert "align-items: end;" in entry_rule
@@ -229,7 +227,7 @@ def test_initial_onboarding_card_uses_deliberate_stable_layout_styles():
     actions_rule = css.split(".empty-state.onboarding.initial-onboarding .empty-state__actions {", 1)[1].split("}", 1)[0]
     action_button_rule = css.split(".empty-state.onboarding.initial-onboarding .empty-state__actions button {", 1)[1].split("}", 1)[0]
 
-    assert "width: min(680px, calc(100% - 48px));" in card_rule
+    assert "width: min(680px, calc(100% - var(--modal-viewport-gutter)));" in card_rule
     assert "z-index: 3;" in card_rule
     assert "gap: var(--space-4);" in card_rule
     assert "width: auto;" in actions_rule

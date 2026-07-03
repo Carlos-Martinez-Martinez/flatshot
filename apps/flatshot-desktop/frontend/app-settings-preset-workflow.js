@@ -55,6 +55,77 @@ function presetItemByName(name) {
   return activePresetItems().find((preset) => preset.name === name) || null;
 }
 
+function adjustmentSnapshot() {
+  return {
+    activePreset: state.activePreset,
+    presetDirty: state.presetDirty,
+    presetSource: state.presetSource,
+    settings: normalizeSettings(state.settings),
+    imageOverrides: adjustmentHistoryHelpers.cloneValue(state.imageOverrides || {}),
+    localOverride: state.localOverride,
+    selectedImageId: state.selectedImageId,
+  };
+}
+
+function restoreAdjustmentSnapshot(snapshot, statusText) {
+  if (!snapshot) {
+    return false;
+  }
+  state.activePreset = snapshot.activePreset || state.activePreset;
+  state.presetDirty = Boolean(snapshot.presetDirty);
+  state.presetSource = snapshot.presetSource || "Global";
+  state.settings = normalizeSettings(snapshot.settings);
+  state.imageOverrides = adjustmentHistoryHelpers.cloneValue(snapshot.imageOverrides || {});
+  state.localOverride = hasImageAdjustmentOverride(selectedImage());
+  state.exportStatus = isExportReady() ? "ready" : "blocked";
+  state.statusText = statusText;
+  refreshPreviewAfterSettingChange();
+  return true;
+}
+
+function recordAdjustmentChange(before, label = "Ajuste") {
+  return adjustmentHistoryHelpers.pushAdjustmentHistory(state.adjustmentHistory, before, adjustmentSnapshot(), label);
+}
+
+function adjustmentHistoryToken(scope, key) {
+  const imageKey = scope === "local" ? imageOverrideKey() : "";
+  return [scope, imageKey, key].filter(Boolean).join(":");
+}
+
+function isContinuousAdjustmentInput(input) {
+  return input?.type === "range";
+}
+
+function beginAdjustmentChange(token) {
+  adjustmentHistoryHelpers.startAdjustmentHistoryChange(state.adjustmentHistory, token, adjustmentSnapshot());
+}
+
+function commitAdjustmentChange(token, label = "Ajuste") {
+  return adjustmentHistoryHelpers.commitAdjustmentHistoryChange(state.adjustmentHistory, token, adjustmentSnapshot(), label);
+}
+
+function undoAdjustmentChange() {
+  const snapshot = adjustmentHistoryHelpers.undoAdjustmentHistory(state.adjustmentHistory, adjustmentSnapshot());
+  if (snapshot) {
+    restoreAdjustmentSnapshot(snapshot, "Ajuste deshecho");
+    return true;
+  }
+  state.statusText = "No hay ajustes que deshacer";
+  render();
+  return false;
+}
+
+function redoAdjustmentChange() {
+  const snapshot = adjustmentHistoryHelpers.redoAdjustmentHistory(state.adjustmentHistory, adjustmentSnapshot());
+  if (snapshot) {
+    restoreAdjustmentSnapshot(snapshot, "Ajuste rehecho");
+    return true;
+  }
+  state.statusText = "No hay ajustes que rehacer";
+  render();
+  return false;
+}
+
 function updatePresetCache(name, settings) {
   const normalized = normalizeSettings(settings);
   const bridgeIndex = state.bridgePresets.findIndex((preset) => preset.name === name);
@@ -85,6 +156,7 @@ function removePresetFromCache(name) {
 }
 
 function applyPresetSettings(name, options = {}) {
+  const before = options.recordHistory ? adjustmentSnapshot() : null;
   const preset = presetItemByName(name);
   if (!preset) {
     return false;
@@ -103,11 +175,16 @@ function applyPresetSettings(name, options = {}) {
   if (options.refresh !== false) {
     refreshPreviewAfterSettingChange();
   }
+  if (before) {
+    recordAdjustmentChange(before, "Cambiar ajuste");
+  }
   return true;
 }
 
 function resetActivePresetSettings() {
+  const before = adjustmentSnapshot();
   if (applyPresetSettings(state.activePreset, { statusText: "Ajuste restaurado" })) {
+    recordAdjustmentChange(before, "Restablecer ajuste");
     return;
   }
   state.settings = { ...defaultSettings };
@@ -115,9 +192,11 @@ function resetActivePresetSettings() {
   state.presetSource = "Global";
   state.statusText = "Ajuste restaurado";
   refreshPreviewAfterSettingChange();
+  recordAdjustmentChange(before, "Restablecer ajuste");
 }
 
 function cancelAdjustmentEdit() {
+  const before = adjustmentSnapshot();
   const preset = activePresetItem();
   state.settings = normalizeSettings(preset?.settings || defaultSettings);
   state.presetDirty = false;
@@ -125,15 +204,18 @@ function cancelAdjustmentEdit() {
   state.presetEditorOpen = false;
   state.statusText = "Cambios de ajuste descartados";
   refreshPreviewAfterSettingChange();
+  recordAdjustmentChange(before, "Descartar cambios");
 }
 
 function applyGlobalAdjustmentWithoutSaving() {
+  const before = adjustmentSnapshot();
   state.presetEditorOpen = false;
   state.presetDirty = true;
   state.presetSource = "Modificado";
   state.exportStatus = isExportReady() ? "ready" : "blocked";
   state.statusText = "Ajuste aplicado al lote sin guardar";
   refreshPreviewAfterSettingChange();
+  recordAdjustmentChange(before, "Aplicar al lote");
 }
 
 function markPresetDirty(options = {}) {
@@ -147,7 +229,7 @@ function markPresetDirty(options = {}) {
 
 function refreshPreviewAfterSettingChange() {
   if (selectedImage()?.source === "bridge") {
-    Object.assign(state, previewStateHelpers.previewLoadingState());
+    Object.assign(state, previewStateHelpers.previewLoadingState({ clearData: false }));
     renderAdjustmentResponse();
     clearTimers();
     setTimer(() => {

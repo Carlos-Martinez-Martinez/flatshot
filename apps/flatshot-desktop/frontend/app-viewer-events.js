@@ -47,7 +47,32 @@ function handleDocumentKeydown(event) {
     return;
   }
 
+  const canUseAdjustmentShortcut = !isTyping || target?.type === "range";
+
+  if (canUseAdjustmentShortcut && command && event.key.toLowerCase() === "z") {
+    event.preventDefault();
+    if (event.shiftKey) {
+      redoAdjustmentChange();
+    } else {
+      undoAdjustmentChange();
+    }
+    return;
+  }
+
+  if (canUseAdjustmentShortcut && command && event.key.toLowerCase() === "y") {
+    event.preventDefault();
+    redoAdjustmentChange();
+    return;
+  }
+
   if (event.key === "Escape") {
+    if (state.responsiveInspectorOpen) {
+      state.responsiveInspectorOpen = false;
+      state.statusText = "Inspector oculto";
+      render();
+      event.preventDefault();
+      return;
+    }
     if (state.exportConfirmOpen) {
       closeExportConfirm();
       event.preventDefault();

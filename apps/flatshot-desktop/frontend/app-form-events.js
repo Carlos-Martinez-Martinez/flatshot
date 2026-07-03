@@ -6,18 +6,72 @@ function handleImageSearchInput(event) {
   render();
 }
 
+function formAdjustmentSnapshot() { return typeof adjustmentSnapshot === "function" ? adjustmentSnapshot() : null; }
+
+function formAdjustmentHistoryToken(scope, key) {
+  return typeof adjustmentHistoryToken === "function" ? adjustmentHistoryToken(scope, key) : [scope, key].filter(Boolean).join(":");
+}
+
+function activeFormAdjustmentToken() { return state.adjustmentHistory?.active?.token || ""; }
+
+function beginFormAdjustmentChange(token) {
+  if (typeof beginAdjustmentChange === "function") { beginAdjustmentChange(token); }
+}
+
+function commitFormAdjustmentChange(token, label) {
+  return typeof commitAdjustmentChange === "function" ? commitAdjustmentChange(token, label) : false;
+}
+
+function recordFormAdjustmentChange(before, label) {
+  return typeof recordAdjustmentChange === "function" && before ? recordAdjustmentChange(before, label) : false;
+}
+
 function handleSettingInput(event) {
   const key = event.target.dataset.setting;
+  const token = formAdjustmentHistoryToken("setting", key);
+  const continuous = isContinuousAdjustmentInput(event.target);
+  const hasActiveChange = activeFormAdjustmentToken() === token;
+  const before = continuous && hasActiveChange ? null : formAdjustmentSnapshot();
+  if (continuous && event.type === "input") {
+    beginFormAdjustmentChange(token);
+  }
   const nextValue = settingInputValue(event.target);
   if (state.settings[key] === nextValue) {
+    if (continuous && event.type === "change") {
+      if (!commitFormAdjustmentChange(token, "Ajustar aspecto")) {
+        recordFormAdjustmentChange(before, "Ajustar aspecto");
+      }
+    }
     return;
   }
   state.settings[key] = nextValue;
   markPresetDirty();
+  if (continuous && event.type === "change") {
+    if (!commitFormAdjustmentChange(token, "Ajustar aspecto")) {
+      recordFormAdjustmentChange(before, "Ajustar aspecto");
+    }
+  } else if (!continuous) {
+    recordFormAdjustmentChange(before, "Ajustar aspecto");
+  }
 }
 
 function handleLightingFieldInput(event) {
-  updateLightingSceneField(event.target.dataset.lightingField, event.target.value);
+  const field = event.target.dataset.lightingField;
+  const token = formAdjustmentHistoryToken("lighting", field);
+  const continuous = isContinuousAdjustmentInput(event.target);
+  const hasActiveChange = activeFormAdjustmentToken() === token;
+  const before = continuous && hasActiveChange ? null : formAdjustmentSnapshot();
+  if (continuous && event.type === "input") {
+    beginFormAdjustmentChange(token);
+  }
+  const changed = updateLightingSceneField(field, event.target.value);
+  if (continuous && event.type === "change") {
+    if (!commitFormAdjustmentChange(token, "Ajustar luz") && changed) {
+      recordFormAdjustmentChange(before, "Ajustar luz");
+    }
+  } else if (!continuous && changed) {
+    recordFormAdjustmentChange(before, "Ajustar luz");
+  }
 }
 
 function handleLightingNumberFieldInput(event) {
@@ -33,10 +87,12 @@ function handleLightingPresetClick(button) {
   if (!preset) {
     return;
   }
+  const before = formAdjustmentSnapshot();
   state.settings.shadow_engine = "studio_2_5d";
   state.settings.lighting_scene = cloneLightingScene(preset);
   state.lightingPresetId = presetId;
   markPresetDirty();
+  recordFormAdjustmentChange(before, "Cambiar luz");
 }
 
 function settingInputValue(input) {
@@ -205,6 +261,7 @@ function updateSettingFromNumberInput(input, options = {}) {
   if (state.settings[key] === parsed.value) {
     return true;
   }
+  const before = formAdjustmentSnapshot();
   state.settings[key] = parsed.value;
   const range = $(`[data-setting="${key}"]`);
   if (range && range.type === "range") {
@@ -212,6 +269,7 @@ function updateSettingFromNumberInput(input, options = {}) {
     syncRangeFill(range);
   }
   markPresetDirty();
+  recordFormAdjustmentChange(before, "Ajustar aspecto");
   return true;
 }
 
@@ -240,7 +298,9 @@ function updateLocalOverrideFromNumberInput(input, options = {}) {
   if (fallback === value) {
     return true;
   }
+  const before = formAdjustmentSnapshot();
   setCurrentImageOverrideValue(key, value);
+  recordFormAdjustmentChange(before, "Ajustar imagen");
   return true;
 }
 
@@ -260,7 +320,12 @@ function updateLightingNumberFieldFromInput(input, options = {}) {
   if (options.commit) {
     input.value = String(parsed.value);
   }
-  return updateLightingSceneField(field, parsed.value);
+  const before = formAdjustmentSnapshot();
+  const changed = updateLightingSceneField(field, parsed.value);
+  if (changed) {
+    recordFormAdjustmentChange(before, "Ajustar luz");
+  }
+  return changed;
 }
 
 function handleFormatSelectChange(event) {

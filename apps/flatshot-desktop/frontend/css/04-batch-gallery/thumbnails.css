@@ -2,35 +2,35 @@
 /* Batch and gallery: thumbnail surfaces and per-image state markers. */
 
 .thumb.tone-b {
-  background: linear-gradient(140deg, #f5d5ce, #dfe9ec);
+  background: linear-gradient(140deg, var(--thumb-tone-b-start), var(--thumb-tone-b-end));
 }
 
 .thumb.tone-c {
-  background: linear-gradient(140deg, #d8d3c9, #8db9ad);
+  background: linear-gradient(140deg, var(--thumb-tone-c-start), var(--thumb-tone-c-end));
 }
 
 .thumb.tone-d {
-  background: linear-gradient(140deg, #f0e2b8, #cad7e8);
+  background: linear-gradient(140deg, var(--thumb-tone-d-start), var(--thumb-tone-d-end));
 }
 
 .thumb.tone-e {
-  background: linear-gradient(140deg, #dfeafa, #b7d2c9);
+  background: linear-gradient(140deg, var(--thumb-tone-e-start), var(--thumb-tone-e-end));
 }
 
 .thumb {
-  border-color: rgba(17, 26, 23, 0.08);
+  border-color: var(--deep-ink-alpha-08);
   aspect-ratio: 1 / 1;
-  width: 56px;
-  border: 1px solid rgba(17, 24, 39, 0.1);
+  width: var(--thumb-size-grid);
+  border: var(--border-width) solid var(--dark-ink-alpha-10);
   border-radius: 7px;
-  background: linear-gradient(45deg, rgba(0, 0, 0, 0.04) 25%, transparent 25%), linear-gradient(-45deg, rgba(0, 0, 0, 0.04) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, rgba(0, 0, 0, 0.04) 75%), linear-gradient(-45deg, transparent 75%, rgba(0, 0, 0, 0.04) 75%), #f8faf9;
-  height: 56px;
+  background: linear-gradient(45deg, var(--black-alpha-04) 25%, transparent 25%), linear-gradient(-45deg, var(--black-alpha-04) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--black-alpha-04) 75%), linear-gradient(-45deg, transparent 75%, var(--black-alpha-04) 75%), var(--thumb-grid-bg);
+  height: var(--thumb-size-grid);
   position: relative;
   display: grid;
   place-items: center;
   overflow: hidden;
-  background-position: 0 0, 0 6px, 6px -6px, -6px 0;
-  background-size: 12px 12px;
+  background-position: 0 0, 0 var(--checker-step-sm), var(--checker-step-sm) calc(0px - var(--checker-step-sm)), calc(0px - var(--checker-step-sm)) 0;
+  background-size: var(--checker-tile-sm) var(--checker-tile-sm);
 }
 
 .thumb-image {
@@ -46,13 +46,13 @@
 }
 
 .batch-rail .thumb {
-  width: 48px;
-  height: 48px;
-  border-color: rgba(15, 23, 42, 0.08);
+  width: var(--thumb-size-rail);
+  height: var(--thumb-size-rail);
+  border-color: var(--ink-alpha-08);
   border-radius: 9px;
-  background: linear-gradient(45deg, rgba(15, 23, 42, 0.035) 25%, transparent 25%), linear-gradient(-45deg, rgba(15, 23, 42, 0.035) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, rgba(15, 23, 42, 0.035) 75%), linear-gradient(-45deg, transparent 75%, rgba(15, 23, 42, 0.035) 75%), #f8fafc;
-  background-position: 0 0, 0 6px, 6px -6px, -6px 0;
-  background-size: 12px 12px;
+  background: linear-gradient(45deg, var(--ink-alpha-035) 25%, transparent 25%), linear-gradient(-45deg, var(--ink-alpha-035) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--ink-alpha-035) 75%), linear-gradient(-45deg, transparent 75%, var(--ink-alpha-035) 75%), var(--thumb-rail-grid-bg);
+  background-position: 0 0, 0 var(--checker-step-sm), var(--checker-step-sm) calc(0px - var(--checker-step-sm)), calc(0px - var(--checker-step-sm)) 0;
+  background-size: var(--checker-tile-sm) var(--checker-tile-sm);
 }
 
 .batch-rail .thumb-error {
@@ -61,8 +61,8 @@
   color: var(--rail-muted);
   text-align: center;
   font-size: 9px;
-  font-weight: 750;
-  line-height: 1.1;
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-extra-tight);
 }
 
 .batch-rail .thumb.is-error .thumb-error {
@@ -73,16 +73,16 @@
   align-self: center;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--space-1);
   max-width: 76px;
   color: var(--rail-muted);
 }
 
 .asset-state > span {
-  width: 7px;
-  height: 7px;
+  width: var(--status-dot-size);
+  height: var(--status-dot-size);
   flex: 0 0 auto;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--rail-accent);
 }
 
@@ -91,7 +91,7 @@
 }
 
 .asset-state.error > span {
-  background: #e11d48;
+  background: var(--color-asset-error-indicator);
 }
 
 .asset-state.exported > span {
@@ -102,9 +102,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 10px;
+  font-size: var(--font-size-2xs);
   font-style: normal;
-  font-weight: 760;
+  font-weight: var(--font-weight-bold);
 }
 
 .gallery-column .thumb-image {
@@ -155,7 +155,7 @@
 
 .gallery-column .asset-state.warning > span {
   background: var(--color-warning);
-  color: #946200;
+  color: var(--color-warning-indicator);
 }
 
 .gallery-column .asset-state.error > span {
@@ -198,8 +198,8 @@ button, .status-dot, .asset-state, .preflight-chip, .change-chip, .state-chip {
 }
 
 .gallery-column[data-gallery-view="list"] .thumb {
-  width: 52px;
-  height: 52px;
+  width: var(--thumb-size-list);
+  height: var(--thumb-size-list);
   aspect-ratio: 1;
   align-self: center;
   justify-self: center;
@@ -209,21 +209,21 @@ button, .status-dot, .asset-state, .preflight-chip, .change-chip, .state-chip {
 .gallery-column[data-gallery-view="thumbs"] .asset-state, .gallery-column .asset-state {
   top: 10px;
   right: 10px;
-  width: 20px;
-  min-width: 20px;
-  height: 20px;
-  min-height: 20px;
+  width: var(--gallery-state-marker-size);
+  min-width: var(--gallery-state-marker-size);
+  height: var(--gallery-state-marker-size);
+  min-height: var(--gallery-state-marker-size);
   display: grid;
   place-items: center;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
+  border-radius: var(--radius-pill);
+  background: var(--surface-alpha-92);
   padding: 0;
 }
 
 .gallery-column[data-gallery-view="thumbs"] .asset-state em {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  width: var(--visually-hidden-size);
+  height: var(--visually-hidden-size);
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
@@ -238,8 +238,8 @@ button, .status-dot, .asset-state, .preflight-chip, .change-chip, .state-chip {
   height: auto;
   background: transparent;
   color: var(--color-success);
-  font-size: 12px;
-  line-height: 1;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-none);
 }
 
 .gallery-column .thumb {
@@ -249,22 +249,22 @@ button, .status-dot, .asset-state, .preflight-chip, .change-chip, .state-chip {
   position: relative;
   display: grid;
   place-items: center;
-  background-position: 0 0, 0 7px, 7px -7px, -7px 0;
-  background-size: 14px 14px;
+  background-position: 0 0, 0 var(--checker-step-thumbnail), var(--checker-step-thumbnail) calc(0px - var(--checker-step-thumbnail)), calc(0px - var(--checker-step-thumbnail)) 0;
+  background-size: var(--checker-tile-thumbnail) var(--checker-tile-thumbnail);
   background-color: var(--color-bg-muted);
-  border-color: rgba(11, 23, 34, 0.09);
+  border-color: var(--neutral-alpha-09);
   aspect-ratio: 4 / 5;
   padding: var(--space-2);
   overflow: hidden;
-  border: 1px solid var(--color-border);
-  background: #e6e6e6;
+  border: var(--border-width) solid var(--color-border);
+  background: var(--color-output-custom-fallback);
 }
 
 .gallery-column[data-gallery-view="list"] .thumb-image {
-  width: 40px;
-  height: 40px;
-  max-width: 40px;
-  max-height: 40px;
+  width: var(--thumb-image-size-list);
+  height: var(--thumb-image-size-list);
+  max-width: var(--thumb-image-size-list);
+  max-height: var(--thumb-image-size-list);
   object-fit: contain;
   object-position: center;
   align-self: center;
@@ -272,15 +272,15 @@ button, .status-dot, .asset-state, .preflight-chip, .change-chip, .state-chip {
 }
 
 .gallery-column[data-output-bg="white"] .thumb {
-  background: #fff;
+  background: var(--color-output-white);
 }
 
-.gallery-column[data-output-bg="custom"] .thumb { background: var(--custom-output-bg, #e6e6e6); }
+.gallery-column[data-output-bg="custom"] .thumb { background: var(--custom-output-bg, var(--color-output-custom-fallback)); }
 
 .gallery-column[data-output-bg="transparent"] .thumb {
-  background: linear-gradient(45deg, rgba(15, 23, 42, 0.08) 25%, transparent 25%), linear-gradient(-45deg, rgba(15, 23, 42, 0.08) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, rgba(15, 23, 42, 0.08) 75%), linear-gradient(-45deg, transparent 75%, rgba(15, 23, 42, 0.08) 75%), #fff;
-  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
-  background-size: 16px 16px;
+  background: linear-gradient(45deg, var(--ink-alpha-08) 25%, transparent 25%), linear-gradient(-45deg, var(--ink-alpha-08) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--ink-alpha-08) 75%), linear-gradient(-45deg, transparent 75%, var(--ink-alpha-08) 75%), var(--color-output-white);
+  background-position: 0 0, 0 var(--checker-step-md), var(--checker-step-md) calc(0px - var(--checker-step-md)), calc(0px - var(--checker-step-md)) 0;
+  background-size: var(--checker-tile-md) var(--checker-tile-md);
 }
 
 .gallery-column .asset-state {
@@ -289,17 +289,17 @@ button, .status-dot, .asset-state, .preflight-chip, .change-chip, .state-chip {
   position: absolute;
   top: 10px;
   right: 10px;
-  box-shadow: 0 2px 8px rgba(11, 23, 34, 0.08);
+  box-shadow: 0 2px 8px var(--neutral-alpha-08);
   width: auto;
-  height: 24px;
+  height: var(--control-size-xs);
   display: inline-flex;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--surface-alpha-96);
   align-items: center;
   gap: var(--space-1);
-  border: 1px solid rgba(255, 255, 255, 0.88);
+  border: var(--border-width) solid var(--surface-alpha-88);
   padding: 0 var(--space-2);
-  min-height: 24px;
+  min-height: var(--control-size-xs);
   border-color: var(--color-border);
 }
 

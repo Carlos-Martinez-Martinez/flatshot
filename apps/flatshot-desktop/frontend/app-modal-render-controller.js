@@ -3,8 +3,7 @@ function renderBatchDetail() {
   if (!modal) {
     return;
   }
-  modal.classList.toggle("is-hidden", !state.batchDetailOpen);
-  modal.setAttribute("aria-hidden", state.batchDetailOpen ? "false" : "true");
+  syncModalVisibility(modal, state.batchDetailOpen);
   if (!state.batchDetailOpen) {
     return;
   }
@@ -19,8 +18,7 @@ function renderExportConfirm() {
   if (!modal) {
     return;
   }
-  modal.classList.toggle("is-hidden", !state.exportConfirmOpen);
-  modal.setAttribute("aria-hidden", state.exportConfirmOpen ? "false" : "true");
+  syncModalVisibility(modal, state.exportConfirmOpen);
   if (!state.exportConfirmOpen) {
     return;
   }
@@ -50,8 +48,7 @@ function renderQaLab() {
   if (!modal) {
     return;
   }
-  modal.classList.toggle("is-hidden", !state.qaLabOpen);
-  modal.setAttribute("aria-hidden", state.qaLabOpen ? "false" : "true");
+  syncModalVisibility(modal, state.qaLabOpen);
 }
 
 function exportConfirmHtml(risks) {

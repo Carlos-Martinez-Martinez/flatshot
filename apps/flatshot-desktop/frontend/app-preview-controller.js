@@ -229,6 +229,22 @@ function calculateFitZoom() {
 
 function realPreviewHtml(image) {
   if (state.previewStatus === "loading") {
+    if (state.previewData?.src) {
+      return `
+        <div class="preview-loading-previous" aria-hidden="true">
+          ${previewViewHelpers.realPreviewImageHtml({
+            src: state.previewData.src,
+            imageName: state.previewData.sourceName || image.name,
+            width: state.previewData.width,
+            height: state.previewData.height,
+            zoom: state.zoom,
+            inlineSize: !previewStateHelpers.isAutoViewerMode(state.fitMode),
+            warning: state.previewData.warning,
+          })}
+        </div>
+        ${previewViewHelpers.previewLoadingOverlayHtml(image.name)}
+      `;
+    }
     return previewViewHelpers.previewLoadingHtml(image.name);
   }
 
@@ -293,6 +309,9 @@ function initialStateHtml() {
   return emptyStateViewHelpers.initialStateHtml({
     bridgeScanPath: state.bridgeScanPath,
     devMode,
+    dropActive: state.folderDropActive,
+    dropMessage: state.folderDropMessage,
+    recentFolders: state.recentFolders,
   });
 }
 

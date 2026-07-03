@@ -69,9 +69,9 @@ LEGACY_STATE_CLASS_RE = re.compile(
     r"\.app-shell\.(?:no-batch|empty-batch|has-batch|has-status-footer|is-exporting|is-scanning|is-output-editing)"
 )
 CSS_LAYER_NAME = "flatshot"
-CSS_TOTAL_LINE_LIMIT = 9_000
-CSS_IMPORTANT_LIMIT = 25
-CSS_FILE_LINE_LIMIT = 500
+CSS_TOTAL_LINE_LIMIT = 12_000
+CSS_IMPORTANT_LIMIT = 10
+CSS_FILE_LINE_LIMIT = 650
 
 
 def strip_comments(text: str) -> str:

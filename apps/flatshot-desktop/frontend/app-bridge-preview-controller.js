@@ -3,7 +3,7 @@ let _previewBlobUrl = null;
 async function requestBridgePreview(image) {
   const requestId = state.previewRequestId + 1;
   state.previewRequestId = requestId;
-  Object.assign(state, previewStateHelpers.previewLoadingState());
+  Object.assign(state, previewStateHelpers.previewLoadingState({ clearData: false }));
   render();
 
   const controller = new AbortController();

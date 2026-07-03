@@ -5,19 +5,18 @@
   align-items: end;
   gap: var(--space-2);
 }
-.background-preset-actions[hidden] { display: none; }
-.background-preset-editor-actions button { min-width: 0; min-height: 34px; padding-inline: 10px; }
-.background-preset-actions button { width: 34px; min-width: 34px; height: 34px; min-height: 34px; padding: 0; }
+.background-preset-editor-actions button { min-width: 0; min-height: var(--control-size-md); padding-inline: 10px; }
+.background-preset-actions button { width: var(--control-size-md); min-width: var(--control-size-md); height: var(--control-size-md); min-height: var(--control-size-md); padding: 0; }
 .background-preset-actions button .button-icon, .background-preset-actions button .button-icon svg { width: 15px; height: 15px; }
 .background-preset-editor {
   position: fixed;
-  width: min(486px, calc(100vw - 48px));
+  width: min(390px, calc(100vw - var(--modal-viewport-gutter)));
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: start;
   gap: var(--space-2);
   z-index: 70;
-  border: 1px solid var(--color-border);
+  border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-bg-soft);
   padding: var(--space-2);
@@ -26,7 +25,7 @@
 .background-preset-editor-fields {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(128px, 150px) 54px;
+  grid-template-columns: minmax(0, 1fr) var(--control-size-lg);
   align-items: end;
   gap: var(--space-2);
 }
@@ -40,9 +39,10 @@
   min-width: 0;
   justify-content: flex-end;
   flex-wrap: nowrap;
+  margin-top: var(--space-1);
 }
 .background-preset-editor-actions button { white-space: nowrap; }
-.background-preset-editor label { gap: 2px; }
+.background-preset-editor label { gap: var(--space-0-5); }
 .background-preset-editor label > span {
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
@@ -50,19 +50,16 @@
   line-height: var(--line-height-tight);
   text-transform: uppercase;
 }
-.background-preset-editor input, .background-preset-editor select { height: 32px; }
-.background-preset-editor[hidden], .background-preset-rgb-field[hidden] {
-  display: none;
-}
+.background-preset-editor input, .background-preset-editor select { height: var(--control-size-slim); }
 .background-preset-swatch.is-transparent {
-  background-color: #fff;
+  background-color: var(--color-output-white);
   background-image:
-    linear-gradient(45deg, rgba(100, 116, 139, 0.24) 25%, transparent 25%),
-    linear-gradient(-45deg, rgba(100, 116, 139, 0.24) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, rgba(100, 116, 139, 0.24) 75%),
-    linear-gradient(-45deg, transparent 75%, rgba(100, 116, 139, 0.24) 75%);
-  background-position: 0 0, 0 6px, 6px -6px, -6px 0;
-  background-size: 12px 12px;
+    linear-gradient(45deg, var(--muted-alpha-24) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--muted-alpha-24) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--muted-alpha-24) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--muted-alpha-24) 75%);
+  background-position: 0 0, 0 var(--checker-step-sm), var(--checker-step-sm) calc(0px - var(--checker-step-sm)), calc(0px - var(--checker-step-sm)) 0;
+  background-size: var(--checker-tile-sm) var(--checker-tile-sm);
 }
 .background-preset-swatch.is-invalid {
   background:

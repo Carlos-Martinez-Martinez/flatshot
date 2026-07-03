@@ -76,6 +76,7 @@ def test_background_preset_editor_stays_with_background_controls():
 def test_background_preset_editor_uses_visual_rgb_selector():
     html = INDEX_PATH.read_text(encoding="utf-8")
     app_js = app_domain_source()
+    background_css = (FRONTEND_DIR / "css" / "06-inspector-export" / "background-presets.css").read_text(encoding="utf-8")
     forms_css = (FRONTEND_DIR / "css" / "03-components" / "forms.css").read_text(encoding="utf-8")
 
     editor_block = html[html.index('id="background-preset-editor"'):html.index('id="background-preset-editor-message"')]
@@ -97,6 +98,9 @@ def test_background_preset_editor_uses_visual_rgb_selector():
     assert "data-rgb-visual-picker" in app_js
     assert ".rgb-visual-control" in forms_css
     assert ".rgb-visual-control--swatch-only" in forms_css
+    assert "Math.min(390" in app_js
+    assert "width: min(390px, calc(100vw - var(--modal-viewport-gutter)))" in background_css
+    assert "grid-template-columns: minmax(0, 1fr) var(--control-size-lg)" in background_css
 
 
 def test_transparent_background_switches_output_type_before_validation():

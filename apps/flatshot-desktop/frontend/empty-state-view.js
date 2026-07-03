@@ -12,6 +12,14 @@
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;");
   };
+  const recentFolderHelpers = globalThis.FlatShotRecentFolders || {
+    basename(path) {
+      return String(path || "").split(/[\\/]+/).pop() || String(path || "");
+    },
+    recentFolderMeta() {
+      return "";
+    },
+  };
 
   function emptyStateHtml({ variant = "inline", title, detail, actionLabel = "", action = "", meta = "" }) {
     const actionHtml = actionLabel && action
@@ -29,6 +37,32 @@
   `;
   }
 
+  function recentFoldersHtml(folders = []) {
+    const rows = Array.isArray(folders) ? folders.slice(0, 8) : [];
+    if (!rows.length) {
+      return "";
+    }
+    return `
+      <div class="recent-folder-list" aria-label="Carpetas recientes">
+        <span>Recientes</span>
+        ${rows.map((folder) => {
+          const path = String(folder.path || "");
+          const name = String(folder.name || recentFolderHelpers.basename(path) || path);
+          const meta = recentFolderHelpers.recentFolderMeta(folder);
+          return `
+            <div class="recent-folder-row">
+              <button type="button" data-action="scan-recent-folder" data-recent-folder-path="${escapeHtml(path)}" title="${escapeHtml(path)}">
+                <strong>${escapeHtml(name)}</strong>
+                ${meta ? `<small>${escapeHtml(meta)}</small>` : ""}
+              </button>
+              <button type="button" class="icon-button" data-action="remove-recent-folder" data-recent-folder-path="${escapeHtml(path)}" aria-label="Quitar ${escapeHtml(name)}" title="Quitar reciente">×</button>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+  }
+
   function initialStateHtml(options = {}) {
     const qaLabActionHtml = options.devMode
       ? `<button type="button" class="ghost-action dev-only" data-action="open-qa-lab">QA Lab</button>`
@@ -42,8 +76,11 @@
         <button type="button" class="folder-entry-inline__scan primary" data-action="scan-bridge-folder" title="Escanear carpeta">Escanear</button>
       </div>
   `;
+    const dropMessage = options.dropMessage
+      ? `<div class="folder-drop-message"><span>${escapeHtml(options.dropMessage)}</span><button type="button" data-action="clear-folder-drop-message" aria-label="Cerrar aviso">×</button></div>`
+      : "";
     return `
-    <div class="empty-state onboarding initial-onboarding">
+    <div class="empty-state onboarding initial-onboarding${options.dropActive ? " is-drop-active" : ""}">
       <span class="empty-icon" aria-hidden="true">
         <svg viewBox="0 0 24 24" focusable="false">
           <path d="M3 6.75A2.75 2.75 0 0 1 5.75 4h4.08c.73 0 1.42.34 1.86.92l.82 1.08h5.74A2.75 2.75 0 0 1 21 8.75v.75H7.18a2.75 2.75 0 0 0-2.63 1.96L3 16.65Z"></path>
@@ -51,8 +88,10 @@
         </svg>
       </span>
       <strong>Selecciona una carpeta</strong>
-      <span>Carga un lote de imágenes PNG o JPG para revisar y exportar.</span>
+      <span>Carga un lote de imágenes PNG o JPG o arrastra una carpeta aquí.</span>
       ${folderEntryHtml}
+      ${dropMessage}
+      ${recentFoldersHtml(options.recentFolders)}
       <div class="empty-state__actions">
         <button type="button" class="ghost-action" data-action="pick-bridge-folder">Buscar carpeta</button>
         <button type="button" class="ghost-action" data-action="open-app-settings">Gestionar formatos</button>
@@ -65,6 +104,7 @@
   return {
     emptyStateHtml,
     escapeHtml,
+    recentFoldersHtml,
     initialStateHtml,
   };
 });

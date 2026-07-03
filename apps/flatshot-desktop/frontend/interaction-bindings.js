@@ -36,6 +36,10 @@
     documentRef.addEventListener("focusout", handlers.documentFocusOut);
     documentRef.addEventListener("submit", handlers.documentSubmit);
     documentRef.addEventListener("keydown", handlers.documentKeydown);
+    documentRef.addEventListener("dragenter", handlers.documentDragEnter);
+    documentRef.addEventListener("dragover", handlers.documentDragOver);
+    documentRef.addEventListener("dragleave", handlers.documentDragLeave);
+    documentRef.addEventListener("drop", handlers.documentDrop);
     documentRef.addEventListener("scroll", handlers.positionBackgroundPresetEditor, true);
 
     optionalElement($, "#bridge-url")?.addEventListener("input", handlers.bridgeUrlInput);

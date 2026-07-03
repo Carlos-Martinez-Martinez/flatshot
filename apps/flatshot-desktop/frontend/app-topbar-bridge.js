@@ -107,6 +107,22 @@ function renderTop() {
     formatButton.disabled = !showFormat || state.exportStatus === "running";
     formatButton.title = "Formatos de salida";
   }
+  const inspectorButton = $(".top-inspector-action");
+  if (inspectorButton) {
+    const showInspector = state.batch !== "none" && state.batch !== "scanning";
+    inspectorButton.hidden = !showInspector;
+    inspectorButton.disabled = !showInspector || state.exportStatus === "running";
+    inspectorButton.textContent = state.responsiveInspectorOpen ? "Cerrar ajustes" : "Ajustes";
+    inspectorButton.title = state.responsiveInspectorOpen ? "Cerrar inspector" : "Abrir ajustes y exportación";
+    inspectorButton.setAttribute("aria-pressed", state.responsiveInspectorOpen ? "true" : "false");
+  }
+  const activePreset = $("#top-active-preset");
+  if (activePreset) {
+    const showPreset = state.batch !== "none" && state.batch !== "scanning" && Boolean(state.activePreset);
+    activePreset.hidden = !showPreset;
+    activePreset.textContent = showPreset ? `Ajuste: ${state.activePreset}` : "";
+    activePreset.title = showPreset ? `Ajuste activo: ${state.activePreset}` : "";
+  }
   const resetButton = $(".top-reset-action");
   if (resetButton) {
     resetButton.hidden = state.batch === "none" || state.batch === "scanning";

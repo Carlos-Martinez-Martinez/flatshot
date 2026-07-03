@@ -142,6 +142,7 @@ function persistBridgeScanPath(path = parseFolderInput(state.bridgeScanPath)[0] 
 function applyBridgeScanResult(response) {
   state.scanDiagnostics = scanDiagnosticsFromResponse(response);
   state.realFolders = (response.folders || []).map(bridgeFolderToItem);
+  rememberScannedFolders(response);
   state.realImages = (response.folders || []).flatMap((folder, folderIndex) =>
     (folder.images || []).map((image, imageIndex) => bridgeImageToItem(image, folderIndex, imageIndex))
   );
@@ -188,6 +189,19 @@ function applyBridgeScanResult(response) {
   }
 
   Object.assign(state, scanStateHelpers.scanEmptyState(state.scanIssues));
+}
+
+function rememberScannedFolders(response) {
+  const folders = Array.isArray(response?.folders) ? response.folders : [];
+  folders.forEach((folder) => {
+    recentFolderHelpers.rememberRecentFolder(window.localStorage, STORAGE_KEYS.recentFolders, {
+      path: folder.path,
+      name: formatterHelpers.basename(folder.path),
+      imageCount: Array.isArray(folder.images) ? folder.images.length : Number(folder.count || 0),
+      limit: 8,
+    });
+  });
+  state.recentFolders = recentFolderHelpers.readRecentFolders(window.localStorage, STORAGE_KEYS.recentFolders);
 }
 
 function parseFolderInput(value) {

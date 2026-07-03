@@ -15,7 +15,7 @@
 }
 
 .btn-linklike {
-  min-height: 32px;
+  min-height: var(--control-height);
   border: 0;
   background: transparent;
   color: var(--color-accent-hover);
@@ -25,10 +25,10 @@
 
 .primary {
   min-width: 150px;
-  font-weight: 750;
+  font-weight: var(--font-weight-bold);
   border-color: var(--accent);
   background: var(--accent);
-  color: #fff;
+  color: var(--color-text-inverse);
   box-shadow: var(--shadow-xs);
 }
 
@@ -40,30 +40,30 @@ button, summary {
   user-select: none;
 }
 
-button:not(.image-item):not(.preset-chip):not(.output-profile-edit):not(.active-output-row__main):not(.guide-system-main):not(.guide-icon-button):not(.rgb-visual-control__swatch) {
+button:not(.image-item):not(.preset-chip):not(.output-profile-edit):not(.active-output-row__main):not(.guide-system-main):not(.guide-icon-button):not(.rgb-visual-control__swatch):not(.top-inspector-action) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  line-height: 1;
+  line-height: var(--line-height-none);
 }
 
 .button-icon {
   flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
+  width: var(--button-icon-size);
+  height: var(--button-icon-size);
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
 .button-icon svg {
-  width: 16px;
-  height: 16px;
+  width: var(--button-icon-size);
+  height: var(--button-icon-size);
   display: block;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2;
+  stroke-width: var(--icon-stroke-width);
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -85,9 +85,9 @@ button.primary {
 }
 
 .segmented button {
-  border-radius: var(--radius-6);
-  font-size: 12px;
-  min-height: var(--control-height-sm);
+  border-radius: var(--radius-xs);
+  font-size: var(--font-size-xs);
+  min-height: var(--control-height);
   border-color: transparent;
   background: transparent;
   padding: 0 var(--space-3);
@@ -95,7 +95,7 @@ button.primary {
 }
 
 .danger-subtle {
-  border-color: rgba(180, 35, 24, 0.18);
+  border-color: var(--danger-deep-alpha-18);
   color: var(--color-error);
 }
 

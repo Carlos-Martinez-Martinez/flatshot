@@ -9,7 +9,7 @@ summary {
 
 button, input, select, summary {
   color: inherit;
-  transition: background-color var(--duration-fast) ease, border-color var(--duration-fast) ease, color var(--duration-fast) ease, box-shadow var(--duration-fast) ease, transform 120ms ease;
+  transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard), transform var(--duration-quick) var(--ease-standard);
 }
 
 * {
@@ -33,7 +33,7 @@ button {
   white-space: nowrap;
   border-color: var(--line);
   min-height: var(--control-height);
-  border: 1px solid var(--color-border);
+  border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-bg-panel);
   padding: 0 var(--space-3);
@@ -51,8 +51,8 @@ body {
 
 .visually-hidden {
   position: absolute !important;
-  width: 1px !important;
-  height: 1px !important;
+  width: var(--visually-hidden-size) !important;
+  height: var(--visually-hidden-size) !important;
   overflow: hidden !important;
   clip: rect(0 0 0 0) !important;
   white-space: nowrap !important;

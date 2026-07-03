@@ -2,7 +2,7 @@
 /* Batch and gallery: QA Lab visual scenario controls. */
 
 .qa-lab-dialog {
-  width: min(720px, calc(100vw - 48px));
+  width: min(720px, calc(100vw - var(--modal-viewport-gutter)));
 }
 
 .qa-lab-body {
@@ -16,14 +16,14 @@
   display: grid;
   gap: var(--space-3);
   padding: var(--space-4);
-  border: 1px solid var(--border-subtle);
+  border: var(--border-width) solid var(--border-subtle);
   border-radius: var(--radius-sm);
   background: var(--surface-muted);
 }
 
 .qa-lab-section-heading {
   display: grid;
-  gap: 3px;
+  gap: var(--space-0-75);
 }
 
 .qa-lab-section-heading h3 {
@@ -40,7 +40,7 @@
 .review-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  gap: var(--space-1-5);
 }
 
 .review-actions {
@@ -50,7 +50,7 @@
 }
 
 .review-grid button, .review-actions button {
-  min-height: 28px;
+  min-height: var(--control-size-sm);
   padding: 0 7px;
   font-size: var(--text-sm);
 }

@@ -198,8 +198,7 @@ function renderAppSettings() {
   if (!modal) {
     return;
   }
-  modal.classList.toggle("is-hidden", !state.appSettingsOpen);
-  modal.setAttribute("aria-hidden", state.appSettingsOpen ? "false" : "true");
+  syncModalVisibility(modal, state.appSettingsOpen);
   if (!state.appSettingsOpen) {
     return;
   }

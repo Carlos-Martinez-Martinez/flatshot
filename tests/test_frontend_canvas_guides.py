@@ -198,15 +198,16 @@ def test_canvas_guide_manager_uses_bounded_editor_layout():
     assert "División" not in editor_block
 
     assert ".guide-manager-panel" in toolbar_css and "height: min(" in toolbar_css
-    assert "width: min(1280px, calc(100vw - 72px))" in toolbar_css
-    assert "max-width: min(1280px, calc(100vw - 72px))" in toolbar_css
+    assert "var(--modal-guide-manager-width)" in toolbar_css
+    assert "var(--modal-max-height)" in toolbar_css
+    assert "var(--modal-padding-wide)" in toolbar_css
     assert "grid-template-columns: 340px minmax(0, 1fr)" in toolbar_css
     assert ".guide-system-row .viewer-guide-system-swatch" in toolbar_css
     assert "grid-template-columns: 24px minmax(0, 1fr)" in toolbar_css
     assert ".guide-system-controls" in toolbar_css
     assert ".guide-system-picker" in toolbar_css
     assert ".guide-icon-button" in toolbar_css
-    assert "width: 30px" in toolbar_css
+    assert "width: var(--control-size-compact)" in toolbar_css
     assert ".guide-system-row.is-inactive" in toolbar_css
     assert ".guide-system-row.is-selected" in toolbar_css
     assert ".guide-draft-form" in toolbar_css and "grid-template-rows: auto auto auto auto minmax(0, 1fr) auto" in toolbar_css

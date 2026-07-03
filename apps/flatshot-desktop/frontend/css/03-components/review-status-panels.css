@@ -8,7 +8,7 @@
   padding: var(--space-2);
   gap: var(--space-2);
   align-items: stretch;
-  border: 1px solid var(--color-border);
+  border: var(--border-width) solid var(--color-border);
   background: var(--color-bg-soft);
 }
 
@@ -51,10 +51,10 @@
 .review-facts > div {
   min-width: 0;
   display: grid;
-  gap: 2px;
-  border: 1px solid var(--ui-border);
+  gap: var(--space-0-5);
+  border: var(--border-width) solid var(--ui-border);
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--surface-alpha-62);
   padding: var(--space-2);
 }
 
@@ -83,7 +83,7 @@
 }
 
 .review-issue.clear {
-  border-color: rgba(15, 143, 114, 0.22);
+  border-color: color-mix(in srgb, var(--color-primary) 22%, transparent);
   background: var(--color-success-soft);
 }
 
@@ -96,7 +96,7 @@
 }
 
 .review-output-card--compact {
-  gap: 2px;
+  gap: var(--space-0-5);
 }
 
 .review-output-card--compact strong, .review-output-card--compact small {
@@ -110,7 +110,7 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   align-items: center;
-  border-top: 1px solid var(--color-border);
+  border-top: var(--border-width) solid var(--color-border);
   padding-top: var(--space-3);
 }
 
@@ -122,7 +122,7 @@
 .lot-summary-card {
   display: grid;
   gap: var(--space-3);
-  border: 1px solid var(--border-default);
+  border: var(--border-width) solid var(--border-default);
   border-radius: var(--radius-sm);
   background: var(--surface-muted);
   padding: var(--space-3);
@@ -156,6 +156,6 @@
 .lot-summary-card__grid span {
   min-width: 0;
   display: grid;
-  gap: 2px;
+  gap: var(--space-0-5);
 }
 }

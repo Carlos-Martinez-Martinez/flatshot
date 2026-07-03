@@ -22,6 +22,7 @@ const initialHiddenGuideSystemIds = guideHelpers.normalizeHiddenGuideSystemIds(
   initialGuideSystems
 );
 const initialGuidesVisible = storageHelpers.readValue(window.localStorage, STORAGE_KEYS.guidesVisible) !== "0";
+const initialRecentFolders = recentFolderHelpers.readRecentFolders(window.localStorage, STORAGE_KEYS.recentFolders);
 const initialOutputProfiles = readOutputProfiles(initialOutputProfileId);
 const initialEnabledOutputProfiles = initialOutputProfiles.filter((profile) => profile.enabled);
 const initialOutputProfile = initialEnabledOutputProfiles.find((profile) => profile.id === initialOutputProfileId)
@@ -80,6 +81,7 @@ const state = {
   galleryView: "thumbs",
   inspectorTab: "review",
   inspectorCollapsed: false,
+  responsiveInspectorOpen: false,
   advancedDisclosureKey: "",
   outputEditMode: false,
   presetEditorOpen: false,
@@ -149,6 +151,10 @@ const state = {
   realFolders: [],
   realImages: [],
   imageOverrides: {},
+  recentFolders: initialRecentFolders,
+  folderDropActive: false,
+  folderDropMessage: "",
+  adjustmentHistory: adjustmentHistoryHelpers.createAdjustmentHistory({ limit: 50 }),
 };
 
 const timers = new Set();

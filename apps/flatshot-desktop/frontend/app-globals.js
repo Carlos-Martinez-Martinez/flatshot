@@ -8,6 +8,9 @@
   global.actionHandlerHelpers = window.FlatShotActionHandlers;
   global.interactionBindingHelpers = window.FlatShotInteractionBindings;
   global.sessionSnapshotHelpers = window.FlatShotSessionSnapshot;
+  global.recentFolderHelpers = window.FlatShotRecentFolders;
+  global.folderDropHelpers = window.FlatShotFolderDrop;
+  global.adjustmentHistoryHelpers = window.FlatShotAdjustmentHistory;
   global.onboardingBackgroundHelpers = window.FlatShotOnboardingBackground;
   global.backgroundPresetHelpers = window.FlatShotBackgroundPresets;
   global.guideHelpers = window.FlatShotCanvasGuides;

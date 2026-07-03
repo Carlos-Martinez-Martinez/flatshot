@@ -6,8 +6,8 @@
 }
 
 .export-confirm-dialog {
-  width: min(640px, calc(100vw - 48px));
-  max-height: min(680px, calc(100vh - 48px));
+  width: min(640px, calc(100vw - var(--modal-viewport-gutter)));
+  max-height: min(680px, calc(100vh - var(--modal-viewport-gutter)));
 }
 
 .export-confirm-content {
@@ -22,7 +22,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
-  border: 1px solid var(--color-border);
+  border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-bg-panel);
   padding: var(--space-4);
@@ -31,7 +31,7 @@
 .export-confirm-summary > div {
   min-width: 0;
   display: grid;
-  gap: 2px;
+  gap: var(--space-0-5);
 }
 
 .export-confirm-summary span, .export-confirm-risk small, .export-confirm-note span {
@@ -71,7 +71,7 @@
   grid-template-columns: 28px minmax(0, 1fr);
   gap: var(--space-3);
   align-items: start;
-  border: 1px solid var(--color-border);
+  border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-bg-panel);
   padding: var(--space-3);
@@ -81,7 +81,7 @@
   display: grid;
   place-items: center;
   width: 24px;
-  height: 24px;
+  height: var(--control-size-xs);
   border-radius: var(--radius-pill);
   background: var(--color-bg-soft);
   color: var(--color-text-muted);
@@ -91,7 +91,7 @@
 .export-confirm-risk > div {
   min-width: 0;
   display: grid;
-  gap: 2px;
+  gap: var(--space-0-5);
 }
 
 .export-confirm-risk.ready {
@@ -124,7 +124,7 @@
 .export-confirm-note {
   display: grid;
   gap: var(--space-1);
-  border: 1px solid var(--color-border);
+  border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-bg-soft);
   padding: var(--space-3);

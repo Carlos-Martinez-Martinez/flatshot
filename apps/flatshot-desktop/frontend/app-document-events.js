@@ -219,7 +219,7 @@ function handleDocumentClick(event) {
 
   const presetTarget = target.closest("[data-preset]");
   if (presetTarget) {
-    applyPresetSettings(presetTarget.dataset.preset);
+    applyPresetSettings(presetTarget.dataset.preset, { recordHistory: true });
   }
 
   const inspectorTarget = target.closest("[data-inspector-tab]");
@@ -282,6 +282,7 @@ function handleDocumentInput(event) {
   }
   const localKey = event.target?.dataset?.localSetting;
   if (localKey) {
+    beginAdjustmentChange(adjustmentHistoryToken("local", localKey));
     setCurrentImageOverrideValue(localKey, event.target.value);
   }
   if (event.target?.matches?.("[data-preview-bg-picker]")) {
@@ -319,6 +320,10 @@ function handleDocumentChange(event) {
     return;
   }
   if (event.target?.matches?.("[data-rgb-visual-channel], [data-rgb-visual-picker]")) { syncRgbVisualControlToTarget(event.target.closest(".rgb-visual-control"), event.target); }
+  if (event.target?.dataset?.localSetting) {
+    commitAdjustmentChange(adjustmentHistoryToken("local", event.target.dataset.localSetting), "Ajustar imagen");
+    return;
+  }
   if (event.target?.id === "gallery-output-select") {
     if (event.target.value !== "__custom") {
       applyOutputProfile(event.target.value);
@@ -352,7 +357,7 @@ function handleDocumentChange(event) {
     return;
   }
   if (event.target.matches?.("[data-image-adjustment-select]")) {
-    applyPresetSettings(event.target.value);
+    applyPresetSettings(event.target.value, { recordHistory: true });
     return;
   }
   if (event.target.closest?.("#output-profile-form")) {

@@ -70,12 +70,16 @@ assert.deepEqual(helpers.viewerFitLayout({{}}), {{ width: 0, height: 0, zoom: 10
 assert.deepEqual(helpers.previewLoadingState(), {{
   previewStatus: "loading",
   statusText: "Generando vista",
-  previewData: null,
-  previewError: "",
 }});
 assert.deepEqual(helpers.previewLoadingState({{ statusText: "Restaurando vista", clearData: false }}), {{
   previewStatus: "loading",
   statusText: "Restaurando vista",
+}});
+assert.deepEqual(helpers.previewLoadingState({{ clearData: true }}), {{
+  previewStatus: "loading",
+  statusText: "Generando vista",
+  previewData: null,
+  previewError: "",
 }});
 assert.deepEqual(helpers.previewEmptyState(), {{
   previewStatus: "empty",

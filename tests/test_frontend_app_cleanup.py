@@ -95,6 +95,7 @@ def test_app_domain_scripts_are_loaded_in_order():
         "app-export-controller.js",
         "app-bridge-connection-controller.js",
         "app-bridge-scan-controller.js",
+        "app-folder-drop-controller.js",
         "app-review-actions.js",
         "app-inspector-disclosure-controller.js",
         "app-shell.js",

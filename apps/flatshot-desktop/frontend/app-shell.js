@@ -14,10 +14,12 @@ function renderShell() {
   shell.classList.toggle("is-settings-open", state.appSettingsOpen);
   shell.classList.toggle("export-completed", ["completed", "partial", "failed"].includes(state.exportStatus));
   shell.classList.toggle("inspector-collapsed", state.inspectorCollapsed);
+  shell.classList.toggle("is-folder-drop-active", state.folderDropActive);
   shell.dataset.uiState = visible.id;
   shell.dataset.batchContext = derived.hasBatchContext ? "true" : "false";
   shell.dataset.statusFooter = hasStatusFooter ? "true" : "false";
   shell.dataset.outputEditing = state.outputEditMode ? "true" : "false";
+  shell.dataset.responsiveInspector = state.responsiveInspectorOpen ? "true" : "false";
   if (gallery) {
     gallery.dataset.galleryView = state.galleryView;
     const galleryBackground = galleryActiveOutputContext().background;

@@ -38,6 +38,7 @@ function imageAdjustmentOverrideCount(images = activeImages()) {
 }
 
 function resetAllImageOverrides() {
+  const before = adjustmentSnapshot();
   state.imageOverrides = {};
   state.realImages = state.realImages.map((image) =>
     image.status === "adjusted" ? { ...image, status: "ready" } : image
@@ -45,6 +46,7 @@ function resetAllImageOverrides() {
   state.localOverride = false;
   state.statusText = "Ajuste del lote aplicado a todas las imágenes";
   refreshPreviewAfterSettingChange();
+  recordAdjustmentChange(before, "Aplicar ajuste global");
 }
 
 function setCurrentImageOverrideValue(key, value) {
@@ -73,10 +75,12 @@ function resetCurrentImageOverride() {
   if (!key) {
     return;
   }
+  const before = adjustmentSnapshot();
   delete state.imageOverrides[key];
   state.localOverride = false;
   state.statusText = "Ajuste de imagen restablecido";
   refreshPreviewAfterSettingChange();
+  recordAdjustmentChange(before, "Restablecer imagen");
 }
 
 function settingsWithLocalOverride(settings = state.settings, override = currentImageOverride()) {

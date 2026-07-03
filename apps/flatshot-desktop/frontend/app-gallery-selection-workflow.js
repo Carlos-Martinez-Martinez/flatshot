@@ -13,7 +13,7 @@ function selectImage(imageId) {
     void requestBridgePreview(image);
     return;
   }
-  Object.assign(state, previewStateHelpers.previewLoadingState());
+  Object.assign(state, previewStateHelpers.previewLoadingState({ clearData: false }));
   render();
   setTimer(() => {
     Object.assign(state, previewStateHelpers.previewImageStatusState(image.status));

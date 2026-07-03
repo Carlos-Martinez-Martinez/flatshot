@@ -10,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
 HELPER_PATH = FRONTEND_DIR / "inspector-review-view.js"
 INDEX_PATH = FRONTEND_DIR / "index.html"
+INSPECTOR_CARDS_CSS_PATH = FRONTEND_DIR / "css" / "06-inspector-export" / "inspector-cards.css"
 
 
 def test_inspector_review_view_helper_loads_before_app_script():
@@ -19,6 +20,17 @@ def test_inspector_review_view_helper_loads_before_app_script():
     app_index = html.index("app.js")
 
     assert helper_index < app_index
+
+
+def test_selected_image_actions_render_as_buttons_in_dark_surfaces():
+    css = INSPECTOR_CARDS_CSS_PATH.read_text(encoding="utf-8")
+
+    assert ".selected-image-card__actions button {" in css
+    action_rule = css.split(".selected-image-card__actions button {", 1)[1].split("}", 1)[0]
+    assert "border-color: var(--color-border)" in action_rule
+    assert "background: var(--color-bg-panel)" in action_rule
+    assert "color: var(--color-text)" in action_rule
+    assert ".inspector-compact-row .selected-image-card__actions button:hover:not(:disabled)" in css
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")

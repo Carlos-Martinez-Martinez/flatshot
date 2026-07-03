@@ -9,18 +9,70 @@
       (() => {
         try {
           const root = document.documentElement;
-          const themePreference = localStorage.getItem("flatshot.theme");
-          const brandTone = localStorage.getItem("flatshot.brandTone");
-          const preferences = JSON.parse(localStorage.getItem("flatshot.interfacePreferences") || "{}");
-          const theme = ["light", "dark", "system"].includes(themePreference) ? themePreference : "light";
-          const systemDark = theme === "system" && window.matchMedia?.("(prefers-color-scheme: dark)")?.matches;
-          root.dataset.theme = theme === "dark" || systemDark ? "dark" : "light";
-          root.dataset.themePreference = theme;
-          root.dataset.brandTone = ["green", "blue", "indigo", "violet", "coral", "amber"].includes(brandTone) ? brandTone : "green";
+          const bootPreferences = (() => {
+            try {
+              const node = document.getElementById("flatshot-boot-preferences");
+              if (!node?.textContent) {
+                return {};
+              }
+              const parsed = JSON.parse(node.textContent);
+              if (!parsed || typeof parsed !== "object") {
+                return {};
+              }
+              return parsed.preferences && typeof parsed.preferences === "object" ? parsed.preferences : parsed;
+            } catch (error) {
+              return {};
+            }
+          })();
+          let storedThemePreference = null;
+          let storedBrandTone = null;
+          let storedInterfacePreferences = {};
+          try {
+            storedThemePreference = localStorage.getItem("flatshot.theme");
+          } catch (error) {}
+          try {
+            storedBrandTone = localStorage.getItem("flatshot.brandTone");
+          } catch (error) {}
+          try {
+            storedInterfacePreferences = JSON.parse(localStorage.getItem("flatshot.interfacePreferences") || "{}");
+          } catch (error) {
+            storedInterfacePreferences = {};
+          }
+          const hasBootTheme = Object.prototype.hasOwnProperty.call(bootPreferences, "themePreference");
+          const hasBootBrandTone = Object.prototype.hasOwnProperty.call(bootPreferences, "brandTone");
+          const hasBootInterfacePreferences = (
+            bootPreferences.interfacePreferences
+            && typeof bootPreferences.interfacePreferences === "object"
+            && !Array.isArray(bootPreferences.interfacePreferences)
+          );
+          const themePreferenceValue = hasBootTheme ? bootPreferences.themePreference : storedThemePreference;
+          const brandToneValue = hasBootBrandTone ? bootPreferences.brandTone : storedBrandTone;
+          const preferences = hasBootInterfacePreferences ? bootPreferences.interfacePreferences : storedInterfacePreferences;
+          const themePreference = ["light", "dark", "system"].includes(themePreferenceValue) ? themePreferenceValue : "light";
+          const systemDark = themePreference === "system" && window.matchMedia?.("(prefers-color-scheme: dark)")?.matches;
+          const brandTone = ["green", "blue", "indigo", "violet", "coral", "amber"].includes(brandToneValue) ? brandToneValue : "green";
+          root.dataset.theme = themePreference === "dark" || systemDark ? "dark" : "light";
+          root.dataset.themePreference = themePreference;
+          root.dataset.brandTone = brandTone;
           root.dataset.uiDensity = preferences.density === "comfortable" ? "comfortable" : "compact";
           root.dataset.motion = preferences.reduceMotion === true ? "reduced" : "auto";
           root.dataset.thumbnailSize = ["small", "medium", "large"].includes(preferences.thumbnailSize) ? preferences.thumbnailSize : "medium";
           root.dataset.fileNameDisplay = ["always", "hover", "none"].includes(preferences.fileNameDisplay) ? preferences.fileNameDisplay : "always";
+          if (hasBootTheme) {
+            try {
+              localStorage.setItem("flatshot.theme", themePreference);
+            } catch (error) {}
+          }
+          if (hasBootBrandTone) {
+            try {
+              localStorage.setItem("flatshot.brandTone", brandTone);
+            } catch (error) {}
+          }
+          if (hasBootInterfacePreferences) {
+            try {
+              localStorage.setItem("flatshot.interfacePreferences", JSON.stringify(preferences));
+            } catch (error) {}
+          }
         } catch (error) {
           document.documentElement.dataset.theme = "light";
           document.documentElement.dataset.themePreference = "light";

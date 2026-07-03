@@ -107,7 +107,7 @@
   white-space: nowrap;
 }
 
-.inspector-output-card__actions button:hover:not(:disabled) {
+.inspector-output-card__actions button:hover:not(:disabled), .inspector-compact-row .selected-image-card__actions button:hover:not(:disabled) {
   border-color: var(--color-accent-border);
   background: var(--color-accent-soft);
   color: var(--color-accent-hover);
@@ -296,4 +296,15 @@
   justify-content: flex-start;
   gap: var(--space-1-5);
 }
+
+.selected-image-card__actions button {
+  min-height: var(--control-height);
+  border-color: var(--color-border);
+  border-radius: var(--radius-xs);
+  background: var(--color-bg-panel);
+  padding: 0 10px;
+  color: var(--color-text);
+  font-weight: var(--font-weight-bold);
+}
+
 }

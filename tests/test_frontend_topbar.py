@@ -83,6 +83,14 @@ def test_primary_toolbar_controls_use_stable_icon_names():
     assert 'class="button-icon' in html
 
 
+def test_theme_toggle_icon_visibility_beats_generic_button_icon_rule():
+    topbar_css = (FRONTEND_DIR / "css" / "02-layout" / "topbar.css").read_text(encoding="utf-8")
+
+    assert ".top-theme-action .theme-icon--light" in topbar_css
+    assert ':root[data-theme="dark"] .top-theme-action .theme-icon--dark' in topbar_css
+    assert ':root[data-theme="dark"] .top-theme-action .theme-icon--light' in topbar_css
+
+
 def test_dev_review_controls_are_hidden_outside_dev_mode():
     html = (FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
     debug_css = (FRONTEND_DIR / "css" / "03-components" / "dev-debug.css").read_text(encoding="utf-8")

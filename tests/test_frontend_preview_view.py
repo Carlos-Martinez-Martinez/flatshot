@@ -11,6 +11,7 @@ FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
 HELPER_PATH = FRONTEND_DIR / "preview-view.js"
 INDEX_PATH = FRONTEND_DIR / "index.html"
 APP_PATH = FRONTEND_DIR / "app.js"
+VIEWER_TOOLBAR_CSS_PATH = FRONTEND_DIR / "css" / "05-viewer" / "viewer-toolbar.css"
 
 
 def app_domain_source():
@@ -62,6 +63,14 @@ def test_preview_toolbar_keeps_compact_context_labels():
     assert 'data-action="zoom-fit" title="Encajar' not in html
     assert 'data-action="zoom-100"' not in html
     assert ">1:1</button>" not in html
+
+
+def test_preview_rgb230_swatch_uses_real_light_background_color():
+    css = VIEWER_TOOLBAR_CSS_PATH.read_text(encoding="utf-8")
+
+    assert '.viewer-background-switch [data-preview-bg="rgb230"]::before' in css
+    rgb230_rule = css.split('.viewer-background-switch [data-preview-bg="rgb230"]::before {', 1)[1].split("}", 1)[0]
+    assert "background: var(--rgb-neutral-fallback);" in rgb230_rule
 
 
 def test_compare_mode_has_draggable_divider_wiring():

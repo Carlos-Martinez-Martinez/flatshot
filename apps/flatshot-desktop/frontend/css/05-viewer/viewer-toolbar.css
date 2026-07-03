@@ -145,6 +145,10 @@
   background: var(--color-preview-neutral);
 }
 
+.viewer-background-switch [data-preview-bg="rgb230"]::before {
+  background: var(--rgb-neutral-fallback);
+}
+
 .viewer-background-switch [data-preview-bg="white"]::before {
   background: var(--color-output-white);
 }

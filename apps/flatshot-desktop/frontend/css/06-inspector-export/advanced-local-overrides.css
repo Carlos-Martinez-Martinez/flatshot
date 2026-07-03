@@ -75,6 +75,23 @@
   pointer-events: none;
 }
 
+:root[data-theme="dark"] .lighting-stage {
+  border-color: var(--color-border-strong);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--color-border-strong) 64%, transparent) 1px, transparent 1px),
+    linear-gradient(0deg, color-mix(in srgb, var(--color-border-strong) 64%, transparent) 1px, transparent 1px),
+    var(--color-bg-muted);
+}
+
+:root[data-theme="dark"] .lighting-stage__cross {
+  background: color-mix(in srgb, var(--color-muted) 32%, transparent);
+}
+
+:root[data-theme="dark"] .lighting-stage__product {
+  border-color: color-mix(in srgb, var(--color-muted) 28%, transparent);
+  background: color-mix(in srgb, var(--color-bg-panel) 74%, var(--color-bg-muted));
+}
+
 .lighting-stage__handle {
   position: absolute;
   left: 50%; top: 50%;

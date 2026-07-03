@@ -44,6 +44,9 @@ DEFAULT_FRONTEND_PORT = 4173
 LIVE_RELOAD_ENV_VAR = "FLATSHOT_LIVE_RELOAD"
 LIVE_RELOAD_ENDPOINT = "/__flatshot_live_reload"
 LIVE_RELOAD_INTERVAL_MS = 700
+UI_PREFERENCES_SETTINGS_KEY = "desktop_ui_preferences"
+BOOT_PREFERENCES_SCRIPT_ID = "flatshot-boot-preferences"
+BOOT_PREFERENCE_KEYS = ("themePreference", "brandTone", "interfacePreferences")
 
 
 def configure_portable_environment() -> None:
@@ -201,8 +204,8 @@ class QuietStaticHandler(SimpleHTTPRequestHandler):
         if parsed.path == LIVE_RELOAD_ENDPOINT:
             self.serve_live_reload_status()
             return
-        if self.live_reload_dir is not None and parsed.path in {"", "/", "/index.html"}:
-            self.serve_live_reload_index()
+        if parsed.path in {"", "/", "/index.html"}:
+            self.serve_index()
             return
         super().do_GET()
 
@@ -229,19 +232,62 @@ class QuietStaticHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
-    def serve_live_reload_index(self) -> None:
+    def serve_index(self) -> None:
         index_path = Path(self.directory) / "index.html"
         try:
             html = index_path.read_text(encoding="utf-8")
         except OSError:
             self.send_error(404, "index.html no disponible")
             return
-        payload = inject_live_reload_script(html).encode("utf-8")
+        html = inject_boot_preferences_script(html, read_boot_preferences())
+        if self.live_reload_dir is not None:
+            html = inject_live_reload_script(html)
+        payload = html.encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
         self.wfile.write(payload)
+
+
+def read_boot_preferences() -> dict[str, object]:
+    return boot_preferences_from_settings(ROOT / "data" / "config" / "settings.json")
+
+
+def boot_preferences_from_settings(settings_path: Path) -> dict[str, object]:
+    try:
+        settings = json.loads(settings_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    if not isinstance(settings, dict):
+        return {}
+    raw_preferences = settings.get(UI_PREFERENCES_SETTINGS_KEY)
+    if not isinstance(raw_preferences, dict):
+        return {}
+    preferences: dict[str, object] = {}
+    for key in BOOT_PREFERENCE_KEYS:
+        value = raw_preferences.get(key)
+        if key == "interfacePreferences":
+            if isinstance(value, dict):
+                preferences[key] = value
+        elif isinstance(value, str):
+            preferences[key] = value
+    return preferences
+
+
+def inject_boot_preferences_script(html: str, preferences: dict[str, object]) -> str:
+    if not preferences or BOOT_PREFERENCES_SCRIPT_ID in html:
+        return html
+    payload = json.dumps(preferences, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
+    script = f'    <script id="{BOOT_PREFERENCES_SCRIPT_ID}" type="application/json">{payload}</script>\n'
+    marker = "    <script>\n      (() => {"
+    marker_index = html.find(marker)
+    if marker_index >= 0:
+        return html[:marker_index] + script + html[marker_index:]
+    head_index = html.lower().find("</head>")
+    if head_index >= 0:
+        return html[:head_index] + script + html[head_index:]
+    return script + html
 
 
 def inject_live_reload_script(html: str) -> str:

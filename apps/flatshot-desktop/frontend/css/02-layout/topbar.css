@@ -230,15 +230,15 @@
   padding: 0;
 }
 
-.theme-icon--light {
+.top-theme-action .theme-icon--light {
   display: none;
 }
 
-:root[data-theme="dark"] .theme-icon--dark {
+:root[data-theme="dark"] .top-theme-action .theme-icon--dark {
   display: none;
 }
 
-:root[data-theme="dark"] .theme-icon--light {
+:root[data-theme="dark"] .top-theme-action .theme-icon--light {
   display: inline-flex;
 }
 

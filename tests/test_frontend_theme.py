@@ -92,6 +92,76 @@ def test_brand_tone_loads_early_and_reuses_theme_tokens():
     assert css_token_value(blue_block, "--color-primary") == "#2563eb"
 
 
+def test_boot_theme_script_accepts_server_injected_preferences_before_css():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+
+    assert 'document.getElementById("flatshot-boot-preferences")' in html
+    assert html.index('document.getElementById("flatshot-boot-preferences")') < html.index("css/00-settings/tokens.css")
+    assert "bootPreferences.themePreference" in html
+    assert "bootPreferences.brandTone" in html
+    assert "bootPreferences.interfacePreferences" in html
+    assert 'localStorage.setItem("flatshot.theme", themePreference)' in html
+    assert 'localStorage.setItem("flatshot.brandTone", brandTone)' in html
+    assert 'localStorage.setItem("flatshot.interfacePreferences", JSON.stringify(preferences))' in html
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend bootstrap checks")
+def test_boot_theme_script_applies_injected_preferences_before_app_helpers():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+    boot_script = re.search(r"<script>\s*(?P<script>\(\(\) => \{.*?\}\)\(\);)\s*</script>", html, re.S)
+    assert boot_script, "theme bootstrap script not found"
+    script = f"""
+const assert = require("node:assert/strict");
+const vm = require("node:vm");
+const storage = new Map();
+global.window = {{ matchMedia: () => ({{ matches: false }}) }};
+global.localStorage = {{
+  getItem(key) {{ return storage.has(key) ? storage.get(key) : null; }},
+  setItem(key, value) {{ storage.set(key, String(value)); }},
+}};
+global.document = {{
+  documentElement: {{ dataset: {{}} }},
+  getElementById(id) {{
+    if (id !== "flatshot-boot-preferences") return null;
+    return {{
+      textContent: JSON.stringify({{
+        themePreference: "dark",
+        brandTone: "blue",
+        interfacePreferences: {{
+          density: "comfortable",
+          reduceMotion: true,
+          thumbnailSize: "large",
+          fileNameDisplay: "none",
+        }},
+      }}),
+    }};
+  }},
+}};
+
+vm.runInThisContext({json.dumps(boot_script.group("script"))});
+
+assert.equal(document.documentElement.dataset.theme, "dark");
+assert.equal(document.documentElement.dataset.themePreference, "dark");
+assert.equal(document.documentElement.dataset.brandTone, "blue");
+assert.equal(document.documentElement.dataset.uiDensity, "comfortable");
+assert.equal(document.documentElement.dataset.motion, "reduced");
+assert.equal(document.documentElement.dataset.thumbnailSize, "large");
+assert.equal(document.documentElement.dataset.fileNameDisplay, "none");
+assert.equal(storage.get("flatshot.theme"), "dark");
+assert.equal(storage.get("flatshot.brandTone"), "blue");
+assert.equal(JSON.parse(storage.get("flatshot.interfacePreferences")).thumbnailSize, "large");
+"""
+    result = subprocess.run(
+        ["node", "-e", script],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
+
+
 def test_dark_theme_is_wired_to_topbar_state_and_persistence():
     html = INDEX_PATH.read_text(encoding="utf-8")
     mock = (FRONTEND_DIR / "mock-data.js").read_text(encoding="utf-8")

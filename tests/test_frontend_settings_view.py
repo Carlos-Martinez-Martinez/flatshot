@@ -123,6 +123,17 @@ def test_studio_lighting_panel_css_keeps_active_preset_filled_and_unclipped():
     ) in css
 
 
+def test_studio_lighting_stage_dark_theme_keeps_lines_visible():
+    css = ADVANCED_CSS_PATH.read_text(encoding="utf-8")
+
+    assert ':root[data-theme="dark"] .lighting-stage {' in css
+    stage_rule = css.split(':root[data-theme="dark"] .lighting-stage {', 1)[1].split("}", 1)[0]
+    assert "var(--color-border-strong)" in stage_rule
+    assert "var(--color-bg-muted)" in stage_rule
+    assert ':root[data-theme="dark"] .lighting-stage__cross {' in css
+    assert ':root[data-theme="dark"] .lighting-stage__product {' in css
+
+
 def test_inspector_navigation_does_not_grid_advanced_disclosures():
     css = INSPECTOR_NAV_CSS_PATH.read_text(encoding="utf-8")
 

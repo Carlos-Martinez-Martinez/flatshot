@@ -36,6 +36,7 @@ interactionBindingHelpers.wireFlatShotInteractions({
   window,
   $,
   $$,
+  onboardingBackgroundHelpers,
   handlers: {
     backgroundSelectChange: handleBackgroundSelectChange,
     bridgeScanPathInput: handleBridgeScanPathInput,

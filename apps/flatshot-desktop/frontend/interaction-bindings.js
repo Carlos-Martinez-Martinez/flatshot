@@ -19,6 +19,7 @@
     const $ = deps.$ || (() => null);
     const $$ = deps.$$ || (() => []);
     const handlers = createFlatShotInteractionHandlers(deps.handlers || {});
+    const onboardingBackgroundHelpers = deps.onboardingBackgroundHelpers || null;
 
     if (!documentRef || !windowRef) {
       return;
@@ -72,6 +73,7 @@
     windowRef.addEventListener("beforeunload", handlers.writeSessionSnapshot);
     windowRef.addEventListener("resize", handlers.positionBackgroundPresetEditor);
 
+    void onboardingBackgroundHelpers?.initialize?.({ document: documentRef });
     handlers.initViewerResizeObserver?.();
     handlers.startup?.();
   }

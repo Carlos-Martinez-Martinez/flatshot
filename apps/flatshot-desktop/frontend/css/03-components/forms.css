@@ -57,6 +57,13 @@ input, select {
   gap: var(--space-2);
 }
 
+.rgb-visual-control { position: relative; min-width: 0; width: 100%; height: 34px; display: inline-flex; align-items: center; overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-bg-panel); }
+.rgb-visual-control:focus-within { border-color: var(--semantic-focus); box-shadow: var(--shadow-focus); }
+.rgb-visual-control .rgb-visual-control__swatch { width: 36px; min-width: 36px; height: 100%; display: block; border: 0; border-right: 1px solid var(--color-border); border-radius: 0; background: var(--rgb-visual-color, rgb(230, 230, 230)); padding: 0; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55); }
+.rgb-visual-control--swatch-only { width: 38px; min-width: 38px; }
+.rgb-visual-control--swatch-only .rgb-visual-control__swatch { width: 100%; min-width: 100%; border-right: 0; }
+.rgb-visual-control__picker { position: absolute; inset: 0 auto auto 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
 @supports (-webkit-appearance: none) {
   .settings-panel input[type="range"] {
     height: 22px;

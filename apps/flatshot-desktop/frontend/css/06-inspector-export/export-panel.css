@@ -248,6 +248,8 @@
   font-weight: 700;
 }
 
+.processing-card__actions button { width: 38px; min-width: 38px; padding: 0; }
+
 .processing-card__actions button:hover:not(:disabled), .selected-image-card__actions button:hover:not(:disabled), .panel-link-button:hover:not(:disabled) {
   background: var(--color-accent-soft);
 }

@@ -203,8 +203,14 @@
           </select>
         </label>
         <div class="processing-card__actions">
-          <button type="button" data-action="open-advanced">Editar ajuste</button>
-          <button type="button" data-action="open-preset-editor">Ajustes</button>
+          <button type="button" data-action="open-advanced" aria-label="Editar ajuste del lote" title="Editar ajuste del lote">
+            <span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></span>
+            <span class="visually-hidden">Editar ajuste</span>
+          </button>
+          <button type="button" data-action="open-preset-editor" aria-label="Gestionar ajustes" title="Gestionar ajustes">
+            <span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M4 7h8"></path><path d="M16 7h4"></path><path d="M4 17h4"></path><path d="M12 17h8"></path><path d="M12 5v4"></path><path d="M8 15v4"></path></svg></span>
+            <span class="visually-hidden">Ajustes</span>
+          </button>
         </div>
       </div>
       ${customizedLabel ? `

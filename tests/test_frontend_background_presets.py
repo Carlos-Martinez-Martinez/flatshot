@@ -49,6 +49,8 @@ assert.equal(helpers.backgroundVisualMode("transparent"), "transparent");
 assert.equal(helpers.backgroundVisualMode("rgb:12,34,56"), "custom");
 assert.deepEqual(helpers.previewCustomRgbChannels("soft-black"), [32, 34, 37]);
 assert.deepEqual(helpers.previewCustomRgbChannels("white"), [255, 255, 255]);
+assert.deepEqual(helpers.rgbChannelsFromHex("#0f766e"), [15, 118, 110]);
+assert.equal(helpers.rgbHexValue([15, 118, 110]), "#0f766e");
 assert.equal(helpers.previewBackgroundLabel("rgb:12,34,56", {{ backgroundLabel: () => "fallback" }}), "RGB 12, 34, 56");
 assert.equal(helpers.previewBackgroundLabel("soft-black", {{ backgroundLabel: () => "fallback" }}), "negro suave");
 assert.equal(helpers.previewBackgroundLabel("white", {{ backgroundLabel: (value) => `label:${{value}}` }}), "label:white");

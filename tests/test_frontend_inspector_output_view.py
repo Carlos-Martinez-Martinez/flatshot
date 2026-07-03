@@ -10,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
 HELPER_PATH = FRONTEND_DIR / "inspector-output-view.js"
 INDEX_PATH = FRONTEND_DIR / "index.html"
+APP_INSPECTOR_CARDS_PATH = FRONTEND_DIR / "app-inspector-cards.js"
 
 
 def test_inspector_output_view_helper_loads_before_app_script():
@@ -19,6 +20,12 @@ def test_inspector_output_view_helper_loads_before_app_script():
     app_index = html.index("app.js")
 
     assert helper_index < app_index
+
+
+def test_inspector_output_card_passes_profile_destination_labels():
+    app_js = APP_INSPECTOR_CARDS_PATH.read_text(encoding="utf-8")
+
+    assert "destinationLabel: outputProfileViewHelpers.profileDestinationLabel(profile)" in app_js
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
@@ -36,14 +43,20 @@ const currentRow = helpers.outputProfileInlineRowHtml({{
   active: true,
   canToggle: false,
   summary: 'JPG · 1800x2400 · "RGB230"',
+  destinationLabel: 'Salida <web>',
 }});
 assert.equal(currentRow.includes("active-output-row is-current is-enabled"), true);
 assert.equal(currentRow.includes("Web &lt;gris&gt;"), true);
 assert.equal(currentRow.includes("&quot;RGB230&quot;"), true);
+assert.equal(currentRow.includes("Destino · Salida &lt;web&gt;"), true);
 assert.equal(currentRow.includes("active-output-row__edit"), true);
 assert.equal(currentRow.includes('data-action="edit-output-profile"'), true);
+assert.equal(currentRow.includes('aria-label="Editar formato Web &lt;gris&gt;"'), true);
+assert.equal(currentRow.includes('title="Editar formato Web &lt;gris&gt;"'), true);
+assert.equal(currentRow.includes('class="button-icon" aria-hidden="true"'), true);
+assert.equal(currentRow.includes('class="visually-hidden">Editar formato</span>'), true);
 assert.equal(currentRow.includes('data-action="select-output-profile"'), false);
-assert.equal(currentRow.includes(">Editar formato</button>"), true);
+assert.equal(currentRow.includes(">Editar formato</button>"), false);
 assert.equal(currentRow.includes("Principal"), false);
 assert.equal(currentRow.includes("disabled"), true);
 
@@ -56,6 +69,7 @@ const disabledRow = helpers.outputProfileInlineRowHtml({{
   summary: "PNG · transparente",
 }});
 assert.equal(disabledRow.includes("active-output-row is-disabled"), true);
+assert.equal(disabledRow.includes("Destino ·"), false);
 assert.equal(disabledRow.includes("checked"), false);
 assert.equal(disabledRow.includes(' disabled />'), false);
 
@@ -73,6 +87,7 @@ assert.equal(selectableRow.includes('data-output-profile-id="zalando"'), true);
 assert.equal(selectableRow.includes('aria-pressed="false"'), true);
 assert.equal(selectableRow.includes('title="Seleccionar Zalando para previsualizar"'), true);
 assert.equal(selectableRow.includes('class="active-output-row__edit" data-action="edit-output-profile"'), true);
+assert.equal(selectableRow.includes(">Editar formato</button>"), false);
 
 const notice = helpers.outputTemporaryNoticeHtml();
 assert.equal(notice.includes("Cambios sin guardar en este formato"), true);

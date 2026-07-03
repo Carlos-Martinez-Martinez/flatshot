@@ -207,16 +207,12 @@ function handleDocumentClick(event) {
     return;
   }
 
+  const rgbPickerTrigger = target.closest("[data-rgb-visual-picker-trigger]");
+  if (rgbPickerTrigger) { openRgbVisualPicker(rgbPickerTrigger.closest(".rgb-visual-control")); return; }
+
   const bgTarget = target.closest("[data-preview-bg]");
   if (bgTarget) {
-    state.previewBg = backgroundPresetHelpers.normalizePreviewBackgroundValue(
-      bgTarget.dataset.previewBg === "custom" ? previewCustomBackgroundValue() : bgTarget.dataset.previewBg,
-      backgroundHelperOptions()
-    );
-    state.statusText = `Fondo: ${backgroundPresetHelpers.previewBackgroundLabel(state.previewBg, {
-      ...backgroundHelperOptions(),
-      backgroundLabel: settingsViewHelpers.backgroundLabel,
-    })}`;
+    applyPreviewBackgroundValue(bgTarget.dataset.previewBg === "custom" ? previewCustomBackgroundValue() : bgTarget.dataset.previewBg);
     render();
     return;
   }
@@ -288,6 +284,12 @@ function handleDocumentInput(event) {
   if (localKey) {
     setCurrentImageOverrideValue(localKey, event.target.value);
   }
+  if (event.target?.matches?.("[data-preview-bg-picker]")) {
+    applyPreviewBackgroundPickerChange(event.target);
+    renderPreview();
+    return;
+  }
+  if (event.target?.matches?.("[data-rgb-visual-channel], [data-rgb-visual-picker]")) { syncRgbVisualControlToTarget(event.target.closest(".rgb-visual-control"), event.target); }
   if (event.target.closest?.("#background-preset-editor")) {
     updateBackgroundPresetEditorFromFields();
     return;
@@ -311,15 +313,12 @@ function handleDocumentChange(event) {
     handleGuideSystemPickerToggle(event.target);
     return;
   }
-  if (event.target.matches?.("[data-preview-bg-channel]")) {
-    state.previewBg = backgroundPresetHelpers.normalizePreviewBackgroundValue(previewCustomBackgroundValue(), backgroundHelperOptions());
-    state.statusText = `Fondo: ${backgroundPresetHelpers.previewBackgroundLabel(state.previewBg, {
-      ...backgroundHelperOptions(),
-      backgroundLabel: settingsViewHelpers.backgroundLabel,
-    })}`;
+  if (event.target.matches?.("[data-preview-bg-channel], [data-preview-bg-picker]")) {
+    applyPreviewBackgroundPickerChange(event.target);
     render();
     return;
   }
+  if (event.target?.matches?.("[data-rgb-visual-channel], [data-rgb-visual-picker]")) { syncRgbVisualControlToTarget(event.target.closest(".rgb-visual-control"), event.target); }
   if (event.target?.id === "gallery-output-select") {
     if (event.target.value !== "__custom") {
       applyOutputProfile(event.target.value);

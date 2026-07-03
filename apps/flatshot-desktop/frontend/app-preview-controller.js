@@ -55,21 +55,14 @@ function renderPreview() {
     button.classList.toggle("active", isActive);
     button.disabled = previewControlsDisabled;
   });
-  const customPreviewRgb = backgroundPresetHelpers.previewCustomRgbChannels(state.previewBg, backgroundHelperOptions());
-  ["r", "g", "b"].forEach((channel, index) => {
-    const input = $(`[data-preview-bg-channel="${channel}"]`);
-    if (input) {
-      input.value = String(customPreviewRgb[index]);
-      input.disabled = previewControlsDisabled;
-    }
-  });
-  const customSwatch = $("#preview-bg-custom-swatch");
-  if (customSwatch) {
-    customSwatch.style.setProperty("--custom-preview-bg-control", `rgb(${customPreviewRgb.join(", ")})`);
-  }
   const customFields = $(".viewer-bg-custom-fields");
   if (customFields) {
+    syncRgbVisualControlFromValue(customFields, state.previewBg);
     customFields.classList.toggle("active", Boolean(outputProfileHelpers.parseRgbBackground(state.previewBg)));
+    const colorPicker = customFields.querySelector("[data-preview-bg-picker]");
+    if (colorPicker) {
+      colorPicker.disabled = previewControlsDisabled;
+    }
   }
   renderGuideToolbarState();
   $$("[data-action='zoom-height'], [data-action='zoom-width'], [data-action='zoom-out'], [data-action='zoom-in'], [data-action='force-preview-error']").forEach((button) => {

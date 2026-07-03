@@ -8,6 +8,26 @@ import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
+ADVANCED_LOCAL_CSS_PATH = FRONTEND_DIR / "css" / "06-inspector-export" / "advanced-local-overrides.css"
+
+
+def test_slider_number_fields_reserve_signed_three_digit_width():
+    css = ADVANCED_LOCAL_CSS_PATH.read_text(encoding="utf-8")
+
+    assert "grid-template-columns: 96px minmax(82px, 1fr) 72px;" in css
+    assert ".settings-panel.is-editing-preset .studio-lighting-panel .control-row {\n  grid-template-columns: 96px minmax(82px, 1fr) 72px;" in css
+    assert ".settings-panel.is-editing-preset .lighting-stage-fields .control-row {\n  grid-template-columns: 96px minmax(82px, 1fr) 72px;" in css
+    assert (
+        ".settings-panel.is-editing-preset .number-input, .settings-panel.is-editing-preset "
+        ".setting-number, .settings-panel.is-editing-preset .local-setting-number"
+    ) in css
+    assert "width: 72px;" in css
+    assert "min-width: 72px;" in css
+    assert (
+        ".settings-panel.is-inspector-subview .local-adjustment[open] .local-setting-number {\n"
+        "  width: 72px;\n"
+        "  min-width: 72px;"
+    ) in css
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend event checks")

@@ -19,15 +19,20 @@
     const canToggle = Boolean(row.canToggle);
     const selectable = enabled && canToggle;
     const summary = row.summary || "";
+    const destinationLabel = String(row.destinationLabel || "").trim();
+    const destinationText = destinationLabel ? `Destino · ${destinationLabel}` : "";
+    const editLabel = `Editar formato ${row.name || ""}`.trim();
     const mainContent = `
         <span class="active-output-row__title">
           <strong>${escapeHtml(row.name)}</strong>
         </span>
         <small>${escapeHtml(summary)}</small>
+        ${destinationText ? `<small>${escapeHtml(destinationText)}</small>` : ""}
     `;
+    const title = [row.name, summary, destinationText].filter(Boolean).join(" · ");
     const mainHtml = selectable
       ? `<button type="button" class="active-output-row__main" data-action="select-output-profile" data-output-profile-id="${escapeHtml(row.id)}" aria-pressed="${active ? "true" : "false"}" title="${escapeHtml(`Seleccionar ${row.name} para previsualizar`)}">${mainContent}</button>`
-      : `<div class="active-output-row__main" title="${escapeHtml(`${row.name} · ${summary}`)}">${mainContent}</div>`;
+      : `<div class="active-output-row__main" title="${escapeHtml(title)}">${mainContent}</div>`;
     return `
     <div class="active-output-row${active ? " is-current" : ""}${enabled ? " is-enabled" : " is-disabled"}">
       <label class="output-toggle" title="${escapeHtml(canToggle ? "Activar o desactivar formato" : "Guarda el formato para activarlo")}">
@@ -35,7 +40,10 @@
         <span></span>
       </label>
       ${mainHtml}
-      <button type="button" class="active-output-row__edit" data-action="edit-output-profile" data-output-profile-id="${escapeHtml(row.id)}">Editar formato</button>
+      <button type="button" class="active-output-row__edit" data-action="edit-output-profile" data-output-profile-id="${escapeHtml(row.id)}" aria-label="${escapeHtml(editLabel)}" title="${escapeHtml(editLabel)}">
+        <span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></span>
+        <span class="visually-hidden">Editar formato</span>
+      </button>
     </div>
   `;
   }

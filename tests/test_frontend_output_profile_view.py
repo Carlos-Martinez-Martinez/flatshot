@@ -73,6 +73,32 @@ def test_background_preset_editor_stays_with_background_controls():
     assert "Muestra del fondo RGB" in app_js
 
 
+def test_background_preset_editor_uses_visual_rgb_selector():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+    app_js = app_domain_source()
+    forms_css = (FRONTEND_DIR / "css" / "03-components" / "forms.css").read_text(encoding="utf-8")
+
+    editor_block = html[html.index('id="background-preset-editor"'):html.index('id="background-preset-editor-message"')]
+
+    assert 'id="background-preset-rgb-input" type="hidden"' in editor_block
+    assert 'class="rgb-visual-control rgb-visual-control--swatch-only background-preset-rgb-control"' in editor_block
+    assert 'data-rgb-visual-control="background-preset"' in editor_block
+    assert 'data-rgb-visual-target="background-preset-rgb-input"' in editor_block
+    assert 'data-rgb-visual-format="rgb-text"' in editor_block
+    assert 'type="button" class="rgb-visual-control__swatch background-preset-swatch"' in editor_block
+    assert 'data-rgb-visual-picker-trigger' in editor_block
+    assert 'type="color" class="rgb-visual-control__picker"' in editor_block
+    assert 'data-rgb-visual-picker' in editor_block
+    assert 'data-rgb-visual-channel=' not in editor_block
+    assert 'data-rgb-visual-swatch' in editor_block
+    assert "syncRgbVisualControlFromValue" in app_js
+    assert "syncRgbVisualControlToTarget" in app_js
+    assert "openRgbVisualPicker" in app_js
+    assert "data-rgb-visual-picker" in app_js
+    assert ".rgb-visual-control" in forms_css
+    assert ".rgb-visual-control--swatch-only" in forms_css
+
+
 def test_transparent_background_switches_output_type_before_validation():
     app_js = app_domain_source()
 
@@ -172,6 +198,79 @@ def test_system_background_presets_are_not_editable_or_deletable():
     assert "state.backgroundPresetEditor = null;" in begin_block
     assert "backgroundPresetHelpers.isSystemBackgroundPreset(preset" in delete_block
     assert "return;" in delete_block
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
+def test_deleting_selected_background_preset_resets_current_editor_draft():
+    script = f"""
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const vm = require("node:vm");
+const path = require("node:path");
+const frontend = {json.dumps(str(FRONTEND_DIR))};
+
+global.outputProfileHelpers = require(path.join(frontend, "output-profiles.js"));
+global.backgroundPresetHelpers = require(path.join(frontend, "background-presets.js"));
+global.defaultBackgroundPresets = [
+  {{ id: "rgb230", name: "Gris claro", kind: "rgb", rgb: [230, 230, 230] }},
+  {{ id: "white", name: "Blanco", kind: "rgb", rgb: [255, 255, 255] }},
+  {{ id: "transparent", name: "Transparente", kind: "transparent", rgb: [230, 230, 230] }},
+];
+const customValue = "rgb:142,82,82";
+global.state = {{
+  backgroundPresets: backgroundPresetHelpers.normalizeBackgroundPresetList([
+    {{ id: "fondo-rojo", name: "Fondo rojo", kind: "rgb", rgb: [142, 82, 82] }},
+  ], {{ defaultPresets: defaultBackgroundPresets }}),
+  backgroundPresetEditor: null,
+  outputProfileDraft: {{ id: "web", background: customValue }},
+  outputProfileEditorId: "web",
+  outputProfiles: [{{ id: "web", background: customValue }}],
+  statusText: "",
+}};
+const backgroundSelect = {{ value: customValue, innerHTML: "" }};
+let persisted = false;
+let rendered = false;
+
+global.window = {{ confirm: () => true }};
+global.$ = (selector) => selector === "#profile-background-input" ? backgroundSelect : null;
+global.outputProfileFormRawData = () => ({{ background: backgroundSelect.value }});
+global.ensureOutputProfileDraft = () => state.outputProfileDraft;
+global.backgroundHelperOptions = (extra = {{}}) => ({{ outputProfileHelpers, ...extra }});
+global.backgroundPresetOptions = (extra = {{}}) => ({{ outputProfileHelpers, defaultPresets: defaultBackgroundPresets, ...extra }});
+global.backgroundPresetByValue = (value) => backgroundPresetHelpers.backgroundPresetByValue(value, state.backgroundPresets, {{ outputProfileHelpers }});
+global.backgroundSelectOptionsHtml = (value) => backgroundPresetHelpers.backgroundSelectOptionsHtml(value, {{
+  presets: state.backgroundPresets,
+  outputProfileHelpers,
+  escapeHtml: (text) => String(text),
+  backgroundLabel: (background) => `Etiqueta ${{background}}`,
+}});
+global.renderOutputProfileModalState = () => {{}};
+global.persistBackgroundPresets = () => {{ persisted = true; }};
+global.persistOutputProfiles = () => {{}};
+global.render = () => {{ rendered = true; }};
+
+vm.runInThisContext(fs.readFileSync(path.join(frontend, "app-background-preset-controller.js"), "utf8"));
+
+deleteBackgroundPreset();
+
+assert.equal(state.backgroundPresets.some((preset) => preset.id === "fondo-rojo"), false);
+assert.equal(state.outputProfileDraft.background, "rgb230");
+assert.equal(backgroundSelect.value, "rgb230");
+assert.equal(backgroundSelect.innerHTML.includes("Actual ·"), false);
+assert.equal(state.outputProfiles[0].background, customValue);
+assert.equal(state.statusText, "Fondo eliminado: Fondo rojo. Formato en edición: gris claro");
+assert.equal(persisted, true);
+assert.equal(rendered, true);
+"""
+    result = subprocess.run(
+        ["node", "-e", script],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")

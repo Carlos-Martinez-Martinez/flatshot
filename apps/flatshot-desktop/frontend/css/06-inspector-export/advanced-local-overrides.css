@@ -15,7 +15,7 @@
 
 .studio-lighting-panel[hidden] { display: none; }
 
-.studio-lighting-panel .control-row { grid-template-columns: minmax(72px, 0.72fr) minmax(0, 1fr) 56px; gap: var(--space-2); }
+.studio-lighting-panel .control-row { grid-template-columns: minmax(72px, 0.72fr) minmax(0, 1fr) 72px; gap: var(--space-2); }
 
 .studio-lighting-panel .control-row--select { grid-template-columns: minmax(70px, 0.72fr) minmax(0, 1fr); }
 .studio-lighting-panel .control-row--select select { grid-column: 2; }
@@ -91,7 +91,7 @@
 
 .lighting-stage-fields { display: grid; gap: var(--space-2); min-width: 0; }
 
-.lighting-stage-fields .control-row { grid-template-columns: minmax(62px, 0.64fr) minmax(0, 1fr) 56px; }
+.lighting-stage-fields .control-row { grid-template-columns: minmax(62px, 0.64fr) minmax(0, 1fr) 72px; }
 
 .lighting-slider-stack, .advanced-technical-panel { display: grid; gap: var(--space-2); min-width: 0; }
 
@@ -153,7 +153,7 @@
 }
 
 .settings-panel.is-inspector-subview .local-adjustment[open] .local-control-row {
-  grid-template-columns: minmax(76px, 0.72fr) minmax(0, 1fr) 56px;
+  grid-template-columns: minmax(76px, 0.72fr) minmax(0, 1fr) 72px;
   gap: var(--space-2);
   min-width: 0;
 }
@@ -190,16 +190,16 @@
 }
 
 .settings-panel.is-editing-preset .control-row, .settings-panel.is-editing-preset .local-control-row {
-  grid-template-columns: 96px minmax(82px, 1fr) 56px;
+  grid-template-columns: 96px minmax(82px, 1fr) 72px;
   gap: var(--space-2);
 }
 
 .settings-panel.is-editing-preset .studio-lighting-panel .control-row {
-  grid-template-columns: minmax(72px, 0.72fr) minmax(0, 1fr) 56px;
+  grid-template-columns: 96px minmax(82px, 1fr) 72px;
 }
 
 .settings-panel.is-editing-preset .lighting-stage-fields .control-row {
-  grid-template-columns: minmax(62px, 0.64fr) minmax(0, 1fr) 56px;
+  grid-template-columns: 96px minmax(82px, 1fr) 72px;
 }
 
 .settings-panel.is-editing-preset .studio-lighting-panel .control-row--select {
@@ -211,15 +211,15 @@
 }
 
 .settings-panel.is-editing-preset .number-input, .settings-panel.is-editing-preset .setting-number, .settings-panel.is-editing-preset .local-setting-number {
-  width: 54px;
-  min-width: 54px;
+  width: 72px;
+  min-width: 72px;
   min-height: 34px;
   padding-inline: var(--space-2);
 }
 
 .settings-panel.is-inspector-subview .local-adjustment[open] .local-setting-number {
-  width: 54px;
-  min-width: 0;
+  width: 72px;
+  min-width: 72px;
 }
 
 .settings-panel.is-editing-preset .control-row > span, .settings-panel.is-editing-preset .local-control-row > span {

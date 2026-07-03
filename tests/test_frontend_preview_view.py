@@ -38,9 +38,18 @@ def test_preview_toolbar_keeps_compact_context_labels():
         assert f'class="viewer-control-label">{label}</span>' in html
     assert 'data-preview-bg="soft-black"' in html
     assert 'data-preview-bg="custom"' in html
-    assert 'data-preview-bg-channel="r"' in html
-    assert 'data-preview-bg-channel="g"' in html
-    assert 'data-preview-bg-channel="b"' in html
+    custom_control = html[html.index('data-rgb-visual-control="preview-background"'):html.index('id="preview-output-context"')]
+    assert 'data-rgb-visual-format="rgb-background"' in custom_control
+    assert 'id="preview-bg-custom-value" type="hidden"' in custom_control
+    assert 'id="preview-bg-color-input" type="color"' in html
+    assert 'data-preview-bg-picker' in html
+    assert 'data-rgb-visual-picker-trigger' in html
+    assert 'data-rgb-visual-picker' in html
+    assert 'data-preview-bg-channel=' not in custom_control
+    assert 'data-rgb-visual-channel=' not in custom_control
+    assert "openRgbVisualPicker" in app_js
+    assert "applyPreviewBackgroundPickerChange" in app_js
+    assert "renderPreview();" in app_js
     assert "customFields.classList.toggle(\"active\"" in app_js
     assert ">Gris</button>" not in html
     assert ">Blanco</button>" not in html

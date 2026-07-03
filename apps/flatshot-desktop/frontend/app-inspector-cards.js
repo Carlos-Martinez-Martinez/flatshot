@@ -30,6 +30,7 @@ function outputInspectorCardHtml() {
       active: profile.id === state.activeOutputProfileId,
       canToggle: true,
       summary: outputProfileSummaryLine(profile),
+      destinationLabel: outputProfileViewHelpers.profileDestinationLabel(profile),
     };
   });
   return inspectorOutputViewHelpers.outputInspectorCardHtml({
@@ -49,6 +50,7 @@ function outputProfileInlineRowHtml(profile) {
     active: profile.id === state.activeOutputProfileId,
     canToggle: true,
     summary: outputProfileSummaryLine(profile),
+    destinationLabel: outputProfileViewHelpers.profileDestinationLabel(profile),
   });
 }
 

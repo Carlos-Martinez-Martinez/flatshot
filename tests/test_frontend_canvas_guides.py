@@ -214,9 +214,9 @@ def test_canvas_guide_manager_uses_bounded_editor_layout():
     assert ".guide-readonly-swatch" in toolbar_css
     assert ".guide-draft-panel" in toolbar_css and "overflow: hidden" in toolbar_css
     assert ".guide-rule-list" in toolbar_css and "overflow-y: auto" in toolbar_css
-    assert '.guide-draft-fields input[type="color"]' in toolbar_css
-    assert "::-webkit-color-swatch-wrapper" in toolbar_css
-    assert "::-moz-color-swatch" in toolbar_css
+    assert "grid-template-columns: minmax(240px, 1fr) 54px 92px 78px" in toolbar_css
+    assert ".guide-color-control" in toolbar_css
+    assert ".guide-color-control input" not in toolbar_css
     assert ".guide-add-row" in toolbar_css
     assert "grid-template-columns: minmax(190px, 1fr) 180px 150px 96px 160px" in toolbar_css
     assert "padding: var(--space-3) var(--space-5)" in toolbar_css
@@ -227,6 +227,27 @@ def test_canvas_guide_manager_uses_bounded_editor_layout():
     assert ".guide-line-row--readonly" in toolbar_css
     assert "padding-inline: var(--space-4)" in toolbar_css
     assert ".guide-rule-row--division" not in toolbar_css
+
+
+def test_canvas_guide_manager_uses_visual_rgb_selector_for_color():
+    view = VIEW_HELPER_PATH.read_text(encoding="utf-8")
+    document_events = (FRONTEND_DIR / "app-document-events.js").read_text(encoding="utf-8")
+    forms_css = (FRONTEND_DIR / "css" / "03-components" / "forms.css").read_text(encoding="utf-8")
+
+    draft_block = view[view.index("function guideDraftFormHtml"):view.index("function guideRuleEditorHtml")]
+
+    assert 'type="hidden" data-guide-draft-field="color"' in draft_block
+    assert 'class="rgb-visual-control rgb-visual-control--swatch-only guide-color-control"' in draft_block
+    assert 'data-rgb-visual-control="guide-color"' in draft_block
+    assert 'data-rgb-visual-format="hex"' in draft_block
+    assert 'type="button" class="rgb-visual-control__swatch"' in draft_block
+    assert 'data-rgb-visual-picker-trigger' in draft_block
+    assert 'type="color" class="rgb-visual-control__picker"' in draft_block
+    assert 'data-rgb-visual-picker' in draft_block
+    assert 'data-rgb-visual-channel=' not in draft_block
+    assert 'data-rgb-visual-swatch' in draft_block
+    assert "syncRgbVisualControlToTarget" in document_events
+    assert ".rgb-visual-control" in forms_css
 
 
 def test_canvas_guide_manager_converts_presets_to_editable_exact_guides():

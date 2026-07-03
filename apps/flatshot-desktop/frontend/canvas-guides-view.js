@@ -25,6 +25,7 @@
     }
     return [];
   };
+  const backgroundPresetHelpers = globalThis.FlatShotBackgroundPresets || {};
 
   function iconSvg(name) {
     const icons = {
@@ -174,7 +175,7 @@
       <div class="guide-draft-heading"><strong>${escapeHtml(draft.id ? "Editar sistema" : "Nuevo sistema")}</strong><span>Define reglas en porcentaje del lienzo.</span></div>
       <div class="guide-draft-fields">
         <label>Nombre <input type="text" data-guide-draft-field="name" value="${escapeHtml(draft.name)}" /></label>
-        <label>Color <input type="color" data-guide-draft-field="color" value="${escapeHtml(draft.color)}" /></label>
+        ${guideColorControlHtml(draft.color)}
         <label>Opacidad <input type="number" min="10" max="100" step="5" data-guide-draft-field="opacity" value="${Math.round(draft.opacity * 100)}" /></label>
         <label>Grosor <input type="number" min="1" max="4" step="1" data-guide-draft-field="thickness" value="${draft.thickness}" /></label>
       </div>
@@ -194,6 +195,18 @@
       </footer>
     </form>
   `;
+  }
+
+  function guideColorControlHtml(color) {
+    const channels = backgroundPresetHelpers.rgbChannelsFromHex
+      ? backgroundPresetHelpers.rgbChannelsFromHex(color, [15, 118, 110])
+      : [15, 118, 110];
+    const hex = backgroundPresetHelpers.rgbHexValue
+      ? backgroundPresetHelpers.rgbHexValue(channels, "#0f766e")
+      : "#0f766e";
+    return `
+        <label>Color <input type="hidden" data-guide-draft-field="color" value="${escapeHtml(hex)}" /><span class="rgb-visual-control rgb-visual-control--swatch-only guide-color-control" data-rgb-visual-control="guide-color" data-rgb-visual-format="hex" style="--rgb-visual-color: rgb(${channels.join(", ")})"><button type="button" class="rgb-visual-control__swatch" data-rgb-visual-picker-trigger data-rgb-visual-swatch aria-label="Elegir color de guía"></button><input type="color" class="rgb-visual-control__picker" value="${escapeHtml(hex)}" data-rgb-visual-picker tabindex="-1" aria-label="Selector de color de guía" /></span></label>
+    `;
   }
 
   function guideRuleEditorHtml(rule, index) {

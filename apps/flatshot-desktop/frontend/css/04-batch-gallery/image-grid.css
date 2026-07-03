@@ -414,9 +414,7 @@
   box-shadow: none;
 }
 
-.gallery-column[data-gallery-view="thumbs"] .image-copy small, .gallery-filter[hidden] {
-  display: none !important;
-}
+.gallery-filter[hidden] { display: none !important; }
 
 .gallery-column[data-gallery-view="thumbs"] .image-output-label {
   margin-top: 1px;
@@ -431,6 +429,7 @@
 .gallery-column[data-gallery-view="thumbs"] .image-item {
   padding: 10px;
   min-height: 148px;
+  grid-template-rows: auto minmax(42px, auto);
   border-color: transparent;
   background: transparent;
 }
@@ -457,7 +456,5 @@
   display: none;
 }
 
-.gallery-column[data-gallery-view="thumbs"] .image-copy small {
-  display: none;
-}
+.gallery-column[data-gallery-view="thumbs"] .image-copy small { display: block; margin-top: 1px; text-align: left; }
 }

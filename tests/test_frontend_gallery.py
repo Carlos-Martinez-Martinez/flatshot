@@ -12,6 +12,7 @@ HELPER_PATH = FRONTEND_DIR / "gallery.js"
 INDEX_PATH = FRONTEND_DIR / "index.html"
 APP_GALLERY_CONTROLLER_PATH = FRONTEND_DIR / "app-gallery-controller.js"
 APP_EXPORT_VIEW_PATH = FRONTEND_DIR / "app-export-view.js"
+GALLERY_CSS_PATH = FRONTEND_DIR / "css" / "04-batch-gallery" / "image-grid.css"
 
 
 def test_gallery_helper_loads_before_app_script():
@@ -35,6 +36,14 @@ def test_gallery_and_export_views_use_output_profile_destination_helper():
     assert "profiles.map(outputProfileViewHelpers.profileDestinationPreviewLabel)" in export_view
     assert "profiles.map(profileDestinationPreviewLabel)" not in gallery_controller
     assert "profiles.map(profileDestinationPreviewLabel)" not in export_view
+
+
+def test_gallery_thumbnail_view_keeps_file_metadata_visible():
+    css = GALLERY_CSS_PATH.read_text(encoding="utf-8")
+
+    assert '.gallery-column[data-gallery-view="thumbs"] .image-copy small' in css
+    assert '.gallery-column[data-gallery-view="thumbs"] .image-copy small {\n  display: none;' not in css
+    assert '.gallery-column[data-gallery-view="thumbs"] .image-copy small, .gallery-filter[hidden]' not in css
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")

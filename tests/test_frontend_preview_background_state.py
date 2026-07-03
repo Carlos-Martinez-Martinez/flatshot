@@ -207,3 +207,97 @@ assert.equal(previewRequests[0].previewBg, "soft-black");
     )
 
     assert result.returncode == 0, result.stderr or result.stdout
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend state checks")
+def test_preview_color_picker_input_updates_viewer_background_state():
+    script = f"""
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const vm = require("node:vm");
+const path = require("node:path");
+const frontend = {json.dumps(str(FRONTEND_DIR))};
+
+global.window = {{}};
+global.SOFT_BLACK_PREVIEW_BG = "soft-black";
+global.state = {{
+  previewBg: "rgb230",
+  statusText: "",
+}};
+global.outputProfileHelpers = require(path.join(frontend, "output-profiles.js"));
+global.backgroundPresetHelpers = require(path.join(frontend, "background-presets.js"));
+global.numberHelpers = {{
+  clampNumber(value, min, max, fallback) {{
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? Math.max(min, Math.min(max, numeric)) : fallback;
+  }},
+}};
+global.settingsViewHelpers = {{
+  backgroundLabel(value) {{
+    return value === "rgb230" ? "gris claro" : value;
+  }},
+}};
+
+const hiddenValue = {{ value: "rgb:230,230,230" }};
+const swatch = {{ style: {{ backgroundColor: "" }} }};
+let control;
+const picker = {{
+  value: "#873636",
+  matches(selector) {{
+    return selector === "[data-rgb-visual-picker]" || selector === "[data-preview-bg-picker]";
+  }},
+  closest(selector) {{
+    return selector === ".rgb-visual-control" ? control : null;
+  }},
+}};
+control = {{
+  dataset: {{
+    rgbVisualTarget: "preview-bg-custom-value",
+    rgbVisualFormat: "rgb-background",
+  }},
+  style: {{
+    props: {{}},
+    setProperty(name, value) {{
+      this.props[name] = value;
+    }},
+  }},
+  querySelector(selector) {{
+    return selector === "[data-rgb-visual-picker]" ? picker : null;
+  }},
+  querySelectorAll(selector) {{
+    return selector === "[data-rgb-visual-swatch]" ? [swatch] : [];
+  }},
+}};
+
+global.document = {{
+  getElementById(id) {{
+    return id === "preview-bg-custom-value" ? hiddenValue : null;
+  }},
+}};
+global.$ = (selector) => {{
+  if (selector === "#preview-bg-custom-value") return hiddenValue;
+  if (selector === "[data-preview-bg-picker]") return picker;
+  if (selector === ".viewer-bg-custom-fields") return control;
+  return null;
+}};
+
+vm.runInThisContext(fs.readFileSync(path.join(frontend, "app-background-state.js"), "utf8"));
+vm.runInThisContext(fs.readFileSync(path.join(frontend, "app-background-preset-controller.js"), "utf8"));
+
+applyPreviewBackgroundPickerChange(picker);
+
+assert.equal(hiddenValue.value, "rgb:135,54,54");
+assert.equal(state.previewBg, "rgb:135,54,54");
+assert.equal(state.statusText, "Fondo: RGB 135, 54, 54");
+assert.equal(control.style.props["--rgb-visual-color"], "rgb(135, 54, 54)");
+assert.equal(swatch.style.backgroundColor, "rgb(135, 54, 54)");
+"""
+    result = subprocess.run(
+        ["node", "-e", script],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout

@@ -15,6 +15,123 @@ function backgroundRgbFromValue(value) {
   return outputProfileHelpers.parseRgbBackground(outputProfileHelpers.normalizeBackgroundValue(value)) || outputProfileHelpers.backgroundColorTuple(value);
 }
 
+function rgbVisualChannelsFromValue(value, format = "rgb-text") {
+  if (format === "hex") {
+    return backgroundPresetHelpers.rgbChannelsFromHex(value, [15, 118, 110]);
+  }
+  return outputProfileHelpers.parseRgbBackground(outputProfileHelpers.customRgbBackgroundValue(value))
+    || backgroundPresetHelpers.previewCustomRgbChannels(value, backgroundHelperOptions());
+}
+
+function rgbVisualTarget(control) {
+  const targetId = control?.dataset?.rgbVisualTarget;
+  if (targetId) {
+    return document.getElementById(targetId);
+  }
+  return control?.closest("label")?.querySelector('input[type="hidden"]') || null;
+}
+
+function rgbVisualChannelsFromControl(control, source = null) {
+  if (source?.matches?.("[data-rgb-visual-picker]")) {
+    const channels = backgroundPresetHelpers.rgbChannelsFromHex(source.value, rgbVisualChannelsFromValue(rgbVisualTarget(control)?.value || "", control?.dataset?.rgbVisualFormat));
+    ["r", "g", "b"].forEach((channel, index) => {
+      const input = control?.querySelector(`[data-rgb-visual-channel="${channel}"]`);
+      if (input && input.value !== String(channels[index])) {
+        input.value = String(channels[index]);
+      }
+    });
+    return channels;
+  }
+  const fallback = rgbVisualChannelsFromValue(rgbVisualTarget(control)?.value || "", control?.dataset?.rgbVisualFormat);
+  return ["r", "g", "b"].map((channel, index) => {
+    const input = control?.querySelector(`[data-rgb-visual-channel="${channel}"]`);
+    const numeric = Number(input?.value);
+    const value = Number.isFinite(numeric) ? Math.round(Math.max(0, Math.min(255, numeric))) : fallback[index];
+    if (input && input.value !== String(value)) {
+      input.value = String(value);
+    }
+    return value;
+  });
+}
+
+function rgbVisualSerializedValue(channels, format = "rgb-text") {
+  if (format === "hex") {
+    return backgroundPresetHelpers.rgbHexValue(channels, "#0f766e");
+  }
+  if (format === "rgb-background") {
+    return `rgb:${channels.join(",")}`;
+  }
+  return channels.join(", ");
+}
+
+function updateRgbVisualSwatch(control, channels) {
+  if (!control) {
+    return;
+  }
+  const color = `rgb(${channels.join(", ")})`;
+  const hex = backgroundPresetHelpers.rgbHexValue(channels, "#e6e6e6");
+  control.style.setProperty("--rgb-visual-color", color);
+  const picker = control.querySelector("[data-rgb-visual-picker]");
+  if (picker && picker.value !== hex) {
+    picker.value = hex;
+  }
+  const swatches = control.querySelectorAll("[data-rgb-visual-swatch]");
+  swatches.forEach((swatch) => {
+    swatch.style.backgroundColor = color;
+  });
+}
+
+function openRgbVisualPicker(control) {
+  const picker = control?.querySelector("[data-rgb-visual-picker]");
+  if (!picker) {
+    return false;
+  }
+  syncRgbVisualControlFromValue(control, rgbVisualTarget(control)?.value || picker.value);
+  try {
+    if (typeof picker.showPicker === "function") {
+      picker.showPicker();
+    } else {
+      picker.click();
+    }
+  } catch (_error) {
+    picker.click();
+  }
+  return true;
+}
+
+function syncRgbVisualControlFromValue(control, value) {
+  if (!control) {
+    return;
+  }
+  const channels = rgbVisualChannelsFromValue(value, control.dataset.rgbVisualFormat);
+  ["r", "g", "b"].forEach((channel, index) => {
+    const input = control.querySelector(`[data-rgb-visual-channel="${channel}"]`);
+    if (input && input.value !== String(channels[index])) {
+      input.value = String(channels[index]);
+    }
+  });
+  const target = rgbVisualTarget(control);
+  const serialized = rgbVisualSerializedValue(channels, control.dataset.rgbVisualFormat);
+  if (target && target.value !== serialized) {
+    target.value = serialized;
+  }
+  updateRgbVisualSwatch(control, channels);
+}
+
+function syncRgbVisualControlToTarget(control, source = null) {
+  if (!control) {
+    return "";
+  }
+  const channels = rgbVisualChannelsFromControl(control, source);
+  const serialized = rgbVisualSerializedValue(channels, control.dataset.rgbVisualFormat);
+  const target = rgbVisualTarget(control);
+  if (target && target.value !== serialized) {
+    target.value = serialized;
+  }
+  updateRgbVisualSwatch(control, channels);
+  return serialized;
+}
+
 function positionBackgroundPresetEditor() {
   const editor = $("#background-preset-editor");
   if (!editor || editor.hidden) {
@@ -89,6 +206,7 @@ function renderBackgroundPresetControls(raw = outputProfileFormRawData()) {
   if (rgbInput && rgbInput.value !== editorState.rgbText) {
     rgbInput.value = editorState.rgbText;
   }
+  syncRgbVisualControlFromValue(editor.querySelector('[data-rgb-visual-control="background-preset"]'), editorState.rgbText);
   if (rgbField) {
     rgbField.hidden = editorState.kind === "transparent";
   }
@@ -224,6 +342,21 @@ function replaceBackgroundValue(previousValue, nextValue) {
   persistOutputProfiles();
 }
 
+function resetDeletedBackgroundPresetDraft(deletedValue) {
+  const deleted = outputProfileHelpers.normalizeBackgroundValue(deletedValue);
+  const stillAvailable = state.backgroundPresets.some((preset) => (
+    outputProfileHelpers.normalizeBackgroundValue(backgroundPresetHelpers.backgroundPresetValue(preset, backgroundHelperOptions())) === deleted
+  ));
+  if (stillAvailable || outputProfileHelpers.normalizeBackgroundValue(outputProfileFormRawData().background) !== deleted) {
+    return false;
+  }
+  const fallback = "rgb230";
+  const draft = ensureOutputProfileDraft();
+  state.outputProfileDraft = { ...draft, background: fallback };
+  syncBackgroundSelectValue($("#profile-background-input"), fallback);
+  return true;
+}
+
 function deleteBackgroundPreset() {
   const preset = selectedBackgroundPresetFromForm();
   if (!preset) {
@@ -234,13 +367,17 @@ function deleteBackgroundPreset() {
     renderOutputProfileModalState();
     return;
   }
-  const confirmed = window.confirm(`Eliminar fondo "${preset.name}"?\n\nLos formatos que ya usen ese RGB conservarán el valor actual.`);
+  const confirmed = window.confirm(`Eliminar fondo "${preset.name}"?\n\nEl formato en edición volverá a gris claro si estaba usando este fondo.`);
   if (!confirmed) {
     return;
   }
+  const deletedValue = backgroundPresetHelpers.backgroundPresetValue(preset, backgroundHelperOptions());
   state.backgroundPresets = state.backgroundPresets.filter((item) => item.id !== preset.id);
   state.backgroundPresetEditor = null;
-  state.statusText = `Fondo eliminado: ${preset.name}`;
+  const resetDraft = resetDeletedBackgroundPresetDraft(deletedValue);
+  state.statusText = resetDraft
+    ? `Fondo eliminado: ${preset.name}. Formato en edición: gris claro`
+    : `Fondo eliminado: ${preset.name}`;
   persistBackgroundPresets();
   render();
 }

@@ -236,11 +236,10 @@
                 <button type="button" data-preview-bg="white" title="Fondo blanco" aria-label="Fondo blanco"></button>
                 <button type="button" data-preview-bg="soft-black" title="Fondo negro suave" aria-label="Fondo negro suave"></button>
                 <button type="button" data-preview-bg="transparent" title="Fondo transparente" aria-label="Fondo transparente"></button>
-                <div class="viewer-bg-custom-fields" aria-label="Fondo personalizado">
-                  <button type="button" id="preview-bg-custom-swatch" data-preview-bg="custom" title="Fondo personalizado" aria-label="Fondo personalizado"></button>
-                  <input type="number" min="0" max="255" step="1" value="230" data-preview-bg-channel="r" aria-label="Rojo del fondo personalizado" />
-                  <input type="number" min="0" max="255" step="1" value="230" data-preview-bg-channel="g" aria-label="Verde del fondo personalizado" />
-                  <input type="number" min="0" max="255" step="1" value="230" data-preview-bg-channel="b" aria-label="Azul del fondo personalizado" />
+                <div class="viewer-bg-custom-fields rgb-visual-control rgb-visual-control--swatch-only" data-rgb-visual-control="preview-background" data-rgb-visual-target="preview-bg-custom-value" data-rgb-visual-format="rgb-background" aria-label="Fondo personalizado">
+                  <button type="button" class="rgb-visual-control__swatch" id="preview-bg-custom-swatch" data-preview-bg="custom" data-rgb-visual-picker-trigger data-rgb-visual-swatch title="Fondo personalizado" aria-label="Fondo personalizado"></button>
+                  <input id="preview-bg-custom-value" type="hidden" value="rgb:230,230,230" />
+                  <input id="preview-bg-color-input" type="color" class="rgb-visual-control__picker" value="#e6e6e6" data-rgb-visual-picker data-preview-bg-picker tabindex="-1" aria-label="Elegir fondo personalizado" />
                 </div>
               </div>
               <div class="viewer-control-group viewer-guides" aria-label="Guías del lienzo">
@@ -815,12 +814,12 @@
               </label>
               <label class="text-field background-preset-rgb-field">
                 <span>RGB</span>
-                <input id="background-preset-rgb-input" type="text" inputmode="numeric" placeholder="Ej. 245, 245, 245" />
+                <input id="background-preset-rgb-input" type="hidden" value="230, 230, 230" />
+                <span class="rgb-visual-control rgb-visual-control--swatch-only background-preset-rgb-control" data-rgb-visual-control="background-preset" data-rgb-visual-target="background-preset-rgb-input" data-rgb-visual-format="rgb-text" style="--rgb-visual-color: rgb(230, 230, 230)">
+                  <button type="button" class="rgb-visual-control__swatch background-preset-swatch" id="background-preset-swatch" data-rgb-visual-picker-trigger data-rgb-visual-swatch aria-label="Elegir color del fondo"></button>
+                  <input type="color" class="rgb-visual-control__picker" value="#e6e6e6" data-rgb-visual-picker tabindex="-1" aria-label="Selector de color del fondo" />
+                </span>
               </label>
-              <div class="background-preset-swatch-field">
-                <span>Muestra</span>
-                <div class="background-preset-swatch" id="background-preset-swatch" role="img" aria-label="Muestra del fondo"></div>
-              </div>
             </div>
             <div class="background-preset-editor-actions">
               <button type="button" data-action="save-background-preset">Guardar fondo</button>

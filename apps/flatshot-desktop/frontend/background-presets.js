@@ -157,6 +157,23 @@
     return backgroundColorTuple(value || "rgb230", options);
   }
 
+  function rgbChannelsFromHex(value, fallback = DEFAULT_RGB) {
+    const match = /^#?([0-9a-fA-F]{6})$/.exec(String(value || "").trim());
+    if (!match) {
+      return Array.isArray(fallback) ? fallback.slice(0, 3) : DEFAULT_RGB;
+    }
+    return [0, 2, 4].map((offset) => Number.parseInt(match[1].slice(offset, offset + 2), 16));
+  }
+
+  function rgbHexValue(channels = [], fallback = "#e6e6e6") {
+    const rgb = Array.isArray(channels) ? channels : DEFAULT_RGB;
+    const parsed = rgb.slice(0, 3).map(clampRgbChannel);
+    if (!parsed.every((channel) => channel !== null)) {
+      return fallback;
+    }
+    return `#${parsed.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
+  }
+
   function previewCustomBackgroundValue(channels = [], options = {}) {
     const fallback = Array.isArray(options.fallback) ? options.fallback : DEFAULT_RGB;
     const clampNumber = options.clampNumber || ((value, min, max, fallbackValue) => {
@@ -324,5 +341,7 @@
     previewCustomBackgroundValue,
     previewCustomRgbChannels,
     readBackgroundPresets,
+    rgbChannelsFromHex,
+    rgbHexValue,
   };
 });

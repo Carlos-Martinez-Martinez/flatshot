@@ -1082,7 +1082,7 @@ def test_responsive_module_consolidates_adjacent_media_blocks():
     assert len(media_queries) == 10
     assert all(
         current != following
-        for current, following in zip(media_queries, media_queries[1:])
+        for current, following in zip(media_queries, media_queries[1:], strict=False)
     )
 
 

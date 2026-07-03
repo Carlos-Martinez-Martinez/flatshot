@@ -21,6 +21,20 @@ def test_topbar_groups_mixed_actions_by_task_type():
     assert 'data-action="open-app-settings"' in config_group
 
 
+def test_topbar_preferences_menu_owns_interface_preferences():
+    html = (FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
+
+    assert '<details class="top-preferences-menu" id="top-preferences-menu">' in html
+    preferences_menu = html.split('<details class="top-preferences-menu" id="top-preferences-menu">', 1)[1].split("</details>", 1)[0]
+    app_settings = html.split('id="app-settings-modal"', 1)[1].split('id="output-profile-list"', 1)[0]
+
+    assert 'data-action="toggle-theme"' in preferences_menu
+    assert 'data-action="set-brand-tone"' in preferences_menu
+    assert 'data-brand-tone-value="blue"' in preferences_menu
+    assert 'data-action="set-brand-tone"' not in app_settings
+    assert "Tono de marca" not in app_settings
+
+
 def test_topbar_exposes_single_batch_entry_action():
     html = (FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
 

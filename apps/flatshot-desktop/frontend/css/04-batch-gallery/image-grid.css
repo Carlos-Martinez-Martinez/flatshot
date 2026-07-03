@@ -441,4 +441,33 @@
 }
 
 .gallery-column[data-gallery-view="thumbs"] .image-copy small { display: block; margin-top: 1px; text-align: left; }
+
+.app-shell[data-thumbnail-size="small"] .gallery-column[data-gallery-view="thumbs"] .image-list {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.app-shell[data-thumbnail-size="large"] .gallery-column[data-gallery-view="thumbs"] .image-list {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-shell[data-thumbnail-size="small"] .gallery-column[data-gallery-view="thumbs"] .image-item {
+  min-height: 126px;
+}
+
+.app-shell[data-thumbnail-size="large"] .gallery-column[data-gallery-view="thumbs"] .image-item {
+  min-height: 210px;
+}
+
+.app-shell[data-file-name-display="hover"] .gallery-column[data-gallery-view="thumbs"] .image-copy {
+  opacity: 0;
+  transition: opacity var(--duration-quick) var(--ease-standard);
+}
+
+.app-shell[data-file-name-display="hover"] .gallery-column[data-gallery-view="thumbs"] .image-item:hover .image-copy, .app-shell[data-file-name-display="hover"] .gallery-column[data-gallery-view="thumbs"] .image-item:focus-visible .image-copy, .app-shell[data-file-name-display="hover"] .gallery-column[data-gallery-view="thumbs"] .image-item.active .image-copy {
+  opacity: 1;
+}
+
+.app-shell[data-file-name-display="none"] .gallery-column[data-gallery-view="thumbs"] .image-copy {
+  display: none;
+}
 }

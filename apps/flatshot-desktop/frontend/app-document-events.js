@@ -1,6 +1,6 @@
 function closeTransientDetails(event) {
   const target = event.target;
-  document.querySelectorAll("details.format-more-menu[open], details.debug-panel[open], details.viewer-guides-menu[open]").forEach((details) => {
+  document.querySelectorAll("details.format-more-menu[open], details.debug-panel[open], details.viewer-guides-menu[open], details.top-preferences-menu[open]").forEach((details) => {
     if (!details.contains(target)) {
       details.open = false;
     }
@@ -134,28 +134,16 @@ function handleDocumentClick(event) {
     }
   }
 
-  if (target.id === "app-settings-modal") {
-    closeAppSettings();
-    return;
-  }
-
-  if (target.id === "batch-detail-modal") {
-    closeBatchDetail();
-    return;
-  }
-
-  if (target.id === "export-confirm-modal") {
-    closeExportConfirm();
-    return;
-  }
-
-  if (target.id === "qa-lab-modal") {
-    closeQaLab();
-    return;
-  }
-
-  if (target.id === "guide-manager-modal") {
-    closeGuideManager();
+  const modalCloseHandler = {
+    "app-settings-modal": closeAppSettings,
+    "batch-detail-modal": closeBatchDetail,
+    "export-confirm-modal": closeExportConfirm,
+    "qa-lab-modal": closeQaLab,
+    "preferences-modal": closePreferences,
+    "guide-manager-modal": closeGuideManager,
+  }[target.id];
+  if (modalCloseHandler) {
+    modalCloseHandler();
     return;
   }
 
@@ -296,6 +284,10 @@ function handleDocumentInput(event) {
 }
 
 function handleDocumentChange(event) {
+  if (event.target?.matches?.("[data-preference-select]")) {
+    handlePreferenceSelectChange(event.target);
+    return;
+  }
   if (event.target?.matches?.("[data-guide-system-toggle]")) {
     handleGuideSystemToggle(event.target);
     return;

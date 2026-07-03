@@ -10,6 +10,9 @@ function uiPreferencesPayload() {
     activeOutputProfile: state.activeOutputProfileId,
     activeOutputFormats: enabledOutputProfiles().map((profile) => profile.id),
     imageAdjustmentPreset: state.activePreset,
+    themePreference: state.themePreference,
+    brandTone: state.brandTone,
+    interfacePreferences: state.interfacePreferences,
     bridgeScanPath: state.bridgeScanPath,
     lastOutputFolder: storageHelpers.readValue(window.localStorage, STORAGE_KEYS.lastOutputFolder),
     exportPreferences: {
@@ -62,6 +65,15 @@ function cacheUiPreferences(preferences = uiPreferencesPayload()) {
   }
   if (source.imageAdjustmentPreset !== undefined) {
     storageHelpers.writeValue(window.localStorage, STORAGE_KEYS.imageAdjustmentPreset, source.imageAdjustmentPreset);
+  }
+  if (source.themePreference !== undefined) {
+    themeHelpers.writeThemePreference(window.localStorage, STORAGE_KEYS.theme, source.themePreference);
+  }
+  if (source.brandTone !== undefined) {
+    themeHelpers.writeBrandTonePreference(window.localStorage, STORAGE_KEYS.brandTone, source.brandTone);
+  }
+  if (source.interfacePreferences && typeof source.interfacePreferences === "object") {
+    interfacePreferenceHelpers.writeInterfacePreferences(window.localStorage, STORAGE_KEYS.interfacePreferences, source.interfacePreferences);
   }
   if (source.bridgeScanPath !== undefined) {
     storageHelpers.writeValue(window.localStorage, STORAGE_KEYS.bridgeScanPath, source.bridgeScanPath);
@@ -150,6 +162,18 @@ function applyBridgeUiPreferences(preferences) {
 
   if (source.imageAdjustmentPreset !== undefined) {
     state.activePreset = String(source.imageAdjustmentPreset || state.activePreset);
+  }
+  if (source.themePreference !== undefined) {
+    state.themePreference = themeHelpers.normalizeThemePreference(source.themePreference);
+    state.theme = themeHelpers.resolveThemePreference(state.themePreference, window);
+    themeHelpers.applyTheme(document, state.theme);
+  }
+  if (source.brandTone !== undefined) {
+    state.brandTone = themeHelpers.normalizeBrandTone(source.brandTone);
+    themeHelpers.applyBrandTone(document, state.brandTone);
+  }
+  if (source.interfacePreferences && typeof source.interfacePreferences === "object") {
+    state.interfacePreferences = interfacePreferenceHelpers.applyInterfacePreferences(document, source.interfacePreferences);
   }
   if (source.bridgeScanPath !== undefined) {
     state.bridgeScanPath = String(source.bridgeScanPath || "");

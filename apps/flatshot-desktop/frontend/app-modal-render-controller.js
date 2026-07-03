@@ -51,6 +51,14 @@ function renderQaLab() {
   syncModalVisibility(modal, state.qaLabOpen);
 }
 
+function renderPreferencesModal() {
+  const modal = $("#preferences-modal");
+  if (!modal) {
+    return;
+  }
+  syncModalVisibility(modal, state.preferencesOpen);
+}
+
 function exportConfirmHtml(risks) {
   const counts = batchCounts();
   const exportable = counts.exportableImages;

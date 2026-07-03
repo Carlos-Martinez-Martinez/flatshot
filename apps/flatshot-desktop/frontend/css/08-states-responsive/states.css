@@ -331,6 +331,11 @@ button.primary:hover:not(:disabled) {
   place-items: center;
 }
 
+#preferences-modal:not(.is-hidden) {
+  display: grid;
+  place-items: center;
+}
+
 #batch-detail-modal:not(.is-hidden) {
   display: flex;
   align-items: center;
@@ -350,5 +355,11 @@ button.primary:hover:not(:disabled) {
 
 .app-shell[data-ui-state="no_folder"] .gallery-column, .app-shell[data-ui-state="scanning"] .gallery-column, .app-shell[data-ui-state="batch_empty"] .gallery-column, .app-shell[data-ui-state="scan_empty"] .gallery-column, .app-shell[data-ui-state="no_folder"] .settings-panel, .app-shell[data-ui-state="scanning"] .settings-panel {
   display: none;
+}
+
+:root[data-motion="reduced"] .thumb-skeleton, :root[data-motion="reduced"] .onboarding-background__slide, :root[data-motion="reduced"] .app-settings-backdrop, :root[data-motion="reduced"] .app-settings-backdrop > section, :root[data-motion="reduced"] .image-item {
+  animation: none;
+  transition: none;
+  transform: none;
 }
 }

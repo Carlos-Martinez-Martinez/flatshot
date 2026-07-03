@@ -50,6 +50,7 @@
     "app-output-profile-manager.js",
     "app-output-profile-modal-renderer.js",
     "app-modal-controller.js",
+    "app-preferences-controller.js",
     "app-export-view.js",
     "app-preset-controller.js",
     "app-footer-status-controller.js",

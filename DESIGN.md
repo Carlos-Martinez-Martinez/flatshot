@@ -12,11 +12,20 @@ colors:
   muted: "#64748b"
   border: "#d9e1e7"
 darkColors:
-  background: "#111715"
-  surface: "#17201d"
-  text: "#e8f0ed"
-  muted: "#b1c0bb"
-  border: "#33443e"
+  background: "#18181b"
+  surface: "#27272a"
+  text: "#f4f4f5"
+  muted: "#d4d4d8"
+  border: "#3f3f46"
+brandTones:
+  default: "green"
+  options:
+    - "green"
+    - "blue"
+    - "indigo"
+    - "violet"
+    - "coral"
+    - "amber"
 typography:
   h1:
     fontFamily: "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
@@ -94,7 +103,13 @@ FlatShot Desktop should feel compact, professional, and production-oriented. The
 
 Use the existing light neutral surface system with teal as the operational accent. Secondary text must remain legible on white and small badges must meet normal text contrast. Error, warning, and success states must use semantic tokens and not rely on color alone.
 
-Dark mode is an explicit user preference, not an automatic redesign. Reuse existing semantic token names with scoped overrides, keep the teal accent, and preserve real output colors such as white preview/export backgrounds.
+Dark mode is an explicit user preference, not an automatic redesign. Reuse existing semantic token names with scoped overrides, keep the background neutral gray rather than green-tinted, and preserve real output colors such as white preview/export backgrounds.
+
+The brand accent is user-selectable and independent of light/dark mode. Keep the default teal available, but allow blue, indigo, violet, coral, and amber variants by overriding the same primary/accent tokens rather than creating parallel color systems.
+
+Interface preferences such as theme and brand tone belong in a dedicated preferences menu. Export format dialogs must stay focused on output configuration.
+
+The preferences surface is for application interface behavior only: theme, brand tone, density, reduced motion, onboarding recents, thumbnail size, file-name display, and local preference cleanup. Export profiles, destinations, file formats, image presets, and processing parameters must remain in their existing workflow surfaces.
 
 ## Typography
 
@@ -115,6 +130,10 @@ Use 8px radius for buttons and compact controls, 12px to 16px for panels and dia
 ## Components
 
 Buttons need at least 36px interactive height. Forms use compact labels, clear disabled states, and stable control dimensions. Modals should preserve focus behavior, support reduced motion, and avoid layout shifts while opening or closing.
+
+The topbar preferences gear may expose fast theme and brand controls, but deeper options open a dedicated preferences modal. Keep the modal dense and sectioned; avoid turning it into another export or preset editor.
+
+Preferences are arranged top-to-bottom by category. Each preference row keeps the label and supporting information on the left, with one clear control or action on the right: toggles for enable/disable settings, selects for option sets, and buttons only for explicit local actions.
 
 ## Do's and Don'ts
 

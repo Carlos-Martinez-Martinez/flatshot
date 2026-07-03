@@ -55,6 +55,8 @@ def test_dark_theme_loads_early_and_uses_existing_token_names():
 
     assert 'localStorage.getItem("flatshot.theme")' in html
     assert html.index('localStorage.getItem("flatshot.theme")') < html.index("css/00-settings/tokens.css")
+    assert 'prefers-color-scheme: dark' in html
+    assert "dataset.themePreference" in html
     assert html.index("theme.js") < html.index("app.js")
     assert "color-scheme: dark;" in dark_block
     assert css_tokens(dark_block) <= css_tokens(root_block)
@@ -64,14 +66,30 @@ def test_dark_theme_core_contrast_stays_accessible():
     dark_block = css_block(TOKENS_CSS_PATH.read_text(encoding="utf-8"), ':root[data-theme="dark"]')
 
     surface = css_token_value(dark_block, "--color-surface")
+    background = css_token_value(dark_block, "--color-bg")
     text = css_token_value(dark_block, "--color-text")
     muted = css_token_value(dark_block, "--color-muted")
     primary = css_token_value(dark_block, "--color-primary")
     inverse = css_token_value(dark_block, "--color-text-inverse")
 
+    assert background == "#18181b"
+    assert surface == "#27272a"
     assert contrast_ratio(text, surface) >= 4.5
     assert contrast_ratio(muted, surface) >= 4.5
     assert contrast_ratio(inverse, primary) >= 4.5
+
+
+def test_brand_tone_loads_early_and_reuses_theme_tokens():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+    tokens = TOKENS_CSS_PATH.read_text(encoding="utf-8")
+    root_block = css_block(tokens, ":root")
+    blue_block = css_block(tokens, ':root[data-brand-tone="blue"]')
+
+    assert 'localStorage.getItem("flatshot.brandTone")' in html
+    assert html.index('localStorage.getItem("flatshot.brandTone")') < html.index("css/00-settings/tokens.css")
+    assert "data-brand-tone-value" in html
+    assert css_tokens(blue_block) <= css_tokens(root_block)
+    assert css_token_value(blue_block, "--color-primary") == "#2563eb"
 
 
 def test_dark_theme_is_wired_to_topbar_state_and_persistence():
@@ -86,13 +104,23 @@ def test_dark_theme_is_wired_to_topbar_state_and_persistence():
 
     assert 'class="top-theme-action"' in html
     assert 'data-action="toggle-theme"' in html
+    assert 'data-action="set-brand-tone"' in html
     assert 'theme: "flatshot.theme"' in mock
+    assert 'brandTone: "flatshot.brandTone"' in mock
     assert "global.themeHelpers = window.FlatShotTheme;" in globals_source
-    assert "const initialTheme = themeHelpers.readThemePreference" in app
+    assert "const initialThemePreference = themeHelpers.readThemePreference" in app
+    assert "const initialTheme = themeHelpers.resolveThemePreference(initialThemePreference" in app
+    assert "const initialBrandTone = themeHelpers.readBrandTonePreference" in app
+    assert "themePreference: initialThemePreference" in app
     assert "theme: initialTheme" in app
+    assert "brandTone: initialBrandTone" in app
     assert "themeHelpers.applyTheme(document, state.theme);" in shell
+    assert "themeHelpers.applyBrandTone(document, state.brandTone);" in shell
+    assert "document.documentElement.dataset.themePreference = state.themePreference;" in shell
     assert 'shell.dataset.theme = state.theme;' in shell
+    assert 'shell.dataset.brandTone = state.brandTone;' in shell
     assert '"toggle-theme": () => toggleTheme()' in actions
+    assert '"set-brand-tone": (target) => setBrandTone(target?.dataset?.brandToneValue)' in actions
     assert 'themeButton.setAttribute("aria-pressed", state.theme === "dark" ? "true" : "false");' in topbar
     assert ".top-theme-action" in topbar_css
 
@@ -127,13 +155,25 @@ function fakeDocument() {{
 assert.equal(helpers.normalizeTheme("dark"), "dark");
 assert.equal(helpers.normalizeTheme("light"), "light");
 assert.equal(helpers.normalizeTheme("system"), "light");
+assert.equal(helpers.normalizeThemePreference("system"), "system");
+assert.equal(helpers.normalizeThemePreference("bad"), "light");
 assert.equal(helpers.readThemePreference(fakeStorage({{ theme: "dark" }}), "theme"), "dark");
+assert.equal(helpers.readThemePreference(fakeStorage({{ theme: "system" }}), "theme"), "system");
 assert.equal(helpers.readThemePreference(fakeStorage({{ theme: "bad" }}), "theme"), "light");
 assert.equal(helpers.readThemePreference(fakeStorage({{}}, true), "theme"), "light");
+assert.equal(helpers.resolveThemePreference("system", {{ matchMedia: () => ({{ matches: true }}) }}), "dark");
+assert.equal(helpers.resolveThemePreference("system", {{ matchMedia: () => ({{ matches: false }}) }}), "light");
+assert.deepEqual(helpers.brandToneOptions().map((tone) => tone.id), ["green", "blue", "indigo", "violet", "coral", "amber"]);
+assert.equal(helpers.normalizeBrandTone("blue"), "blue");
+assert.equal(helpers.normalizeBrandTone("bad"), "green");
+assert.equal(helpers.readBrandTonePreference(fakeStorage({{ tone: "violet" }}), "tone"), "violet");
+assert.equal(helpers.readBrandTonePreference(fakeStorage({{}}, true), "tone"), "green");
 
 const documentRef = fakeDocument();
 assert.equal(helpers.applyTheme(documentRef, "dark"), "dark");
 assert.equal(documentRef.documentElement.dataset.theme, "dark");
+assert.equal(helpers.applyBrandTone(documentRef, "coral"), "coral");
+assert.equal(documentRef.documentElement.dataset.brandTone, "coral");
 
 const storage = fakeStorage();
 assert.equal(helpers.toggleTheme({{
@@ -144,7 +184,12 @@ assert.equal(helpers.toggleTheme({{
 }}), "light");
 assert.deepEqual(storage.dump(), {{ theme: "light" }});
 assert.equal(documentRef.documentElement.dataset.theme, "light");
+helpers.writeThemePreference(storage, "theme", "system");
+assert.equal(storage.dump().theme, "system");
 
+helpers.writeBrandTonePreference(storage, "tone", "amber");
+assert.equal(storage.dump().tone, "amber");
+assert.doesNotThrow(() => helpers.writeBrandTonePreference(fakeStorage({{}}, true), "tone", "blue"));
 assert.doesNotThrow(() => helpers.writeThemePreference(fakeStorage({{}}, true), "theme", "dark"));
 """
     result = subprocess.run(

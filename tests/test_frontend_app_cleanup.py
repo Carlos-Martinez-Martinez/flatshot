@@ -117,6 +117,7 @@ def test_app_domain_scripts_are_loaded_in_order():
         "app-output-profile-manager.js",
         "app-output-profile-modal-renderer.js",
         "app-modal-controller.js",
+        "app-preferences-controller.js",
         "app-export-view.js",
         "app-preset-controller.js",
         "app-footer-status-controller.js",

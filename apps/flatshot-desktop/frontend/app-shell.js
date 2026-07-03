@@ -12,6 +12,7 @@ function renderShell() {
   shell.classList.toggle("no-selected-image", !derived.hasSelectedImage);
   shell.classList.toggle("can-export", derived.canExport);
   shell.classList.toggle("is-settings-open", state.appSettingsOpen);
+  shell.classList.toggle("is-preferences-open", state.preferencesOpen);
   shell.classList.toggle("export-completed", ["completed", "partial", "failed"].includes(state.exportStatus));
   shell.classList.toggle("inspector-collapsed", state.inspectorCollapsed);
   shell.classList.toggle("is-folder-drop-active", state.folderDropActive);
@@ -21,7 +22,17 @@ function renderShell() {
   shell.dataset.outputEditing = state.outputEditMode ? "true" : "false";
   shell.dataset.responsiveInspector = state.responsiveInspectorOpen ? "true" : "false";
   themeHelpers.applyTheme(document, state.theme);
+  themeHelpers.applyBrandTone(document, state.brandTone);
+  state.interfacePreferences = interfacePreferenceHelpers.applyInterfacePreferences(document, state.interfacePreferences);
   shell.dataset.theme = state.theme;
+  shell.dataset.brandTone = state.brandTone;
+  document.documentElement.dataset.themePreference = state.themePreference;
+  shell.dataset.uiDensity = state.interfacePreferences.density;
+  shell.dataset.reduceMotion = state.interfacePreferences.reduceMotion ? "true" : "false";
+  shell.dataset.thumbnailSize = state.interfacePreferences.thumbnailSize;
+  shell.dataset.fileNameDisplay = state.interfacePreferences.fileNameDisplay;
+  renderBrandToneControls();
+  renderPreferenceControls();
   if (gallery) {
     gallery.dataset.galleryView = state.galleryView;
     const galleryBackground = galleryActiveOutputContext().background;
@@ -52,6 +63,66 @@ function toggleTheme() {
     storageKey: STORAGE_KEYS.theme,
     currentTheme: state.theme,
   });
+  state.themePreference = state.theme;
   state.statusText = state.theme === "dark" ? "Tema oscuro" : "Tema claro";
+  scheduleBridgeUiPreferencesSave();
   render();
+}
+
+function setBrandTone(tone) {
+  const nextTone = themeHelpers.normalizeBrandTone(tone);
+  const label = themeHelpers.brandToneOptions().find((option) => option.id === nextTone)?.label || "Verde";
+  state.brandTone = nextTone;
+  themeHelpers.writeBrandTonePreference(window.localStorage, STORAGE_KEYS.brandTone, nextTone);
+  themeHelpers.applyBrandTone(document, nextTone);
+  state.statusText = `Tono: ${label}`;
+  scheduleBridgeUiPreferencesSave();
+  render();
+}
+
+function renderBrandToneControls() {
+  const currentTone = themeHelpers.normalizeBrandTone(state.brandTone);
+  $$("[data-brand-tone-value]").forEach((button) => {
+    const selected = themeHelpers.normalizeBrandTone(button.dataset.brandToneValue) === currentTone;
+    button.classList.toggle("active", selected);
+    button.setAttribute("aria-pressed", selected ? "true" : "false");
+  });
+}
+
+function renderPreferenceControls() {
+  const themePreference = themeHelpers.normalizeThemePreference(state.themePreference);
+  const preferences = interfacePreferenceHelpers.normalizeInterfacePreferences(state.interfacePreferences);
+  const values = {
+    brandTone: themeHelpers.normalizeBrandTone(state.brandTone),
+    density: preferences.density,
+    fileNameDisplay: preferences.fileNameDisplay,
+    theme: themePreference,
+    thumbnailSize: preferences.thumbnailSize,
+  };
+  $$("[data-preference-select]").forEach((select) => {
+    const value = values[select.dataset.preferenceSelect];
+    if (value && select.value !== value) {
+      select.value = value;
+    }
+  });
+  const reducedMotion = $("[data-action='toggle-reduced-motion']");
+  if (reducedMotion) {
+    const reducedMotionLabel = reducedMotion.querySelector("em");
+    reducedMotion.setAttribute("aria-pressed", preferences.reduceMotion ? "true" : "false");
+    if (reducedMotionLabel) {
+      reducedMotionLabel.textContent = preferences.reduceMotion ? "Reducidas" : "Automáticas";
+    }
+  }
+  const recentFolders = $("[data-action='toggle-show-recent-folders']");
+  if (recentFolders) {
+    const recentFoldersLabel = recentFolders.querySelector("em");
+    recentFolders.setAttribute("aria-pressed", preferences.showRecentFolders ? "true" : "false");
+    if (recentFoldersLabel) {
+      recentFoldersLabel.textContent = preferences.showRecentFolders ? "Visibles" : "Ocultas";
+    }
+  }
+  const clearRecent = $("[data-action='clear-recent-folders']");
+  if (clearRecent) {
+    clearRecent.disabled = !state.recentFolders.length;
+  }
 }

@@ -207,11 +207,15 @@ function galleryVirtualWindow(images = []) {
     total: images.length,
     scrollTop,
     viewportHeight: imageList?.clientHeight || 0,
-    rowHeight: state.galleryView === "list" ? 82 : 178,
+    rowHeight: state.galleryView === "list" ? 82 : galleryThumbnailRowHeight(),
     columns,
     overscanRows: 3,
     threshold: 100,
   });
+}
+
+function galleryThumbnailRowHeight() {
+  return { small: 156, medium: 178, large: 240 }[state.interfacePreferences.thumbnailSize] || 178;
 }
 
 function galleryGridColumnCount(imageList) {

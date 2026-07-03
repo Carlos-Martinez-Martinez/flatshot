@@ -22,8 +22,13 @@ const initialHiddenGuideSystemIds = guideHelpers.normalizeHiddenGuideSystemIds(
   initialGuideSystems
 );
 const initialGuidesVisible = storageHelpers.readValue(window.localStorage, STORAGE_KEYS.guidesVisible) !== "0";
-const initialTheme = themeHelpers.readThemePreference(window.localStorage, STORAGE_KEYS.theme);
+const initialThemePreference = themeHelpers.readThemePreference(window.localStorage, STORAGE_KEYS.theme);
+const initialTheme = themeHelpers.resolveThemePreference(initialThemePreference, window);
+const initialBrandTone = themeHelpers.readBrandTonePreference(window.localStorage, STORAGE_KEYS.brandTone);
+const initialInterfacePreferences = interfacePreferenceHelpers.readInterfacePreferences(window.localStorage, STORAGE_KEYS.interfacePreferences);
 themeHelpers.applyTheme(document, initialTheme);
+themeHelpers.applyBrandTone(document, initialBrandTone);
+interfacePreferenceHelpers.applyInterfacePreferences(document, initialInterfacePreferences);
 const initialRecentFolders = recentFolderHelpers.readRecentFolders(window.localStorage, STORAGE_KEYS.recentFolders);
 const initialExportHistory = exportHistoryHelpers.readExportHistory(window.localStorage, STORAGE_KEYS.exportHistory);
 const initialOutputProfiles = readOutputProfiles(initialOutputProfileId);
@@ -55,7 +60,10 @@ const initialMaxFileSizeKb = initialFormat === "JPG"
 
 const state = {
   scenario: "initial",
+  themePreference: initialThemePreference,
   theme: initialTheme,
+  brandTone: initialBrandTone,
+  interfacePreferences: initialInterfacePreferences,
   batch: "none",
   batchSource: "none",
   selectedImageId: null,
@@ -112,6 +120,7 @@ const state = {
   exportPollTimer: null,
   outputDraft: null,
   appSettingsOpen: false,
+  preferencesOpen: false,
   batchDetailOpen: false,
   exportConfirmOpen: false,
   qaLabOpen: false,

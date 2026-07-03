@@ -312,7 +312,7 @@ function initialStateHtml() {
     devMode,
     dropActive: state.folderDropActive,
     dropMessage: state.folderDropMessage,
-    recentFolders: state.recentFolders,
+    recentFolders: state.interfacePreferences.showRecentFolders ? state.recentFolders : [],
   });
 }
 

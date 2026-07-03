@@ -93,6 +93,11 @@ function handleDocumentKeydown(event) {
       event.preventDefault();
       return;
     }
+    if (state.preferencesOpen) {
+      closePreferences();
+      event.preventDefault();
+      return;
+    }
     if (state.qaLabOpen) {
       closeQaLab();
       event.preventDefault();

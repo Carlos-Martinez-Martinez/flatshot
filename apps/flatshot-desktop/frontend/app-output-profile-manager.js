@@ -38,6 +38,7 @@ function editOutputProfileFromInspector(profileId) {
   rememberModalFocusReturn();
   state.batchDetailOpen = false;
   state.exportConfirmOpen = false;
+  state.preferencesOpen = false;
   state.appSettingsOpen = true;
   state.outputProfileEditorId = profile.id;
   state.outputProfileDraft = { ...profile };
@@ -64,6 +65,7 @@ function newOutputProfile() {
   };
   state.outputProfileNotice = "";
   state.outputDeleteConfirmId = "";
+  state.preferencesOpen = false;
   state.appSettingsOpen = true;
   state.statusText = "Nuevo formato de salida";
   render();
@@ -85,6 +87,7 @@ function duplicateOutputProfile() {
   };
   state.outputProfileNotice = "";
   state.outputDeleteConfirmId = "";
+  state.preferencesOpen = false;
   state.appSettingsOpen = true;
   state.statusText = "Formato duplicado";
   render();

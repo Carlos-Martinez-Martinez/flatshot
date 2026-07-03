@@ -3,6 +3,7 @@ function openAppSettings() {
   state.batchDetailOpen = false;
   state.exportConfirmOpen = false;
   state.qaLabOpen = false;
+  state.preferencesOpen = false;
   const activeProfile = activeOutputProfile();
   const profile = outputMatchesProfile(activeProfile)
     ? activeProfile
@@ -52,6 +53,7 @@ function openBatchDetail() {
   rememberModalFocusReturn();
   state.exportConfirmOpen = false;
   state.qaLabOpen = false;
+  state.preferencesOpen = false;
   state.batchDetailOpen = true;
   state.statusText = "Detalle del lote";
   render();
@@ -69,6 +71,7 @@ function openExportConfirm(risks, options = {}) {
   rememberModalFocusReturn();
   state.appSettingsOpen = false;
   state.qaLabOpen = false;
+  state.preferencesOpen = false;
   state.outputProfileDraft = null;
   state.outputDeleteConfirmId = "";
   state.batchDetailOpen = false;
@@ -112,6 +115,7 @@ function openQaLab() {
   state.appSettingsOpen = false;
   state.batchDetailOpen = false;
   state.exportConfirmOpen = false;
+  state.preferencesOpen = false;
   state.qaLabOpen = true;
   state.statusText = "QA Lab";
   render();
@@ -179,6 +183,9 @@ function firstFocusableElement(container) {
 function currentOpenModal() {
   if (state.qaLabOpen) {
     return $("#qa-lab-modal");
+  }
+  if (state.preferencesOpen) {
+    return $("#preferences-modal");
   }
   if (state.exportConfirmOpen) {
     return $("#export-confirm-modal");

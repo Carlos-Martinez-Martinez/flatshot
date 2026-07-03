@@ -8,9 +8,27 @@
     <script>
       (() => {
         try {
-          document.documentElement.dataset.theme = localStorage.getItem("flatshot.theme") === "dark" ? "dark" : "light";
+          const root = document.documentElement;
+          const themePreference = localStorage.getItem("flatshot.theme");
+          const brandTone = localStorage.getItem("flatshot.brandTone");
+          const preferences = JSON.parse(localStorage.getItem("flatshot.interfacePreferences") || "{}");
+          const theme = ["light", "dark", "system"].includes(themePreference) ? themePreference : "light";
+          const systemDark = theme === "system" && window.matchMedia?.("(prefers-color-scheme: dark)")?.matches;
+          root.dataset.theme = theme === "dark" || systemDark ? "dark" : "light";
+          root.dataset.themePreference = theme;
+          root.dataset.brandTone = ["green", "blue", "indigo", "violet", "coral", "amber"].includes(brandTone) ? brandTone : "green";
+          root.dataset.uiDensity = preferences.density === "comfortable" ? "comfortable" : "compact";
+          root.dataset.motion = preferences.reduceMotion === true ? "reduced" : "auto";
+          root.dataset.thumbnailSize = ["small", "medium", "large"].includes(preferences.thumbnailSize) ? preferences.thumbnailSize : "medium";
+          root.dataset.fileNameDisplay = ["always", "hover", "none"].includes(preferences.fileNameDisplay) ? preferences.fileNameDisplay : "always";
         } catch (error) {
           document.documentElement.dataset.theme = "light";
+          document.documentElement.dataset.themePreference = "light";
+          document.documentElement.dataset.brandTone = "green";
+          document.documentElement.dataset.uiDensity = "compact";
+          document.documentElement.dataset.motion = "auto";
+          document.documentElement.dataset.thumbnailSize = "medium";
+          document.documentElement.dataset.fileNameDisplay = "always";
         }
       })();
     </script>
@@ -69,11 +87,51 @@
               <strong>FlatShot</strong>
               <span id="active-batch-label" hidden>Sin lote</span>
             </div>
-            <button type="button" class="top-theme-action" data-action="toggle-theme" aria-label="Activar tema oscuro" title="Tema oscuro">
-              <span class="button-icon theme-icon theme-icon--dark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 13a8 8 0 1 1-10-10 7 7 0 0 0 10 10Z"></path></svg></span>
-              <span class="button-icon theme-icon theme-icon--light" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path></svg></span>
-              <span class="visually-hidden">Tema oscuro</span>
-            </button>
+            <details class="top-preferences-menu" id="top-preferences-menu">
+              <summary aria-label="Preferencias" title="Preferencias">
+                <span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 0-.4 1.1V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-.6-1 1.65 1.65 0 0 0-1.1-.4H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-.6 1.65 1.65 0 0 0 .4-1.1V3a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 .6 1 1.65 1.65 0 0 0 1.1.4H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51.6Z"></path></svg></span>
+              </summary>
+              <div class="top-preferences-menu__content" role="menu" aria-label="Preferencias de interfaz">
+                <section class="top-preferences-section" aria-label="Tema">
+                  <span>Tema</span>
+                  <button type="button" class="top-theme-action" data-action="toggle-theme" aria-label="Activar tema oscuro" title="Tema oscuro">
+                    <span class="button-icon theme-icon theme-icon--dark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 13a8 8 0 1 1-10-10 7 7 0 0 0 10 10Z"></path></svg></span>
+                    <span class="button-icon theme-icon theme-icon--light" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path></svg></span>
+                    <span class="top-theme-label">Tema oscuro</span>
+                  </button>
+                </section>
+                <section class="top-preferences-section" aria-label="Tono de marca">
+                  <span>Tono de marca</span>
+                  <div class="brand-tone-list" aria-label="Tonos disponibles">
+                    <button type="button" class="brand-tone-option" data-action="set-brand-tone" data-brand-tone-value="green" aria-pressed="false">
+                      <span class="brand-tone-swatch" style="--brand-tone-swatch: #0e8469"></span>
+                      Verde
+                    </button>
+                    <button type="button" class="brand-tone-option" data-action="set-brand-tone" data-brand-tone-value="blue" aria-pressed="false">
+                      <span class="brand-tone-swatch" style="--brand-tone-swatch: #2563eb"></span>
+                      Azul
+                    </button>
+                    <button type="button" class="brand-tone-option" data-action="set-brand-tone" data-brand-tone-value="indigo" aria-pressed="false">
+                      <span class="brand-tone-swatch" style="--brand-tone-swatch: #4f46e5"></span>
+                      Índigo
+                    </button>
+                    <button type="button" class="brand-tone-option" data-action="set-brand-tone" data-brand-tone-value="violet" aria-pressed="false">
+                      <span class="brand-tone-swatch" style="--brand-tone-swatch: #7c3aed"></span>
+                      Violeta
+                    </button>
+                    <button type="button" class="brand-tone-option" data-action="set-brand-tone" data-brand-tone-value="coral" aria-pressed="false">
+                      <span class="brand-tone-swatch" style="--brand-tone-swatch: #c2410c"></span>
+                      Coral
+                    </button>
+                    <button type="button" class="brand-tone-option" data-action="set-brand-tone" data-brand-tone-value="amber" aria-pressed="false">
+                      <span class="brand-tone-swatch" style="--brand-tone-swatch: #b45309"></span>
+                      Ámbar
+                    </button>
+                  </div>
+                </section>
+                <button type="button" class="top-preferences-full-action" data-action="open-preferences">Preferencias...</button>
+              </div>
+            </details>
           </div>
 
           <div class="top-summary" aria-live="polite" hidden>
@@ -679,6 +737,158 @@
         </section>
       </div>
 
+      <div class="app-settings-backdrop is-hidden" id="preferences-modal" role="dialog" aria-modal="true" aria-labelledby="preferences-title">
+        <section class="app-settings-dialog preferences-dialog">
+          <header class="app-settings-header">
+            <div>
+              <span class="eyebrow">Aplicación</span>
+              <h2 id="preferences-title">Preferencias</h2>
+              <small>Interfaz, inicio y datos locales.</small>
+            </div>
+            <button type="button" class="icon-button" data-action="close-preferences" aria-label="Cerrar preferencias">×</button>
+          </header>
+
+          <div class="app-settings-content preferences-content">
+            <section class="preferences-section" aria-labelledby="preferences-appearance-title">
+              <div class="preferences-section-heading">
+                <h3 id="preferences-appearance-title">Apariencia</h3>
+                <small>Estos cambios no afectan al procesado ni a la exportación.</small>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Tema</strong>
+                  <small>El modo sistema sigue el ajuste del escritorio.</small>
+                </div>
+                <label class="preference-select">
+                  <span class="visually-hidden">Tema</span>
+                  <select data-preference-select="theme">
+                    <option value="light">Claro</option>
+                    <option value="dark">Oscuro</option>
+                    <option value="system">Sistema</option>
+                  </select>
+                </label>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Tono de marca</strong>
+                  <small>Color de acento para controles y estados activos.</small>
+                </div>
+                <label class="preference-select preference-select--brand">
+                  <span class="preference-brand-preview" aria-hidden="true"></span>
+                  <select data-preference-select="brandTone" aria-label="Tono de marca">
+                    <option value="green">Verde</option>
+                    <option value="blue">Azul</option>
+                    <option value="indigo">Índigo</option>
+                    <option value="violet">Violeta</option>
+                    <option value="coral">Coral</option>
+                    <option value="amber">Ámbar</option>
+                  </select>
+                </label>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Densidad</strong>
+                  <small>Controla altura de controles y respiración general.</small>
+                </div>
+                <label class="preference-select">
+                  <span class="visually-hidden">Densidad</span>
+                  <select data-preference-select="density">
+                    <option value="compact">Compacta</option>
+                    <option value="comfortable">Cómoda</option>
+                  </select>
+                </label>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Animaciones</strong>
+                  <small>Reduce transiciones y efectos de carga visual.</small>
+                </div>
+                <button type="button" class="preference-toggle" data-action="toggle-reduced-motion" aria-pressed="false">
+                  <span aria-hidden="true"></span>
+                  <em>Automáticas</em>
+                </button>
+              </div>
+            </section>
+
+            <section class="preferences-section" aria-labelledby="preferences-start-title">
+              <div class="preferences-section-heading">
+                <h3 id="preferences-start-title">Inicio</h3>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Carpetas recientes</strong>
+                  <small>Muestra u oculta accesos recientes en la pantalla inicial.</small>
+                </div>
+                <button type="button" class="preference-toggle" data-action="toggle-show-recent-folders" aria-pressed="true">
+                  <span aria-hidden="true"></span>
+                  <em>Visibles</em>
+                </button>
+              </div>
+            </section>
+
+            <section class="preferences-section" aria-labelledby="preferences-view-title">
+              <div class="preferences-section-heading">
+                <h3 id="preferences-view-title">Vista</h3>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Tamaño de miniaturas</strong>
+                  <small>Ajusta la densidad visual de la galería.</small>
+                </div>
+                <label class="preference-select">
+                  <span class="visually-hidden">Tamaño de miniaturas</span>
+                  <select data-preference-select="thumbnailSize">
+                    <option value="small">Pequeño</option>
+                    <option value="medium">Medio</option>
+                    <option value="large">Grande</option>
+                  </select>
+                </label>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Nombres de archivo</strong>
+                  <small>Controla la visibilidad de nombres en miniaturas.</small>
+                </div>
+                <label class="preference-select">
+                  <span class="visually-hidden">Nombres de archivo</span>
+                  <select data-preference-select="fileNameDisplay">
+                    <option value="always">Siempre</option>
+                    <option value="hover">Al pasar</option>
+                    <option value="none">Ocultos</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+
+            <section class="preferences-section" aria-labelledby="preferences-local-title">
+              <div class="preferences-section-heading">
+                <h3 id="preferences-local-title">Datos locales</h3>
+                <small>Sólo afecta a preferencias de este equipo; no modifica imágenes ni presets.</small>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Carpetas recientes</strong>
+                  <small>Elimina sólo el acceso rápido de la pantalla inicial.</small>
+                </div>
+                <button type="button" data-action="clear-recent-folders">Borrar carpetas recientes</button>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Interfaz</strong>
+                  <small>Vuelve a tema claro, tono verde y valores compactos.</small>
+                </div>
+                <button type="button" data-action="reset-interface-preferences">Restablecer interfaz</button>
+              </div>
+            </section>
+          </div>
+
+          <footer class="app-settings-footer">
+            <span class="settings-footer-note">Preferencias locales de interfaz.</span>
+            <button type="button" class="primary" data-action="close-preferences">Cerrar</button>
+          </footer>
+        </section>
+      </div>
+
       <div class="app-settings-backdrop is-hidden" id="app-settings-modal" role="dialog" aria-modal="true" aria-labelledby="app-settings-title">
         <section class="app-settings-dialog">
           <header class="app-settings-header">
@@ -900,6 +1110,7 @@
     <script src="./action-handlers.js?v=20260703-ux-ui-sprint-54"></script>
     <script src="./interaction-bindings.js?v=20260703-ux-ui-sprint-54"></script>
     <script src="./theme.js?v=20260703-ux-ui-sprint-54"></script>
+    <script src="./interface-preferences.js?v=20260703-ux-ui-sprint-54"></script>
     <script src="./session-snapshot.js?v=20260703-ux-ui-sprint-54"></script>
     <script src="./recent-folders.js?v=20260703-ux-ui-sprint-54"></script>
     <script src="./folder-drop.js?v=20260703-ux-ui-sprint-54"></script>
@@ -955,6 +1166,7 @@
         "app-output-profile-manager.js",
         "app-output-profile-modal-renderer.js",
         "app-modal-controller.js",
+        "app-preferences-controller.js",
         "app-export-view.js",
         "app-preset-controller.js",
         "app-footer-status-controller.js",

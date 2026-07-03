@@ -122,9 +122,9 @@ function renderTop() {
     themeButton.title = themeLabel;
     themeButton.setAttribute("aria-label", themeLabel);
     themeButton.setAttribute("aria-pressed", state.theme === "dark" ? "true" : "false");
-    const hiddenLabel = themeButton.querySelector(".visually-hidden");
-    if (hiddenLabel) {
-      hiddenLabel.textContent = themeLabel;
+    const themeText = themeButton.querySelector(".top-theme-label");
+    if (themeText) {
+      themeText.textContent = themeLabel;
     }
   }
   const activePreset = $("#top-active-preset");

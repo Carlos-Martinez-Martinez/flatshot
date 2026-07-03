@@ -46,6 +46,7 @@
   gap: var(--space-4); border-color: var(--border-subtle); background: var(--surface-panel);
   padding: var(--space-5) var(--space-8); box-shadow: var(--shadow-sm);
 }
+.app-shell.is-preferences-open .empty-state.onboarding.initial-onboarding { visibility: hidden; pointer-events: none; }
 .empty-state.onboarding.initial-onboarding.is-drop-active { border-color: var(--color-accent-border); background: var(--surface-alpha-96); box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 12%, transparent), var(--shadow-sm); }
 .preview-panel:has(.onboarding-background.is-visible) .empty-state.onboarding.initial-onboarding { background: var(--surface-alpha-90); backdrop-filter: blur(8px); }
 

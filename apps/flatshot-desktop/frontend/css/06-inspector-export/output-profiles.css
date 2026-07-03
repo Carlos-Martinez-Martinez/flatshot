@@ -299,20 +299,16 @@
 }
 .format-background-row {
   display: grid;
-  grid-template-columns: minmax(0, 240px) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
   gap: var(--space-2);
 }
-.format-size-limit-field[hidden] {
-  display: none;
-}
-.format-size-limit-field {
-  max-width: 220px;
-}
+.format-size-limit-field.is-reserved-hidden { visibility: hidden; pointer-events: none; }
+.format-size-limit-field { width: 100%; max-width: none; }
 .format-size-limit-input {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 34px;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-1);
 }

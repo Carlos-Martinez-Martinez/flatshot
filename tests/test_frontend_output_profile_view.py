@@ -125,7 +125,9 @@ def test_jpg_size_limit_field_stays_below_background_control():
     assert '<span>Peso máx.</span>' in html
     assert 'data-profile-field-message="maxFileSizeKb"' in html
     assert "function syncJpgSizeLimitVisibility()" in app_js
-    assert 'sizeLimitField.hidden = outputProfileHelpers.normalizeExportFormat(formatInput.value) !== "JPG";' in app_js
+    assert 'const isJpg = outputProfileHelpers.normalizeExportFormat(formatInput.value) === "JPG";' in app_js
+    assert 'sizeLimitField.classList.toggle("is-reserved-hidden", !isJpg);' in app_js
+    assert 'sizeLimitInput.disabled = !isJpg;' in app_js
 
 
 def test_background_preset_editor_closes_on_outside_click():

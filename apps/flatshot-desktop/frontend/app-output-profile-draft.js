@@ -124,8 +124,11 @@ function syncJpgSizeLimitVisibility() {
   if (!sizeLimitField || !sizeLimitInput || !formatInput) {
     return;
   }
-  sizeLimitField.hidden = outputProfileHelpers.normalizeExportFormat(formatInput.value) !== "JPG";
-  if (sizeLimitField.hidden) {
+  const isJpg = outputProfileHelpers.normalizeExportFormat(formatInput.value) === "JPG";
+  sizeLimitField.classList.toggle("is-reserved-hidden", !isJpg);
+  sizeLimitField.setAttribute("aria-hidden", isJpg ? "false" : "true");
+  sizeLimitInput.disabled = !isJpg;
+  if (!isJpg) {
     sizeLimitInput.value = "";
   }
 }

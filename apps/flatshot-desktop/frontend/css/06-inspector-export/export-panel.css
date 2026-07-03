@@ -282,7 +282,10 @@
 
 .processing-card__notice button {
   min-height: var(--control-size-compact);
-  white-space: nowrap;
-  justify-self: start;
+  width: 100%;
+  min-width: 0;
+  white-space: normal;
+  line-height: var(--line-height-tight);
+  justify-self: stretch;
 }
 }

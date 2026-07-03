@@ -255,7 +255,6 @@
   --line-height-tight: 1.15;
   --line-soft: #dde3e0;
   --line-strong: var(--border-strong);
-  --quiet: var(--text-tertiary);
   --radius-10: 10px;
   --rail-accent: var(--color-accent);
   --rail-accent-soft: var(--color-accent-soft);

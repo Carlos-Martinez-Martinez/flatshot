@@ -98,7 +98,7 @@ Estado generado para el sprint UX/UI de 2026-07-03.
 - Ancho inline de workflow (`min(640px, 100%)`) centralizado en `--workflow-inline-width` para drop de carpeta, recientes y entrada inline; cache frontend actualizado a sprint 50.
 - Gaps micro de `5px` normalizados a escala existente sin mantener `--space-1-25`; cache frontend actualizado a sprint 51.
 - Separacion vertical de secciones del rail/galeria (`margin-top: 10px`) resuelta con `--space-2-5` existente sin mantener `--gallery-section-offset`; cache frontend actualizado a sprint 52.
-- Correccion de deriva CSS: retirados aliases locales/microtokens de formularios, galeria, footer, botones, guide manager e inspector; duplicados estructurales de inspector consolidados; cache frontend actualizado a sprint 53.
+- Correccion de deriva CSS: retirados aliases locales/microtokens de formularios, galeria, footer, botones, guide manager e inspector; duplicados estructurales de inspector consolidados; wrapping de acciones largas del inspector corregido; cache frontend actualizado a sprint 54.
 
 ## Evaluaciones P2 Cerradas
 

@@ -11,6 +11,7 @@ const actionDispatcher = actionHandlerHelpers.createActionDispatcher({
     state.statusText = state.responsiveInspectorOpen ? "Inspector visible" : "Inspector oculto";
     render();
   },
+  "toggle-theme": () => toggleTheme(),
   "pick-bridge-folder": () => { void pickBridgeFolder(); },
   "scan-recent-folder": (target) => scanRecentFolder(target),
   "remove-recent-folder": (target) => removeRecentFolder(target),

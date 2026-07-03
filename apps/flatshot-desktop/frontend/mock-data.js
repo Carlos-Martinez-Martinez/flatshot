@@ -91,6 +91,7 @@ global.STORAGE_KEYS = {
   recentFolders: "flatshot.recentFolders",
   exportHistory: "flatshot.exportHistory",
   exportPreferences: "flatshot.exportPreferences",
+  theme: "flatshot.theme",
   sessionSnapshot: "flatshot.liveReloadSession.v1",
 };
 

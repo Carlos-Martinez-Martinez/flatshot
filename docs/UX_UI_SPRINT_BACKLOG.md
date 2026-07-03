@@ -23,7 +23,6 @@ Estado generado para el sprint UX/UI de 2026-07-03.
 ## P2 Pospuesto
 
 - Consolidar tokens redundantes restantes solo si reduce el total neto de tokens o elimina duplicacion real.
-- Preparar dark mode fase 1: pospuesto para una pasada dedicada; no se anadiran tokens de tema sin una decision visual completa.
 - Evaluar Proxy para state con auto-sync.
 - Evaluar bundler ligero como esbuild o Vite.
 
@@ -101,12 +100,12 @@ Estado generado para el sprint UX/UI de 2026-07-03.
 - Soporte `forced-colors` para foco y bordes criticos sin depender solo de color personalizado.
 - Selector CSS base de botones refactorizado a `:where(...)` de baja especificidad para que componentes especializados sobrescriban sin excepciones largas.
 - Divisor arrastrable en compare mode con `aria-valuenow` y actualizacion por pointer events.
+- Dark mode fase 1 implementado como preferencia explicita persistida (`flatshot.theme`), con carga temprana para evitar flash y overrides de tokens existentes sin crear una familia paralela de variables.
 
 ## Evaluaciones P2 Cerradas
 
 - Proxy para state con auto-sync: pospuesto. La app actual depende de flujos explicitos entre controladores, bridge y renderizado; un Proxy global podria ocultar efectos laterales y complicar pruebas sin resolver una friccion bloqueante.
 - Bundler ligero como esbuild o Vite: pospuesto. El frontend actual funciona como scripts estaticos versionados y sin framework; introducir bundler requiere revisar empaquetado desktop, cache busting y orden de carga. Tiene sentido retomarlo junto con una migracion gradual a ES modules.
-- Dark mode fase 1: pospuesto. Con el criterio actual de minimizar tokens, preparar tema oscuro sin diseno cerrado crearia mas variables de las necesarias.
 - Consolidacion de tokens restante: se mantiene como tarea de reduccion, no de ampliacion. Nuevos tokens solo si sustituyen repeticion real y no aumentan complejidad visual.
 
 ## Verificacion Manual Registrada

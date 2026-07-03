@@ -20,6 +20,8 @@ function renderShell() {
   shell.dataset.statusFooter = hasStatusFooter ? "true" : "false";
   shell.dataset.outputEditing = state.outputEditMode ? "true" : "false";
   shell.dataset.responsiveInspector = state.responsiveInspectorOpen ? "true" : "false";
+  themeHelpers.applyTheme(document, state.theme);
+  shell.dataset.theme = state.theme;
   if (gallery) {
     gallery.dataset.galleryView = state.galleryView;
     const galleryBackground = galleryActiveOutputContext().background;
@@ -41,4 +43,15 @@ function keepActiveThumbnailVisible() {
     }
     active.scrollIntoView({ block: "nearest", inline: "center" });
   });
+}
+
+function toggleTheme() {
+  state.theme = themeHelpers.toggleTheme({
+    document,
+    storage: window.localStorage,
+    storageKey: STORAGE_KEYS.theme,
+    currentTheme: state.theme,
+  });
+  state.statusText = state.theme === "dark" ? "Tema oscuro" : "Tema claro";
+  render();
 }

@@ -116,6 +116,17 @@ function renderTop() {
     inspectorButton.title = state.responsiveInspectorOpen ? "Cerrar inspector" : "Abrir ajustes y exportación";
     inspectorButton.setAttribute("aria-pressed", state.responsiveInspectorOpen ? "true" : "false");
   }
+  const themeButton = $(".top-theme-action");
+  if (themeButton) {
+    const themeLabel = state.theme === "dark" ? "Cambiar a tema claro" : "Activar tema oscuro";
+    themeButton.title = themeLabel;
+    themeButton.setAttribute("aria-label", themeLabel);
+    themeButton.setAttribute("aria-pressed", state.theme === "dark" ? "true" : "false");
+    const hiddenLabel = themeButton.querySelector(".visually-hidden");
+    if (hiddenLabel) {
+      hiddenLabel.textContent = themeLabel;
+    }
+  }
   const activePreset = $("#top-active-preset");
   if (activePreset) {
     const showPreset = state.batch !== "none" && state.batch !== "scanning" && Boolean(state.activePreset);

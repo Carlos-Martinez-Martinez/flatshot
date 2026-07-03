@@ -7,6 +7,7 @@
   global.bridgeClientHelpers = window.FlatShotBridgeClient;
   global.actionHandlerHelpers = window.FlatShotActionHandlers;
   global.interactionBindingHelpers = window.FlatShotInteractionBindings;
+  global.themeHelpers = window.FlatShotTheme;
   global.sessionSnapshotHelpers = window.FlatShotSessionSnapshot;
   global.recentFolderHelpers = window.FlatShotRecentFolders;
   global.folderDropHelpers = window.FlatShotFolderDrop;

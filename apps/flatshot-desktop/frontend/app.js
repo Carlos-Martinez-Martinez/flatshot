@@ -22,6 +22,8 @@ const initialHiddenGuideSystemIds = guideHelpers.normalizeHiddenGuideSystemIds(
   initialGuideSystems
 );
 const initialGuidesVisible = storageHelpers.readValue(window.localStorage, STORAGE_KEYS.guidesVisible) !== "0";
+const initialTheme = themeHelpers.readThemePreference(window.localStorage, STORAGE_KEYS.theme);
+themeHelpers.applyTheme(document, initialTheme);
 const initialRecentFolders = recentFolderHelpers.readRecentFolders(window.localStorage, STORAGE_KEYS.recentFolders);
 const initialExportHistory = exportHistoryHelpers.readExportHistory(window.localStorage, STORAGE_KEYS.exportHistory);
 const initialOutputProfiles = readOutputProfiles(initialOutputProfileId);
@@ -53,6 +55,7 @@ const initialMaxFileSizeKb = initialFormat === "JPG"
 
 const state = {
   scenario: "initial",
+  theme: initialTheme,
   batch: "none",
   batchSource: "none",
   selectedImageId: null,

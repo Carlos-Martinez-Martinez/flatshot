@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>FlatShot Desktop</title>
     <link rel="icon" href="data:," />
+    <script>
+      (() => {
+        try {
+          document.documentElement.dataset.theme = localStorage.getItem("flatshot.theme") === "dark" ? "dark" : "light";
+        } catch (error) {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
     <link rel="stylesheet" href="./css/00-settings/tokens.css?v=20260703-ux-ui-sprint-54" />
     <link rel="stylesheet" href="./css/01-base/base.css?v=20260703-ux-ui-sprint-54" />
     <link rel="stylesheet" href="./css/02-layout/shell-workspace.css?v=20260703-ux-ui-sprint-54" />
@@ -60,6 +69,11 @@
               <strong>FlatShot</strong>
               <span id="active-batch-label" hidden>Sin lote</span>
             </div>
+            <button type="button" class="top-theme-action" data-action="toggle-theme" aria-label="Activar tema oscuro" title="Tema oscuro">
+              <span class="button-icon theme-icon theme-icon--dark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 13a8 8 0 1 1-10-10 7 7 0 0 0 10 10Z"></path></svg></span>
+              <span class="button-icon theme-icon theme-icon--light" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path></svg></span>
+              <span class="visually-hidden">Tema oscuro</span>
+            </button>
           </div>
 
           <div class="top-summary" aria-live="polite" hidden>
@@ -885,6 +899,7 @@
     <script src="./bridge-client.js?v=20260703-ux-ui-sprint-54"></script>
     <script src="./action-handlers.js?v=20260703-ux-ui-sprint-54"></script>
     <script src="./interaction-bindings.js?v=20260703-ux-ui-sprint-54"></script>
+    <script src="./theme.js?v=20260703-ux-ui-sprint-54"></script>
     <script src="./session-snapshot.js?v=20260703-ux-ui-sprint-54"></script>
     <script src="./recent-folders.js?v=20260703-ux-ui-sprint-54"></script>
     <script src="./folder-drop.js?v=20260703-ux-ui-sprint-54"></script>

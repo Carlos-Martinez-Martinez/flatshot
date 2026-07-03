@@ -11,6 +11,12 @@ colors:
   text: "#0f172a"
   muted: "#64748b"
   border: "#d9e1e7"
+darkColors:
+  background: "#111715"
+  surface: "#17201d"
+  text: "#e8f0ed"
+  muted: "#b1c0bb"
+  border: "#33443e"
 typography:
   h1:
     fontFamily: "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
@@ -88,6 +94,8 @@ FlatShot Desktop should feel compact, professional, and production-oriented. The
 
 Use the existing light neutral surface system with teal as the operational accent. Secondary text must remain legible on white and small badges must meet normal text contrast. Error, warning, and success states must use semantic tokens and not rely on color alone.
 
+Dark mode is an explicit user preference, not an automatic redesign. Reuse existing semantic token names with scoped overrides, keep the teal accent, and preserve real output colors such as white preview/export backgrounds.
+
 ## Typography
 
 Use system UI fonts explicitly. Keep dense application text at 13px to 14px, reserve 18px to 22px text for panel and modal headings, and keep letter spacing at 0px.
@@ -113,5 +121,6 @@ Buttons need at least 36px interactive height. Forms use compact labels, clear d
 - Do: keep image processing and export behavior separate from UI presentation.
 - Do: use existing CSS modules and tokens before adding new visual rules.
 - Do: keep paths, filenames, and status messages truncated in dense panels.
+- Do: implement theme variants by overriding existing semantic tokens instead of adding parallel token families.
 - Don't: introduce frameworks or new dependencies for UI polish.
 - Don't: hide critical preset, adjustment, or export controls without a responsive alternative.

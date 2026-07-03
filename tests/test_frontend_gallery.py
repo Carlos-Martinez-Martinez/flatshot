@@ -17,6 +17,7 @@ APP_THUMBNAIL_CONTROLLER_PATH = FRONTEND_DIR / "app-thumbnail-controller.js"
 APP_JS_PATH = FRONTEND_DIR / "app.js"
 APP_EXPORT_VIEW_PATH = FRONTEND_DIR / "app-export-view.js"
 GALLERY_CSS_PATH = FRONTEND_DIR / "css" / "04-batch-gallery" / "image-grid.css"
+THUMBNAILS_CSS_PATH = FRONTEND_DIR / "css" / "04-batch-gallery" / "thumbnails.css"
 
 
 def test_gallery_helper_loads_before_app_script():
@@ -48,6 +49,13 @@ def test_gallery_thumbnail_view_keeps_file_metadata_visible():
     assert '.gallery-column[data-gallery-view="thumbs"] .image-copy small' in css
     assert '.gallery-column[data-gallery-view="thumbs"] .image-copy small {\n  display: none;' not in css
     assert '.gallery-column[data-gallery-view="thumbs"] .image-copy small, .gallery-filter[hidden]' not in css
+
+
+def test_gallery_rgb230_thumbnail_background_uses_resolved_output_color():
+    css = THUMBNAILS_CSS_PATH.read_text(encoding="utf-8")
+
+    assert '.gallery-column[data-output-bg="rgb230"] .thumb' in css
+    assert '.gallery-column[data-output-bg="rgb230"] .thumb, .gallery-column[data-output-bg="custom"] .thumb' in css
 
 
 def test_gallery_multiselect_and_virtual_window_are_wired():

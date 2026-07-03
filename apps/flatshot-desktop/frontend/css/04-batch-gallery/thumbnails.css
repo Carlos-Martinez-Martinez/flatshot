@@ -275,7 +275,7 @@ button, .status-dot, .asset-state, .preflight-chip, .change-chip, .state-chip {
   background: var(--color-output-white);
 }
 
-.gallery-column[data-output-bg="custom"] .thumb { background: var(--custom-output-bg, var(--color-output-custom-fallback)); }
+.gallery-column[data-output-bg="rgb230"] .thumb, .gallery-column[data-output-bg="custom"] .thumb { background: var(--custom-output-bg, var(--color-output-custom-fallback)); }
 
 .gallery-column[data-output-bg="transparent"] .thumb {
   background: linear-gradient(45deg, var(--ink-alpha-08) 25%, transparent 25%), linear-gradient(-45deg, var(--ink-alpha-08) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--ink-alpha-08) 75%), linear-gradient(-45deg, transparent 75%, var(--ink-alpha-08) 75%), var(--color-output-white);

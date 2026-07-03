@@ -89,6 +89,7 @@ global.STORAGE_KEYS = {
   activeOutputFormats: "flatshot.activeOutputFormatIds",
   lastOutputFolder: "flatshot.lastOutputFolder",
   recentFolders: "flatshot.recentFolders",
+  exportHistory: "flatshot.exportHistory",
   exportPreferences: "flatshot.exportPreferences",
   sessionSnapshot: "flatshot.liveReloadSession.v1",
 };

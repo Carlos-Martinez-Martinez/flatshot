@@ -11,6 +11,10 @@ FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
 HELPER_PATH = FRONTEND_DIR / "gallery.js"
 INDEX_PATH = FRONTEND_DIR / "index.html"
 APP_GALLERY_CONTROLLER_PATH = FRONTEND_DIR / "app-gallery-controller.js"
+APP_GALLERY_SELECTION_PATH = FRONTEND_DIR / "app-gallery-selection-workflow.js"
+APP_DOCUMENT_EVENTS_PATH = FRONTEND_DIR / "app-document-events.js"
+APP_THUMBNAIL_CONTROLLER_PATH = FRONTEND_DIR / "app-thumbnail-controller.js"
+APP_JS_PATH = FRONTEND_DIR / "app.js"
 APP_EXPORT_VIEW_PATH = FRONTEND_DIR / "app-export-view.js"
 GALLERY_CSS_PATH = FRONTEND_DIR / "css" / "04-batch-gallery" / "image-grid.css"
 
@@ -46,6 +50,30 @@ def test_gallery_thumbnail_view_keeps_file_metadata_visible():
     assert '.gallery-column[data-gallery-view="thumbs"] .image-copy small, .gallery-filter[hidden]' not in css
 
 
+def test_gallery_multiselect_and_virtual_window_are_wired():
+    app = APP_JS_PATH.read_text(encoding="utf-8")
+    selection = APP_GALLERY_SELECTION_PATH.read_text(encoding="utf-8")
+    controller = APP_GALLERY_CONTROLLER_PATH.read_text(encoding="utf-8")
+    events = APP_DOCUMENT_EVENTS_PATH.read_text(encoding="utf-8")
+    thumbnails = APP_THUMBNAIL_CONTROLLER_PATH.read_text(encoding="utf-8")
+    css = GALLERY_CSS_PATH.read_text(encoding="utf-8")
+
+    assert "selectedImageIds: []" in app
+    assert "selectionAnchorImageId: null" in app
+    assert "galleryScrollTop: 0" in app
+    assert "function selectGalleryImage(imageId, options = {})" in selection
+    assert "galleryHelpers.resolveGallerySelection" in selection
+    assert "selectGalleryImage(imageTarget.dataset.imageId" in events
+    assert "additive: event.ctrlKey || event.metaKey" in events
+    assert "range: event.shiftKey" in events
+    assert "galleryHelpers.virtualGalleryWindow" in controller
+    assert "galleryVirtualSpacerHtml" in controller
+    assert "queueThumbnailPreload(renderedImages)" in controller
+    assert "function queueThumbnailPreload(images = null)" in thumbnails
+    assert "preloadBatchThumbnails(images)" in thumbnails
+    assert "gallery-virtual-spacer" in css
+
+
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
 def test_gallery_helpers_keep_filter_and_search_contracts():
     script = f"""
@@ -62,6 +90,76 @@ const images = [
 const exportItemStatuses = new Map([
   ["e", {{ status: "error", label: "Error" }}],
 ]);
+
+assert.deepEqual(helpers.resolveGallerySelection({{
+  images,
+  selectedIds: ["a"],
+  primaryId: "a",
+  anchorId: "a",
+  targetId: "c",
+  additive: false,
+  range: false,
+}}), {{
+  selectedImageId: "c",
+  selectedIds: ["c"],
+  anchorId: "c",
+}});
+assert.deepEqual(helpers.resolveGallerySelection({{
+  images,
+  selectedIds: ["a"],
+  primaryId: "a",
+  anchorId: "a",
+  targetId: "c",
+  additive: true,
+  range: false,
+}}), {{
+  selectedImageId: "c",
+  selectedIds: ["a", "c"],
+  anchorId: "c",
+}});
+assert.deepEqual(helpers.resolveGallerySelection({{
+  images,
+  selectedIds: ["a"],
+  primaryId: "a",
+  anchorId: "a",
+  targetId: "d",
+  additive: false,
+  range: true,
+}}), {{
+  selectedImageId: "d",
+  selectedIds: ["a", "b", "c", "d"],
+  anchorId: "a",
+}});
+
+assert.deepEqual(helpers.virtualGalleryWindow({{
+  total: 20,
+  scrollTop: 180,
+  viewportHeight: 240,
+  rowHeight: 60,
+  columns: 2,
+  overscanRows: 1,
+}}), {{
+  virtualized: false,
+  start: 0,
+  end: 20,
+  paddingTop: 0,
+  paddingBottom: 0,
+}});
+assert.deepEqual(helpers.virtualGalleryWindow({{
+  total: 240,
+  scrollTop: 360,
+  viewportHeight: 300,
+  rowHeight: 60,
+  columns: 2,
+  overscanRows: 2,
+  threshold: 80,
+}}), {{
+  virtualized: true,
+  start: 8,
+  end: 24,
+  paddingTop: 240,
+  paddingBottom: 6480,
+}});
 
 assert.equal(helpers.imageFileStem("C:/lote/Zapato-Verde 01.png"), "Zapato-Verde 01");
 assert.equal(helpers.imageFileStem(""), "Imagen");
@@ -273,6 +371,22 @@ const itemWithOutput = helpers.imageItemHtml({{
 }});
 assert.equal(itemWithOutput.includes('aria-label="Camisa.png · Lista · PNG · transparente"'), true);
 assert.equal(itemWithOutput.includes('class="image-output-label">PNG · transparente</span>'), true);
+
+const multiSelectedItem = helpers.imageItemHtml({{
+  image: {{
+    id: "img-3",
+    name: "Bolso.png",
+    path: "C:/lote/Bolso.png",
+    detail: "PNG · 14 KB",
+    status: "ready",
+  }},
+  selected: true,
+  primarySelected: false,
+  statusLabels: {{}},
+}});
+assert.equal(multiSelectedItem.includes('class="image-item asset-row selected ready"'), true);
+assert.equal(multiSelectedItem.includes('aria-selected="true"'), true);
+assert.equal(multiSelectedItem.includes('aria-current="false"'), true);
 """
     result = subprocess.run(
         ["node", "-e", script],

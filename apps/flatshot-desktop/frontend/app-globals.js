@@ -27,6 +27,7 @@
   global.exportStateHelpers = window.FlatShotExportState;
   global.exportSummaryViewHelpers = window.FlatShotExportSummaryView;
   global.exportResultViewHelpers = window.FlatShotExportResultView;
+  global.exportHistoryHelpers = window.FlatShotExportHistory;
   global.exportPreflightViewHelpers = window.FlatShotExportPreflightView;
   global.topStatusViewHelpers = window.FlatShotTopStatusView;
   global.preflightHelpers = window.FlatShotPreflight;

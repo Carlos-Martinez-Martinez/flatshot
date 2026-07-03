@@ -16,6 +16,8 @@ APP_LOADER_PATH = FRONTEND_DIR / "app-loader.js"
 APP_STARTUP_PATH = FRONTEND_DIR / "app-startup.js"
 APP_SHELL_PATH = FRONTEND_DIR / "app-shell.js"
 APP_ACTION_DISPATCHER_PATH = FRONTEND_DIR / "app-action-dispatcher.js"
+APP_EXPORT_CONTROLLER_PATH = FRONTEND_DIR / "app-export-controller.js"
+APP_EXPORT_VIEW_PATH = FRONTEND_DIR / "app-export-view.js"
 APP_VIEWER_EVENTS_PATH = FRONTEND_DIR / "app-viewer-events.js"
 INTERACTION_BINDINGS_PATH = FRONTEND_DIR / "interaction-bindings.js"
 ONBOARDING_BACKGROUND_PATH = FRONTEND_DIR / "onboarding-background.js"
@@ -292,6 +294,33 @@ def test_preview_loading_keeps_previous_render_and_uses_overlay_class():
     assert "previewLoadingState({ clearData: false })" in bridge_preview
 
 
+def test_failed_export_retry_is_wired_to_failed_bridge_paths_only():
+    actions = APP_ACTION_DISPATCHER_PATH.read_text(encoding="utf-8")
+    controller = APP_EXPORT_CONTROLLER_PATH.read_text(encoding="utf-8")
+    view = APP_EXPORT_VIEW_PATH.read_text(encoding="utf-8")
+
+    assert '"retry-failed-export"' in actions
+    assert "retryFailedExport()" in actions
+    assert "function retryFailedExport()" in controller
+    assert "failedBridgeExportImages(exportableImages(), state.exportCompletedItems)" in controller
+    assert "retryFailedOnly" in controller
+    assert "images: retryImages" in controller
+    assert "canRetryFailed: retryableFailedExportImages().length > 0" in view
+
+
+def test_export_history_is_persisted_and_rendered_from_export_flow():
+    app = (FRONTEND_DIR / "app.js").read_text(encoding="utf-8")
+    controller = APP_EXPORT_CONTROLLER_PATH.read_text(encoding="utf-8")
+    view = APP_EXPORT_VIEW_PATH.read_text(encoding="utf-8")
+
+    assert "initialExportHistory" in app
+    assert "exportHistory: initialExportHistory" in app
+    assert "rememberCurrentExportHistory" in controller
+    assert "exportHistoryHelpers.rememberExportHistory" in controller
+    assert "STORAGE_KEYS.exportHistory" in controller
+    assert "exportHistoryHelpers.exportHistoryHtml(state.exportHistory)" in view
+
+
 def test_responsive_inspector_has_drawer_toggle_under_1120px():
     html = INDEX_PATH.read_text(encoding="utf-8")
     shell = APP_SHELL_PATH.read_text(encoding="utf-8")
@@ -307,7 +336,9 @@ def test_responsive_inspector_has_drawer_toggle_under_1120px():
     assert '.app-shell[data-responsive-inspector="true"] .settings-panel' in responsive
     assert ".top-inspector-action" in responsive
     assert ".top-inspector-action {\n  display: none;" in topbar
-    assert ":not(.top-inspector-action)" in buttons
+    assert ".top-inspector-action, .top-more-menu > summary" in topbar
+    assert ":where(button[data-action]" in buttons
+    assert ":not(.top-inspector-action)" not in buttons
 
 
 def test_modals_use_shared_transition_visibility_controller():

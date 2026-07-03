@@ -40,7 +40,7 @@ button, summary {
   user-select: none;
 }
 
-button:not(.image-item):not(.preset-chip):not(.output-profile-edit):not(.active-output-row__main):not(.guide-system-main):not(.guide-icon-button):not(.rgb-visual-control__swatch):not(.top-inspector-action) {
+:where(button[data-action], button[data-filter], button[data-gallery-view], button[data-preview-mode], button[data-preview-bg], button[data-lighting-preset], button[data-review-scenario], button[data-inspector-tab], button[data-output-profile-close], button[data-output-profile-reset], button[data-output-profile-save]) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -105,7 +105,7 @@ button.primary {
   color: var(--color-primary);
 }
 
-button:not(.primary):not(.active):not(.danger):not(.danger-subtle):not(.btn-linklike):not(.ghost-action):not(.icon-button):not(.image-item):not(.preset-chip):not(.output-profile-edit):not(.active-output-row__main):not(.guide-system-main):not(.guide-icon-button):not(.rgb-visual-control__swatch) {
+:where(button[data-action], button[data-filter], button[data-gallery-view], button[data-preview-mode], button[data-preview-bg], button[data-lighting-preset], button[data-review-scenario], button[data-inspector-tab], button[data-output-profile-close], button[data-output-profile-reset], button[data-output-profile-save]):where(:not(.primary):not(.active):not(.danger):not(.danger-subtle):not(.btn-linklike):not(.ghost-action):not(.icon-button)) {
   border-color: var(--border-default);
   background: var(--surface-panel);
   color: var(--text-secondary);
@@ -125,6 +125,8 @@ button:not(.primary):not(.active):not(.danger):not(.danger-subtle):not(.btn-link
 
 .icon-button {
   min-width: var(--control-height);
+  border-color: transparent;
+  background: transparent;
   padding-inline: var(--space-2);
 }
 

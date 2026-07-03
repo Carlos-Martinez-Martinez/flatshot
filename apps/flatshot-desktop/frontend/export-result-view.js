@@ -87,8 +87,11 @@
     if (issues.length || status === "failed" || status === "partial") {
       actions.push('<button type="button" data-action="review-errors">Revisar avisos</button>');
     }
+    if ((status === "failed" || status === "partial") && options.canRetryFailed) {
+      actions.push('<button type="button" class="primary" data-action="retry-failed-export">Reintentar fallidas</button>');
+    }
     if (status === "failed" && options.canRetry) {
-      actions.push('<button type="button" class="primary" data-action="start-export">Reintentar</button>');
+      actions.push('<button type="button" data-action="start-export">Reintentar todo</button>');
     }
     if (!actions.length || destinations.length > 3) {
       return destinations.length > 3

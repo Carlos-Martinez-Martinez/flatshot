@@ -89,6 +89,13 @@
   `;
   }
 
+  function compareDividerHtml(value = 50) {
+    const percent = Math.max(5, Math.min(95, Number(value) || 50));
+    return `
+      <button type="button" class="compare-divider" data-compare-divider aria-label="Mover divisor de comparación" aria-valuemin="5" aria-valuemax="95" aria-valuenow="${percent}" title="Mover comparación"></button>
+    `;
+  }
+
   function viewerOutputCompactLabel(options = {}) {
     return `${options.format || "JPG"} · ${options.sizeLabel || "1800×2400"} · ${options.backgroundLabel || "gris claro"}`;
   }
@@ -108,6 +115,7 @@
   }
 
   return {
+    compareDividerHtml,
     escapeHtml,
     mockPreviewHtml,
     previewLoadingOverlayHtml,

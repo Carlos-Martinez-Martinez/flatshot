@@ -23,6 +23,7 @@ const initialHiddenGuideSystemIds = guideHelpers.normalizeHiddenGuideSystemIds(
 );
 const initialGuidesVisible = storageHelpers.readValue(window.localStorage, STORAGE_KEYS.guidesVisible) !== "0";
 const initialRecentFolders = recentFolderHelpers.readRecentFolders(window.localStorage, STORAGE_KEYS.recentFolders);
+const initialExportHistory = exportHistoryHelpers.readExportHistory(window.localStorage, STORAGE_KEYS.exportHistory);
 const initialOutputProfiles = readOutputProfiles(initialOutputProfileId);
 const initialEnabledOutputProfiles = initialOutputProfiles.filter((profile) => profile.enabled);
 const initialOutputProfile = initialEnabledOutputProfiles.find((profile) => profile.id === initialOutputProfileId)
@@ -55,6 +56,8 @@ const state = {
   batch: "none",
   batchSource: "none",
   selectedImageId: null,
+  selectedImageIds: [],
+  selectionAnchorImageId: null,
   previewStatus: "empty",
   previewRequestId: 0,
   previewData: null,
@@ -62,6 +65,7 @@ const state = {
   thumbnailStatus: {},
   thumbnailErrors: [],
   previewMode: "processed",
+  compareSplit: 50,
   previewBg: initialBackground,
   guidesVisible: initialGuidesVisible,
   activeGuideSystemIds: initialActiveGuideSystemIds,
@@ -79,6 +83,7 @@ const state = {
   filter: "all",
   search: "",
   galleryView: "thumbs",
+  galleryScrollTop: 0,
   inspectorTab: "review",
   inspectorCollapsed: false,
   responsiveInspectorOpen: false,
@@ -99,6 +104,8 @@ const state = {
   exportCompletedItems: [],
   exportIssues: [],
   exportResult: null,
+  exportHistory: initialExportHistory,
+  exportHistoryRecordedJobId: "",
   exportPollTimer: null,
   outputDraft: null,
   appSettingsOpen: false,
@@ -166,6 +173,7 @@ let fitZoomFrame = 0;
 let viewerResizeObserver = null;
 let inspectorScrollTopBeforeToggle = 0;
 let modalFocusReturnTarget = null;
+let galleryScrollFrame = 0;
 let sessionSnapshotPersistenceEnabled = false;
 let restoredSessionSnapshot = false;
 let bridgeUiPreferencesSaveTimer = 0;
@@ -180,6 +188,10 @@ const viewerPanState = {
   startY: 0,
   originX: 0,
   originY: 0,
+};
+const compareDividerDrag = {
+  active: false,
+  pointerId: null,
 };
 
 const $ = (selector) => document.querySelector(selector);

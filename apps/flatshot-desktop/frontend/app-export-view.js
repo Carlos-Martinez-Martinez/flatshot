@@ -172,8 +172,9 @@ function renderExportResult() {
   const target = $("#export-result");
   const resultStatuses = ["running", "completed", "partial", "failed"];
   const shouldShow = resultStatuses.includes(state.exportStatus) || state.exportJobId || state.exportResult;
+  const historyHtml = exportHistoryHelpers.exportHistoryHtml(state.exportHistory);
   if (!shouldShow) {
-    target.innerHTML = "";
+    target.innerHTML = historyHtml;
     return;
   }
 
@@ -205,7 +206,7 @@ function renderExportResult() {
     issueSummary: exportIssueActionText(issues[0]),
     items,
     actionsHtml,
-  });
+  }) + historyHtml;
 }
 
 function exportResultTitle() {
@@ -242,6 +243,7 @@ function exportResultActionsHtml(issues, destinations) {
     destinations,
     canOpenOutput: Boolean(outputDestinationToOpen()),
     canRetry: isExportReady(),
+    canRetryFailed: retryableFailedExportImages().length > 0,
   });
 }
 

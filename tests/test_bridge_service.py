@@ -809,7 +809,11 @@ def test_bridge_start_export_reports_structured_item_errors(tmp_path):
     assert final["issues"][0]["level"] == "error"
     assert final["issues"][0]["title"] == "item.png"
     assert "fallo controlado" in final["issues"][0]["detail"]
-    assert final["completedItems"][0] == {"name": "item.png", "success": False}
+    assert final["completedItems"][0] == {
+        "name": "item.png",
+        "path": png.as_posix(),
+        "success": False,
+    }
 
 
 def test_bridge_start_export_marks_false_runner_result_as_failed(tmp_path):

@@ -71,6 +71,16 @@
   box-shadow: inset 0 0 0 var(--border-width-strong) var(--accent);
 }
 
+.image-item.selected:not(.active) {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+}
+
+.gallery-virtual-spacer {
+  grid-column: 1 / -1;
+  pointer-events: none;
+}
+
 .image-item.warning {
   box-shadow: inset 0 0 0 var(--border-width) var(--warning-border-alpha-34);
   border-color: var(--warning-line);

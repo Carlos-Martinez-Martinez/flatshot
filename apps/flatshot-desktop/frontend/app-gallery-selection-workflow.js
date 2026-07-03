@@ -1,4 +1,4 @@
-function selectImage(imageId) {
+function selectImage(imageId, options = {}) {
   const image = activeImages().find((item) => item.id === imageId);
   if (!image) {
     return;
@@ -6,6 +6,10 @@ function selectImage(imageId) {
   rememberSelectedImage(image);
   clearTimers();
   state.selectedImageId = image.id;
+  if (!options.preserveGallerySelection) {
+    state.selectedImageIds = [image.id];
+    state.selectionAnchorImageId = image.id;
+  }
   state.localOverride = hasImageAdjustmentOverride(image);
   state.fitZoom = 100;
   resetViewerPan();
@@ -19,6 +23,21 @@ function selectImage(imageId) {
     Object.assign(state, previewStateHelpers.previewImageStatusState(image.status));
     render();
   }, 380);
+}
+
+function selectGalleryImage(imageId, options = {}) {
+  const selection = galleryHelpers.resolveGallerySelection({
+    images: filteredImages(),
+    selectedIds: state.selectedImageIds,
+    primaryId: state.selectedImageId,
+    anchorId: state.selectionAnchorImageId,
+    targetId: imageId,
+    additive: Boolean(options.additive),
+    range: Boolean(options.range),
+  });
+  state.selectedImageIds = selection.selectedIds;
+  state.selectionAnchorImageId = selection.anchorId;
+  selectImage(selection.selectedImageId, { preserveGallerySelection: true });
 }
 
 function rememberSelectedImage(image) {
@@ -57,6 +76,8 @@ function clearPreviewSelection() {
   state.previewRequestId += 1;
   clearTimers();
   state.selectedImageId = null;
+  state.selectedImageIds = [];
+  state.selectionAnchorImageId = null;
   state.localOverride = false;
   Object.assign(state, previewStateHelpers.previewEmptyState());
   state.fitZoom = 100;

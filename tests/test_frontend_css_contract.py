@@ -920,6 +920,16 @@ def test_css_modules_do_not_use_shadow_tokens_as_outline_colors():
     assert offenders == []
 
 
+def test_states_module_supports_forced_colors_focus_and_borders():
+    css = (FRONTEND_DIR / "css" / "08-states-responsive" / "states.css").read_text(
+        encoding="utf-8"
+    )
+
+    assert "@media (forced-colors: active)" in css
+    assert "outline-color: Highlight;" in css
+    assert "border-color: CanvasText;" in css
+
+
 def test_css_modules_use_icon_stroke_width_token():
     icon_stroke_width = re.compile(r"\bstroke-width\s*:\s*2\b")
     offenders = [
@@ -1217,8 +1227,24 @@ def test_active_output_row_main_keeps_grid_layout_when_selectable():
         / "output-profiles.css"
     ).read_text(encoding="utf-8")
 
-    assert ":not(.active-output-row__main)" in buttons_css
+    assert ":where(button[data-action]" in buttons_css
+    assert ":where(:not(.primary):not(.active)" in buttons_css
+    assert ":not(.active-output-row__main)" not in buttons_css
     assert "button.active-output-row__main {\n  cursor: pointer;" in output_profiles_css
     assert ".active-output-row__main {\n  min-width: 0;\n  width: 100%;\n  display: grid;" in output_profiles_css
+    assert "border: 0;\n  background: transparent;" in output_profiles_css
     assert "font-weight: var(--font-weight-regular);" in output_profiles_css
     assert ".active-output-row__main small {\n  overflow: visible;" in output_profiles_css
+
+
+def test_button_defaults_avoid_long_negative_selector_lists():
+    css = (
+        FRONTEND_DIR
+        / "css"
+        / "03-components"
+        / "buttons.css"
+    ).read_text(encoding="utf-8")
+
+    assert "button:not(.image-item):not(.preset-chip)" not in css
+    assert "button:not(.primary):not(.active)" not in css
+    assert "[data-action]" in css

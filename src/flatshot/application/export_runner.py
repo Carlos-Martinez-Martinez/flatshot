@@ -228,7 +228,7 @@ class ExportRunner:
                 self.copy_file(cache_path, save_path)
 
                 completed_count += 1
-                self._emit(ExportImageCompletedEvent(cached.display_name, True))
+                self._emit(ExportImageCompletedEvent(cached.display_name, True, cached.source_path))
                 self._emit_progress(completed_count, total)
             except Exception as e:
                 self._emit(ExportLogEvent(f"Caché no válida para {cached.display_name}; renderizando normal ({e})"))
@@ -281,11 +281,11 @@ class ExportRunner:
                             self._store_render_cache(task, cache)
                             if warning:
                                 self._emit(ExportLogEvent(f"Aviso: {msg}: {warning}"))
-                            self._emit(ExportImageCompletedEvent(msg, True))
+                            self._emit(ExportImageCompletedEvent(msg, True, task.source_path))
                         else:
                             error_count += 1
                             self._emit(ExportLogEvent(f"Error: {msg}"))
-                            self._emit(ExportImageCompletedEvent(msg.split(":")[0], False))
+                            self._emit(ExportImageCompletedEvent(msg.split(":")[0], False, task.source_path))
 
                         completed_count += 1
                         self._emit_progress(completed_count, total)

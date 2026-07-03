@@ -182,7 +182,10 @@ class BridgeExportJob:
                 self.processed = min(completed_offset + event.processed, self.total_outputs)
                 self.percent = _percent(self.processed, self.total_outputs)
             elif isinstance(event, ExportImageCompletedEvent):
-                self.completed_items.append({"name": event.image_name, "success": event.success})
+                item = {"name": event.image_name, "success": event.success}
+                if event.source_path:
+                    item["path"] = serialize_path(event.source_path)
+                self.completed_items.append(item)
                 if not event.success:
                     self.errors += 1
                     self.issues.append(

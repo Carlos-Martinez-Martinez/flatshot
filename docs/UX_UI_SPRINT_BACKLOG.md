@@ -22,13 +22,8 @@ Estado generado para el sprint UX/UI de 2026-07-03.
 
 ## P2 Pospuesto
 
-- Consolidar tokens redundantes restantes.
-- Migrar colores hardcodeados restantes a tokens semanticos.
-- Anadir multi-seleccion en galeria.
-- Anadir virtualizacion de scroll en lotes grandes.
-- Anadir reintento de imagenes fallidas en exportacion.
-- Preparar dark mode fase 1 mediante tokens.
-- Refactorizar selectores CSS fragiles de botones hacia clases positivas.
+- Consolidar tokens redundantes restantes solo si reduce el total neto de tokens o elimina duplicacion real.
+- Preparar dark mode fase 1: pospuesto para una pasada dedicada; no se anadiran tokens de tema sin una decision visual completa.
 - Evaluar Proxy para state con auto-sync.
 - Evaluar bundler ligero como esbuild o Vite.
 
@@ -99,15 +94,24 @@ Estado generado para el sprint UX/UI de 2026-07-03.
 - Gaps micro de `5px` normalizados a escala existente sin mantener `--space-1-25`; cache frontend actualizado a sprint 51.
 - Separacion vertical de secciones del rail/galeria (`margin-top: 10px`) resuelta con `--space-2-5` existente sin mantener `--gallery-section-offset`; cache frontend actualizado a sprint 52.
 - Correccion de deriva CSS: retirados aliases locales/microtokens de formularios, galeria, footer, botones, guide manager e inspector; duplicados estructurales de inspector consolidados; wrapping de acciones largas del inspector corregido; cache frontend actualizado a sprint 54.
+- Reintento de exportacion fallida limitado a imagenes con error reportado por bridge y ruta resoluble, sin cambiar el payload normal de exportacion completa.
+- Historial local de exportaciones persistido con estado, conteos, fecha y ruta de salida, visible en el panel de exportacion.
+- Multi-seleccion de galeria con `Ctrl/Cmd` para seleccion aditiva y `Shift` para rango, manteniendo la imagen primaria como preview activa.
+- Virtualizacion de galeria para lotes grandes con espaciadores y precarga de miniaturas acotada a la ventana renderizada.
+- Soporte `forced-colors` para foco y bordes criticos sin depender solo de color personalizado.
+- Selector CSS base de botones refactorizado a `:where(...)` de baja especificidad para que componentes especializados sobrescriban sin excepciones largas.
+- Divisor arrastrable en compare mode con `aria-valuenow` y actualizacion por pointer events.
 
 ## Evaluaciones P2 Cerradas
 
 - Proxy para state con auto-sync: pospuesto. La app actual depende de flujos explicitos entre controladores, bridge y renderizado; un Proxy global podria ocultar efectos laterales y complicar pruebas sin resolver una friccion bloqueante.
 - Bundler ligero como esbuild o Vite: pospuesto. El frontend actual funciona como scripts estaticos versionados y sin framework; introducir bundler requiere revisar empaquetado desktop, cache busting y orden de carga. Tiene sentido retomarlo junto con una migracion gradual a ES modules.
-- Dark mode fase 1 y consolidacion de tokens: pospuestos para una pasada dedicada de CSS. La auditoria exige no duplicar tokens ni selectores, asi que deben abordarse como refactor controlado.
+- Dark mode fase 1: pospuesto. Con el criterio actual de minimizar tokens, preparar tema oscuro sin diseno cerrado crearia mas variables de las necesarias.
+- Consolidacion de tokens restante: se mantiene como tarea de reduccion, no de ampliacion. Nuevos tokens solo si sustituyen repeticion real y no aumentan complejidad visual.
 
 ## Verificacion Manual Registrada
 
+- Arranque temporal del bridge y frontend estatico: `/health` OK y `index.html` servido con marcador `FlatShot`; procesos cerrados al terminar.
 - Escaneo de carpeta con 2 PNG validos: `totalImages=2`, `validImages=2`, sin errores.
 - Escaneo de carpeta vacia: `totalImages=0`, `validImages=0`, sin bloqueo.
 - Preview renderizado desde bridge: respuesta PNG valida de 320x420.
@@ -119,10 +123,7 @@ Estado generado para el sprint UX/UI de 2026-07-03.
 
 - Arreglar escala de spacing duplicada.
 - Consolidar breakpoints.
-- Anadir divisor arrastrable en compare mode.
-- Persistir historial de exportaciones.
 - Anadir tour guiado inicial.
-- Anadir soporte `forced-colors`.
 - Animar disclosures.
 - Limpiar elementos muertos adicionales si aparecen en futuras auditorias.
 - Extraer strings para i18n.

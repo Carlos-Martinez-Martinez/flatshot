@@ -9,6 +9,8 @@ function setScenario(scenario) {
     batch: "ready",
     batchSource: "mock",
     selectedImageId: "img-001",
+    selectedImageIds: ["img-001"],
+    selectionAnchorImageId: "img-001",
     previewStatus: "ready",
     previewData: null,
     previewError: "",
@@ -28,6 +30,7 @@ function setScenario(scenario) {
     errors: [],
     filter: "all",
     search: "",
+    galleryScrollTop: 0,
     fitMode: DEFAULT_VIEW_MODE,
     fitZoom: 100,
     zoom: 100,
@@ -51,6 +54,8 @@ function setScenario(scenario) {
       batch: "none",
       batchSource: "none",
       selectedImageId: null,
+      selectedImageIds: [],
+      selectionAnchorImageId: null,
       previewStatus: "empty",
       exportStatus: "blocked",
       statusText: "Sin lote",
@@ -62,6 +67,8 @@ function setScenario(scenario) {
       batch: "empty",
       batchSource: "mock",
       selectedImageId: null,
+      selectedImageIds: [],
+      selectionAnchorImageId: null,
       previewStatus: "empty",
       exportStatus: "blocked",
       statusText: "No hay PNG válidos",
@@ -77,6 +84,8 @@ function setScenario(scenario) {
   } else if (scenario === "preview-warning") {
     Object.assign(state, {
       selectedImageId: "img-003",
+      selectedImageIds: ["img-003"],
+      selectionAnchorImageId: "img-003",
       previewStatus: "warning",
       exportStatus: "ready",
       statusText: "Vista con aviso",
@@ -84,6 +93,8 @@ function setScenario(scenario) {
   } else if (scenario === "preview-error") {
     Object.assign(state, {
       selectedImageId: "img-004",
+      selectedImageIds: ["img-004"],
+      selectionAnchorImageId: "img-004",
       previewStatus: "error",
       exportStatus: "blocked",
       statusText: "Vista no disponible",

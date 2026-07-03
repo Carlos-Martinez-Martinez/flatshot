@@ -41,3 +41,12 @@ async function checkBridge() {
 
   render();
 }
+
+function handleBridgeUrlInput(event) {
+  state.bridgeUrl = event.target.value || defaultBridgeUrl;
+  state.bridgeStatus = "idle";
+  state.bridgeMessage = "Comprueba conexión";
+  state.bridgeLastResponse = "URL pendiente";
+  state.scanStatus = "Comprueba bridge";
+  render();
+}

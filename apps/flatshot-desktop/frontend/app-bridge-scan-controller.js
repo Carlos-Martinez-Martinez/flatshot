@@ -24,6 +24,10 @@ async function pickBridgeFolder() {
   }
 }
 
+function handleBridgeScanPathInput(event) {
+  state.bridgeScanPath = event.target.value;
+}
+
 async function pickOutputProfileDestination() {
   if (!state.appSettingsOpen) {
     return;
@@ -113,6 +117,9 @@ async function scanBridgeFolder() {
   thumbnailFallbackQueue.length = 0;
   thumbnailFallbackInFlight.clear();
   clearBridgeExportPoll();
+  state.selectedImageIds = [];
+  state.selectionAnchorImageId = null;
+  state.galleryScrollTop = 0;
   Object.assign(state, scanStateHelpers.scanStartState(folders, emptyScanDiagnostics(), DEFAULT_VIEW_MODE));
   render();
 
@@ -183,6 +190,8 @@ function applyBridgeScanResult(response) {
       scanIssueCount: state.scanIssues.length,
       selectedImageId: selectedImage.id,
     }));
+    state.selectedImageIds = [selectedImage.id];
+    state.selectionAnchorImageId = selectedImage.id;
     rememberSelectedImage(selectedImage);
     void requestBridgePreview(selectedImage);
     return;

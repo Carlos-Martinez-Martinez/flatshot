@@ -77,6 +77,14 @@ const settings = {{ opacity: 20, blur: 14 }};
 const imageOverrides = {{ "C:/lote/a.png": {{ opacity: 10 }} }};
 
 assert.deepEqual(helpers.bridgeImagePaths(images), ["C:/lote/a.png", "C:/lote/d.png"]);
+assert.deepEqual(helpers.failedBridgeExportImages(images, [
+  {{ name: "a.png", path: "C:/lote/a.png", success: false }},
+  {{ name: "d.png", path: "C:/lote/d.png", success: true }},
+  {{ name: "missing.png", path: "C:/lote/missing.png", success: false }},
+  {{ name: "legacy.png", success: false }},
+]), [
+  {{ id: "a", source: "bridge", path: "C:/lote/a.png" }},
+]);
 assert.equal(helpers.primaryOutputProfile(profiles, "missing", profiles[1]), profiles[0]);
 assert.equal(helpers.primaryOutputProfile(profiles, "web_rgb230", profiles[1]), profiles[0]);
 assert.equal(helpers.primaryOutputProfile([], "missing", profiles[1]), profiles[1]);

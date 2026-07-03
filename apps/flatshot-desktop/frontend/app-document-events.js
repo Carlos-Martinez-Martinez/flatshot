@@ -175,7 +175,10 @@ function handleDocumentClick(event) {
 
   const imageTarget = target.closest("[data-image-id]");
   if (imageTarget) {
-    selectImage(imageTarget.dataset.imageId);
+    selectGalleryImage(imageTarget.dataset.imageId, {
+      additive: event.ctrlKey || event.metaKey,
+      range: event.shiftKey,
+    });
     return;
   }
 
@@ -254,19 +257,6 @@ function handleDocumentToggle(event) {
     window.setTimeout(restoreScroll, 80);
     window.setTimeout(restoreScroll, 180);
   });
-}
-
-function handleBridgeUrlInput(event) {
-  state.bridgeUrl = event.target.value || defaultBridgeUrl;
-  state.bridgeStatus = "idle";
-  state.bridgeMessage = "Comprueba conexión";
-  state.bridgeLastResponse = "URL pendiente";
-  state.scanStatus = "Comprueba bridge";
-  render();
-}
-
-function handleBridgeScanPathInput(event) {
-  state.bridgeScanPath = event.target.value;
 }
 
 function handleDocumentInput(event) {
@@ -393,4 +383,18 @@ function handleDocumentSubmit(event) {
     event.preventDefault();
     saveOutputProfile();
   }
+}
+
+function handleGalleryScroll(event) {
+  if (event.target?.id !== "image-list") {
+    return;
+  }
+  state.galleryScrollTop = event.target.scrollTop;
+  if (galleryScrollFrame) {
+    return;
+  }
+  galleryScrollFrame = window.requestAnimationFrame(() => {
+    galleryScrollFrame = 0;
+    renderBatch();
+  });
 }

@@ -59,6 +59,7 @@ try {
       documentSubmit: handleDocumentSubmit,
       documentToggle: handleDocumentToggle,
       formatSelectChange: handleFormatSelectChange,
+      galleryScroll: handleGalleryScroll,
       imageSearchInput: handleImageSearchInput,
       initViewerResizeObserver,
       inspectorDisclosureClick: handleInspectorDisclosureClick,

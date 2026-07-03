@@ -18,6 +18,7 @@ from flatshot.utils.render_cache import RenderCache
 @dataclass
 class ExportRenderTask:
     img_path: Path
+    source_path: Path
     key: str
     fmt: str
     save_path: Path
@@ -97,6 +98,7 @@ def build_export_plan(
             )
             render_task = ExportRenderTask(
                 img_path=img_path,
+                source_path=cache_identity_path,
                 key=key,
                 fmt=fmt,
                 save_path=save_path,

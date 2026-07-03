@@ -10,6 +10,19 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   box-shadow: var(--focus-ring);
 }
 
+@media (forced-colors: active) {
+  button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible {
+    outline: var(--focus-outline-width) solid Highlight;
+    outline-color: Highlight;
+    outline-offset: var(--focus-outline-offset);
+    box-shadow: none;
+  }
+
+  button, input, select, summary, .image-item, .modal-card, .export-state-card, .preflight-item {
+    border-color: CanvasText;
+  }
+}
+
 input:hover:not(:disabled), select:hover:not(:disabled) {
   border-color: var(--border-strong);
 }

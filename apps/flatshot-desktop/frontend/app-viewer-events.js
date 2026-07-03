@@ -144,6 +144,10 @@ function handleViewerWheel(event) {
 }
 
 function handleViewerPointerDown(event) {
+  if (event.target.closest?.("[data-compare-divider]")) {
+    handleCompareDividerPointerDown(event);
+    return;
+  }
   if (
     event.button !== 0
     || !isViewerNavigationAvailable()
@@ -170,6 +174,10 @@ function handleViewerPointerDown(event) {
 }
 
 function handleViewerPointerMove(event) {
+  if (compareDividerDrag.active && event.pointerId === compareDividerDrag.pointerId) {
+    updateCompareDividerFromPointer(event);
+    return;
+  }
   if (!viewerPanState.active || event.pointerId !== viewerPanState.pointerId) {
     return;
   }
@@ -180,6 +188,16 @@ function handleViewerPointerMove(event) {
 }
 
 function handleViewerPointerEnd(event) {
+  if (compareDividerDrag.active && event.pointerId === compareDividerDrag.pointerId) {
+    compareDividerDrag.active = false;
+    compareDividerDrag.pointerId = null;
+    try {
+      $("#preview-canvas")?.releasePointerCapture(event.pointerId);
+    } catch (error) {
+      // Pointer capture may already be released.
+    }
+    return;
+  }
   if (!viewerPanState.active || event.pointerId !== viewerPanState.pointerId) {
     return;
   }
@@ -194,6 +212,35 @@ function handleViewerPointerEnd(event) {
     // Release can fail if the pointer was already released by the browser.
   }
   viewerPanState.pointerId = null;
+}
+
+function handleCompareDividerPointerDown(event) {
+  if (state.previewMode !== "compare") {
+    return;
+  }
+  event.preventDefault();
+  compareDividerDrag.active = true;
+  compareDividerDrag.pointerId = event.pointerId;
+  try {
+    $("#preview-canvas")?.setPointerCapture(event.pointerId);
+  } catch (error) {
+    // Pointer capture is optional for divider dragging.
+  }
+  updateCompareDividerFromPointer(event);
+}
+
+function updateCompareDividerFromPointer(event) {
+  const canvas = $("#preview-canvas");
+  const rect = canvas?.getBoundingClientRect();
+  if (!rect?.width) {
+    return;
+  }
+  const raw = ((event.clientX - rect.left) / rect.width) * 100;
+  const next = Math.max(5, Math.min(95, Math.round(raw)));
+  state.compareSplit = next;
+  canvas.style.setProperty("--compare-split", `${next}%`);
+  const divider = canvas.querySelector("[data-compare-divider]");
+  divider?.setAttribute("aria-valuenow", String(next));
 }
 
 function handleViewerDoubleClick(event) {

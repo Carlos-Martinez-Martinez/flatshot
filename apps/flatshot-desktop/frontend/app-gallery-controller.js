@@ -169,19 +169,65 @@ function renderBatch() {
   renderFilterButtons();
 
   const visible = filteredImages();
+  const imageList = $("#image-list");
+  const virtualWindow = galleryVirtualWindow(visible);
+  const renderedImages = visible.slice(virtualWindow.start, virtualWindow.end);
   setGalleryTitle(exportable);
   setGalleryMeta(galleryBatchMetaText(counts, images));
-  $("#batch-visible-count").textContent = visible.length === images.length
-    ? ""
-    : `${visible.length}/${images.length}`;
-  $("#image-list").innerHTML = visible.map(imageItemHtml).join("");
-  queueThumbnailPreload();
+  $("#batch-visible-count").textContent = galleryVisibleCountText(visible.length, images.length);
+  imageList.classList.toggle("is-virtualized", virtualWindow.virtualized);
+  imageList.innerHTML = [
+    galleryVirtualSpacerHtml(virtualWindow.paddingTop),
+    ...renderedImages.map(imageItemHtml),
+    galleryVirtualSpacerHtml(virtualWindow.paddingBottom),
+  ].join("");
+  queueThumbnailPreload(renderedImages);
   $("#batch-empty-note").innerHTML = visible.length ? "" : filteredEmptyHtml(images.length, valid, warnings, errors);
   if (filmstripCount) {
     filmstripCount.textContent = visible.length === images.length
       ? `${images.length} imágenes`
       : `${visible.length} de ${images.length}`;
   }
+}
+
+function galleryVisibleCountText(visibleCount, totalCount) {
+  const visibleText = visibleCount === totalCount ? "" : `${visibleCount}/${totalCount}`;
+  const selectedCount = state.selectedImageIds.length;
+  const selectedText = selectedCount > 1 ? `${selectedCount} seleccionadas` : "";
+  return [visibleText, selectedText].filter(Boolean).join(" · ");
+}
+
+function galleryVirtualWindow(images = []) {
+  const imageList = $("#image-list");
+  const columns = state.galleryView === "list" ? 1 : galleryGridColumnCount(imageList);
+  const scrollTop = Number.isFinite(state.galleryScrollTop)
+    ? state.galleryScrollTop
+    : imageList?.scrollTop || 0;
+  return galleryHelpers.virtualGalleryWindow({
+    total: images.length,
+    scrollTop,
+    viewportHeight: imageList?.clientHeight || 0,
+    rowHeight: state.galleryView === "list" ? 82 : 178,
+    columns,
+    overscanRows: 3,
+    threshold: 100,
+  });
+}
+
+function galleryGridColumnCount(imageList) {
+  if (!imageList || typeof window.getComputedStyle !== "function") {
+    return 2;
+  }
+  const columns = window.getComputedStyle(imageList).gridTemplateColumns || "";
+  const count = columns.split(" ").filter(Boolean).length;
+  return Math.max(1, count || 2);
+}
+
+function galleryVirtualSpacerHtml(height) {
+  const normalized = Math.max(0, Math.round(Number(height) || 0));
+  return normalized
+    ? `<div class="gallery-virtual-spacer" style="height:${normalized}px" aria-hidden="true"></div>`
+    : "";
 }
 
 function setGalleryTitle(count, label = "") {
@@ -287,13 +333,16 @@ function imageItemHtml(image) {
   const exportState = exportItemState(image);
   const imageStatus = hasImageAdjustmentOverride(image) ? "adjusted" : image.status;
   const thumbnailSrc = imageThumbnailSrc(image);
+  const selectedIds = new Set(state.selectedImageIds);
+  const selected = selectedIds.has(image.id) || image.id === state.selectedImageId;
   return galleryHelpers.imageItemHtml({
     exportState,
     fileType: imageFileType(image),
     image,
     imageStatus,
     outputLabel: "",
-    selected: image.id === state.selectedImageId,
+    primarySelected: image.id === state.selectedImageId,
+    selected,
     statusLabels,
     thumbState: thumbnailState(image, thumbnailSrc),
     thumbnailSrc,

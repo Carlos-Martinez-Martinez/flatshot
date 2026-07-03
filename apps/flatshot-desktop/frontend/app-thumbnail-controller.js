@@ -44,18 +44,18 @@ function thumbnailTargetSize(maxSide = 180) {
   };
 }
 
-function queueThumbnailPreload() {
+function queueThumbnailPreload(images = null) {
   if (!hasBatch() || state.exportStatus === "running") {
     return;
   }
-  window.requestAnimationFrame(() => preloadBatchThumbnails());
+  window.requestAnimationFrame(() => preloadBatchThumbnails(images));
 }
 
-function preloadBatchThumbnails() {
+function preloadBatchThumbnails(images = null) {
   if (state.exportStatus === "running") {
     return;
   }
-  activeImages().forEach((image) => {
+  (Array.isArray(images) ? images : activeImages()).forEach((image) => {
     const src = imageThumbnailSrc(image);
     const current = state.thumbnailStatus[image.id];
     const key = `${image.id}|${src}`;

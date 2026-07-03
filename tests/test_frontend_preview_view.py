@@ -64,6 +64,20 @@ def test_preview_toolbar_keeps_compact_context_labels():
     assert ">1:1</button>" not in html
 
 
+def test_compare_mode_has_draggable_divider_wiring():
+    app_js = app_domain_source()
+    canvas_css = (FRONTEND_DIR / "css" / "05-viewer" / "canvas.css").read_text(encoding="utf-8")
+
+    assert "compareSplit: 50" in app_js
+    assert "compareDividerDrag" in app_js
+    assert "previewViewHelpers.compareDividerHtml" in app_js
+    assert "handleCompareDividerPointerDown(event)" in app_js
+    assert "updateCompareDividerFromPointer(event)" in app_js
+    assert "data-compare-divider" in app_js
+    assert "--compare-split" in canvas_css
+    assert ".compare-divider" in canvas_css
+
+
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
 def test_preview_view_renders_canvas_state_contracts():
     script = f"""

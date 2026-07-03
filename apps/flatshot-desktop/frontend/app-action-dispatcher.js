@@ -146,6 +146,7 @@ const actionDispatcher = actionHandlerHelpers.createActionDispatcher({
   "pause-export": () => pauseExport(),
   "stop-export": () => stopExport(),
   "start-export": () => startExport(),
+  "retry-failed-export": () => retryFailedExport(),
   "review-errors": () => reviewWarnings(),
   "review-warnings": () => reviewWarnings(),
   "review-output": () => beginOutputEdit(),

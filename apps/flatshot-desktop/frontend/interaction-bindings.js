@@ -45,6 +45,7 @@
     optionalElement($, "#bridge-url")?.addEventListener("input", handlers.bridgeUrlInput);
     optionalElement($, "#bridge-scan-path")?.addEventListener("input", handlers.bridgeScanPathInput);
     optionalElement($, "#image-search")?.addEventListener("input", handlers.imageSearchInput);
+    optionalElement($, "#image-list")?.addEventListener("scroll", handlers.galleryScroll);
     optionalElement($, "#format-select")?.addEventListener("change", handlers.formatSelectChange);
     optionalElement($, "#output-profile-select")?.addEventListener("change", handlers.outputProfileSelectChange);
     optionalElement($, "#size-select")?.addEventListener("input", handlers.sizeSelectInput);

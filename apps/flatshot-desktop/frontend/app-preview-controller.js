@@ -87,6 +87,7 @@ function renderPreview() {
   const canvas = $("#preview-canvas");
   canvas.className = `preview-canvas ${state.previewMode} bg-${previewBackgroundMode} ${previewStateHelpers.viewerModeClass(state.fitMode)}`;
   canvas.style.setProperty("--preview-scale", previewStateHelpers.isAutoViewerMode(state.fitMode) ? "1" : String(state.zoom / 100));
+  canvas.style.setProperty("--compare-split", `${Math.max(5, Math.min(95, Number(state.compareSplit) || 50))}%`);
   applyViewerPanDom();
 
   if (state.batch === "none") {
@@ -162,7 +163,7 @@ function renderPreview() {
 
   canvas.innerHTML = previewViewHelpers.mockPreviewHtml({
     warning: state.previewStatus === "warning" ? "Render con fallback. Revisa antes de exportar." : "",
-  });
+  }) + (state.previewMode === "compare" ? previewViewHelpers.compareDividerHtml(state.compareSplit) : "");
   finishPreviewRender();
 }
 

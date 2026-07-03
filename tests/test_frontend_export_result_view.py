@@ -98,9 +98,22 @@ const actions = helpers.exportResultActionsHtml({{
   destinations: ["C:/Export"],
   canOpenOutput: false,
   canRetry: true,
+  canRetryFailed: true,
 }});
 assert.equal(actions.includes('data-action="review-errors"'), true);
+assert.equal(actions.includes('data-action="retry-failed-export"'), true);
 assert.equal(actions.includes('data-action="start-export"'), true);
+
+const partialRetry = helpers.exportResultActionsHtml({{
+  status: "partial",
+  issues: [{{ title: "Error" }}],
+  destinations: ["C:/Export"],
+  canOpenOutput: true,
+  canRetry: true,
+  canRetryFailed: true,
+}});
+assert.equal(partialRetry.includes('data-action="retry-failed-export"'), true);
+assert.equal(partialRetry.includes("Reintentar fallidas"), true);
 
 const manyDestinations = helpers.exportResultActionsHtml({{
   status: "completed",

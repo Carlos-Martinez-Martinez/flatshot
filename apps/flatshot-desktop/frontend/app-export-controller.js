@@ -23,7 +23,7 @@ function startExport(options = {}) {
   closeExportConfirm({ renderAfter: false });
 
   if (isBridgeBatch()) {
-    void startBridgeExport();
+    void startBridgeExport(options);
     return;
   }
 
@@ -41,6 +41,7 @@ function startExport(options = {}) {
     return;
   }
 
+  state.exportHistoryRecordedJobId = "";
   Object.assign(state, exportStateHelpers.exportStartState({
     scenario: options.keepScenario ? "export-running" : state.scenario,
     resetConfirm: true,
@@ -49,16 +50,28 @@ function startExport(options = {}) {
   scheduleExportStep();
 }
 
-async function startBridgeExport() {
+async function startBridgeExport(options = {}) {
+  const retryImages = options.retryFailedOnly ? retryableFailedExportImages() : exportableImages();
+  if (options.retryFailedOnly && !retryImages.length) {
+    state.errors = [{
+      level: "warning",
+      title: "Sin fallidas reintentables",
+      detail: "La última exportación no conserva rutas fallidas para reintentar.",
+    }];
+    state.statusText = "Sin fallidas reintentables";
+    render();
+    return;
+  }
   clearBridgeExportPoll();
   cancelThumbnailWork();
+  state.exportHistoryRecordedJobId = "";
   Object.assign(state, exportStateHelpers.exportStartState());
   render();
 
   try {
     const response = await bridgeRequest("/exports/run", {
       method: "POST",
-      body: JSON.stringify(bridgeExportPayload()),
+      body: JSON.stringify(bridgeExportPayload({ images: retryImages })),
       timeoutMs: 10000,
     });
     applyBridgeExportStatus(response);
@@ -71,16 +84,25 @@ async function startBridgeExport() {
   }
 }
 
-function bridgeExportPayload() {
+function bridgeExportPayload(options = {}) {
+  const images = Array.isArray(options.images) ? options.images : exportableImages();
   return exportPayloadHelpers.buildBridgeExportPayload({
     activeOutputProfileId: state.activeOutputProfileId,
     fallbackProfile: currentOutputProfileData(),
     imageOverrides: state.imageOverrides,
-    images: exportableImages(),
+    images,
     presetName: state.activePreset,
     profiles: exportOutputProfiles(),
     settings: bridgePreviewSettings(),
   });
+}
+
+function retryableFailedExportImages() {
+  return exportPayloadHelpers.failedBridgeExportImages(exportableImages(), state.exportCompletedItems);
+}
+
+function retryFailedExport() {
+  startExport({ retryFailedOnly: true, confirmed: true });
 }
 
 function exportVariantPayloadFromProfile(profile, index, seenVariantIds = new Set()) {
@@ -123,6 +145,36 @@ function clearBridgeExportPoll() {
 function applyBridgeExportStatus(payload) {
   Object.assign(state, exportStateHelpers.bridgeStatusPatch(payload, state));
   state.errors = exportStateHelpers.bridgeStatusErrors(payload, state.exportCompletedItems, state.exportIssues);
+  if (["completed", "partial", "failed"].includes(state.exportStatus)) {
+    rememberCurrentExportHistory();
+  }
+}
+
+function rememberCurrentExportHistory() {
+  if (!["completed", "partial", "failed"].includes(state.exportStatus) || !state.exportResult) {
+    return;
+  }
+  const recordId = state.exportJobId
+    || `local-${state.exportStatus}-${state.exportResult.processed}-${state.exportResult.total}-${state.exportHistory.length}`;
+  if (state.exportHistoryRecordedJobId === recordId) {
+    return;
+  }
+  const destinations = state.exportDestinations.length
+    ? state.exportDestinations
+    : Array.isArray(state.exportResult.destinations)
+      ? state.exportResult.destinations
+      : [];
+  state.exportHistory = exportHistoryHelpers.rememberExportHistory(window.localStorage, STORAGE_KEYS.exportHistory, {
+    id: recordId,
+    status: state.exportStatus,
+    processed: state.exportResult.processed,
+    total: state.exportResult.total,
+    errors: state.exportResult.errors,
+    destinations,
+    presetName: state.activePreset,
+    outputProfileName: outputProfileDisplayName(),
+  });
+  state.exportHistoryRecordedJobId = recordId;
 }
 
 function scheduleExportStep() {
@@ -154,6 +206,7 @@ function scheduleExportStep() {
         destinations: ["Mock / Salida"],
       };
       state.statusText = "Exportación completada";
+      rememberCurrentExportHistory();
       render();
       return;
     }

@@ -14,7 +14,7 @@
 }
 
 .canvas-area.bg-rgb230 {
-  background: var(--color-bg-stage);
+  background: var(--rgb-neutral-fallback);
 }
 
 .canvas-area.bg-white {

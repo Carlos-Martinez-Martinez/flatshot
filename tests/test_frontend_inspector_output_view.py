@@ -49,6 +49,7 @@ assert.equal(currentRow.includes("active-output-row is-current is-enabled"), tru
 assert.equal(currentRow.includes("Web &lt;gris&gt;"), true);
 assert.equal(currentRow.includes("&quot;RGB230&quot;"), true);
 assert.equal(currentRow.includes("Destino · Salida &lt;web&gt;"), true);
+assert.equal(currentRow.includes("active-output-row__preview-badge"), false);
 assert.equal(currentRow.includes("active-output-row__edit"), true);
 assert.equal(currentRow.includes('data-action="edit-output-profile"'), true);
 assert.equal(currentRow.includes('aria-label="Editar formato Web &lt;gris&gt;"'), true);
@@ -70,6 +71,7 @@ const disabledRow = helpers.outputProfileInlineRowHtml({{
 }});
 assert.equal(disabledRow.includes("active-output-row is-disabled"), true);
 assert.equal(disabledRow.includes("Destino ·"), false);
+assert.equal(disabledRow.includes("active-output-row__preview-badge"), false);
 assert.equal(disabledRow.includes("checked"), false);
 assert.equal(disabledRow.includes(' disabled />'), false);
 
@@ -86,6 +88,7 @@ assert.equal(selectableRow.includes('data-action="select-output-profile"'), true
 assert.equal(selectableRow.includes('data-output-profile-id="zalando"'), true);
 assert.equal(selectableRow.includes('aria-pressed="false"'), true);
 assert.equal(selectableRow.includes('title="Seleccionar Zalando para previsualizar"'), true);
+assert.equal(selectableRow.includes("active-output-row__preview-badge"), false);
 assert.equal(selectableRow.includes('class="active-output-row__edit" data-action="edit-output-profile"'), true);
 assert.equal(selectableRow.includes(">Editar formato</button>"), false);
 

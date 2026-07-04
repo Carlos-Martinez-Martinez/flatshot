@@ -1232,9 +1232,22 @@ def test_active_output_row_main_keeps_grid_layout_when_selectable():
     assert ":not(.active-output-row__main)" not in buttons_css
     assert "button.active-output-row__main {\n  cursor: pointer;" in output_profiles_css
     assert ".active-output-row__main {\n  min-width: 0;\n  width: 100%;\n  display: grid;" in output_profiles_css
+    assert "justify-content: stretch;" in output_profiles_css
+    assert "justify-items: start;" in output_profiles_css
     assert "border: 0;\n  background: transparent;" in output_profiles_css
     assert "font-weight: var(--font-weight-regular);" in output_profiles_css
     assert ".active-output-row__main small {\n  overflow: visible;" in output_profiles_css
+    assert (
+        ".active-output-row.is-current {\n"
+        "  border-color: color-mix(in srgb, var(--semantic-selection-border) 42%, var(--color-border));"
+        in output_profiles_css
+    )
+    assert (
+        "background: color-mix(in srgb, var(--semantic-selection-soft) 24%, var(--color-bg-panel));"
+        in output_profiles_css
+    )
+    assert "inset var(--border-width-emphasis) 0 0 var(--semantic-selection)" not in output_profiles_css
+    assert ".active-output-row__preview-badge {" not in output_profiles_css
 
 
 def test_button_defaults_avoid_long_negative_selector_lists():

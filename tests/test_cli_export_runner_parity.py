@@ -5,7 +5,7 @@ import pytest
 from PIL import Image
 
 from flatshot import cli
-from flatshot.application.contracts import ExportJobRequest
+from flatshot.application.contracts import ExportJobRequest, ExportJobResult
 from flatshot.application.export_runner import ExportRunner
 from flatshot.core.models import ExportConfig, ShadowSettings
 from flatshot.core.scaling import DEFAULT_SCALE_CURVE, normalize_curve_data
@@ -127,11 +127,17 @@ def test_cli_jpg_save_quality_matches_export_runner(monkeypatch, tmp_path, capsy
     source = tmp_path / "cli-source"
     _write_png(source)
     _patch_cli_user_state(monkeypatch)
+    monkeypatch.setattr(
+        cli,
+        "ExportRunner",
+        lambda event_sink=None: ExportRunner(event_sink=event_sink, executor_factory=InlineExecutor),
+    )
     save_calls = []
     original_save = Image.Image.save
 
     def capture_save(image, fp, *args, **kwargs):
-        if str(fp).endswith("product_PRO.jpg"):
+        path = Path(fp)
+        if path.suffix.lower() == ".jpg" and "product_PRO" in path.name:
             save_calls.append(dict(kwargs))
         return original_save(image, fp, *args, **kwargs)
 
@@ -143,6 +149,33 @@ def test_cli_jpg_save_quality_matches_export_runner(monkeypatch, tmp_path, capsy
     assert save_calls
     assert save_calls[-1]["quality"] == 100
     assert save_calls[-1]["subsampling"] == 0
+
+
+def test_cli_process_uses_shared_export_runner(monkeypatch, tmp_path, capsys):
+    source = tmp_path / "cli-source"
+    _write_png(source)
+    _patch_cli_user_state(monkeypatch)
+    captured: dict = {}
+
+    class FakeRunner:
+        def __init__(self, event_sink=None):
+            captured["event_sink"] = event_sink
+
+        def run(self, request):
+            captured["request"] = request
+            return ExportJobResult(True, 1, 1, 0, 0.1, [source / "_PARITY_OUT"])
+
+    monkeypatch.setattr(cli, "ExportRunner", FakeRunner, raising=False)
+
+    cli.process_folder(_cli_args(source))
+    capsys.readouterr()
+
+    request = captured["request"]
+    assert request.input_folder == source
+    assert request.export_config.output_folder_name == "_PARITY_OUT"
+    assert request.export_config.output_width == 80
+    assert request.export_config.output_height == 100
+    assert request.export_config.format == "JPG"
 
 
 def test_cli_dry_run_reports_plan_without_creating_output(monkeypatch, tmp_path, capsys):

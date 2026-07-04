@@ -17,6 +17,7 @@ from flatshot.application.export_runner import (
     build_export_plan,
     validate_export_requests_outputs,
 )
+from flatshot.application.export_workers import process_single_image
 from flatshot.core.models import CurveData, ExportConfig, ShadowSettings
 from flatshot.utils.render_cache import RenderCache
 from tests.helpers import CollectingSink, InlineExecutor
@@ -144,6 +145,26 @@ def test_export_runner_writes_render_cache_after_normal_render(monkeypatch, tmp_
     assert cache_files[0].stat().st_size > 0
 
 
+def test_export_runner_prunes_render_cache_after_export(monkeypatch, tmp_path):
+    cache_dir = tmp_path / "cache"
+    _use_isolated_cache(monkeypatch, cache_dir)
+    _source(tmp_path)
+    prune_calls = []
+    original_prune = RenderCache.prune
+
+    def prune(self, *args, **kwargs):
+        prune_calls.append(self.cache_dir)
+        return original_prune(self, *args, **kwargs)
+
+    monkeypatch.setattr(RenderCache, "prune", prune)
+    runner = ExportRunner(executor_factory=InlineExecutor)
+
+    result = runner.run(_request(tmp_path))
+
+    assert result.success
+    assert prune_calls == [cache_dir]
+
+
 def test_export_runner_honors_configured_max_workers(tmp_path):
     for index in range(4):
         Image.new("RGBA", (8, 8), (120, 80, 40, 255)).save(tmp_path / f"source-{index}.png")
@@ -212,6 +233,32 @@ def test_export_validation_rejects_existing_output_without_overwriting(tmp_path)
 
     assert not result.success
     assert existing.read_bytes() == b"existing-output"
+
+
+def test_export_worker_does_not_overwrite_destination_created_during_render(tmp_path):
+    source = _source(tmp_path)
+    output = tmp_path / "_SALIDA_PRO" / "source_PRO.png"
+    output.parent.mkdir()
+    output.write_bytes(b"existing-output")
+
+    success, message, warning = process_single_image(
+        (
+            source,
+            output,
+            ShadowSettings(opacity=0, blur=0, noise=0).model_dump(),
+            (8, 8),
+            "png",
+            _curve().model_dump(),
+            {},
+            "source.png · Web RGB230",
+        )
+    )
+
+    assert not success
+    assert "already exists" in message
+    assert warning is None
+    assert output.read_bytes() == b"existing-output"
+    assert list(output.parent.glob(".*.png")) == []
 
 
 def test_export_runner_honors_cancellation_before_rendering(tmp_path):

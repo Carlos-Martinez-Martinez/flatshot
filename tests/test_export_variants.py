@@ -8,7 +8,9 @@ from PIL.JpegImagePlugin import get_sampling
 from flatshot.application.contracts import ExportJobRequest
 from flatshot.application.export_runner import (
     ExportRunner,
+    OutputPathValidationError,
     build_variant_output_path,
+    validate_export_requests_outputs,
     validate_output_path_collisions,
     variant_target_size,
 )
@@ -110,6 +112,49 @@ def test_two_enabled_variants_with_same_suffix_detect_collision(tmp_path):
             [
                 {"save_path": web_path, "variant": config.variants[0]},
                 {"save_path": white_path, "variant": config.variants[1]},
+            ]
+        )
+
+
+def test_export_validation_rejects_template_that_escapes_destination(tmp_path):
+    source = _source(tmp_path)
+    config = ExportConfig(
+        format="PNG",
+        naming_template="../escape_{original}{suffix}",
+    )
+
+    with pytest.raises(OutputPathValidationError, match="nombre de salida"):
+        validate_export_requests_outputs(
+            [
+                ExportJobRequest(
+                    input_folder=tmp_path,
+                    input_files=[source],
+                    settings=ShadowSettings(opacity=0, blur=0, noise=0),
+                    export_config=config,
+                    curve_data=_curve(),
+                )
+            ]
+        )
+
+
+def test_export_validation_rejects_suffix_with_path_separator_in_fallback_variant(tmp_path):
+    source = _source(tmp_path)
+    config = ExportConfig(
+        format="PNG",
+        suffix="../escape",
+        naming_template="{original}{suffix}",
+    )
+
+    with pytest.raises(OutputPathValidationError, match="nombre de salida"):
+        validate_export_requests_outputs(
+            [
+                ExportJobRequest(
+                    input_folder=tmp_path,
+                    input_files=[source],
+                    settings=ShadowSettings(opacity=0, blur=0, noise=0),
+                    export_config=config,
+                    curve_data=_curve(),
+                )
             ]
         )
 

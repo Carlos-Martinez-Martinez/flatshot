@@ -3,6 +3,7 @@ from __future__ import annotations
 import http.client
 import json
 import base64
+import logging
 import os
 import threading
 from contextlib import contextmanager
@@ -35,9 +36,13 @@ def _export_runner_factory(**kwargs) -> ExportRunner:
 
 
 @contextmanager
-def running_bridge(config_dir: Path, service: FlatShotBridgeService | None = None):
+def running_bridge(
+    config_dir: Path,
+    service: FlatShotBridgeService | None = None,
+    allowed_origins: set[str] | None = None,
+):
     service = service or FlatShotBridgeService(config_resolver=ConfigPathResolver(config_dir))
-    server = create_server("127.0.0.1", 0, service=service)
+    server = create_server("127.0.0.1", 0, service=service, allowed_origins=allowed_origins)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
@@ -100,6 +105,8 @@ def _handler_with_disconnected_writer() -> FlatShotBridgeRequestHandler:
     handler = object.__new__(FlatShotBridgeRequestHandler)
     handler.server = SimpleNamespace(allowed_origins=set())
     handler.headers = {}
+    handler.command = "GET"
+    handler.path = "/test"
     handler.wfile = _DisconnectedWriter()
     handler.send_response = lambda status: None
     handler.send_header = lambda name, value: None
@@ -117,6 +124,18 @@ def test_bridge_http_send_error_ignores_client_disconnect():
     handler = _handler_with_disconnected_writer()
 
     handler._send_error(RuntimeError("boom"))
+
+
+def test_bridge_http_logs_unexpected_errors(caplog):
+    handler = _handler_with_disconnected_writer()
+    caplog.set_level(logging.ERROR, logger="flatshot.bridge.http_server")
+
+    handler._send_error(RuntimeError("boom"))
+
+    assert any(
+        "Unhandled bridge error for GET /test" in record.message and record.exc_info
+        for record in caplog.records
+    )
 
 
 def test_bridge_http_health(tmp_path):
@@ -140,7 +159,21 @@ def test_bridge_http_capabilities(tmp_path):
     assert data["exportProgress"] is True
 
 
-def test_bridge_http_allows_localhost_frontend_origin_on_custom_port(tmp_path):
+def test_bridge_http_allows_configured_localhost_frontend_origin_on_custom_port(tmp_path):
+    origin = "http://127.0.0.1:4174"
+    with running_bridge(tmp_path / "config", allowed_origins={origin}) as port:
+        status, headers = request_with_headers(
+            port,
+            "GET",
+            "/health",
+            {"Origin": origin},
+        )
+
+    assert status == 200
+    assert headers["Access-Control-Allow-Origin"] == origin
+
+
+def test_bridge_http_rejects_unconfigured_localhost_frontend_origin(tmp_path):
     with running_bridge(tmp_path / "config") as port:
         status, headers = request_with_headers(
             port,
@@ -150,7 +183,7 @@ def test_bridge_http_allows_localhost_frontend_origin_on_custom_port(tmp_path):
         )
 
     assert status == 200
-    assert headers["Access-Control-Allow-Origin"] == "http://127.0.0.1:4174"
+    assert "Access-Control-Allow-Origin" not in headers
 
 
 def test_bridge_http_presets_include_settings(tmp_path):

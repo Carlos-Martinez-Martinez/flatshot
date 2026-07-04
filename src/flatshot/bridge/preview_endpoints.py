@@ -27,6 +27,7 @@ def render_preview(service, payload: Mapping[str, Any]) -> dict[str, Any]:
         raise InvalidRequestError("Expected a JSON object.")
 
     image_path = preview_image_path(payload)
+    service._validate_image_path_access(image_path)
     target_size = preview_target_size(payload)
     settings = normalize_shadow_settings(
         preview_settings(payload.get("settings", {})),
@@ -60,6 +61,7 @@ def render_preview_binary(service, payload: Mapping[str, Any]) -> tuple[str, byt
         raise InvalidRequestError("Expected a JSON object.")
 
     image_path = preview_image_path(payload)
+    service._validate_image_path_access(image_path)
     target_size = preview_target_size(payload)
     settings = normalize_shadow_settings(
         preview_settings(payload.get("settings", {})),
@@ -94,6 +96,7 @@ def render_thumbnail(service, payload: Mapping[str, Any]) -> tuple[str, bytes]:
         raise InvalidRequestError("Expected a JSON object.")
 
     image_path = preview_image_path(payload)
+    service._validate_image_path_access(image_path)
     size = min(positive_int(payload.get("size"), "size", default=DEFAULT_THUMBNAIL_SIDE), MAX_THUMBNAIL_SIDE)
 
     try:

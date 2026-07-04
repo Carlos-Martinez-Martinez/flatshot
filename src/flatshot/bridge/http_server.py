@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -23,6 +24,7 @@ DEFAULT_ALLOWED_ORIGINS = {
 }
 CLIENT_DISCONNECT_ERRORS = (BrokenPipeError, ConnectionAbortedError, ConnectionResetError)
 MAX_JSON_BODY_BYTES = 1_000_000
+_logger = logging.getLogger(__name__)
 
 
 class FlatShotBridgeHTTPServer(ThreadingHTTPServer):
@@ -174,6 +176,13 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
         if isinstance(exc, CLIENT_DISCONNECT_ERRORS):
             return
         status = exc.status if isinstance(exc, BridgeError) else 500
+        if not isinstance(exc, BridgeError):
+            _logger.error(
+                "Unhandled bridge error for %s %s",
+                getattr(self, "command", "?"),
+                getattr(self, "path", "?"),
+                exc_info=(type(exc), exc, exc.__traceback__),
+            )
         self._send_json(error_response(exc), status=status)
 
     def _send_json(self, payload: dict[str, Any], *, status: int = 200) -> None:
@@ -219,7 +228,7 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
 
     def _send_cors_headers(self) -> None:
         origin = self.headers.get("Origin")
-        if origin and (origin in self.server.allowed_origins or _is_local_http_origin(origin)):
+        if origin and origin in self.server.allowed_origins:
             self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
@@ -253,11 +262,6 @@ def _single_query_value(query: dict[str, list[str]], name: str, *, required: boo
     return value
 
 
-def _is_local_http_origin(origin: str) -> bool:
-    parsed = urlparse(origin)
-    return parsed.scheme == "http" and parsed.hostname in {"127.0.0.1", "localhost"}
-
-
 def _is_export_job_status_path(path: str) -> bool:
     parts = _path_parts(path)
     return len(parts) == 3 and parts[:2] == ["exports", "jobs"]
@@ -276,12 +280,20 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="flatshot-bridge", description="FlatShot local development bridge")
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
+    parser.add_argument(
+        "--allowed-origin",
+        action="append",
+        default=[],
+        help="Frontend origin allowed to call the local bridge. Can be passed multiple times.",
+    )
     args = parser.parse_args(argv)
 
     if args.host not in {"127.0.0.1", "localhost"}:
         parser.error("APP.3 bridge must bind to 127.0.0.1 or localhost.")
 
-    server = create_server(args.host, args.port)
+    allowed_origins = set(DEFAULT_ALLOWED_ORIGINS)
+    allowed_origins.update(origin.strip() for origin in args.allowed_origin if origin and origin.strip())
+    server = create_server(args.host, args.port, allowed_origins=allowed_origins)
     print(f"FlatShot bridge listening on http://{args.host}:{server.server_port}", flush=True)
     try:
         server.serve_forever()

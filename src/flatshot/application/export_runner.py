@@ -98,6 +98,7 @@ class ExportRunner:
         error_count = 0
         total = 0
         destinations: list[Path] = []
+        cache: RenderCache | None = None
 
         try:
             image_items = self._snapshot_image_items(request)
@@ -167,6 +168,11 @@ class ExportRunner:
         except Exception as exc:
             self._emit(ExportLogEvent(f"Error crítico en ExportRunner: {exc}"))
         finally:
+            if cache is not None:
+                try:
+                    cache.prune()
+                except Exception as exc:
+                    self._emit(ExportLogEvent(f"Aviso: no se pudo limpiar la caché: {exc}"))
             if self._snapshot_dir:
                 shutil.rmtree(self._snapshot_dir, ignore_errors=True)
             if self.executor:

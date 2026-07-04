@@ -8,8 +8,10 @@ from PIL import Image
 
 from flatshot.application.config_paths import ConfigPathResolver
 from flatshot.application.export_runner import ExportRunner
+from flatshot.application.events import ExportImageCompletedEvent, ExportLogEvent
 from flatshot.application.preset_service import PresetService
 from flatshot.bridge.errors import BridgeError, InvalidRequestError, error_response
+from flatshot.bridge.export_jobs import BridgeExportJob
 from flatshot.bridge.serialization import image_file_info_to_dict
 from flatshot.bridge.service import FlatShotBridgeService
 from flatshot.application.contracts import ExportJobResult, ImageFileInfo, PreviewResult
@@ -141,6 +143,18 @@ def test_bridge_save_preset_creates_persisted_config(tmp_path):
     assert saved["settings"]["opacity"] == 35
     assert saved["settings"]["blur"] == 12
     assert (config_dir / PresetService.CATEGORIZED_PRESETS_FILE).exists()
+
+
+def test_bridge_save_preset_rejects_extreme_numeric_settings(tmp_path):
+    service = _service(tmp_path / "config")
+
+    with pytest.raises(InvalidRequestError, match="blur"):
+        service.save_preset(
+            {
+                "name": "Bad",
+                "settings": {"blur": 10000, "opacity": 20, "shadow_engine": "realistic_v2"},
+            }
+        )
 
 
 def test_bridge_ui_preferences_persist_between_service_instances(tmp_path):
@@ -437,6 +451,51 @@ def test_bridge_pick_folder_rejects_invalid_initial_path(tmp_path):
         _service(tmp_path / "config").pick_folder({"initialPath": 123})
 
 
+def test_bridge_restricts_preview_paths_after_folder_scan(tmp_path):
+    allowed = tmp_path / "allowed"
+    outside = tmp_path / "outside"
+    allowed.mkdir()
+    outside.mkdir()
+    allowed_png = _png(allowed / "allowed.png")
+    outside_png = _png(outside / "outside.png")
+    service = _service(tmp_path / "config")
+
+    service.scan_folders({"folders": [str(allowed)]})
+
+    mime_type, payload = service.render_thumbnail({"imagePath": str(allowed_png), "size": 24})
+    assert mime_type == "image/png"
+    assert payload.startswith(b"\x89PNG")
+    with pytest.raises(BridgeError) as exc_info:
+        service.render_thumbnail({"imagePath": str(outside_png), "size": 24})
+
+    assert exc_info.value.code == "path_not_allowed"
+    assert exc_info.value.status == 403
+
+
+def test_bridge_restricts_export_paths_after_folder_scan(tmp_path):
+    allowed = tmp_path / "allowed"
+    outside = tmp_path / "outside"
+    allowed.mkdir()
+    outside.mkdir()
+    _png(allowed / "allowed.png")
+    outside_png = _png(outside / "outside.png")
+    service = _export_service(tmp_path / "config")
+
+    service.scan_folders({"folders": [str(allowed)]})
+
+    with pytest.raises(BridgeError) as exc_info:
+        service.prepare_export(
+            {
+                "imagePaths": [str(outside_png)],
+                "settings": {"opacity": 0, "blur": 0, "noise": 0},
+                "export": {"format": "PNG", "size": "8x8", "destinationValue": "_OUT"},
+            }
+        )
+
+    assert exc_info.value.code == "path_not_allowed"
+    assert exc_info.value.status == 403
+
+
 def test_bridge_open_onboarding_assets_folder_uses_frontend_assets_dir(tmp_path):
     opened: list[Path] = []
     service = FlatShotBridgeService(
@@ -703,6 +762,32 @@ def test_bridge_export_rejects_template_collision_without_partial_outputs(tmp_pa
     assert list(output.iterdir()) == []
 
 
+def test_bridge_export_rejects_output_name_that_escapes_destination(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    png = _png(source / "item.png")
+    service = _export_service(tmp_path / "config")
+
+    with pytest.raises(BridgeError) as exc_info:
+        service.start_export(
+            {
+                "imagePaths": [str(png)],
+                "settings": {"opacity": 0, "blur": 0, "noise": 0},
+                "export": {
+                    "format": "PNG",
+                    "size": "8x8",
+                    "destinationMode": "source",
+                    "destinationValue": "_OUT",
+                    "namingTemplate": "../escape_{original}{suffix}",
+                },
+            }
+        )
+
+    assert exc_info.value.code == "export_output_collision"
+    assert "nombre de salida" in str(exc_info.value)
+    assert not (source / "escape_item_PRO.png").exists()
+
+
 def test_bridge_export_rejects_existing_output_without_overwriting(tmp_path):
     source = tmp_path / "source"
     output = tmp_path / "out"
@@ -854,6 +939,49 @@ def test_bridge_start_export_marks_false_runner_result_as_failed(tmp_path):
     assert final["issues"][0]["title"] == "Exportación"
 
 
+def test_bridge_service_prunes_old_finished_export_jobs(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    images = [_png(source / f"item-{index}.png") for index in range(3)]
+    service = _export_service(tmp_path / "config")
+    service.max_retained_jobs = 2
+    started_jobs = []
+
+    for image in images:
+        started = service.start_export(
+            {
+                "imagePaths": [str(image)],
+                "settings": {"opacity": 0, "blur": 0, "noise": 0},
+                "export": {"format": "PNG", "size": "8x8", "destinationValue": f"_OUT_{image.stem}"},
+            }
+        )
+        started_jobs.append(started["jobId"])
+        _wait_for_export(service, started["jobId"])
+
+    assert len(service._jobs) <= 2
+    assert started_jobs[0] not in service._jobs
+    assert started_jobs[-1] in service._jobs
+
+
+def test_bridge_export_job_keeps_internal_event_lists_bounded(tmp_path):
+    job = BridgeExportJob(
+        job_id="job",
+        requests=[],
+        source_images=0,
+        total_outputs=200,
+        destinations=[],
+    )
+
+    for index in range(260):
+        job._handle_event(ExportLogEvent(f"Aviso: item-{index}: detalle"), 0)
+        job._handle_event(ExportImageCompletedEvent(f"item-{index}.png", False, tmp_path / f"item-{index}.png"), 0)
+
+    assert len(job.messages) <= 200
+    assert len(job.issues) <= 200
+    assert len(job.completed_items) <= 200
+    assert job.messages[-1] == "Aviso: item-259: detalle"
+
+
 def test_bridge_export_rejects_invalid_input(tmp_path):
     with pytest.raises(InvalidRequestError):
         _export_service(tmp_path / "config").prepare_export({"imagePaths": []})
@@ -876,6 +1004,21 @@ def test_bridge_export_rejects_custom_destination_without_path(tmp_path):
         )
 
     assert "destino personalizado" in str(exc_info.value)
+
+
+def test_bridge_export_rejects_extreme_numeric_settings_before_planning(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    png = _png(source / "item.png")
+
+    with pytest.raises(InvalidRequestError, match="padding"):
+        _export_service(tmp_path / "config").prepare_export(
+            {
+                "imagePaths": [str(png)],
+                "settings": {"padding": 10000},
+                "export": {"format": "PNG", "size": "8x8", "destinationValue": "_OUT"},
+            }
+        )
 
 
 def test_bridge_export_unknown_job_returns_controlled_error(tmp_path):

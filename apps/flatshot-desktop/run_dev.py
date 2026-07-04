@@ -151,6 +151,8 @@ def main(argv: list[str] | None = None) -> int:
                     HOST,
                     "--port",
                     str(bridge_port),
+                    "--allowed-origin",
+                    frontend_url,
                 ],
             )
             processes.append(("bridge", bridge_process))

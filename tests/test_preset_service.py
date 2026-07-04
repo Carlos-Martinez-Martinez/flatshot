@@ -69,6 +69,25 @@ def test_save_flat_presets_preserves_existing_categories(tmp_path):
     assert saved.uncategorized["Nuevo"]["shadow_engine"] == SHADOW_ENGINE_COMPAT
 
 
+def test_save_categorized_presets_preserves_existing_file_when_write_fails(tmp_path, monkeypatch):
+    service = PresetService(tmp_path)
+    presets = service.get_default_categorized_presets()
+    service.save_categorized_presets(presets)
+    before = service.categorized_presets_path.read_text(encoding="utf-8")
+
+    def failing_dump(_payload, handle, *args, **kwargs):
+        handle.write('{"partial":')
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr(preset_service_module.json, "dump", failing_dump)
+
+    with pytest.raises(RuntimeError, match="disk full"):
+        service.save_categorized_presets(presets)
+
+    assert service.categorized_presets_path.read_text(encoding="utf-8") == before
+    assert list(tmp_path.glob("*.tmp")) == []
+
+
 def test_export_presets_to_file_writes_portable_bundle(tmp_path):
     service = PresetService(tmp_path)
     presets = service.get_default_categorized_presets()

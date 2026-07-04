@@ -21,6 +21,8 @@ from flatshot.bridge.serialization import serialize_path
 
 
 ExportRunnerFactory = Callable[..., ExportRunner]
+TERMINAL_EXPORT_STATUSES = {"completed", "partial", "failed", "cancelled"}
+MAX_EVENT_ENTRIES = 200
 
 
 @dataclass
@@ -62,14 +64,14 @@ class BridgeExportJob:
             if self.status == "running":
                 self.status = "paused"
                 self.pause_token.pause()
-                self.messages.append("Exportación pausada.")
+                self._append_bounded(self.messages, "Exportación pausada.")
 
     def resume(self) -> None:
         with self._lock:
             if self.status == "paused":
                 self.status = "running"
                 self.pause_token.resume()
-                self.messages.append("Exportación reanudada.")
+                self._append_bounded(self.messages, "Exportación reanudada.")
 
     def cancel(self) -> None:
         with self._lock:
@@ -77,7 +79,7 @@ class BridgeExportJob:
                 self.status = "cancelling"
                 self.cancellation_token.cancel()
                 self.pause_token.resume()
-                self.messages.append("Cancelando exportación.")
+                self._append_bounded(self.messages, "Cancelando exportación.")
 
     def snapshot(self) -> dict:
         with self._lock:
@@ -139,12 +141,13 @@ class BridgeExportJob:
                 elif not success:
                     self.status = "failed"
                     if not self.issues:
-                        self.issues.append(
+                        self._append_bounded(
+                            self.issues,
                             {
                                 "level": "error",
                                 "title": "Exportación",
                                 "detail": "No se pudo completar la exportación.",
-                            }
+                            },
                         )
                 else:
                     self.status = "completed"
@@ -164,7 +167,7 @@ class BridgeExportJob:
                 self.status = "failed"
                 self.errors += 1
                 self._finished_at = perf_counter()
-                self.messages.append(f"Error de exportación: {exc}")
+                self._append_bounded(self.messages, f"Error de exportación: {exc}")
                 self.result = ExportJobResult(
                     success=False,
                     processed=self.processed,
@@ -177,7 +180,7 @@ class BridgeExportJob:
     def _handle_event(self, event: ExportEvent, completed_offset: int) -> None:
         with self._lock:
             if isinstance(event, ExportStartedEvent):
-                self.messages.append(f"Exportando {event.total_outputs} archivos.")
+                self._append_bounded(self.messages, f"Exportando {event.total_outputs} archivos.")
             elif isinstance(event, ExportProgressEvent):
                 self.processed = min(completed_offset + event.processed, self.total_outputs)
                 self.percent = _percent(self.processed, self.total_outputs)
@@ -185,30 +188,32 @@ class BridgeExportJob:
                 item = {"name": event.image_name, "success": event.success}
                 if event.source_path:
                     item["path"] = serialize_path(event.source_path)
-                self.completed_items.append(item)
+                self._append_bounded(self.completed_items, item)
                 if not event.success:
                     self.errors += 1
-                    self.issues.append(
+                    self._append_bounded(
+                        self.issues,
                         {
                             "level": "error",
                             "title": event.image_name,
                             "detail": "No se pudo exportar.",
-                        }
+                        },
                     )
             elif isinstance(event, ExportLogEvent):
-                self.messages.append(event.message)
+                self._append_bounded(self.messages, event.message)
                 issue = _issue_from_log_message(event.message)
                 if issue:
-                    self.issues.append(issue)
+                    self._append_bounded(self.issues, issue)
             elif isinstance(event, ExportFinishedEvent):
                 self.errors = max(self.errors, event.errors)
                 if not event.success and event.errors and not self.issues:
-                    self.issues.append(
+                    self._append_bounded(
+                        self.issues,
                         {
                             "level": "error",
                             "title": "Exportación",
                             "detail": f"{event.errors} errores durante la exportación.",
-                        }
+                        },
                     )
 
     def _duration_seconds_locked(self) -> float:
@@ -216,6 +221,21 @@ class BridgeExportJob:
             return 0.0
         end = self._finished_at or perf_counter()
         return max(0.0, end - self._started_at)
+
+    @property
+    def is_terminal(self) -> bool:
+        return self.status in TERMINAL_EXPORT_STATUSES
+
+    @property
+    def retention_timestamp(self) -> float:
+        return self._finished_at or self._started_at
+
+    @staticmethod
+    def _append_bounded(items: list, item) -> None:
+        items.append(item)
+        overflow = len(items) - MAX_EVENT_ENTRIES
+        if overflow > 0:
+            del items[:overflow]
 
     def _result_dict(self) -> dict | None:
         if self.result is None:

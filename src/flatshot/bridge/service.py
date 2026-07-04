@@ -7,41 +7,22 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from flatshot.application.config_paths import ConfigPathResolver
-from flatshot.application.contracts import ExportJobRequest
 from flatshot.application.export_config_service import ExportConfigService
-from flatshot.application.export_runner import (
-    ExportRunner,
-    OutputPathValidationError,
-    validate_export_requests_outputs,
-)
+from flatshot.application.export_runner import ExportRunner
 from flatshot.application.folder_scanner import FolderScanner
 from flatshot.application.preset_service import PresetService
 from flatshot.application.preview_service import PreviewService
 from flatshot.application.settings_service import SettingsService
 from flatshot.bridge import app_info as bridge_app_info
-from flatshot.bridge import export_endpoints, preferences, preset_endpoints, preview_endpoints
+from flatshot.bridge import export_endpoints, export_requests, preferences, preset_endpoints, preview_endpoints
 from flatshot.bridge.errors import BridgeError, InvalidRequestError
 from flatshot.bridge.export_jobs import BridgeExportJob, ExportRunnerFactory
 from flatshot.bridge.onboarding_assets import onboarding_assets_folder, open_folder_with_system
-from flatshot.bridge.payload_helpers import (
-    backgroundColorTuple,
-)
-from flatshot.bridge.payload_helpers import (
-    export_size as _export_size,
-)
-from flatshot.bridge.payload_helpers import (
-    optional_string as _optional_string,
-)
-from flatshot.bridge.payload_helpers import (
-    preview_settings as _preview_settings,
-)
+from flatshot.bridge.path_policy import TrustedPathPolicy
 from flatshot.bridge.serialization import (
     batch_scan_result_to_dict,
     serialize_path,
 )
-from flatshot.bridge.validation import export_image_paths
-from flatshot.core.models import SHADOW_ENGINE_DEFAULT, ExportConfig, normalize_shadow_settings
-from flatshot.core.overrides import normalize_image_override
 
 
 class FlatShotBridgeService:
@@ -58,6 +39,8 @@ class FlatShotBridgeService:
         folder_picker: Callable[[Path | None], Path | None] | None = None,
         folder_opener: Callable[[Path], None] | None = None,
         max_concurrent_exports: int = 1,
+        max_retained_jobs: int = 20,
+        path_policy: TrustedPathPolicy | None = None,
     ) -> None:
         self.folder_scanner = folder_scanner or FolderScanner()
         self.preview_service = preview_service or PreviewService()
@@ -67,6 +50,8 @@ class FlatShotBridgeService:
         self.folder_picker = folder_picker or pick_folder_with_tk
         self.folder_opener = folder_opener or open_folder_with_system
         self.max_concurrent_exports = max_concurrent_exports
+        self.max_retained_jobs = max(1, int(max_retained_jobs))
+        self.path_policy = path_policy or TrustedPathPolicy()
         self._jobs: dict[str, BridgeExportJob] = {}
         self._jobs_lock = threading.Lock()
 
@@ -110,7 +95,9 @@ class FlatShotBridgeService:
         for index, folder in enumerate(raw_folders):
             if not isinstance(folder, str) or not folder.strip():
                 raise InvalidRequestError(f"Field 'folders[{index}]' must be a non-empty path string.")
-            folders.append(Path(folder).expanduser())
+            path = Path(folder).expanduser()
+            folders.append(path)
+            self.path_policy.register_root(path)
 
         image_overrides = payload.get("imageOverrides", {})
         if image_overrides is None:
@@ -136,6 +123,7 @@ class FlatShotBridgeService:
         if selected is None:
             return {"ok": True, "selected": False, "path": None}
 
+        self.path_policy.register_root(selected)
         return {"ok": True, "selected": True, "path": serialize_path(selected)}
 
     def open_onboarding_assets_folder(self) -> dict[str, Any]:
@@ -185,91 +173,15 @@ class FlatShotBridgeService:
         job.cancel()
         return job.snapshot()
 
-    def _export_requests(self, payload: Mapping[str, Any]) -> tuple[list[ExportJobRequest], ExportConfig]:
-        if not isinstance(payload, Mapping):
-            raise InvalidRequestError("Expected a JSON object.")
-
-        image_paths = export_image_paths(payload.get("imagePaths"))
-        settings = normalize_shadow_settings(
-            _preview_settings(payload.get("settings", {})),
-            missing_engine=SHADOW_ENGINE_DEFAULT,
-        )
-        raw_image_overrides = payload.get("imageOverrides", {})
-        if raw_image_overrides is None:
-            raw_image_overrides = {}
-        if not isinstance(raw_image_overrides, Mapping):
-            raise InvalidRequestError("Field 'imageOverrides' must be an object when provided.")
-        image_overrides = {
-            str(key): normalized
-            for key, value in raw_image_overrides.items()
-            if (normalized := normalize_image_override(value))
-        }
-        export_config = self._export_config(payload.get("export", {}))
-        errors = self.export_config_service.validate(export_config)
-        if errors:
-            raise InvalidRequestError(errors[0])
-
-        grouped: dict[Path, list[Path]] = {}
-        for image_path in image_paths:
-            grouped.setdefault(image_path.parent, []).append(image_path)
-
-        return (
-            [
-                ExportJobRequest(
-                    input_folder=folder,
-                    input_files=sorted(paths),
-                    settings=settings,
-                    export_config=export_config,
-                    curve_data=None,
-                    preset_name=_optional_string(payload.get("presetName")),
-                    image_overrides=image_overrides,
-                )
-                for folder, paths in sorted(grouped.items(), key=lambda item: str(item[0]))
-            ],
-            export_config,
-        )
+    def _export_requests(self, payload: Mapping[str, Any]):
+        return export_requests.build_export_requests(self, payload)
 
     @staticmethod
-    def _validate_export_outputs(requests: list[ExportJobRequest]) -> None:
-        try:
-            validate_export_requests_outputs(requests)
-        except OutputPathValidationError as exc:
-            raise BridgeError("export_output_collision", str(exc), status=409) from exc
+    def _validate_export_outputs(requests) -> None:
+        export_requests.validate_export_outputs(requests)
 
-    def _export_config(self, raw_export: Any) -> ExportConfig:
-        if raw_export is None:
-            raw_export = {}
-        if not isinstance(raw_export, Mapping):
-            raise InvalidRequestError("Field 'export' must be an object when provided.")
-
-        width, height = _export_size(raw_export)
-        background = str(raw_export.get("background", "rgb230"))
-        destination_mode = str(raw_export.get("destinationMode", "source"))
-        destination_value = _optional_string(raw_export.get("destinationValue"))
-        output_destination = "custom" if destination_mode == "custom" else "subfolder"
-        custom_output_path = _optional_string(raw_export.get("customOutputPath")) or (
-            destination_value if output_destination == "custom" else None
-        )
-        output_folder_name = (
-            _optional_string(raw_export.get("outputFolderName"))
-            or (destination_value if output_destination == "subfolder" else None)
-            or "_SALIDA_PRO"
-        )
-
-        settings = {
-            "format": raw_export.get("format", "JPG"),
-            "output_width": width,
-            "output_height": height,
-            "transparent_bg": background == "transparent",
-            "bg_color": backgroundColorTuple(background),
-            "output_folder_name": output_folder_name,
-            "suffix": raw_export.get("suffix", "_PRO"),
-            "naming_template": raw_export.get("namingTemplate", "{original}{suffix}"),
-            "output_destination": output_destination,
-            "custom_output_path": custom_output_path,
-            "variants": raw_export.get("variants", []),
-        }
-        return self.export_config_service.build_from_settings(settings)
+    def _export_config(self, raw_export: Any):
+        return export_requests.build_export_config(self.export_config_service, raw_export)
 
     def _job(self, job_id: str) -> BridgeExportJob:
         if not isinstance(job_id, str) or not job_id.strip():
@@ -279,6 +191,25 @@ class FlatShotBridgeService:
         if job is None:
             raise BridgeError("job_not_found", "Exportación no encontrada.", status=404)
         return job
+
+    def _prune_finished_jobs_locked(self, *, reserve_slots: int = 0) -> None:
+        retained_limit = max(0, self.max_retained_jobs - max(0, int(reserve_slots)))
+        finished_jobs = sorted(
+            (
+                (job_id, job)
+                for job_id, job in self._jobs.items()
+                if job.is_terminal
+            ),
+            key=lambda item: item[1].retention_timestamp,
+        )
+        remove_count = len(finished_jobs) - retained_limit
+        if remove_count <= 0:
+            return
+        for job_id, _job in finished_jobs[:remove_count]:
+            del self._jobs[job_id]
+
+    def _validate_image_path_access(self, path: Path) -> None:
+        self.path_policy.validate_image_path(path)
 
     @staticmethod
     def _folder_picker_initial_path(value: Any) -> Path | None:

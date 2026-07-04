@@ -339,8 +339,8 @@ def main() -> int:
         source_root = find_source_root()
         auto_sync_from_source(source_root)
         ensure_runtime_paths()
-        bridge = start_bridge_server()
         frontend = start_frontend_server(source_root)
+        bridge = start_bridge_server(allowed_origins={frontend.url})
         app_url = frontend.url + "?" + urlencode({"bridge": bridge.url})
         open_desktop_window(app_url)
         return 0
@@ -371,11 +371,11 @@ def ensure_runtime_paths() -> None:
         sys.path.insert(0, str(APP_PARENT))
 
 
-def start_bridge_server() -> LocalServer:
+def start_bridge_server(allowed_origins: set[str] | None = None) -> LocalServer:
     from flatshot.bridge.http_server import create_server
 
     port = find_available_port(DEFAULT_BRIDGE_PORT)
-    server = create_server(HOST, port)
+    server = create_server(HOST, port, allowed_origins=allowed_origins)
     local = LocalServer("bridge", HOST, server.server_port, server, threading.Thread(target=server.serve_forever, daemon=True))
     local.thread.start()
     wait_until_ready(local.url + "/health")

@@ -52,6 +52,8 @@ def save_preset(service, payload: Mapping[str, Any]) -> dict[str, Any]:
             preview_settings(raw_settings),
             missing_engine=SHADOW_ENGINE_DEFAULT,
         ).model_dump()
+    except InvalidRequestError:
+        raise
     except Exception as exc:
         raise InvalidRequestError("Field 'settings' contains invalid preset values.") from exc
 

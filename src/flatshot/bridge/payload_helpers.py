@@ -32,6 +32,19 @@ PREVIEW_SETTING_KEYS = {
     "transparent_bg",
     "bg_color",
 }
+PREVIEW_SETTING_LIMITS = {
+    "angle": (0, 360),
+    "distance": (0, 80),
+    "blur": (0, 80),
+    "spread": (0, 20),
+    "fusion": (0, 20),
+    "opacity": (0, 100),
+    "noise": (0, 20),
+    "padding": (0, 30),
+    "contact_blur": (0, 40),
+    "contraction": (0, 80),
+    "scale_adjustment": (-30, 30),
+}
 
 
 def positive_int(value: Any, field_name: str, *, default: int) -> int:
@@ -45,6 +58,24 @@ def positive_int(value: Any, field_name: str, *, default: int) -> int:
         raise InvalidRequestError(f"Field '{field_name}' must be a positive integer.") from exc
     if numeric <= 0:
         raise InvalidRequestError(f"Field '{field_name}' must be a positive integer.")
+    return numeric
+
+
+def bounded_int(value: Any, field_name: str, *, minimum: int, maximum: int) -> int:
+    if isinstance(value, bool):
+        raise InvalidRequestError(
+            f"Field '{field_name}' must be an integer between {minimum} and {maximum}."
+        )
+    try:
+        numeric = int(value)
+    except (TypeError, ValueError) as exc:
+        raise InvalidRequestError(
+            f"Field '{field_name}' must be an integer between {minimum} and {maximum}."
+        ) from exc
+    if numeric < minimum or numeric > maximum:
+        raise InvalidRequestError(
+            f"Field '{field_name}' must be an integer between {minimum} and {maximum}."
+        )
     return numeric
 
 
@@ -84,7 +115,11 @@ def preview_settings(raw_settings: Any) -> dict[str, Any]:
     for key, value in raw_settings.items():
         normalized_key = PREVIEW_SETTING_ALIASES.get(str(key), str(key))
         if normalized_key in PREVIEW_SETTING_KEYS:
-            settings[normalized_key] = value
+            if normalized_key in PREVIEW_SETTING_LIMITS:
+                minimum, maximum = PREVIEW_SETTING_LIMITS[normalized_key]
+                settings[normalized_key] = bounded_int(value, normalized_key, minimum=minimum, maximum=maximum)
+            else:
+                settings[normalized_key] = value
     return settings
 
 

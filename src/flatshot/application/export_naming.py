@@ -18,6 +18,10 @@ EXPORT_OUTPUT_COLLISION_MESSAGE = (
     "Hay archivos de salida repetidos o ya existentes. "
     "Cambia el destino, el sufijo o el patrón de nombre antes de exportar."
 )
+EXPORT_OUTPUT_NAME_MESSAGE = (
+    f"{EXPORT_OUTPUT_COLLISION_MESSAGE} "
+    "El nombre de salida no puede contener separadores de ruta ni partes relativas."
+)
 
 class OutputPathValidationError(ValueError):
     """Raised when planned export outputs are not safe to write."""
@@ -72,6 +76,18 @@ def _safe_filename_token(value: str) -> str:
     text = "".join("_" if ord(ch) < 32 else ch for ch in text)
     return text.strip(" .")
 
+def _validate_output_filename(value: str) -> str:
+    text = str(value or "")
+    if not text.strip() or text in {".", ".."}:
+        raise OutputPathValidationError(EXPORT_OUTPUT_NAME_MESSAGE)
+    if Path(text).name != text:
+        raise OutputPathValidationError(EXPORT_OUTPUT_NAME_MESSAGE)
+    if any(char in text for char in '<>:"/\\|?*'):
+        raise OutputPathValidationError(EXPORT_OUTPUT_NAME_MESSAGE)
+    if any(ord(ch) < 32 for ch in text):
+        raise OutputPathValidationError(EXPORT_OUTPUT_NAME_MESSAGE)
+    return text
+
 def variant_bg_token(variant: ExportVariant) -> str:
     return "{:02X}{:02X}{:02X}".format(*variant.bg_color)
 
@@ -110,6 +126,7 @@ def build_variant_output_path(
         variant_id=variant.id,
         bg=variant_bg_token(variant),
     )
+    base_name = _validate_output_filename(base_name)
     return output_folder / f"{base_name}.{fmt}", fmt
 
 def _path_collision_key(path: Path) -> str:

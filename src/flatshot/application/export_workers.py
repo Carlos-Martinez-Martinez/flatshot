@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 from typing import Callable
+from uuid import uuid4
 
 from PIL import Image
 
@@ -55,14 +57,22 @@ def process_single_image(args):
 
         save_path = Path(save_path)
         save_path.parent.mkdir(parents=True, exist_ok=True)
+        temp_path = _temporary_output_path(save_path)
 
         encoding_warning = save_export_image(
             final_img,
-            save_path,
+            temp_path,
             fmt,
             dpi=dpi,
             max_file_size_kb=export_options.get("max_file_size_kb"),
         )
+        try:
+            commit_output_file(temp_path, save_path)
+        finally:
+            try:
+                temp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
         if warning and encoding_warning:
             warning = f"{warning} {encoding_warning}"
         elif encoding_warning:
@@ -71,6 +81,34 @@ def process_single_image(args):
         return True, display_name, warning
     except Exception as e:
         return False, f"{img_path.name}: {e}", None
+
+
+def _temporary_output_path(save_path: Path) -> Path:
+    suffix = save_path.suffix or ".tmp"
+    return save_path.with_name(f".{save_path.stem}.{uuid4().hex}{suffix}")
+
+
+def commit_output_file(temp_path: Path, save_path: Path) -> None:
+    """Move a completed export into place without overwriting an existing file."""
+    try:
+        os.link(temp_path, save_path)
+        return
+    except FileExistsError as exc:
+        raise FileExistsError(f"Output already exists: {save_path}") from exc
+    except OSError:
+        pass
+
+    try:
+        with temp_path.open("rb") as source, save_path.open("xb") as target:
+            shutil.copyfileobj(source, target)
+    except FileExistsError as exc:
+        raise FileExistsError(f"Output already exists: {save_path}") from exc
+    except Exception:
+        try:
+            save_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
 
 
 def copy_stable(src: Path, dest: Path, copy_file: Callable = shutil.copy2) -> bool:

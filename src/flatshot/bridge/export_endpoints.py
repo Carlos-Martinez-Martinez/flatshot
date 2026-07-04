@@ -57,6 +57,7 @@ def start_export(service, payload: Mapping[str, Any]) -> dict[str, Any]:
     job_id = uuid4().hex
 
     with service._jobs_lock:
+        service._prune_finished_jobs_locked(reserve_slots=1)
         active_count = sum(
             1 for job in service._jobs.values() if job.status in {"queued", "running", "paused", "cancelling"}
         )

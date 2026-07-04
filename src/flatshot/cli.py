@@ -5,14 +5,14 @@ Process product images from the command line.
 import argparse
 import sys
 from pathlib import Path
-from time import time
 
+from flatshot.application.contracts import ExportJobRequest
 from flatshot.application.config_paths import ConfigPathResolver
-from flatshot.application.export_runner import apply_naming_template
+from flatshot.application.events import ExportImageCompletedEvent, ExportLogEvent, ExportProgressEvent
+from flatshot.application.export_runner import ExportRunner
 from flatshot.application.log_service import ActivityLogService
 from flatshot.application.preset_service import PresetService
 from flatshot.application.settings_service import SettingsService
-from flatshot.core.engine import ShadowEngine
 from flatshot.core.models import (
     SHADOW_ENGINE_COMPAT,
     SHADOW_ENGINE_LEGACY,
@@ -23,6 +23,27 @@ from flatshot.core.models import (
     normalize_shadow_settings,
 )
 from flatshot.core.scaling import DEFAULT_SCALE_CURVE, normalize_curve_data
+
+
+class CliExportSink:
+    def __init__(self, logger: ActivityLogService) -> None:
+        self.logger = logger
+
+    def emit(self, event) -> None:
+        if isinstance(event, ExportProgressEvent):
+            print(f"\r[{event.percent:3d}%] Processing: {event.processed}/{event.total}", end="", flush=True)
+            return
+
+        if isinstance(event, ExportImageCompletedEvent) and not event.success:
+            self.logger.log_error(event.image_name, str(event.source_path or ""))
+            return
+
+        if isinstance(event, ExportLogEvent):
+            if event.message.startswith("Aviso:"):
+                print(f"\nWarning: {event.message.removeprefix('Aviso:').strip()}")
+            elif event.message.startswith("Error:"):
+                self.logger.log_error(event.message)
+                print(f"\n{event.message}")
 
 
 def _path_resolver() -> ConfigPathResolver:
@@ -151,77 +172,27 @@ def process_folder(args):
         print("\n[DRY RUN] No images will be processed.")
         return
     
-    # Create output folder
-    output_folder = input_folder / export_config.output_folder_name
-    output_folder.mkdir(exist_ok=True)
-    
     # Load curve data
     curve_dict = app_settings.get('scale_curve', DEFAULT_SCALE_CURVE.copy())
     curve_data = normalize_curve_data(curve_dict)
-    
-    # Process images
-    from PIL import Image
-    
+
     logger = _log_service()
     logger.log_export_start(str(input_folder), total, args.preset)
-    
-    target_size = (width, height)
-    start_time = time()
-    processed = 0
-    errors = 0
-    
-    settings = settings.model_copy(update={
-        "transparent_bg": export_config.transparent_bg,
-        "bg_color": export_config.bg_color,
-    })
-    
-    for index, img_path in enumerate(sorted(images), start=1):
-        try:
-            # Show progress
-            progress = int((index / total) * 100)
-            print(f"\r[{progress:3d}%] Processing: {img_path.name[:40]:<40}", end="", flush=True)
-            
-            original = Image.open(img_path).convert('RGBA')
-            dpi = original.info.get('dpi', (300, 300))
-            
-            final_img, diagnostics = ShadowEngine._aplicar_efectos_with_diagnostics(
-                original, settings, target_size,
-                scale_factor=1.0, curve_data=curve_data
-            )
-            if diagnostics.fallback_used and diagnostics.warning:
-                print(f"\nWarning: {img_path.name}: {diagnostics.warning}")
-            
-            # Generate output name
-            base_name = apply_naming_template(
-                export_config.naming_template,
-                img_path.stem,
-                export_config.suffix,
-                input_folder.name,
-                index
-            )
-            
-            fmt = export_config.format.lower()
-            save_path = output_folder / f"{base_name}.{fmt}"
-            
-            if fmt in ['jpg', 'jpeg']:
-                final_img = final_img.convert("RGB")
-                final_img.save(save_path, quality=100, subsampling=0, dpi=dpi)
-            else:
-                final_img.save(save_path, optimize=False, compress_level=0, dpi=dpi)
-            
-            processed += 1
-            
-        except Exception as e:
-            errors += 1
-            logger.log_error(str(e), img_path.name)
-            print(f"\nError processing {img_path.name}: {e}")
-    
-    duration = time() - start_time
-    logger.log_export_complete(str(input_folder), processed, total, duration)
-    
-    print(f"\n\n✓ Completed: {processed}/{total} images in {duration:.1f}s")
-    if errors > 0:
-        print(f"✗ Errors: {errors}")
+
+    request = ExportJobRequest(
+        input_folder=input_folder,
+        input_files=sorted(images),
+        settings=settings,
+        export_config=export_config,
+        curve_data=curve_data,
+    )
+    result = ExportRunner(event_sink=CliExportSink(logger)).run(request)
+
+    logger.log_export_complete(str(input_folder), result.processed, result.total, result.duration)
+
+    print(f"\n\n✓ Completed: {result.processed}/{result.total} images in {result.duration:.1f}s")
+    if result.errors > 0:
+        print(f"✗ Errors: {result.errors}")
 
 
 def main():

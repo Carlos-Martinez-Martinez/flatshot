@@ -170,6 +170,10 @@ def test_gallery_rail_uses_brand_tint_in_light_and_dark():
     assert "-webkit-appearance: none;" in search_input_rule
     assert "background: transparent;" in search_input_rule
     assert "border-radius: 0;" in search_input_rule
+    search_focus_rule = css_rule(gallery_css, ".batch-search__box input:focus-visible")
+    assert "box-shadow: none;" in search_focus_rule
+    assert "outline: 0;" in search_focus_rule
+    assert "box-shadow: var(--shadow-focus);" in css_rule(gallery_css, ".batch-search__box:focus-within")
     assert "font-weight: var(--font-weight-bold);" in css_rule(gallery_css, ".gallery-search > span")
     assert ".settings-panel .search-field input" in adjustments_css
     assert not re.search(r"(?m)^\.search-field input\b", adjustments_css)

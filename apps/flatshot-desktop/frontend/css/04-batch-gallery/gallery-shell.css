@@ -179,6 +179,11 @@
   -webkit-appearance: none;
 }
 
+.batch-search__box input:focus-visible {
+  outline: 0;
+  box-shadow: none;
+}
+
 .batch-search__box button {
   font-size: var(--font-size-md);
   line-height: var(--line-height-none);

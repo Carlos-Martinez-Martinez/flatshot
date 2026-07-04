@@ -9,6 +9,7 @@
       (() => {
         try {
           const root = document.documentElement;
+          root.dataset.boot = "pending";
           const bootPreferences = (() => {
             try {
               const node = document.getElementById("flatshot-boot-preferences");
@@ -56,6 +57,7 @@
           root.dataset.brandTone = brandTone;
           root.dataset.uiDensity = preferences.density === "comfortable" ? "comfortable" : "compact";
           root.dataset.motion = preferences.reduceMotion === true ? "reduced" : "auto";
+          root.dataset.onboardingBackground = preferences.onboardingBackground === false ? "disabled" : "enabled";
           root.dataset.thumbnailSize = ["small", "medium", "large"].includes(preferences.thumbnailSize) ? preferences.thumbnailSize : "medium";
           root.dataset.fileNameDisplay = ["always", "hover", "none"].includes(preferences.fileNameDisplay) ? preferences.fileNameDisplay : "always";
           if (hasBootTheme) {
@@ -74,11 +76,13 @@
             } catch (error) {}
           }
         } catch (error) {
+          document.documentElement.dataset.boot = "pending";
           document.documentElement.dataset.theme = "light";
           document.documentElement.dataset.themePreference = "light";
           document.documentElement.dataset.brandTone = "green";
           document.documentElement.dataset.uiDensity = "compact";
           document.documentElement.dataset.motion = "auto";
+          document.documentElement.dataset.onboardingBackground = "enabled";
           document.documentElement.dataset.thumbnailSize = "medium";
           document.documentElement.dataset.fileNameDisplay = "always";
         }
@@ -191,6 +195,7 @@
             <span id="top-status-text">Sin lote</span>
             <span class="bridge-chip idle" id="bridge-status">Bridge pendiente</span>
           </div>
+          <span class="top-active-preset" id="top-active-preset" hidden></span>
 
           <div class="top-actions">
             <span class="preflight-chip" id="top-preflight-status" hidden>Exportación bloqueada</span>
@@ -201,7 +206,6 @@
               <button type="button" class="top-format-action" data-action="open-app-settings" data-icon="sliders"><span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h8M16 7h4M4 17h4M12 17h8"></path><path d="M12 5v4M8 15v4"></path></svg></span>Formatos</button>
               <button type="button" class="top-inspector-action" data-action="toggle-responsive-inspector" data-icon="sliders" hidden>Ajustes</button>
             </div>
-            <span class="top-active-preset" id="top-active-preset" hidden></span>
             <div class="top-action-cluster top-action-cluster--run" aria-label="Procesamiento">
               <button type="button" class="top-secondary-action" id="top-secondary-action" data-action="secondary-primary" hidden></button>
               <button type="button" class="primary top-export" id="top-primary-action" data-action="primary">Seleccionar carpeta</button>
@@ -875,6 +879,40 @@
                   <span aria-hidden="true"></span>
                   <em>Visibles</em>
                 </button>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Fondos de bienvenida</strong>
+                  <small>Muestra imágenes decorativas al iniciar sin lote.</small>
+                </div>
+                <button type="button" class="preference-toggle" data-action="toggle-onboarding-background" aria-pressed="true">
+                  <span aria-hidden="true"></span>
+                  <em>Activas</em>
+                </button>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Carpeta de fondos</strong>
+                  <small>Añade tus imágenes a la carpeta local de onboarding.</small>
+                </div>
+                <button type="button" data-action="open-onboarding-assets-folder">Abrir carpeta</button>
+              </div>
+            </section>
+
+            <section class="preferences-section" aria-labelledby="preferences-processing-title">
+              <div class="preferences-section-heading">
+                <h3 id="preferences-processing-title">Procesado</h3>
+                <small>Controla sólo el ajuste inicial; no modifica presets guardados.</small>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Ajuste al iniciar</strong>
+                  <small data-preference-startup-adjustment-summary>Usar el ajuste guardado por defecto.</small>
+                </div>
+                <div class="preference-action-group">
+                  <button type="button" data-action="set-startup-adjustment">Usar actual</button>
+                  <button type="button" data-action="clear-startup-adjustment">Borrar</button>
+                </div>
               </div>
             </section>
 

@@ -6,7 +6,7 @@
 }
 
 .export-confirm-dialog {
-  width: min(640px, calc(100vw - var(--modal-viewport-gutter)));
+  width: min(860px, calc(100vw - var(--modal-viewport-gutter)));
   max-height: min(680px, calc(100vh - var(--modal-viewport-gutter)));
 }
 
@@ -20,7 +20,7 @@
 
 .export-confirm-summary {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
   gap: var(--space-3);
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -28,18 +28,64 @@
   padding: var(--space-4);
 }
 
-.export-confirm-summary > div {
+.export-confirm-summary__item {
   min-width: 0;
   display: grid;
-  gap: var(--space-0-5);
+  align-content: start;
+  gap: var(--space-1);
 }
 
-.export-confirm-summary span, .export-confirm-risk small, .export-confirm-note span {
+.export-confirm-summary span, .export-confirm-summary__list strong, .export-confirm-risk small, .export-confirm-note span {
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
 }
 
-.export-confirm-summary strong, .export-confirm-risk strong, .export-confirm-note strong {
+.export-confirm-summary strong {
+  min-width: 0;
+  color: var(--color-text-strong);
+  white-space: normal;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.export-confirm-summary__list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.export-confirm-summary__list li {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(130px, 0.42fr) minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: start;
+  padding-top: var(--space-1);
+  border-top: var(--border-width) solid var(--line-soft);
+}
+
+.export-confirm-summary__list li:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.export-confirm-summary__list li > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.export-confirm-summary__list li > strong {
+  color: var(--color-text-strong);
+}
+
+.export-confirm-summary__list li:only-child {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.export-confirm-risk strong, .export-confirm-note strong {
   min-width: 0;
   overflow: hidden;
   color: var(--color-text-strong);
@@ -130,7 +176,4 @@
   padding: var(--space-3);
 }
 
-.path-line, .batch-detail-row strong, .result-path strong, .format-section-preview strong, .export-confirm-summary strong {
-  user-select: text;
-}
 }

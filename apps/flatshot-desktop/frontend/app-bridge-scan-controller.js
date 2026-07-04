@@ -82,6 +82,9 @@ function applyBridgePresets(payload) {
 
   const names = items.map((item) => item.name);
   if (state.bridgeMode === "bridge") {
+    if (applyStartupAdjustmentPreference({ refresh: false, statusText: state.statusText })) {
+      return;
+    }
     if (!names.includes(state.activePreset)) {
       state.activePreset = names[0];
     }

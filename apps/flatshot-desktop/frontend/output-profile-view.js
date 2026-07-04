@@ -129,9 +129,10 @@
       return "Nombre de archivo pendiente";
     }
     const image = options.image || {};
+    const suffix = options.suffix === undefined || options.suffix === null ? "_PRO" : String(options.suffix);
     return outputNameFromTemplate({
       naming: options.naming,
-      suffix: options.suffix || "_PRO",
+      suffix,
       format: options.format || "JPG",
     }, {
       original: imageFileStem(image?.name || "imagen_001.png"),
@@ -185,9 +186,10 @@
     if (!String(options.naming || "").trim()) {
       return "Sin ejemplo";
     }
+    const suffix = options.suffix === undefined || options.suffix === null ? "_PRO" : String(options.suffix);
     return outputNameFromTemplate({
       naming: options.naming,
-      suffix: options.suffix || "_PRO",
+      suffix,
       format: options.format || "JPG",
     }, {
       original: options.original || "imagen_001",

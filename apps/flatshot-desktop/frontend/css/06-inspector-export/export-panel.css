@@ -298,7 +298,7 @@
   gap: var(--space-1-5);
 }
 
-.processing-card__actions button, .selected-image-card__actions button {
+.processing-card__actions button {
   min-height: var(--control-size-slim);
   border-radius: var(--radius-sm);
   padding: 0 10px;
@@ -311,7 +311,7 @@
 
 .processing-card__actions button { width: var(--control-size-lg); min-width: var(--control-size-lg); padding: 0; }
 
-.processing-card__actions button:hover:not(:disabled), .selected-image-card__actions button:hover:not(:disabled), .panel-link-button:hover:not(:disabled) {
+.processing-card__actions button:hover:not(:disabled), .panel-link-button:hover:not(:disabled) {
   background: var(--color-accent-soft);
 }
 

@@ -399,9 +399,12 @@ button.active-output-row__main {
 button.active-output-row__main:hover:not(:disabled) {
   color: var(--color-text-strong);
 }
-button.active-output-row__main:focus-visible {
-  outline: none;
+.active-output-row:has(.active-output-row__main:focus-visible) {
   box-shadow: var(--shadow-focus);
+}
+.active-output-row__main:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 .active-output-row__title {
   width: 100%;

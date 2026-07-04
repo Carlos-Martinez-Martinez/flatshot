@@ -131,8 +131,17 @@ function renderTop() {
   if (activePreset) {
     const showPreset = state.batch !== "none" && state.batch !== "scanning" && Boolean(state.activePreset);
     activePreset.hidden = !showPreset;
-    activePreset.textContent = showPreset ? `Ajuste: ${state.activePreset}` : "";
     activePreset.title = showPreset ? `Ajuste activo: ${state.activePreset}` : "";
+    activePreset.replaceChildren();
+    if (showPreset) {
+      const label = document.createElement("span");
+      label.className = "top-active-preset__label";
+      label.textContent = "Ajuste";
+      const value = document.createElement("strong");
+      value.className = "top-active-preset__value";
+      value.textContent = state.activePreset;
+      activePreset.append(label, value);
+    }
   }
   const resetButton = $(".top-reset-action");
   if (resetButton) {

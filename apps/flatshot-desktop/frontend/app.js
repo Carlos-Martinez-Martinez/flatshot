@@ -26,6 +26,7 @@ const initialThemePreference = themeHelpers.readThemePreference(window.localStor
 const initialTheme = themeHelpers.resolveThemePreference(initialThemePreference, window);
 const initialBrandTone = themeHelpers.readBrandTonePreference(window.localStorage, STORAGE_KEYS.brandTone);
 const initialInterfacePreferences = interfacePreferenceHelpers.readInterfacePreferences(window.localStorage, STORAGE_KEYS.interfacePreferences);
+const initialStartupAdjustment = interfacePreferenceHelpers.startupAdjustmentPreference(initialInterfacePreferences);
 themeHelpers.applyTheme(document, initialTheme);
 themeHelpers.applyBrandTone(document, initialBrandTone);
 interfacePreferenceHelpers.applyInterfacePreferences(document, initialInterfacePreferences);
@@ -101,12 +102,12 @@ const state = {
   advancedDisclosureKey: "",
   outputEditMode: false,
   presetEditorOpen: false,
-  activePreset: initialImageAdjustmentPreset,
+  activePreset: initialStartupAdjustment?.name || initialImageAdjustmentPreset,
   presetOutputSettings: {},
-  settings: { ...defaultSettings },
+  settings: normalizeSettings(initialStartupAdjustment?.settings || defaultSettings),
   lightingPresetId: "",
-  presetDirty: false,
-  presetSource: "Global",
+  presetDirty: Boolean(initialStartupAdjustment),
+  presetSource: initialStartupAdjustment ? "Preferencias" : "Global",
   localOverride: false,
   exportStatus: "blocked",
   exportJobId: null,

@@ -26,7 +26,7 @@ def test_preferences_modal_is_dedicated_to_interface_preferences():
     assert 'aria-labelledby="preferences-title"' in modal
     assert 'id="preferences-title">Preferencias' in modal
 
-    for section in ("Apariencia", "Inicio", "Vista", "Datos locales"):
+    for section in ("Apariencia", "Inicio", "Procesado", "Vista", "Datos locales"):
         assert section in modal
 
     assert 'class="preferences-row"' in modal
@@ -36,6 +36,11 @@ def test_preferences_modal_is_dedicated_to_interface_preferences():
     assert 'data-preference-select="density"' in modal
     assert 'class="preference-toggle" data-action="toggle-reduced-motion"' in modal
     assert 'class="preference-toggle" data-action="toggle-show-recent-folders"' in modal
+    assert 'class="preference-toggle" data-action="toggle-onboarding-background"' in modal
+    assert 'data-action="open-onboarding-assets-folder"' in modal
+    assert 'data-preference-startup-adjustment-summary' in modal
+    assert 'data-action="set-startup-adjustment"' in modal
+    assert 'data-action="clear-startup-adjustment"' in modal
     assert 'data-preference-select="thumbnailSize"' in modal
     assert 'data-preference-select="fileNameDisplay"' in modal
     assert 'data-action="clear-recent-folders"' in modal
@@ -64,6 +69,9 @@ def test_preferences_actions_state_and_modal_visibility_are_wired():
     app = (FRONTEND_DIR / "app.js").read_text(encoding="utf-8")
     shell = (FRONTEND_DIR / "app-shell.js").read_text(encoding="utf-8")
     actions = (FRONTEND_DIR / "app-action-dispatcher.js").read_text(encoding="utf-8")
+    preferences = (FRONTEND_DIR / "app-preferences-controller.js").read_text(encoding="utf-8")
+    preset_workflow = (FRONTEND_DIR / "app-settings-preset-workflow.js").read_text(encoding="utf-8")
+    scan_controller = (FRONTEND_DIR / "app-bridge-scan-controller.js").read_text(encoding="utf-8")
     renderer = (FRONTEND_DIR / "app-modal-render-controller.js").read_text(encoding="utf-8")
     modals = (FRONTEND_DIR / "app-modal-controller.js").read_text(encoding="utf-8")
     bridge_preferences = (FRONTEND_DIR / "app-bridge-ui-preferences.js").read_text(encoding="utf-8")
@@ -72,6 +80,10 @@ def test_preferences_actions_state_and_modal_visibility_are_wired():
     assert 'interfacePreferences: "flatshot.interfacePreferences"' in mock
     assert "global.interfacePreferenceHelpers = window.FlatShotInterfacePreferences;" in globals_source
     assert "const initialInterfacePreferences = interfacePreferenceHelpers.readInterfacePreferences" in app
+    assert "const initialStartupAdjustment = interfacePreferenceHelpers.startupAdjustmentPreference(initialInterfacePreferences);" in app
+    assert "settings: normalizeSettings(initialStartupAdjustment?.settings || defaultSettings)" in app
+    assert 'presetSource: initialStartupAdjustment ? "Preferencias" : "Global"' in app
+    assert 'root.dataset.onboardingBackground = preferences.onboardingBackground === false ? "disabled" : "enabled";' in (FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
     assert "themePreference: initialThemePreference" in app
     assert "interfacePreferences: initialInterfacePreferences" in app
     assert "preferencesOpen: false" in app
@@ -79,7 +91,12 @@ def test_preferences_actions_state_and_modal_visibility_are_wired():
     assert 'shell.dataset.uiDensity = state.interfacePreferences.density;' in shell
     assert 'shell.dataset.thumbnailSize = state.interfacePreferences.thumbnailSize;' in shell
     assert 'shell.dataset.fileNameDisplay = state.interfacePreferences.fileNameDisplay;' in shell
+    assert 'shell.dataset.onboardingBackground = state.interfacePreferences.onboardingBackground ? "enabled" : "disabled";' in shell
     assert "function handlePreferenceSelectChange(" in (FRONTEND_DIR / "app-preferences-controller.js").read_text(encoding="utf-8")
+    assert "function setStartupAdjustmentFromCurrent()" in preferences
+    assert "function clearStartupAdjustmentPreference()" in preferences
+    assert "function applyStartupAdjustmentPreference(" in preset_workflow
+    assert "if (applyStartupAdjustmentPreference({ refresh: false, statusText: state.statusText }))" in scan_controller
     assert '[data-preference-select]' in (FRONTEND_DIR / "app-document-events.js").read_text(encoding="utf-8")
 
     for action in (
@@ -89,6 +106,10 @@ def test_preferences_actions_state_and_modal_visibility_are_wired():
         "set-ui-density",
         "toggle-reduced-motion",
         "toggle-show-recent-folders",
+        "toggle-onboarding-background",
+        "open-onboarding-assets-folder",
+        "set-startup-adjustment",
+        "clear-startup-adjustment",
         "set-thumbnail-size",
         "set-file-name-display",
         "clear-recent-folders",
@@ -138,6 +159,8 @@ assert.deepEqual(helpers.defaultInterfacePreferences(), {{
   density: "compact",
   reduceMotion: false,
   showRecentFolders: true,
+  onboardingBackground: true,
+  startupAdjustment: null,
   thumbnailSize: "medium",
   fileNameDisplay: "always",
 }});
@@ -146,12 +169,24 @@ assert.deepEqual(helpers.normalizeInterfacePreferences({{
   density: "comfortable",
   reduceMotion: true,
   showRecentFolders: false,
+  onboardingBackground: false,
+  startupAdjustment: {{
+    name: "Estudio propio",
+    settings: {{ shadow_engine: "studio_2_5d", opacity: 42 }},
+    updatedAt: "2026-07-04T10:00:00.000Z",
+  }},
   thumbnailSize: "large",
   fileNameDisplay: "hover",
 }}), {{
   density: "comfortable",
   reduceMotion: true,
   showRecentFolders: false,
+  onboardingBackground: false,
+  startupAdjustment: {{
+    name: "Estudio propio",
+    settings: {{ shadow_engine: "studio_2_5d", opacity: 42 }},
+    updatedAt: "2026-07-04T10:00:00.000Z",
+  }},
   thumbnailSize: "large",
   fileNameDisplay: "hover",
 }});
@@ -160,22 +195,42 @@ assert.deepEqual(helpers.normalizeInterfacePreferences({{
   density: "wide",
   reduceMotion: "yes",
   showRecentFolders: "no",
+  onboardingBackground: "no",
+  startupAdjustment: {{ name: "", settings: null }},
   thumbnailSize: "huge",
   fileNameDisplay: "bad",
 }}), helpers.defaultInterfacePreferences());
+
+assert.deepEqual(helpers.startupAdjustmentPreference({{
+  startupAdjustment: {{
+    name: "Studio",
+    settings: {{ shadow_engine: "studio_2_5d", lighting_scene: {{ main: {{ x: 0.2 }} }} }},
+  }},
+}}), {{
+  name: "Studio",
+  settings: {{ shadow_engine: "studio_2_5d", lighting_scene: {{ main: {{ x: 0.2 }} }} }},
+  updatedAt: "",
+}});
+
+assert.equal(helpers.startupAdjustmentPreference({{ startupAdjustment: {{ name: "Bad" }} }}), null);
 
 const storage = fakeStorage();
 helpers.writeInterfacePreferences(storage, "prefs", {{ density: "comfortable", thumbnailSize: "small" }});
 assert.equal(JSON.parse(storage.dump().prefs).density, "comfortable");
 assert.equal(helpers.readInterfacePreferences(storage, "prefs").thumbnailSize, "small");
+helpers.writeInterfacePreferences(storage, "startup", {{
+  startupAdjustment: {{ name: "Inicio", settings: {{ shadow_engine: "studio_2_5d" }} }},
+}});
+assert.equal(JSON.parse(storage.dump().startup).startupAdjustment.settings.shadow_engine, "studio_2_5d");
 assert.deepEqual(helpers.readInterfacePreferences(fakeStorage({{ prefs: "{{" }}), "prefs"), helpers.defaultInterfacePreferences());
 assert.deepEqual(helpers.readInterfacePreferences(fakeStorage({{}}, true), "prefs"), helpers.defaultInterfacePreferences());
 
 const documentRef = fakeDocument();
-helpers.applyInterfacePreferences(documentRef, {{ density: "comfortable", reduceMotion: true, thumbnailSize: "large", fileNameDisplay: "none" }});
+helpers.applyInterfacePreferences(documentRef, {{ density: "comfortable", reduceMotion: true, onboardingBackground: false, thumbnailSize: "large", fileNameDisplay: "none" }});
 assert.deepEqual(documentRef.documentElement.dataset, {{
   uiDensity: "comfortable",
   motion: "reduced",
+  onboardingBackground: "disabled",
   thumbnailSize: "large",
   fileNameDisplay: "none",
 }});

@@ -62,6 +62,8 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(self.server.service.list_presets())
             elif path == "/ui/preferences":
                 self._send_json(self.server.service.load_ui_preferences())
+            elif path == "/assets/onboarding/open":
+                raise MethodNotAllowedError("Use POST for /assets/onboarding/open.")
             elif path == "/images/thumbnail":
                 query = parse_qs(parsed.query)
                 mime_type, body = self.server.service.render_thumbnail(
@@ -108,6 +110,8 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(self.server.service.delete_preset(self._read_json_body()))
             elif path == "/ui/preferences":
                 self._send_json(self.server.service.save_ui_preferences(self._read_json_body()))
+            elif path == "/assets/onboarding/open":
+                self._send_json(self.server.service.open_onboarding_assets_folder())
             elif path == "/exports/prepare":
                 self._send_json(self.server.service.prepare_export(self._read_json_body()))
             elif path == "/exports/run":

@@ -22,6 +22,7 @@ from flatshot.bridge import app_info as bridge_app_info
 from flatshot.bridge import export_endpoints, preferences, preset_endpoints, preview_endpoints
 from flatshot.bridge.errors import BridgeError, InvalidRequestError
 from flatshot.bridge.export_jobs import BridgeExportJob, ExportRunnerFactory
+from flatshot.bridge.onboarding_assets import onboarding_assets_folder, open_folder_with_system
 from flatshot.bridge.payload_helpers import (
     backgroundColorTuple,
 )
@@ -55,6 +56,7 @@ class FlatShotBridgeService:
         export_runner_factory: ExportRunnerFactory = ExportRunner,
         config_resolver: ConfigPathResolver | None = None,
         folder_picker: Callable[[Path | None], Path | None] | None = None,
+        folder_opener: Callable[[Path], None] | None = None,
         max_concurrent_exports: int = 1,
     ) -> None:
         self.folder_scanner = folder_scanner or FolderScanner()
@@ -63,6 +65,7 @@ class FlatShotBridgeService:
         self.export_runner_factory = export_runner_factory
         self.config_resolver = config_resolver or ConfigPathResolver()
         self.folder_picker = folder_picker or pick_folder_with_tk
+        self.folder_opener = folder_opener or open_folder_with_system
         self.max_concurrent_exports = max_concurrent_exports
         self._jobs: dict[str, BridgeExportJob] = {}
         self._jobs_lock = threading.Lock()
@@ -134,6 +137,20 @@ class FlatShotBridgeService:
             return {"ok": True, "selected": False, "path": None}
 
         return {"ok": True, "selected": True, "path": serialize_path(selected)}
+
+    def open_onboarding_assets_folder(self) -> dict[str, Any]:
+        folder = onboarding_assets_folder()
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise BridgeError("folder_open_unavailable", "No se pudo preparar la carpeta de fondos.", status=503) from exc
+        try:
+            self.folder_opener(folder)
+        except BridgeError:
+            raise
+        except Exception as exc:
+            raise BridgeError("folder_open_unavailable", "No se pudo abrir la carpeta de fondos.", status=503) from exc
+        return {"ok": True, "path": serialize_path(folder)}
 
     def render_preview(self, payload: Mapping[str, Any]) -> dict[str, Any]:
         return preview_endpoints.render_preview(self, payload)

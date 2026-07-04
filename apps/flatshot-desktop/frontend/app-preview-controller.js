@@ -1,3 +1,11 @@
+function setPreviewCanvasHtml(canvas, html) {
+  const onboardingLayer = canvas.querySelector("#onboarding-background");
+  canvas.innerHTML = html;
+  if (onboardingLayer) {
+    canvas.prepend(onboardingLayer);
+  }
+}
+
 function renderPreview() {
   const image = selectedImage();
   const visibleImages = filteredImages();
@@ -91,19 +99,19 @@ function renderPreview() {
   applyViewerPanDom();
 
   if (state.batch === "none") {
-    canvas.innerHTML = initialStateHtml();
+    setPreviewCanvasHtml(canvas, initialStateHtml());
     finishPreviewRender();
     return;
   }
 
   if (state.batch === "scanning") {
-    canvas.innerHTML = scanningStateHtml();
+    setPreviewCanvasHtml(canvas, scanningStateHtml());
     finishPreviewRender();
     return;
   }
 
   if (state.batch === "empty") {
-    canvas.innerHTML = emptyStateViewHelpers.emptyStateHtml({
+    setPreviewCanvasHtml(canvas, emptyStateViewHelpers.emptyStateHtml({
       variant: "warning",
       title: "No se encontraron imágenes compatibles",
       detail: state.scanDiagnostics.totalOmitted
@@ -112,58 +120,58 @@ function renderPreview() {
       actionLabel: "",
       action: "",
       meta: state.scanStatus || "",
-    });
+    }));
     finishPreviewRender();
     return;
   }
 
   if (filterIsEmpty) {
-    canvas.innerHTML = emptyStateViewHelpers.emptyStateHtml({
+    setPreviewCanvasHtml(canvas, emptyStateViewHelpers.emptyStateHtml({
       variant: "inline",
       title: "No hay imágenes en este filtro",
       detail: filterEmptyDetail(),
       actionLabel: "Ver todas",
       action: "clear-filter",
       meta: `${activeImages().length} imágenes en el lote`,
-    });
+    }));
     finishPreviewRender();
     return;
   }
 
   if (!image || state.previewStatus === "empty") {
-    canvas.innerHTML = emptyStateViewHelpers.emptyStateHtml({
+    setPreviewCanvasHtml(canvas, emptyStateViewHelpers.emptyStateHtml({
       variant: "inline",
       title: "Selecciona una imagen",
       detail: "Elige una miniatura para revisar.",
       actionLabel: activeImages().length ? "Seleccionar primera" : "",
       action: activeImages().length ? "select-first-image" : "",
       meta: activeImages().length ? `${activeImages().length} imágenes en el lote` : "",
-    });
+    }));
     finishPreviewRender();
     return;
   }
 
   if (isBridgeImage) {
-    canvas.innerHTML = realPreviewHtml(image);
+    setPreviewCanvasHtml(canvas, realPreviewHtml(image));
     finishPreviewRender();
     return;
   }
 
   if (state.previewStatus === "loading") {
-    canvas.innerHTML = previewViewHelpers.previewLoadingHtml(image.name);
+    setPreviewCanvasHtml(canvas, previewViewHelpers.previewLoadingHtml(image.name));
     finishPreviewRender();
     return;
   }
 
   if (state.previewStatus === "error") {
-    canvas.innerHTML = previewStateHtml("Vista no disponible", "Revisa alpha o archivo fuente.");
+    setPreviewCanvasHtml(canvas, previewStateHtml("Vista no disponible", "Revisa alpha o archivo fuente."));
     finishPreviewRender();
     return;
   }
 
-  canvas.innerHTML = previewViewHelpers.mockPreviewHtml({
+  setPreviewCanvasHtml(canvas, previewViewHelpers.mockPreviewHtml({
     warning: state.previewStatus === "warning" ? "Render con fallback. Revisa antes de exportar." : "",
-  }) + (state.previewMode === "compare" ? previewViewHelpers.compareDividerHtml(state.compareSplit) : "");
+  }) + (state.previewMode === "compare" ? previewViewHelpers.compareDividerHtml(state.compareSplit) : ""));
   finishPreviewRender();
 }
 

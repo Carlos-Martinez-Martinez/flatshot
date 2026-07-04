@@ -24,6 +24,9 @@ def test_inspector_review_view_helper_loads_before_app_script():
 
 def test_selected_image_actions_render_as_buttons_in_dark_surfaces():
     css = INSPECTOR_CARDS_CSS_PATH.read_text(encoding="utf-8")
+    export_panel_css = (
+        FRONTEND_DIR / "css" / "06-inspector-export" / "export-panel.css"
+    ).read_text(encoding="utf-8")
 
     assert ".selected-image-card__actions button {" in css
     action_rule = css.split(".selected-image-card__actions button {", 1)[1].split("}", 1)[0]
@@ -31,6 +34,7 @@ def test_selected_image_actions_render_as_buttons_in_dark_surfaces():
     assert "background: var(--color-bg-panel)" in action_rule
     assert "color: var(--color-text)" in action_rule
     assert ".inspector-compact-row .selected-image-card__actions button:hover:not(:disabled)" in css
+    assert ".selected-image-card__actions button" not in export_panel_css
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")

@@ -70,6 +70,7 @@ def test_dark_theme_core_contrast_stays_accessible():
     text = css_token_value(dark_block, "--color-text")
     muted = css_token_value(dark_block, "--color-muted")
     primary = css_token_value(dark_block, "--color-primary")
+    primary_hover = css_token_value(dark_block, "--color-primary-hover")
     inverse = css_token_value(dark_block, "--color-text-inverse")
 
     assert background == "#18181b"
@@ -77,6 +78,29 @@ def test_dark_theme_core_contrast_stays_accessible():
     assert contrast_ratio(text, surface) >= 4.5
     assert contrast_ratio(muted, surface) >= 4.5
     assert contrast_ratio(inverse, primary) >= 4.5
+    assert contrast_ratio(primary_hover, surface) >= 4.5
+
+
+def test_dark_brand_tones_keep_text_accent_legible():
+    tokens = TOKENS_CSS_PATH.read_text(encoding="utf-8")
+    dark_block = css_block(tokens, ':root[data-theme="dark"]')
+    root_block = css_block(tokens, ":root")
+    surface = css_token_value(dark_block, "--color-surface")
+    inverse = css_token_value(dark_block, "--color-text-inverse")
+
+    expected_hover = {
+        "blue": "#93c5fd",
+        "indigo": "#a5b4fc",
+        "violet": "#c4b5fd",
+        "coral": "#fdba74",
+        "amber": "#fbbf24",
+    }
+    for tone, hover in expected_hover.items():
+        block = css_block(tokens, f':root[data-theme="dark"][data-brand-tone="{tone}"]')
+        assert css_tokens(block) <= css_tokens(root_block)
+        assert css_token_value(block, "--color-primary-hover") == hover
+        assert contrast_ratio(css_token_value(block, "--color-primary"), inverse) >= 4.5
+        assert contrast_ratio(hover, surface) >= 4.5
 
 
 def test_brand_tone_loads_early_and_reuses_theme_tokens():
@@ -94,12 +118,24 @@ def test_brand_tone_loads_early_and_reuses_theme_tokens():
 
 def test_boot_theme_script_accepts_server_injected_preferences_before_css():
     html = INDEX_PATH.read_text(encoding="utf-8")
+    shell_css = (FRONTEND_DIR / "css" / "02-layout" / "shell-workspace.css").read_text(encoding="utf-8")
+    startup = (FRONTEND_DIR / "app-startup.js").read_text(encoding="utf-8")
+    bridge_preferences = (FRONTEND_DIR / "app-bridge-ui-preferences.js").read_text(encoding="utf-8")
 
     assert 'document.getElementById("flatshot-boot-preferences")' in html
     assert html.index('document.getElementById("flatshot-boot-preferences")') < html.index("css/00-settings/tokens.css")
     assert "bootPreferences.themePreference" in html
     assert "bootPreferences.brandTone" in html
     assert "bootPreferences.interfacePreferences" in html
+    assert 'root.dataset.boot = "pending";' in html
+    assert ':root[data-boot="pending"] .app-shell {' in shell_css
+    assert "visibility: hidden;" in shell_css
+    assert "function markFlatShotBootReady()" in startup
+    assert 'document.documentElement.dataset.boot = "ready";' in startup
+    assert 'await restoreBridgeUiPreferences({ skipSessionSnapshot: true, renderOnRestore: false, timeoutMs: 900 });' in startup
+    assert "restorePersistentBridgeSession();" not in startup
+    assert "void scanBridgeFolder();" not in startup
+    assert "if (restored && options.renderOnRestore !== false)" in bridge_preferences
     assert 'localStorage.setItem("flatshot.theme", themePreference)' in html
     assert 'localStorage.setItem("flatshot.brandTone", brandTone)' in html
     assert 'localStorage.setItem("flatshot.interfacePreferences", JSON.stringify(preferences))' in html
@@ -143,6 +179,7 @@ vm.runInThisContext({json.dumps(boot_script.group("script"))});
 assert.equal(document.documentElement.dataset.theme, "dark");
 assert.equal(document.documentElement.dataset.themePreference, "dark");
 assert.equal(document.documentElement.dataset.brandTone, "blue");
+assert.equal(document.documentElement.dataset.boot, "pending");
 assert.equal(document.documentElement.dataset.uiDensity, "comfortable");
 assert.equal(document.documentElement.dataset.motion, "reduced");
 assert.equal(document.documentElement.dataset.thumbnailSize, "large");

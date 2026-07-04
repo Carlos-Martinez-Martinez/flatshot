@@ -56,6 +56,9 @@
     if (!documentRef) {
       return false;
     }
+    if (documentRef.documentElement?.dataset) {
+      documentRef.documentElement.dataset.boot = "ready";
+    }
     const shell = documentRef.querySelector?.(".app-shell");
     const host = documentRef.querySelector?.(".workspace") || shell || documentRef.body;
     if (!host) {

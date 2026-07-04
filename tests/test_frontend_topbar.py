@@ -66,6 +66,32 @@ def test_topbar_primary_button_has_no_drop_shadow():
     assert "transform: none;" in primary_hover_rule
 
 
+def test_topbar_active_preset_is_status_text_outside_action_group():
+    html = (FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
+    topbar_css = (FRONTEND_DIR / "css" / "02-layout" / "topbar.css").read_text(encoding="utf-8")
+    topbar_js = (FRONTEND_DIR / "app-topbar-bridge.js").read_text(encoding="utf-8")
+
+    actions_block = html.split('<div class="top-actions">', 1)[1].split('<button type="button" class="dev-only"', 1)[0]
+    actions_rule = topbar_css.split("\n.top-actions {", 1)[1].split("}", 1)[0]
+    preset_rule = topbar_css.split("\n.top-active-preset {", 1)[1].split("}", 1)[0]
+
+    assert html.index('id="top-active-preset"') < html.index('<div class="top-actions">')
+    assert 'id="top-active-preset"' not in actions_block
+    assert "grid-template-columns: auto auto auto;" in actions_rule
+    assert "minmax(320px, 1fr)" not in actions_rule
+    assert "grid-column: 2;" in preset_rule
+    assert "display: inline-grid;" in preset_rule
+    assert "border:" not in preset_rule
+    assert "background:" not in preset_rule
+    assert "border-radius:" not in preset_rule
+    assert "max-width:" not in preset_rule
+    assert "overflow: hidden;" not in preset_rule
+    assert "text-overflow:" not in preset_rule
+    assert ".top-active-preset__label" in topbar_css
+    assert ".top-active-preset__value" in topbar_css
+    assert "activePreset.replaceChildren" in topbar_js
+
+
 def test_primary_toolbar_controls_use_stable_icon_names():
     html = (FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
     buttons_css = (FRONTEND_DIR / "css" / "03-components" / "buttons.css").read_text(encoding="utf-8")

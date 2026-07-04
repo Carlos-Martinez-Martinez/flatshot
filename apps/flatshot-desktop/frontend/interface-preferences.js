@@ -9,6 +9,8 @@
     density: "compact",
     reduceMotion: false,
     showRecentFolders: true,
+    onboardingBackground: true,
+    startupAdjustment: null,
     thumbnailSize: "medium",
     fileNameDisplay: "always",
   });
@@ -24,12 +26,44 @@
     return allowed.has(value) ? value : fallback;
   }
 
+  function cloneSerializable(value) {
+    if (Array.isArray(value)) {
+      return value.map(cloneSerializable);
+    }
+    if (value && typeof value === "object") {
+      return Object.fromEntries(
+        Object.entries(value).map(([key, item]) => [key, cloneSerializable(item)])
+      );
+    }
+    return value;
+  }
+
+  function startupAdjustmentPreference(value = {}) {
+    const source = value && typeof value === "object" && !Array.isArray(value)
+      ? value.startupAdjustment
+      : null;
+    if (!source || typeof source !== "object" || Array.isArray(source)) {
+      return null;
+    }
+    if (!source.settings || typeof source.settings !== "object" || Array.isArray(source.settings)) {
+      return null;
+    }
+    const name = String(source.name || "Ajuste inicial").trim() || "Ajuste inicial";
+    return {
+      name,
+      settings: cloneSerializable(source.settings),
+      updatedAt: typeof source.updatedAt === "string" ? source.updatedAt : "",
+    };
+  }
+
   function normalizeInterfacePreferences(value = {}) {
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
     return {
       density: normalizeChoice(source.density, densityValues, DEFAULTS.density),
       reduceMotion: source.reduceMotion === true,
       showRecentFolders: source.showRecentFolders === false ? false : DEFAULTS.showRecentFolders,
+      onboardingBackground: source.onboardingBackground === false ? false : DEFAULTS.onboardingBackground,
+      startupAdjustment: startupAdjustmentPreference(source),
       thumbnailSize: normalizeChoice(source.thumbnailSize, thumbnailSizeValues, DEFAULTS.thumbnailSize),
       fileNameDisplay: normalizeChoice(source.fileNameDisplay, fileNameDisplayValues, DEFAULTS.fileNameDisplay),
     };
@@ -61,6 +95,7 @@
     if (root?.dataset) {
       root.dataset.uiDensity = normalized.density;
       root.dataset.motion = normalized.reduceMotion ? "reduced" : "auto";
+      root.dataset.onboardingBackground = normalized.onboardingBackground ? "enabled" : "disabled";
       root.dataset.thumbnailSize = normalized.thumbnailSize;
       root.dataset.fileNameDisplay = normalized.fileNameDisplay;
     }
@@ -72,6 +107,7 @@
     defaultInterfacePreferences,
     normalizeInterfacePreferences,
     readInterfacePreferences,
+    startupAdjustmentPreference,
     writeInterfacePreferences,
   };
 });

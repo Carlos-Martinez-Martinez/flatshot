@@ -276,17 +276,26 @@
   .top-actions {
     width: 100%;
     max-width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-column: 1;
     justify-self: stretch;
-    justify-content: flex-start;
-    flex-wrap: wrap;
+    justify-content: stretch;
     overflow: visible;
     padding-bottom: 2px;
   }
 
   .top-actions > * {
-    flex: 0 1 auto;
     min-width: 0;
+  }
+
+  .top-active-preset {
+    grid-column: 1;
+    justify-self: start;
+  }
+
+  .top-action-cluster--run {
+    grid-column: 1 / -1;
+    margin-inline-start: 0;
   }
 
   .workspace {

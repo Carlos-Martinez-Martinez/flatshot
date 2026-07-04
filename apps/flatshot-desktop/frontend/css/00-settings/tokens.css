@@ -365,8 +365,8 @@
   --color-panel-summary-border: #3f3f46;
   --color-preview-neutral: #2f2f35;
   --color-preview-soft-black: #111113;
-  --color-primary: #0e8469;
-  --color-primary-hover: #0b755e;
+  --color-primary: #0f766e;
+  --color-primary-hover: #5eead4;
   --color-primary-soft: color-mix(in srgb, var(--color-primary) 16%, var(--color-bg-panel));
   --color-surface: #27272a;
   --color-text: #f4f4f5;
@@ -498,6 +498,31 @@
   --primary-panel-alpha-92: color-mix(in srgb, var(--color-primary-soft) 92%, transparent);
   --primary-soft-alpha-06: color-mix(in srgb, var(--color-primary) 6%, transparent);
   --primary-soft-alpha-66: color-mix(in srgb, var(--color-primary-soft) 66%, transparent);
+}
+
+:root[data-theme="dark"][data-brand-tone="blue"] {
+  --color-primary: #2563eb;
+  --color-primary-hover: #93c5fd;
+}
+
+:root[data-theme="dark"][data-brand-tone="indigo"] {
+  --color-primary: #4f46e5;
+  --color-primary-hover: #a5b4fc;
+}
+
+:root[data-theme="dark"][data-brand-tone="violet"] {
+  --color-primary: #7c3aed;
+  --color-primary-hover: #c4b5fd;
+}
+
+:root[data-theme="dark"][data-brand-tone="coral"] {
+  --color-primary: #c2410c;
+  --color-primary-hover: #fdba74;
+}
+
+:root[data-theme="dark"][data-brand-tone="amber"] {
+  --color-primary: #b45309;
+  --color-primary-hover: #fbbf24;
 }
 
 :root[data-ui-density="comfortable"] {

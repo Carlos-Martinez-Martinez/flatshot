@@ -217,11 +217,13 @@ async function restoreBridgeUiPreferences(options = {}) {
     return false;
   }
   try {
-    const payload = await bridgeRequest("/ui/preferences", { timeoutMs: 5000, retries: 1 });
+    const payload = await bridgeRequest("/ui/preferences", { timeoutMs: options.timeoutMs || 5000, retries: 1 });
     const restored = applyBridgeUiPreferences(payload.preferences);
     bridgeUiPreferencesRestored = restored || bridgeUiPreferencesRestored;
     if (restored) {
       state.statusText = state.statusText === "Sin lote" ? "Ajustes restaurados" : state.statusText;
+    }
+    if (restored && options.renderOnRestore !== false) {
       render();
     }
     return restored;

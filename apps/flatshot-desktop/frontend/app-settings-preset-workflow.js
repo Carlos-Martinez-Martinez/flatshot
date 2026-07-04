@@ -181,6 +181,23 @@ function applyPresetSettings(name, options = {}) {
   return true;
 }
 
+function applyStartupAdjustmentPreference(options = {}) {
+  const startupAdjustment = interfacePreferenceHelpers.startupAdjustmentPreference(state.interfacePreferences);
+  if (!startupAdjustment) {
+    return false;
+  }
+  state.activePreset = startupAdjustment.name;
+  state.settings = normalizeSettings(startupAdjustment.settings);
+  state.presetDirty = true;
+  state.presetSource = "Preferencias";
+  state.exportStatus = isExportReady() ? "ready" : "blocked";
+  state.statusText = options.statusText || "Ajuste inicial restaurado";
+  if (options.refresh !== false) {
+    refreshPreviewAfterSettingChange();
+  }
+  return true;
+}
+
 function resetActivePresetSettings() {
   const before = adjustmentSnapshot();
   if (applyPresetSettings(state.activePreset, { statusText: "Ajuste restaurado" })) {

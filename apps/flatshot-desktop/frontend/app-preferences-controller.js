@@ -98,6 +98,44 @@ function toggleShowRecentFolders() {
   );
 }
 
+function toggleOnboardingBackground() {
+  const current = interfacePreferenceHelpers.normalizeInterfacePreferences(state.interfacePreferences);
+  updateInterfacePreference(
+    { onboardingBackground: !current.onboardingBackground },
+    current.onboardingBackground ? "Fondos de inicio ocultos" : "Fondos de inicio activos"
+  );
+}
+
+function startupAdjustmentLabel(preferences = state.interfacePreferences) {
+  const startupAdjustment = interfacePreferenceHelpers.startupAdjustmentPreference(preferences);
+  if (!startupAdjustment) {
+    return "Sin ajuste inicial guardado; se usará el último ajuste/preset activo.";
+  }
+  const engine = shadowEngineLabels[startupAdjustment.settings?.shadow_engine] || "Motor guardado";
+  return `${startupAdjustment.name} · ${engine}`;
+}
+
+function setStartupAdjustmentFromCurrent() {
+  const settings = normalizeSettings(state.settings);
+  updateInterfacePreference(
+    {
+      startupAdjustment: {
+        name: state.activePreset || "Ajuste inicial",
+        settings,
+        updatedAt: new Date().toISOString(),
+      },
+    },
+    "Ajuste inicial guardado"
+  );
+}
+
+function clearStartupAdjustmentPreference() {
+  updateInterfacePreference(
+    { startupAdjustment: null },
+    "Ajuste inicial borrado"
+  );
+}
+
 function setThumbnailSize(target) {
   const rawSize = target?.dataset?.thumbnailSize || target?.value;
   const size = ["small", "medium", "large"].includes(rawSize)
@@ -136,6 +174,22 @@ function clearRecentFolders() {
   state.recentFolders = [];
   state.statusText = "Historial de carpetas borrado";
   preferenceSaveSync();
+  render();
+}
+
+async function openOnboardingAssetsFolder() {
+  try {
+    const response = await bridgeRequest("/assets/onboarding/open", {
+      method: "POST",
+      body: JSON.stringify({}),
+      timeoutMs: 5000,
+      retries: 1,
+    });
+    state.statusText = response?.path ? "Carpeta de fondos abierta" : "Carpeta de fondos solicitada";
+  } catch (error) {
+    const opened = window.open("./assets/onboarding/", "_blank", "noopener");
+    state.statusText = opened ? "Fondos abiertos en navegador" : "No se pudo abrir la carpeta de fondos";
+  }
   render();
 }
 

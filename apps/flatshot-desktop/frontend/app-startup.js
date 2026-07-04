@@ -7,28 +7,27 @@ function initViewerResizeObserver() {
   viewerResizeObserver.observe(canvas);
 }
 
-function restorePersistentBridgeSession() {
-  const path = parseFolderInput(state.bridgeScanPath)[0];
-  if (!path || state.bridgeMode !== "bridge") {
-    return;
+function markFlatShotBootReady() {
+  if (document?.documentElement?.dataset) {
+    document.documentElement.dataset.boot = "ready";
   }
-  state.bridgeScanPath = path;
-  state.scanStatus = `Última carpeta: ${formatterHelpers.basename(path)}`;
-  state.statusText = "Restaurando último lote";
-  render();
-  void scanBridgeFolder();
 }
 
-function startFlatShotApp() {
-  restoredSessionSnapshot = restoreSessionSnapshot();
-  sessionSnapshotPersistenceEnabled = true;
-  if (restoredSessionSnapshot) {
-    render();
-    return;
+async function startFlatShotApp() {
+  try {
+    restoredSessionSnapshot = restoreSessionSnapshot();
+    sessionSnapshotPersistenceEnabled = true;
+    if (restoredSessionSnapshot) {
+      render();
+      return;
+    }
+    await restoreBridgeUiPreferences({ skipSessionSnapshot: true, renderOnRestore: false, timeoutMs: 900 });
+    setScenario("initial");
+  } catch (error) {
+    window.FlatShotErrorBoundary?.renderGlobalError?.(error, { document, source: "app-startup" });
+  } finally {
+    markFlatShotBootReady();
   }
-  setScenario("initial");
-  void restoreBridgeUiPreferences({ skipSessionSnapshot: true });
-  restorePersistentBridgeSession();
 }
 
 try {

@@ -92,6 +92,14 @@ def test_initial_canvas_uses_app_background_instead_of_preview_background():
     assert "--rgb-neutral-fallback" not in initial_rule
 
 
+def test_preview_render_preserves_onboarding_background_layer():
+    source = (FRONTEND_DIR / "app-preview-controller.js").read_text(encoding="utf-8")
+
+    assert "function setPreviewCanvasHtml(" in source
+    assert 'canvas.querySelector("#onboarding-background")' in source
+    assert "canvas.prepend(onboardingLayer);" in source
+
+
 def test_compare_mode_has_draggable_divider_wiring():
     app_js = app_domain_source()
     canvas_css = (FRONTEND_DIR / "css" / "05-viewer" / "canvas.css").read_text(encoding="utf-8")

@@ -420,14 +420,14 @@ assert.equal(helpers.outputNameForImage({{
   format: "JPG",
   image: {{ name: "camisa.png", folderId: "missing" }},
   folders: [{{ id: "folder-a", name: "Lote A" }}],
-}}), "Lote A_camisa_PRO.jpg");
+}}), "Lote A_camisa.jpg");
 assert.equal(helpers.outputNameForImage({{
   naming: "{{folder}}_{{original}}{{suffix}}",
   suffix: "",
   format: "JPG",
   image: {{}},
   folders: [],
-}}), "lote_imagen_001_PRO.jpg");
+}}), "lote_imagen_001.jpg");
 assert.equal(helpers.outputNameForImage({{
   naming: "{{original}}.webp",
   suffix: "_PRO",
@@ -515,6 +515,14 @@ assert.equal(helpers.namingExample({{
   original: "camisa",
   folder: "Lote",
 }}), "Sin ejemplo");
+assert.equal(helpers.namingExample({{
+  naming: "{{folder}}_{{index:02d}}_{{original}}{{suffix}}",
+  suffix: "",
+  format: "JPG",
+  original: "camisa",
+  folder: "Lote",
+  index: 3,
+}}), "Lote_03_camisa.jpg");
 assert.equal(helpers.namingExample({{
   naming: "{{folder}}_{{index:02d}}_{{original}}{{suffix}}",
   suffix: "_PRO",

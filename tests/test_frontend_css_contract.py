@@ -1237,6 +1237,10 @@ def test_active_output_row_main_keeps_grid_layout_when_selectable():
     assert "border: 0;\n  background: transparent;" in output_profiles_css
     assert "font-weight: var(--font-weight-regular);" in output_profiles_css
     assert ".active-output-row__main small {\n  overflow: visible;" in output_profiles_css
+    assert "button.active-output-row__main:focus-visible {" not in output_profiles_css
+    assert ".active-output-row:has(.active-output-row__main:focus-visible) {" in output_profiles_css
+    focus_rule = output_profiles_css.split(".active-output-row:has(.active-output-row__main:focus-visible) {", 1)[1].split("}", 1)[0]
+    assert "box-shadow: var(--shadow-focus)" in focus_rule
     assert (
         ".active-output-row.is-current {\n"
         "  border-color: color-mix(in srgb, var(--semantic-selection-border) 42%, var(--color-border));"

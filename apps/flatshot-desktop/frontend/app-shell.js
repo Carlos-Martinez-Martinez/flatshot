@@ -31,6 +31,7 @@ function renderShell() {
   shell.dataset.reduceMotion = state.interfacePreferences.reduceMotion ? "true" : "false";
   shell.dataset.thumbnailSize = state.interfacePreferences.thumbnailSize;
   shell.dataset.fileNameDisplay = state.interfacePreferences.fileNameDisplay;
+  shell.dataset.onboardingBackground = state.interfacePreferences.onboardingBackground ? "enabled" : "disabled";
   renderBrandToneControls();
   renderPreferenceControls();
   if (gallery) {
@@ -120,6 +121,23 @@ function renderPreferenceControls() {
     if (recentFoldersLabel) {
       recentFoldersLabel.textContent = preferences.showRecentFolders ? "Visibles" : "Ocultas";
     }
+  }
+  const onboardingBackground = $("[data-action='toggle-onboarding-background']");
+  if (onboardingBackground) {
+    const onboardingBackgroundLabel = onboardingBackground.querySelector("em");
+    onboardingBackground.setAttribute("aria-pressed", preferences.onboardingBackground ? "true" : "false");
+    if (onboardingBackgroundLabel) {
+      onboardingBackgroundLabel.textContent = preferences.onboardingBackground ? "Activas" : "Ocultas";
+    }
+  }
+  const startupAdjustment = interfacePreferenceHelpers.startupAdjustmentPreference(preferences);
+  const startupAdjustmentSummary = $("[data-preference-startup-adjustment-summary]");
+  if (startupAdjustmentSummary) {
+    startupAdjustmentSummary.textContent = startupAdjustmentLabel(preferences);
+  }
+  const clearStartupAdjustment = $("[data-action='clear-startup-adjustment']");
+  if (clearStartupAdjustment) {
+    clearStartupAdjustment.disabled = !startupAdjustment;
   }
   const clearRecent = $("[data-action='clear-recent-folders']");
   if (clearRecent) {

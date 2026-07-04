@@ -437,6 +437,22 @@ def test_bridge_pick_folder_rejects_invalid_initial_path(tmp_path):
         _service(tmp_path / "config").pick_folder({"initialPath": 123})
 
 
+def test_bridge_open_onboarding_assets_folder_uses_frontend_assets_dir(tmp_path):
+    opened: list[Path] = []
+    service = FlatShotBridgeService(
+        config_resolver=ConfigPathResolver(tmp_path / "config"),
+        folder_opener=lambda path: opened.append(path),
+    )
+
+    response = service.open_onboarding_assets_folder()
+
+    assets_dir = Path(response["path"])
+    assert response["ok"] is True
+    assert assets_dir.name == "onboarding"
+    assert (assets_dir / "flatshot-abstract-01.png").exists()
+    assert opened == [assets_dir]
+
+
 def test_bridge_render_preview_returns_png_payload(tmp_path):
     image = _png(tmp_path / "source.png")
 

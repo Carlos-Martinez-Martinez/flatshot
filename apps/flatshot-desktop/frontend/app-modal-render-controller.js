@@ -60,15 +60,54 @@ function renderPreferencesModal() {
 }
 
 function exportConfirmHtml(risks) {
+  const summaryRows = exportConfirmSummaryRows();
+  return exportConfirmViewHelpers.exportConfirmHtml({ risks, summaryRows });
+}
+
+function exportConfirmSummaryRows() {
   const counts = batchCounts();
   const exportable = counts.exportableImages;
-  const summaryRows = [
+  const profiles = exportOutputProfiles();
+  const profileCount = profiles.length;
+  return [
     ["Imágenes", `${exportable} exportable${exportable === 1 ? "" : "s"}`],
-    ["Formatos", outputProfilesSummaryLabel()],
-    ["Destino", destinationFallbackLabel()],
-    ["Nombre", namingExample()],
+    {
+      label: "Formatos",
+      value: profileCount ? `${profileCount} formato${profileCount === 1 ? "" : "s"} activo${profileCount === 1 ? "" : "s"}` : "Sin formatos activos",
+      items: exportConfirmFormatRows(profiles),
+    },
+    {
+      label: "Destino",
+      value: destinationFallbackLabel(),
+      items: exportConfirmDestinationRows(profiles),
+    },
+    {
+      label: "Nombres de salida",
+      value: profileCount ? "" : "Sin formatos activos",
+      items: exportConfirmOutputNameRows(profiles),
+    },
   ];
-  return exportConfirmViewHelpers.exportConfirmHtml({ risks, summaryRows });
+}
+
+function exportConfirmFormatRows(profiles) {
+  return profiles.map((profile) => `${profile.name} (${profile.format})`);
+}
+
+function exportConfirmDestinationRows(profiles) {
+  if (profiles.length <= 1) {
+    return [];
+  }
+  return profiles.map((profile) => ({
+    label: `${profile.name} (${profile.format})`,
+    value: outputProfileViewHelpers.profileDestinationPreviewLabel(profile),
+  }));
+}
+
+function exportConfirmOutputNameRows(profiles) {
+  return profiles.map((profile) => ({
+    label: `${profile.name} (${profile.format})`,
+    value: outputNameForProfile(profile),
+  }));
 }
 
 function batchDetailHtml() {

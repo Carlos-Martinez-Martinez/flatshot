@@ -93,6 +93,10 @@
   grid-template-rows: var(--header-height) minmax(0, 1fr) var(--footer-height);
 }
 
+:root[data-boot="pending"] .app-shell {
+  visibility: hidden;
+}
+
 .workspace {
   min-width: 0;
   min-height: 0;

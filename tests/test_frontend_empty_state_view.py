@@ -452,3 +452,22 @@ def test_onboarding_background_styles_are_perceptible_without_blocking_controls(
     assert "background-position: center;" in slide_rule
     assert "background-size: cover;" in slide_rule
     assert "background-repeat: no-repeat;" in slide_rule
+    assert "background-color: color-mix(in srgb, var(--color-accent)" in slide_rule
+    assert "background-blend-mode: luminosity;" in slide_rule
+    assert "hue-rotate" not in slide_rule
+    assert "background-color var(--duration-onboarding-fade)" in slide_rule
+
+    disabled_selector = ':root[data-onboarding-background="disabled"] .app-shell[data-ui-state="no_folder"] .onboarding-background.is-visible {'
+    assert disabled_selector in css
+    disabled_rule = css.split(disabled_selector, 1)[1].split("}", 1)[0]
+    assert "display: none;" in disabled_rule
+
+    dark_slide_selector = ':root[data-theme="dark"] .onboarding-background__slide {'
+    dark_active_selector = ':root[data-theme="dark"] .onboarding-background__slide.is-active {'
+    assert dark_slide_selector in css
+    assert dark_active_selector in css
+    dark_slide_rule = css.split(dark_slide_selector, 1)[1].split("}", 1)[0]
+    dark_active_slide_rule = css.split(dark_active_selector, 1)[1].split("}", 1)[0]
+    assert "background-color: color-mix(in srgb, var(--color-accent)" in dark_slide_rule
+    assert "brightness(0." in dark_slide_rule
+    assert "opacity: 0." in dark_active_slide_rule

@@ -21,6 +21,17 @@ def test_export_confirm_view_helper_loads_before_app_script():
     assert helper_index < app_index
 
 
+def test_export_confirm_controller_lists_output_names_per_profile():
+    source = (FRONTEND_DIR / "app-modal-render-controller.js").read_text(encoding="utf-8")
+    confirm_block = source.split("function exportConfirmHtml(risks) {", 1)[1].split("function batchDetailHtml()", 1)[0]
+
+    assert "exportConfirmSummaryRows" in confirm_block
+    assert "exportConfirmOutputNameRows" in source
+    assert "outputNameForProfile(profile)" in source
+    assert 'label: "Nombres de salida"' in source
+    assert '["Nombre", namingExample()]' not in confirm_block
+
+
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
 def test_export_confirm_view_renders_existing_modal_contract():
     script = f"""
@@ -45,6 +56,23 @@ assert.equal(readyHtml.includes('<h3>Avisos</h3>'), true);
 assert.equal(readyHtml.includes('<div class="export-confirm-risk ready">'), true);
 assert.equal(readyHtml.includes('Sin avisos'), true);
 assert.equal(readyHtml.includes('Archivos existentes'), false);
+
+const multiOutputHtml = helpers.exportConfirmHtml({{
+  risks: [],
+  summaryRows: [
+    {{ label: "Formatos", value: "3 formatos", items: ["Percha web (JPG)", "Zalando (JPG)", "JPG Baja (JPG)"] }},
+    {{ label: "Nombres de salida", items: [
+      {{ label: "Percha web (JPG)", value: "Capa 1.jpg" }},
+      {{ label: "Zalando (JPG)", value: "Capa 1.jpg" }},
+      {{ label: "JPG Baja (JPG)", value: "Capa 1.jpg" }},
+    ] }},
+  ],
+}});
+assert.equal(multiOutputHtml.includes('class="export-confirm-summary__item has-list"'), true);
+assert.equal(multiOutputHtml.includes("<span>Nombres de salida</span>"), true);
+assert.equal(multiOutputHtml.includes("Percha web (JPG)"), true);
+assert.equal(multiOutputHtml.includes('title="Capa 1.jpg"'), true);
+assert.equal(multiOutputHtml.includes("Capa 1_PRO.jpg"), false);
 
 const riskHtml = helpers.exportConfirmRiskHtml({{
   blocking: true,

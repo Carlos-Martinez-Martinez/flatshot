@@ -226,6 +226,26 @@ def test_bridge_http_pick_folder_rejects_invalid_initial_path(tmp_path):
     assert data["error"]["code"] == "invalid_request"
 
 
+def test_bridge_http_open_onboarding_assets_folder(tmp_path):
+    opened: list[Path] = []
+    service = FlatShotBridgeService(
+        config_resolver=ConfigPathResolver(tmp_path / "config"),
+        folder_opener=lambda path: opened.append(path),
+    )
+
+    with running_bridge(tmp_path / "config", service=service) as port:
+        status, data = request_json(port, "POST", "/assets/onboarding/open", {})
+        get_status, get_data = request_json(port, "GET", "/assets/onboarding/open")
+
+    assets_dir = Path(data["path"])
+    assert status == 200
+    assert data["ok"] is True
+    assert assets_dir.name == "onboarding"
+    assert opened == [assets_dir]
+    assert get_status == 405
+    assert get_data["error"]["code"] == "method_not_allowed"
+
+
 def test_bridge_http_render_preview(tmp_path):
     source = tmp_path / "source"
     source.mkdir()

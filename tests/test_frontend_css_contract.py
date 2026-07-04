@@ -90,6 +90,24 @@ def test_css_modules_keep_cascade_contract():
         assert "{" in payload, f"{path} is linked but has no active rules"
 
 
+def test_css_cascade_inventory_matches_current_runtime_order():
+    inventory = (PROJECT_ROOT / "docs" / "CSS_CASCADE_INVENTORY.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "`css/06-inspector-export/background-presets.css`" in inventory
+    for index, stylesheet in enumerate(audit_css.CSS_MODULE_ORDER, start=1):
+        assert f"{index}. `{stylesheet}`" in inventory
+
+
+def test_css_audit_reports_no_unreferenced_runtime_classes():
+    assert audit_css.unreferenced_css_classes(FRONTEND_DIR) == {}
+
+
+def test_css_audit_reports_no_unreferenced_runtime_ids():
+    assert audit_css.unreferenced_css_ids(FRONTEND_DIR) == {}
+
+
 def test_primary_button_tokens_meet_normal_text_contrast():
     tokens = (FRONTEND_DIR / "css" / "00-settings" / "tokens.css").read_text(encoding="utf-8")
     primary = css_token_value(tokens, "--color-primary")
@@ -1079,7 +1097,17 @@ def test_responsive_module_consolidates_adjacent_media_blocks():
     ).read_text(encoding="utf-8")
     media_queries = re.findall(r"@media\s*\(([^)]+)\)\s*{", responsive_css)
 
-    assert len(media_queries) == 10
+    assert media_queries == [
+        "min-width: 1600px",
+        "max-width: 1360px",
+        "max-width: 1500px",
+        "max-width: 1240px",
+        "max-width: 1280px",
+        "max-width: 1180px",
+        "max-width: 1120px",
+        "max-width: 1080px",
+        "max-width: 720px",
+    ]
     assert all(
         current != following
         for current, following in zip(media_queries, media_queries[1:], strict=False)
@@ -1227,7 +1255,7 @@ def test_active_output_row_main_keeps_grid_layout_when_selectable():
         / "output-profiles.css"
     ).read_text(encoding="utf-8")
 
-    assert ":where(button[data-action]" in buttons_css
+    assert "button:where([data-action]" in buttons_css
     assert ":where(:not(.primary):not(.active)" in buttons_css
     assert ":not(.active-output-row__main)" not in buttons_css
     assert "button.active-output-row__main {\n  cursor: pointer;" in output_profiles_css

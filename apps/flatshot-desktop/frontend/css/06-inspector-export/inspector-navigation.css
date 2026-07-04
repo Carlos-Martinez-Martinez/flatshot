@@ -1,31 +1,6 @@
 @layer flatshot {
 /* Inspector/export: background switch, tabs and subview navigation. */
 
-.inspector-background-switch {
-  width: 100%;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  min-width: 0;
-  display: grid;
-  gap: var(--space-1);
-  border: 0;
-  background: transparent;
-  padding: 0;
-}
-
-.inspector-background-switch::before {
-  display: none;
-  content: none;
-}
-
-.inspector-background-switch button {
-  min-width: 0;
-  min-height: var(--control-height);
-  padding: 0 var(--space-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .settings-panel details.inspector-disclosure .inspector-disclosure__body {
   box-sizing: border-box;
   max-height: var(--inspector-disclosure-height, 0px);
@@ -105,10 +80,6 @@
   border-color: var(--border-emphasis);
 }
 
-.inspector-card--quiet {
-  background: var(--surface-muted);
-}
-
 .inspector-card__head, .inspector-subview-head {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
@@ -139,27 +110,7 @@
   font-size: var(--font-size-sm);
 }
 
-.inspector-card__list {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.inspector-card__list span {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--text-secondary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--font-size-sm);
-}
-
-.inspector-card__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.inspector-card__actions button, .inspector-subview-head button {
+.inspector-subview-head button {
   min-height: var(--control-height);
 }
 

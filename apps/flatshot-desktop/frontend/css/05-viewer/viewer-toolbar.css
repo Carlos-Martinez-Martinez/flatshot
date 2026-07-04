@@ -1,12 +1,12 @@
 @layer flatshot {
 /* Viewer: preview header, mode controls and zoom/navigation. */
-.brand-block, .top-summary, .top-actions, .bottom-actions, .preview-toolbar, .zoom-controls, .button-row, .batch-actions { min-width: 0; display: flex; align-items: center; gap: var(--space-2); }
+.brand-block, .top-summary, .top-actions, .bottom-actions, .preview-toolbar, .zoom-controls, .button-row { min-width: 0; display: flex; align-items: center; gap: var(--space-2); }
 .brand-copy, .preview-title-block, .image-copy, .folder-item > div, .section-title > div { min-width: 0; }
-.brand-copy strong, .brand-copy span, .source-panel-heading strong, .source-panel-heading span, .folder-item strong, .folder-item small, .image-copy strong, .image-copy small, .preview-title-block h2, .preview-title-block span, #top-status-text, #preview-meta, #bottom-status, .summary-note, .result-path strong, .result-issues span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.panel-heading, .section-title, .source-panel-heading { min-width: 0; display: flex; justify-content: space-between; gap: var(--space-3); }
-.panel-heading, .source-panel-heading { align-items: center; }
+.brand-copy strong, .brand-copy span, .source-panel-heading strong, .source-panel-heading span, .folder-item strong, .folder-item small, .image-copy strong, .image-copy small, .preview-title-block h2, .preview-title-block span, #top-status-text, #preview-meta, #bottom-status, .result-path strong, .result-issues span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.section-title, .source-panel-heading { min-width: 0; display: flex; justify-content: space-between; gap: var(--space-3); }
+.source-panel-heading { align-items: center; }
 .app-shell.no-selected-image .preview-toolbar { opacity: 0; pointer-events: none; }
-.app-shell.no-selected-image .background-switch, .app-shell[data-ui-state="no_folder"] .preview-header, .app-shell[data-ui-state="no_folder"] .filmstrip-panel, .app-shell[data-ui-state="no_folder"] .preview-footer, .app-shell[data-ui-state="batch_empty"] .preview-header, .app-shell[data-ui-state="batch_empty"] .filmstrip-panel, .app-shell[data-ui-state="batch_empty"] .preview-footer, .app-shell[data-ui-state="scan_empty"] .preview-header, .app-shell[data-ui-state="scan_empty"] .filmstrip-panel, .app-shell[data-ui-state="scan_empty"] .preview-footer, .app-shell[data-ui-state="scanning"] .preview-header, .app-shell[data-ui-state="scanning"] .filmstrip-panel, .app-shell[data-ui-state="scanning"] .preview-footer { display: none; }
+.app-shell.no-selected-image .background-switch, .app-shell:is([data-ui-state="no_folder"], [data-ui-state="batch_empty"], [data-ui-state="scan_empty"], [data-ui-state="scanning"]) :is(.preview-header, .preview-footer) { display: none; }
 
 .preview-header {
   min-width: 0;

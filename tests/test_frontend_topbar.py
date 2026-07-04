@@ -125,4 +125,5 @@ def test_dev_review_controls_are_hidden_outside_dev_mode():
     assert '<details class="debug-panel dev-only" id="debug-panel">' in html
     assert 'data-action="open-qa-lab"' in html
     assert '<details class="review-panel dev-only">' not in html
-    assert "html:not(.dev-mode) .dev-only" in debug_css
+    assert "html:not(.dev-mode) :is(" in debug_css
+    assert ".dev-only" in debug_css

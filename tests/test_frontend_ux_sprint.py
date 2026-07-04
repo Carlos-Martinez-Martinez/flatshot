@@ -341,8 +341,9 @@ def test_responsive_inspector_has_drawer_toggle_under_1120px():
     assert '.app-shell[data-responsive-inspector="true"] .settings-panel' in responsive
     assert ".top-inspector-action" in responsive
     assert ".top-inspector-action {\n  display: none;" in topbar
-    assert ".top-inspector-action, .top-more-menu > summary" in topbar
-    assert ":where(button[data-action]" in buttons
+    assert ":is(.top-format-action, .top-folder-action, .top-secondary-action, .top-theme-action, .top-inspector-action), .top-preferences-menu > summary" in topbar
+    assert ".top-more-menu" not in topbar
+    assert "button:where([data-action]" in buttons
     assert ":not(.top-inspector-action)" not in buttons
 
 

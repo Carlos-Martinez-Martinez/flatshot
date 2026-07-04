@@ -93,76 +93,6 @@
   order: -1;
 }
 
-.export-state-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3);
-  border: var(--border-width) solid var(--line-soft);
-  border-radius: var(--radius-md);
-  background: var(--bg-panel-muted);
-  padding: var(--space-3);
-}
-
-.export-state-card span, .export-state-card em {
-  color: var(--text-muted);
-  font-size: var(--font-size-xs);
-  font-style: normal;
-}
-
-.export-state-card strong {
-  display: block;
-  margin-top: 2px;
-  color: var(--text-strong);
-  font-size: var(--font-size-md);
-}
-
-.export-state-card.ready {
-  border-color: var(--accent-border);
-  background: var(--accent-muted);
-}
-
-.export-state-card.warning, .export-state-card.running {
-  border-color: var(--warning-line);
-  background: var(--warning-soft);
-}
-
-.export-state-card.error {
-  border-color: var(--danger-line);
-  background: var(--danger-soft);
-}
-
-.export-config-list {
-  display: grid;
-  gap: 7px;
-  border: var(--border-width) solid var(--line-soft);
-  border-radius: var(--radius-10);
-  background: var(--bg-panel);
-  padding: 10px var(--space-3);
-}
-
-.export-config-list div {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 76px minmax(0, 1fr);
-  gap: var(--space-2-5);
-}
-
-.export-config-list span {
-  color: var(--text-muted);
-  font-size: var(--font-size-xs);
-}
-
-.export-config-list strong {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--text-strong);
-  text-align: right;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--font-size-xs);
-}
-
 .settings-panel:not(.is-editing-output) .export-section .form-grid, .settings-panel:not(.is-editing-output) .export-section > .text-field {
   display: none;
 }
@@ -180,11 +110,11 @@
   order: -2;
 }
 
-.export-state-card, .export-config-list, .preflight-list {
+.settings-panel .preflight-list {
   display: none;
 }
 
-.settings-panel.is-editing-output .export-state-card, .settings-panel.is-editing-output .export-config-list, .settings-panel.is-editing-output .preflight-list {
+.settings-panel.is-editing-output .preflight-list {
   display: grid;
 }
 
@@ -192,7 +122,7 @@
   display: none;
 }
 
-.review-background-panel, .preset-summary-card, .compact-panel, .warning-summary, .context-panel, .export-result, .issue-list {
+.preset-summary-card, .compact-panel, .warning-summary, .context-panel, .export-result, .issue-list {
   min-width: 0;
 }
 
@@ -243,19 +173,13 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.processing-card__controls, .selected-image-card__adjustment {
-  display: grid;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
 .processing-card__controls label {
   display: grid;
   gap: var(--space-1);
   min-width: 0;
 }
 
-.processing-card__controls label > span, .selected-image-card__adjustment > span {
+.processing-card__controls label > span {
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
@@ -267,7 +191,7 @@
   width: 100%;
 }
 
-.processing-card__controls > button, .selected-image-card__adjustment button {
+.processing-card__controls > button {
   min-height: var(--control-size-compact);
 }
 
@@ -276,6 +200,8 @@
 }
 
 .processing-card__controls {
+  min-width: 0;
+  display: grid;
   grid-column: 1 / -1;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;

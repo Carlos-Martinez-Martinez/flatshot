@@ -3,7 +3,7 @@
 
 /* Inspector/export: presets, adjustment controls and local overrides. */
 
-.brand-copy span, .eyebrow, .text-field span, .form-grid span, .advanced-grid span, .search-field span, .status-grid span, small {
+.brand-copy span, .eyebrow, .text-field span, .form-grid span, .search-field span, small {
   color: var(--text-secondary);
 }
 
@@ -13,13 +13,6 @@
 
 .settings-panel .appearance-section .inspector-disclosure__body {
   padding: 10px var(--space-4) var(--space-3);
-}
-
-.settings-panel .advanced-block .advanced-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4) var(--space-4);
 }
 
 .settings-panel .control-stack {
@@ -45,13 +38,6 @@
   padding: var(--space-3) var(--space-4) var(--space-4);
 }
 
-.advanced-block .advanced-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4) var(--space-4);
-}
-
 .local-adjustment__body {
   gap: var(--space-2);
 }
@@ -74,11 +60,6 @@
   white-space: nowrap;
 }
 
-.advanced-grid label, .form-grid label, .text-field {
-  display: grid;
-  gap: var(--space-1-5);
-}
-
 .local-adjustment__body span {
   display: block;
   color: var(--text-secondary);
@@ -89,7 +70,7 @@
   background: var(--warning-soft);
 }
 
-.settings-panel .search-field input, .settings-panel .text-field input, .settings-panel .form-grid select, .settings-panel .advanced-grid input, .settings-panel .advanced-grid select {
+.settings-panel .search-field input, .settings-panel .text-field input, .settings-panel .form-grid select {
   border-color: var(--line-soft);
   border-radius: var(--radius-sm);
   background: var(--bg-panel);
@@ -139,7 +120,7 @@
   grid-template-columns: 76px minmax(0, 1fr);
 }
 
-.preset-list, .button-row, .inspector-actions {
+.preset-list, .button-row {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);

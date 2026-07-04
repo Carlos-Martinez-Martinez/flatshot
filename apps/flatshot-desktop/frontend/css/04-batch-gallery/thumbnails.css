@@ -168,10 +168,6 @@
   position: static;
 }
 
-button, .status-dot, .asset-state, .preflight-chip, .change-chip, .state-chip {
-  user-select: none;
-}
-
 .gallery-column .asset-state.warning > span, .gallery-column .asset-state.warning em {
   color: var(--color-warning);
 }

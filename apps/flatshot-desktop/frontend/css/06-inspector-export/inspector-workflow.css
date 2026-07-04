@@ -10,26 +10,6 @@
   padding: 0 0 var(--space-4);
 }
 
-.inspector-summary__main {
-  min-width: 0;
-  display: grid;
-  gap: var(--space-0-75);
-}
-
-.inspector-summary__main strong {
-  color: var(--color-text);
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-bold);
-}
-
-.inspector-summary__main small {
-  overflow: hidden;
-  color: var(--color-muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--font-size-sm);
-}
-
 .inspector-alert {
   display: grid;
   gap: var(--space-2);
@@ -82,18 +62,6 @@
   display: grid;
   gap: var(--space-0-5);
   grid-template-columns: minmax(0, 1fr);
-}
-
-.inspector-card__actions button {
-  min-height: var(--control-height);
-  border-color: var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text);
-}
-
-.inspector-card__actions button:hover:not(:disabled) {
-  border-color: var(--color-border-strong);
-  background: var(--color-bg-soft);
 }
 
 .settings-panel.is-editing-output {

@@ -75,7 +75,7 @@
   color: var(--text-secondary);
 }
 
-.real-preview-placeholder .path-line, .result-path strong, #preview-meta, #footer-destination {
+.real-preview-placeholder .path-line, .result-path strong, #preview-meta {
   user-select: text;
 }
 

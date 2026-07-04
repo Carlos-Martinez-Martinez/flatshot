@@ -56,42 +56,6 @@
   cursor: pointer;
 }
 
-.advanced-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-  padding: 0 var(--space-4) var(--space-4);
-  margin-top: 0;
-}
-
-.advanced-grid label {
-  min-width: 0;
-}
-
-.advanced-grid input, .advanced-grid select {
-  width: 100%;
-  height: var(--control-size-lg);
-  min-width: 0;
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-panel);
-  padding: 0 var(--space-3);
-  color: var(--color-text);
-  font-size: var(--font-size-md);
-}
-
-.advanced-grid input[type="checkbox"] {
-  width: 28px;
-  height: var(--control-size-sm);
-  justify-self: start;
-  padding: 0;
-  accent-color: var(--color-accent);
-}
-
-.advanced-grid .advanced-wide {
-  grid-column: 1 / -1;
-}
-
 .preset-group-heading {
   min-width: 0;
   display: flex;

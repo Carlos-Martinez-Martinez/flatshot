@@ -1,10 +1,6 @@
 @layer flatshot {
 /* Layout: app shell and workspace grid. */
 
-.app-shell[data-ui-state="scanning"] #batch-visible-count, .app-shell[data-ui-state="no_folder"] #batch-visible-count, .app-shell[data-ui-state="batch_empty"] #batch-visible-count, .app-shell[data-ui-state="scan_empty"] #batch-visible-count {
-  display: none;
-}
-
 .dev-status-strip {
   display: grid;
   gap: var(--space-1-5);

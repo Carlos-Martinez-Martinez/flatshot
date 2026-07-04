@@ -1,7 +1,7 @@
 @layer flatshot {
 /* Batch and gallery: image grid/list items and text layout. */
 
-.brand-copy strong, .brand-copy span, .source-panel-heading strong, .source-panel-heading span, .folder-item strong, .folder-item small, .image-copy strong, .image-copy small, .text-field span, .form-grid span, .advanced-grid span {
+.brand-copy strong, .brand-copy span, .source-panel-heading strong, .source-panel-heading span, .folder-item strong, .folder-item small, .image-copy strong, .image-copy small, .text-field span, .form-grid span {
   display: block;
 }
 
@@ -15,10 +15,6 @@
 
 .image-item.exported {
   box-shadow: inset 0 0 0 var(--border-width) var(--primary-alpha-32);
-}
-
-.app-shell[data-ui-state="no_folder"] .search-field, .app-shell[data-ui-state="no_folder"] .folder-list, .app-shell[data-ui-state="no_folder"] .batch-filter, .app-shell[data-ui-state="no_folder"] .image-list, .app-shell[data-ui-state="no_folder"] .empty-note {
-  display: none;
 }
 
 .image-list {
@@ -463,7 +459,7 @@
   transition: opacity var(--duration-quick) var(--ease-standard);
 }
 
-.app-shell[data-file-name-display="hover"] .gallery-column[data-gallery-view="thumbs"] .image-item:hover .image-copy, .app-shell[data-file-name-display="hover"] .gallery-column[data-gallery-view="thumbs"] .image-item:focus-visible .image-copy, .app-shell[data-file-name-display="hover"] .gallery-column[data-gallery-view="thumbs"] .image-item.active .image-copy {
+.app-shell[data-file-name-display="hover"] .gallery-column[data-gallery-view="thumbs"] .image-item:is(:hover, :focus-visible, .active) .image-copy {
   opacity: 1;
 }
 

@@ -36,14 +36,6 @@
     padding-inline: var(--space-3);
   }
 
-  .status-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 0.7fr);
-  }
-
-  .status-grid div:nth-child(2), .status-grid div:nth-child(4) {
-    display: none;
-  }
-
   .top-bar-main {
     gap: var(--space-3);
     padding-inline: var(--space-3);
@@ -108,9 +100,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .preview-toolbar {
-    justify-content: flex-start;
-  }
 }
 
 @media (max-width: 1280px) {
@@ -191,12 +180,6 @@
   }
 }
 
-@media (max-width: 720px) {
-  .export-confirm-summary {
-    grid-template-columns: 1fr;
-  }
-}
-
 @media (max-width: 1080px) {
   .app-shell[data-ui-state="no_folder"] .workspace, .app-shell[data-ui-state="batch_empty"] .workspace, .app-shell[data-ui-state="scan_empty"] .workspace, .app-shell[data-ui-state="scanning"] .workspace {
     grid-template-columns: minmax(0, 1fr);
@@ -204,10 +187,6 @@
 
   .settings-panel {
     display: none;
-  }
-
-  #app-settings-modal .app-settings-content {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .format-form-section .form-grid, .settings-panel.is-editing-output .export-section .form-grid {
@@ -244,6 +223,10 @@
 }
 
 @media (max-width: 720px) {
+  .export-confirm-summary {
+    grid-template-columns: 1fr;
+  }
+
   .app-shell {
     grid-template-rows: auto minmax(0, 1fr) var(--footer-height);
   }

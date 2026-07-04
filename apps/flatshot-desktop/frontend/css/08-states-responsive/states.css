@@ -18,7 +18,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
     box-shadow: none;
   }
 
-  button, input, select, summary, .image-item, .modal-card, .export-state-card, .preflight-item {
+  button, input, select, summary, .image-item, .preflight-item {
     border-color: CanvasText;
   }
 }
@@ -303,11 +303,6 @@ button.primary:hover:not(:disabled) {
   white-space: pre-wrap; user-select: text;
 }
 
-.top-more-menu__content button:hover:not(:disabled) {
-  border-color: var(--color-border);
-  background: var(--color-bg-soft);
-}
-
 .ghost-action:hover:not(:disabled) {
   border-color: var(--color-accent-border);
   background: var(--color-primary-soft);
@@ -341,11 +336,20 @@ button.primary:hover:not(:disabled) {
   color: var(--color-text-inverse);
 }
 
-.app-shell[data-ui-state="no_folder"] .gallery-column, .app-shell[data-ui-state="scanning"] .gallery-column, .app-shell[data-ui-state="batch_empty"] .gallery-column, .app-shell[data-ui-state="scan_empty"] .gallery-column, .app-shell[data-ui-state="no_folder"] .settings-panel, .app-shell[data-ui-state="scanning"] .settings-panel {
+.app-shell:is([data-ui-state="scanning"], [data-ui-state="no_folder"], [data-ui-state="batch_empty"], [data-ui-state="scan_empty"]) :is(#batch-visible-count, .gallery-search, .gallery-filter, .gallery-view-switch) {
   display: none;
 }
 
-:root[data-motion="reduced"] .thumb-skeleton, :root[data-motion="reduced"] .onboarding-background__slide, :root[data-motion="reduced"] .app-settings-backdrop, :root[data-motion="reduced"] .app-settings-backdrop > section, :root[data-motion="reduced"] .image-item {
+.app-shell:is([data-ui-state="no_folder"], [data-ui-state="scanning"], [data-ui-state="batch_empty"], [data-ui-state="scan_empty"]) .gallery-column,
+.app-shell:is([data-ui-state="no_folder"], [data-ui-state="scanning"]) .settings-panel {
+  display: none;
+}
+
+.app-shell[data-ui-state="no_folder"] :is(.search-field, .folder-list, .batch-filter, .image-list, .empty-note) {
+  display: none;
+}
+
+:root[data-motion="reduced"] :is(.thumb-skeleton, .onboarding-background__slide, .app-settings-backdrop, .app-settings-backdrop > section, .image-item) {
   animation: none;
   transition: none;
   transform: none;

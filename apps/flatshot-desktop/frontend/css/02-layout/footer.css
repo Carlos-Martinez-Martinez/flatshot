@@ -1,10 +1,6 @@
 @layer flatshot {
 /* Layout: bottom status bar and export controls. */
 
-.status-grid div, .progress-block {
-  min-width: 0;
-}
-
 .bottom-actions button:hover:not(:disabled) {
   background: var(--surface-muted);
   color: var(--text-primary);

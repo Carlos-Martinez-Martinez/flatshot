@@ -1,19 +1,19 @@
 @layer flatshot {
 /* Inspector/export: summary, selected image and compact card rows. */
 
-.inspector-summary__main, .inspector-output-card__head, .inspector-output-card__grid span, .inspector-compact-row > div, .inspector-alert__head {
+.inspector-output-card__head, .inspector-compact-row > div, .inspector-alert__head {
   min-width: 0;
   display: grid;
   gap: var(--space-0-75);
 }
 
-.inspector-summary__main span, .inspector-output-card__head span, .inspector-compact-row span, .inspector-alert__head span {
+.inspector-output-card__head span, .inspector-compact-row span, .inspector-alert__head span {
   color: var(--color-muted);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
 }
 
-.inspector-summary__main small, .inspector-compact-row small, .inspector-alert__list span {
+.inspector-compact-row small, .inspector-alert__list span {
   overflow: hidden;
   color: var(--color-muted);
   text-overflow: ellipsis;
@@ -21,7 +21,7 @@
   font-size: var(--font-size-xs);
 }
 
-.inspector-output-card__grid strong, .inspector-compact-row strong, .inspector-alert__head strong {
+.inspector-compact-row strong, .inspector-alert__head strong {
   overflow: hidden;
   color: var(--color-text);
   text-overflow: ellipsis;
@@ -34,7 +34,7 @@
   min-width: 0;
 }
 
-.inspector-summary__action button, .inspector-output-card__actions button, .inspector-compact-row button, .inspector-alert__actions button {
+.inspector-output-card__actions button, .inspector-compact-row button, .inspector-alert__actions button {
   min-height: var(--control-height);
   border-color: transparent;
   background: transparent;
@@ -42,7 +42,7 @@
   font-weight: var(--font-weight-semibold);
 }
 
-.inspector-summary__action button:hover:not(:disabled), .inspector-output-card__actions button:hover:not(:disabled), .inspector-compact-row button:hover:not(:disabled), .inspector-alert__actions button:hover:not(:disabled) {
+.inspector-output-card__actions button:hover:not(:disabled), .inspector-compact-row button:hover:not(:disabled), .inspector-alert__actions button:hover:not(:disabled) {
   border-color: var(--color-accent-border);
   background: var(--color-primary-soft);
   color: var(--semantic-selection);
@@ -55,45 +55,6 @@
   white-space: nowrap;
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-bold);
-}
-
-.inspector-output-card__grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
-}
-
-.inspector-output-card__grid em {
-  color: var(--color-muted);
-  font-size: var(--font-size-xs);
-  font-style: normal;
-  font-weight: var(--font-weight-medium);
-}
-
-.inspector-output-card__details {
-  min-width: 0;
-  display: grid;
-  gap: var(--space-1);
-  border-top: var(--border-width) solid color-mix(in srgb, var(--color-primary) 16%, transparent);
-  padding-top: var(--space-3);
-}
-
-.inspector-output-card__details span, .inspector-output-card__details strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.inspector-output-card__details span {
-  color: var(--color-muted);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
-}
-
-.inspector-output-card__details strong {
-  color: var(--color-text);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
 }
 
 .inspector-output-card__actions button {
@@ -151,7 +112,7 @@
   min-width: 0;
 }
 
-.inspector-output-card__head strong, .inspector-output-card__head small, .inspector-summary__main strong, .inspector-summary__main small, .inspector-compact-row strong, .inspector-compact-row small {
+.inspector-output-card__head strong, .inspector-output-card__head small, .inspector-compact-row strong, .inspector-compact-row small {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -173,12 +134,6 @@
   grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
   gap: var(--space-2-5);
-}
-
-.selected-image-card__adjustment > div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1-5);
 }
 
 .panel-summary-card, .inspector-output-card.panel-summary-card, .inspector-compact-row.panel-summary-card {

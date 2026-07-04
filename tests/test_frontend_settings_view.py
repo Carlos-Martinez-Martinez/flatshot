@@ -85,7 +85,7 @@ def test_studio_lighting_panel_css_keeps_active_preset_filled_and_unclipped():
     active_rule = css.split(".lighting-scene-toolbar button.active {", 1)[1].split("}", 1)[0]
     assert "background: var(--color-accent)" in active_rule
     assert "color: var(--color-text-inverse)" in active_rule
-    assert ":where(button[data-action]" in buttons_css
+    assert "button:where([data-action]" in buttons_css
     assert "button:not(.primary):not(.active)" not in buttons_css
     assert "button:hover:not(:disabled):not(.active)" in states_css
     assert ".settings-panel details.advanced-block[open] { overflow: visible; }" in css

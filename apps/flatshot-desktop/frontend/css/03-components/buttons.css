@@ -40,7 +40,7 @@ button, summary {
   user-select: none;
 }
 
-:where(button[data-action], button[data-filter], button[data-gallery-view], button[data-preview-mode], button[data-preview-bg], button[data-lighting-preset], button[data-review-scenario], button[data-inspector-tab], button[data-output-profile-close], button[data-output-profile-reset], button[data-output-profile-save]) {
+button:where([data-action], [data-filter], [data-gallery-view], [data-preview-mode], [data-preview-bg], [data-lighting-preset], [data-review-scenario], [data-inspector-tab], [data-output-profile-close], [data-output-profile-reset], [data-output-profile-save]) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -68,12 +68,7 @@ button, summary {
   stroke-linejoin: round;
 }
 
-.button-icon--fill svg {
-  fill: currentColor;
-  stroke: none;
-}
-
-button, .status-dot, .asset-state, .preflight-chip, .change-chip, .state-chip, .empty-output-chip {
+.status-dot, .asset-state, .preflight-chip, .change-chip, .state-chip {
   user-select: none;
 }
 
@@ -106,7 +101,7 @@ button.primary {
   color: var(--semantic-selection);
 }
 
-:where(button[data-action], button[data-filter], button[data-gallery-view], button[data-preview-mode], button[data-preview-bg], button[data-lighting-preset], button[data-review-scenario], button[data-inspector-tab], button[data-output-profile-close], button[data-output-profile-reset], button[data-output-profile-save]):where(:not(.primary):not(.active):not(.danger):not(.danger-subtle):not(.btn-linklike):not(.ghost-action):not(.icon-button)) {
+button:where([data-action], [data-filter], [data-gallery-view], [data-preview-mode], [data-preview-bg], [data-lighting-preset], [data-review-scenario], [data-inspector-tab], [data-output-profile-close], [data-output-profile-reset], [data-output-profile-save]):where(:not(.primary):not(.active):not(.danger):not(.danger-subtle):not(.btn-linklike):not(.ghost-action):not(.icon-button)) {
   border-color: var(--border-default);
   background: var(--surface-panel);
   color: var(--text-secondary);
@@ -129,14 +124,6 @@ button.primary {
   border-color: transparent;
   background: transparent;
   padding-inline: var(--space-2);
-}
-
-.top-more-menu__content button {
-  width: 100%;
-  justify-content: flex-start;
-  border-color: transparent;
-  background: transparent;
-  color: var(--color-text);
 }
 
 .empty-state.onboarding .primary {

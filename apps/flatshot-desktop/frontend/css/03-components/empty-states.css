@@ -16,7 +16,6 @@
 }
 .empty-state strong { color: var(--text-strong); font-size: var(--font-size-lg); line-height: var(--line-height-tight); }
 .empty-state span:not(.empty-icon), .empty-state small { max-width: 420px; color: var(--text-secondary); font-size: var(--font-size-sm); }
-.filmstrip-panel .empty-note { min-height: 0; margin: 0; align-self: stretch; }
 .empty-note, .empty-state { color: var(--text-secondary); }
 
 .empty-state.onboarding {

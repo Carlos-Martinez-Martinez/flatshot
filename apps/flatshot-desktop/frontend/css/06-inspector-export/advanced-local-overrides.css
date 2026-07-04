@@ -125,7 +125,7 @@
 
 .settings-panel[data-shadow-engine="studio_2_5d"] [data-engine-row="direction"] { display: none; }
 
-.settings-panel .preset-section, .settings-panel .appearance-section, .settings-panel .review-background-panel, .settings-panel .advanced-block, .settings-panel .local-adjustment {
+.settings-panel .preset-section, .settings-panel .appearance-section, .settings-panel .advanced-block, .settings-panel .local-adjustment {
   margin: 0;
 }
 
@@ -134,7 +134,7 @@
   padding-top: var(--space-3);
 }
 
-.preset-section, .appearance-section, .review-background-panel, .advanced-block, .local-adjustment {
+.preset-section, .appearance-section, .advanced-block, .local-adjustment {
   border-radius: var(--radius-sm);
 }
 

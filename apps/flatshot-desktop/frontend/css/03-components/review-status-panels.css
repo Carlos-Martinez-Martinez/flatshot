@@ -1,30 +1,6 @@
 @layer flatshot {
 /* Components: review result panels and compact batch result summaries. */
 
-.review-background-panel {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  border-radius: var(--radius-md);
-  padding: var(--space-2);
-  gap: var(--space-2);
-  align-items: stretch;
-  border: var(--border-width) solid var(--color-border);
-  background: var(--color-bg-soft);
-}
-
-.review-background-panel .section-title {
-  display: flex;
-}
-
-.review-background-panel .eyebrow {
-  display: inline;
-}
-
-.review-background-panel .section-title strong {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-}
-
 #review-summary {
   display: grid;
   gap: var(--space-3);
@@ -42,35 +18,10 @@
   min-width: 0;
 }
 
-.review-facts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-2);
-}
-
-.review-facts > div {
-  min-width: 0;
-  display: grid;
-  gap: var(--space-0-5);
-  border: var(--border-width) solid var(--ui-border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-alpha-62);
-  padding: var(--space-2);
-}
-
-.review-facts span, .review-output-card .eyebrow {
+.review-output-card .eyebrow {
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
-}
-
-.review-facts strong {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--color-text-strong);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--font-size-sm);
 }
 
 .review-issue-list {

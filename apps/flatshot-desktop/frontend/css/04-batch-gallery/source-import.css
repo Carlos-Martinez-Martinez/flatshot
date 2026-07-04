@@ -119,12 +119,7 @@
   text-transform: uppercase;
 }
 
-.batch-source__actions {
-  display: flex;
-  gap: var(--space-1-5);
-}
-
-.batch-source__actions button, .batch-source__toolbar button, .source-path-panel__scan, .batch-source__refresh {
+.batch-source__toolbar button, .source-path-panel__scan {
   min-height: 26px;
   border-color: var(--rail-border);
   border-radius: var(--radius-sm);
@@ -135,7 +130,7 @@
   font-weight: var(--font-weight-bold);
 }
 
-.batch-source__actions button:hover:not(:disabled), .batch-source__toolbar button:hover:not(:disabled), .source-path-panel__scan:hover:not(:disabled), .batch-source__refresh:hover:not(:disabled) {
+.batch-source__toolbar button:hover:not(:disabled), .source-path-panel__scan:hover:not(:disabled) {
   border-color: var(--color-accent-border);
   background: var(--rail-accent-soft);
   color: var(--rail-accent);
@@ -248,14 +243,6 @@
 
 .source-panel.batch-rail__source .batch-source__toolbar {
   justify-self: end;
-}
-
-.batch-source__refresh {
-  color: var(--rail-muted);
-  font-size: var(--font-size-base);
-  width: var(--control-size-compact);
-  min-width: var(--control-size-compact);
-  padding: 0;
 }
 
 .batch-diagnostics summary, .advanced-block summary {

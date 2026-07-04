@@ -65,6 +65,8 @@ COMMENT_RE = re.compile(r"/\*.*?\*/", re.S)
 LINK_RE = re.compile(r"<link\b[^>]*\brel=[\"']stylesheet[\"'][^>]*\bhref=[\"']([^\"']+)[\"']", re.I)
 TOKEN_RE = re.compile(r"(?m)^\s*(--[A-Za-z0-9_-]+)\s*:")
 ROOT_RE = re.compile(r"(?m)^\s*:root\s*\{")
+CLASS_SELECTOR_RE = re.compile(r"\.(-?[_a-zA-Z][_a-zA-Z0-9-]*)")
+ID_SELECTOR_RE = re.compile(r"#(-?[_a-zA-Z][_a-zA-Z0-9-]*)")
 LEGACY_STATE_CLASS_RE = re.compile(
     r"\.app-shell\.(?:no-batch|empty-batch|has-batch|has-status-footer|is-exporting|is-scanning|is-output-editing)"
 )
@@ -72,6 +74,15 @@ CSS_LAYER_NAME = "flatshot"
 CSS_TOTAL_LINE_LIMIT = 12_000
 CSS_IMPORTANT_LIMIT = 10
 CSS_FILE_LINE_LIMIT = 650
+DYNAMIC_RUNTIME_CLASSES = {
+    "bg-custom",
+    "bg-rgb230",
+    "bg-transparent",
+    "bg-white",
+    "guide-line--x",
+    "guide-line--y",
+}
+DYNAMIC_RUNTIME_IDS: set[str] = set()
 
 
 def strip_comments(text: str) -> str:
@@ -229,6 +240,83 @@ def duplicated_selector_groups_same_context(paths: list[Path]) -> dict[str, dict
     }
 
 
+def frontend_runtime_sources(frontend_dir: Path) -> str:
+    source_paths = [
+        path
+        for path in frontend_dir.rglob("*")
+        if path.is_file()
+        and path.suffix in {".html", ".js"}
+        and "css" not in path.parts
+    ]
+    return "\n".join(path.read_text(encoding="utf-8", errors="ignore") for path in source_paths)
+
+
+def selector_class_locations(paths: list[Path]) -> dict[str, list[str]]:
+    class_locations: dict[str, list[str]] = defaultdict(list)
+    for _context, selector, location in iter_rule_selectors(paths):
+        for class_name in CLASS_SELECTOR_RE.findall(selector):
+            class_locations[class_name].append(location)
+    return {
+        class_name: locations
+        for class_name, locations in sorted(class_locations.items())
+    }
+
+
+def selector_id_locations(paths: list[Path]) -> dict[str, list[str]]:
+    id_locations: dict[str, list[str]] = defaultdict(list)
+    for _context, selector, location in iter_rule_selectors(paths):
+        for id_name in ID_SELECTOR_RE.findall(selector):
+            id_locations[id_name].append(location)
+    return {
+        id_name: locations
+        for id_name, locations in sorted(id_locations.items())
+    }
+
+
+def source_mentions_class(source: str, class_name: str) -> bool:
+    return re.search(
+        rf"(?<![A-Za-z0-9_-]){re.escape(class_name)}(?![A-Za-z0-9_-])",
+        source,
+    ) is not None
+
+
+def source_mentions_identifier(source: str, identifier: str) -> bool:
+    return re.search(
+        rf"(?<![A-Za-z0-9_-]){re.escape(identifier)}(?![A-Za-z0-9_-])",
+        source,
+    ) is not None
+
+
+def unreferenced_css_classes(
+    frontend_dir: Path,
+    *,
+    allowed_dynamic_classes: set[str] | None = None,
+) -> dict[str, list[str]]:
+    allowed = DYNAMIC_RUNTIME_CLASSES | (allowed_dynamic_classes or set())
+    runtime_source = frontend_runtime_sources(frontend_dir)
+    class_locations = selector_class_locations(active_css_paths(frontend_dir))
+    return {
+        class_name: locations
+        for class_name, locations in class_locations.items()
+        if class_name not in allowed and not source_mentions_class(runtime_source, class_name)
+    }
+
+
+def unreferenced_css_ids(
+    frontend_dir: Path,
+    *,
+    allowed_dynamic_ids: set[str] | None = None,
+) -> dict[str, list[str]]:
+    allowed = DYNAMIC_RUNTIME_IDS | (allowed_dynamic_ids or set())
+    runtime_source = frontend_runtime_sources(frontend_dir)
+    id_locations = selector_id_locations(active_css_paths(frontend_dir))
+    return {
+        id_name: locations
+        for id_name, locations in id_locations.items()
+        if id_name not in allowed and not source_mentions_identifier(runtime_source, id_name)
+    }
+
+
 def css_metrics(paths: list[Path]) -> dict[str, object]:
     files = []
     token_locations: dict[str, list[str]] = {}
@@ -288,6 +376,8 @@ def build_payload(project_root: Path) -> dict[str, object]:
         "linked_stylesheets": linked_stylesheets(frontend_dir / "index.html"),
         "versions": sorted(stylesheet_versions(frontend_dir / "index.html")),
         "metrics": css_metrics(paths),
+        "unreferenced_css_classes": unreferenced_css_classes(frontend_dir),
+        "unreferenced_css_ids": unreferenced_css_ids(frontend_dir),
         "layer": CSS_LAYER_NAME,
         "legacy_compat_empty": legacy_compat_payload(frontend_dir / "css" / "99-legacy-compat.css") == "",
     }
@@ -323,6 +413,10 @@ def css_contract_failures(project_root: Path, payload: dict[str, object]) -> lis
         failures.append("Duplicate selectors in the same cascade context are not allowed.")
     if metrics["duplicated_selector_groups_same_context"]:
         failures.append("Duplicate selector groups in the same cascade context are not allowed.")
+    if payload["unreferenced_css_classes"]:
+        failures.append("Active CSS classes must be referenced by runtime HTML/JS or explicitly allowlisted.")
+    if payload["unreferenced_css_ids"]:
+        failures.append("Active CSS ids must be referenced by runtime HTML/JS or explicitly allowlisted.")
     if not payload["legacy_compat_empty"]:
         failures.append("css/99-legacy-compat.css must stay empty.")
 

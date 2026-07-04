@@ -83,6 +83,15 @@ def test_preview_rgb230_canvas_uses_real_light_background_color():
     assert "background: var(--color-bg-stage);" not in rgb230_rule
 
 
+def test_initial_canvas_uses_app_background_instead_of_preview_background():
+    css = CANVAS_CSS_PATH.read_text(encoding="utf-8")
+
+    assert '.app-shell[data-ui-state="no_folder"] .canvas-area' in css
+    initial_rule = css.split('.app-shell[data-ui-state="no_folder"] .canvas-area {', 1)[1].split("}", 1)[0]
+    assert "background: var(--color-bg);" in initial_rule
+    assert "--rgb-neutral-fallback" not in initial_rule
+
+
 def test_compare_mode_has_draggable_divider_wiring():
     app_js = app_domain_source()
     canvas_css = (FRONTEND_DIR / "css" / "05-viewer" / "canvas.css").read_text(encoding="utf-8")

@@ -43,12 +43,17 @@ def test_sprint_tokens_fix_focus_contrast_and_system_font():
     assert not re.search(r"font-weight:\s*(750|760|780)\b", css_sources)
 
 
-def test_onboarding_uses_deliberate_css_fallback_without_missing_assets():
+def test_onboarding_uses_local_assets_without_missing_references():
     source = ONBOARDING_BACKGROUND_PATH.read_text(encoding="utf-8")
 
-    assert "flatshot-abstract" not in source
-    assert "ONBOARDING_BACKGROUND_ASSETS = []" in source
-    assert "./assets/onboarding/" not in source
+    assert "ONBOARDING_BACKGROUND_ASSETS = [" in source
+    assert "ONBOARDING_BACKGROUND_ASSET_DIR" in source
+    assert "assetsFromDirectoryListing" in source
+    assert source.count("./assets/onboarding/flatshot-abstract-") == 5
+    for index in range(1, 6):
+        relative = f"./assets/onboarding/flatshot-abstract-{index:02}.png"
+        assert relative in source
+        assert (FRONTEND_DIR / relative.removeprefix("./")).is_file()
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")

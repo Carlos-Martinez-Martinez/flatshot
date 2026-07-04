@@ -42,6 +42,57 @@ assert.equal(typeof helpers.createFlatShotInteractionHandlers, "function");
     assert result.returncode == 0, result.stderr or result.stdout
 
 
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
+def test_interaction_bindings_initialize_onboarding_after_startup_render():
+    script = f"""
+const assert = require("node:assert/strict");
+const helpers = require({json.dumps(str(HELPER_PATH))});
+
+const calls = [];
+const fakeElement = {{
+  addEventListener() {{}},
+}};
+const fakeDocument = {{
+  addEventListener() {{}},
+}};
+const fakeWindow = {{
+  addEventListener() {{}},
+}};
+
+helpers.wireFlatShotInteractions({{
+  document: fakeDocument,
+  window: fakeWindow,
+  $() {{ return fakeElement; }},
+  $$() {{ return []; }},
+  onboardingBackgroundHelpers: {{
+    initialize() {{
+      calls.push("onboarding");
+    }},
+  }},
+  handlers: {{
+    startup() {{
+      calls.push("startup");
+    }},
+    initViewerResizeObserver() {{
+      calls.push("resize");
+    }},
+  }},
+}});
+
+assert.deepEqual(calls.slice(0, 2), ["startup", "onboarding"]);
+assert.equal(calls.includes("resize"), true);
+"""
+    result = subprocess.run(
+        ["node", "-e", script],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
+
+
 def test_interaction_bindings_wire_focusout_for_commit_on_blur():
     source = HELPER_PATH.read_text(encoding="utf-8")
 

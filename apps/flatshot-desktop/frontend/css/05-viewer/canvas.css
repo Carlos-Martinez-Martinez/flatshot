@@ -36,6 +36,10 @@
   background-size: var(--checker-tile-lg) var(--checker-tile-lg);
 }
 
+.app-shell[data-ui-state="no_folder"] .canvas-area {
+  background: var(--color-bg);
+}
+
 .preview-canvas {
   position: relative;
   z-index: 1;

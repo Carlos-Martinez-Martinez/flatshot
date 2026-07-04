@@ -78,9 +78,9 @@
     windowRef.addEventListener("beforeunload", handlers.writeSessionSnapshot);
     windowRef.addEventListener("resize", handlers.positionBackgroundPresetEditor);
 
+    handlers.startup?.();
     void onboardingBackgroundHelpers?.initialize?.({ document: documentRef });
     handlers.initViewerResizeObserver?.();
-    handlers.startup?.();
   }
 
   function wireLightingStage(lightingStage, handlers) {

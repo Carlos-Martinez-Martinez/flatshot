@@ -40,7 +40,15 @@ const assert = require("node:assert/strict");
 const helpers = require({json.dumps(str(ONBOARDING_BACKGROUND_PATH))});
 
 assert.equal(Array.isArray(helpers.ONBOARDING_BACKGROUND_ASSETS), true);
-assert.equal(helpers.ONBOARDING_BACKGROUND_ASSETS.length, 0);
+assert.equal(helpers.ONBOARDING_BACKGROUND_ASSETS.length, 5);
+assert.equal(helpers.ONBOARDING_BACKGROUND_ASSET_DIR, "./assets/onboarding/");
+assert.deepEqual(helpers.ONBOARDING_BACKGROUND_ASSETS, [
+  "./assets/onboarding/flatshot-abstract-01.png",
+  "./assets/onboarding/flatshot-abstract-02.png",
+  "./assets/onboarding/flatshot-abstract-03.png",
+  "./assets/onboarding/flatshot-abstract-04.png",
+  "./assets/onboarding/flatshot-abstract-05.png",
+]);
 
 assert.deepEqual(helpers.uniqueLoadedAssets([
   "./assets/onboarding/mesh-01.png",
@@ -52,6 +60,58 @@ assert.deepEqual(helpers.uniqueLoadedAssets([
   "./assets/onboarding/mesh-02.png",
 ]);
 assert.deepEqual(helpers.uniqueLoadedAssets([]), []);
+assert.deepEqual(helpers.normalizeAssetList([
+  "flatshot-extra-06.png",
+  "assets/onboarding/flatshot-extra-07.jpg",
+  "./assets/onboarding/flatshot-extra-08.webp",
+  "./assets/onboarding/flatshot-extra-08.webp",
+  "../escape.png",
+  "https://example.com/remote.png",
+  "notes.txt",
+]), [
+  "./assets/onboarding/flatshot-extra-06.png",
+  "./assets/onboarding/flatshot-extra-07.jpg",
+  "./assets/onboarding/flatshot-extra-08.webp",
+]);
+assert.deepEqual(helpers.assetsFromDirectoryListing(`
+  <a href="flatshot-abstract-01.png">flatshot-abstract-01.png</a>
+  <a href="custom-extra.webp">custom-extra.webp</a>
+  <a href="nested/">nested/</a>
+  <a href="../">../</a>
+  <a href="notes.txt">notes.txt</a>
+`), [
+  "./assets/onboarding/custom-extra.webp",
+  "./assets/onboarding/flatshot-abstract-01.png",
+]);
+
+(async () => {{
+  const configured = await helpers.configuredAssetCandidates({{
+    fetch: async (url) => {{
+      assert.equal(url, "./assets/onboarding/");
+      return {{
+        ok: true,
+        async text() {{
+          return `
+            <a href="flatshot-extra-06.png">flatshot-extra-06.png</a>
+            <a href="flatshot-extra-07.jpg">flatshot-extra-07.jpg</a>
+          `;
+        }},
+      }};
+    }},
+  }});
+  assert.deepEqual(configured, [
+    "./assets/onboarding/flatshot-extra-06.png",
+    "./assets/onboarding/flatshot-extra-07.jpg",
+  ]);
+
+  const fallback = await helpers.configuredAssetCandidates({{
+    fetch: async () => {{ throw new Error("manifest unavailable"); }},
+  }});
+  assert.deepEqual(fallback, helpers.ONBOARDING_BACKGROUND_ASSETS);
+}})().catch((error) => {{
+  console.error(error);
+  process.exit(1);
+}});
 
 (async () => {{
   Object.defineProperty(global, "Image", {{
@@ -127,6 +187,142 @@ assert.deepEqual(helpers.uniqueLoadedAssets([]), []);
     )
 
     assert result.returncode == 0, result.stderr or result.stdout
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
+def test_onboarding_background_randomizes_initial_and_rotation_without_repeating():
+    script = f"""
+const assert = require("node:assert/strict");
+const helpers = require({json.dumps(str(ONBOARDING_BACKGROUND_PATH))});
+
+assert.equal(helpers.pickInitialAssetIndex(5, () => 0), 0);
+assert.equal(helpers.pickInitialAssetIndex(5, () => 0.62), 3);
+assert.equal(helpers.pickInitialAssetIndex(5, () => 0.999), 4);
+assert.equal(helpers.pickInitialAssetIndex(0, () => 0.5), 0);
+assert.equal(helpers.nextRandomSlideIndex(0, 1, () => 0.9), 0);
+assert.equal(helpers.nextRandomSlideIndex(1, 3, () => 0), 2);
+assert.equal(helpers.nextRandomSlideIndex(1, 3, () => 0.99), 0);
+
+(async () => {{
+  Object.defineProperty(global, "Image", {{
+    configurable: true,
+    value: class LoadedImage {{
+      set src(_value) {{
+        this.onload();
+      }}
+    }},
+  }});
+
+  let intervalCallback = null;
+  const originalSetInterval = global.setInterval;
+  const originalClearInterval = global.clearInterval;
+  const originalMatchMedia = global.matchMedia;
+  global.setInterval = (callback) => {{
+    intervalCallback = callback;
+    return 99;
+  }};
+  global.clearInterval = () => {{}};
+  global.matchMedia = () => ({{ matches: false }});
+
+  function fakeClassList(element, initial = "") {{
+    const names = new Set(initial ? initial.split(" ") : []);
+    return {{
+      contains(name) {{ return names.has(name); }},
+      toggle(name, enabled) {{ enabled ? names.add(name) : names.delete(name); }},
+      add(name) {{ names.add(name); }},
+      remove(name) {{ names.delete(name); }},
+      toString() {{ return Array.from(names).join(" "); }},
+    }};
+  }}
+  function fakeElement(tag) {{
+    const element = {{
+      tag,
+      children: [],
+      className: "",
+      id: "",
+      style: {{}},
+      appendChild(child) {{ this.children.push(child); }},
+      prepend(child) {{ this.children.unshift(child); }},
+      querySelectorAll(selector) {{
+        return selector === ".onboarding-background__slide"
+          ? this.children.filter((child) => child.className === "onboarding-background__slide")
+          : [];
+      }},
+      remove() {{ this.removed = true; }},
+      setAttribute(name, value) {{ this[name] = value; }},
+    }};
+    element.classList = fakeClassList(element);
+    return element;
+  }}
+  const shell = {{ dataset: {{ uiState: "no_folder" }} }};
+  const previewCanvas = fakeElement("div");
+  const fakeDocument = {{
+    querySelector(selector) {{
+      if (selector === ".app-shell") {{
+        return shell;
+      }}
+      if (selector === "#preview-canvas") {{
+        return previewCanvas;
+      }}
+      return null;
+    }},
+    createElement: fakeElement,
+    getElementById() {{
+      return null;
+    }},
+  }};
+
+  const randomValues = [0.6, 0, 0];
+  const controller = await helpers.initialize({{
+    document: fakeDocument,
+    assets: [
+      "./assets/onboarding/a.png",
+      "./assets/onboarding/b.png",
+      "./assets/onboarding/c.png",
+    ],
+    random() {{
+      return randomValues.shift() ?? 0;
+    }},
+  }});
+  const slides = controller.layer.querySelectorAll(".onboarding-background__slide");
+  assert.equal(slides[1].classList.contains("is-active"), true);
+  assert.equal(slides[0].classList.contains("is-active"), false);
+
+  intervalCallback();
+  assert.equal(slides[2].classList.contains("is-active"), true);
+  assert.equal(slides[1].classList.contains("is-active"), false);
+
+  intervalCallback();
+  assert.equal(slides[0].classList.contains("is-active"), true);
+  assert.equal(slides[2].classList.contains("is-active"), false);
+
+  controller.stop();
+  global.setInterval = originalSetInterval;
+  global.clearInterval = originalClearInterval;
+  global.matchMedia = originalMatchMedia;
+}})().catch((error) => {{
+  console.error(error);
+  process.exit(1);
+}});
+"""
+    result = subprocess.run(
+        ["node", "-e", script],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
+
+
+def test_onboarding_background_assets_exist():
+    source = ONBOARDING_BACKGROUND_PATH.read_text(encoding="utf-8")
+
+    for index in range(1, 6):
+        relative = f"./assets/onboarding/flatshot-abstract-{index:02}.png"
+        assert relative in source
+        assert (FRONTEND_DIR / relative.removeprefix("./")).is_file()
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
@@ -244,6 +440,7 @@ def test_onboarding_background_styles_are_perceptible_without_blocking_controls(
     overlay_rule = css.split(".onboarding-background::after {", 1)[1].split("}", 1)[0]
     active_slide_rule = css.split(".onboarding-background__slide.is-active {", 1)[1].split("}", 1)[0]
     fallback_rule = css.split(".onboarding-background.is-fallback::before {", 1)[1].split("}", 1)[0]
+    slide_rule = css.split(".onboarding-background__slide {", 1)[1].split("}", 1)[0]
 
     assert "pointer-events: none;" in layer_rule
     assert "z-index: 0;" in layer_rule
@@ -252,3 +449,6 @@ def test_onboarding_background_styles_are_perceptible_without_blocking_controls(
     assert "repeating-linear-gradient" in overlay_rule
     assert "opacity: 0.92;" in active_slide_rule
     assert "radial-gradient" in fallback_rule
+    assert "background-position: center;" in slide_rule
+    assert "background-size: cover;" in slide_rule
+    assert "background-repeat: no-repeat;" in slide_rule

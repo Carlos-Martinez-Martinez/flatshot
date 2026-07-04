@@ -29,7 +29,7 @@ def test_frontend_assets_share_output_flow_cache_token():
     asset_versions = re.findall(r'[<](?:script|link)[^>]+[?]v=([^"&]+)', html)
 
     assert asset_versions
-    assert set(asset_versions) == {"20260703-ux-ui-sprint-54"}
+    assert set(asset_versions) == {"20260704-rail-accent"}
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")

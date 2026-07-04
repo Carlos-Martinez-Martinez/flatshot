@@ -14,7 +14,7 @@
   --border-emphasis: var(--color-border-strong);
   --semantic-primary: var(--color-primary);
   --semantic-primary-hover: var(--color-primary-hover);
-  --semantic-selection: var(--color-primary);
+  --semantic-selection: var(--color-primary-hover);
   --semantic-selection-soft: var(--color-primary-soft);
   --semantic-selection-border: var(--color-accent-border);
   --semantic-warning-soft: var(--color-warning-soft);
@@ -221,7 +221,6 @@
   --mock-shade-alpha-32: rgba(23, 32, 29, 0.32);
   --surface-bg-alpha-12: rgba(245, 247, 248, 0.12);
   --surface-bg-alpha-92: rgba(245, 247, 248, 0.92);
-  --surface-raised-alpha-96: rgba(248, 250, 251, 0.96);
   --surface-raised-alpha-98: rgba(248, 250, 251, 0.98);
   --primary-soft-alpha-06: rgba(230, 245, 241, 0.06);
   --primary-soft-alpha-66: rgba(230, 245, 241, 0.66);
@@ -256,10 +255,10 @@
   --line-soft: #dde3e0;
   --line-strong: var(--border-strong);
   --radius-10: 10px;
-  --rail-accent: var(--color-accent);
+  --rail-accent: var(--semantic-selection);
   --rail-accent-soft: var(--color-accent-soft);
-  --rail-bg: #ffffff;
-  --rail-border: var(--color-border);
+  --rail-bg: color-mix(in srgb, var(--color-surface) 88%, var(--color-primary) 12%);
+  --rail-border: color-mix(in srgb, var(--color-border) 78%, var(--color-primary) 22%);
   --rail-faint: var(--color-text-subtle);
   --rail-muted: var(--color-text-muted);
   --rail-soft: var(--color-bg-soft);
@@ -331,7 +330,7 @@
   --border-emphasis: var(--color-border-strong);
   --semantic-primary: var(--color-primary);
   --semantic-primary-hover: var(--color-primary-hover);
-  --semantic-selection: var(--color-primary);
+  --semantic-selection: var(--color-primary-hover);
   --semantic-selection-soft: var(--color-primary-soft);
   --semantic-selection-border: var(--color-accent-border);
   --semantic-warning-soft: var(--color-warning-soft);
@@ -383,7 +382,8 @@
   --info-soft: #153141;
   --line: var(--color-border);
   --line-soft: #35353b;
-  --rail-bg: var(--color-surface);
+  --rail-bg: color-mix(in srgb, var(--color-surface) 84%, var(--color-primary) 16%);
+  --rail-border: color-mix(in srgb, var(--color-border) 68%, var(--color-primary) 32%);
   --rail-soft: var(--color-bg-soft);
   --rail-soft-strong: var(--color-bg-muted);
   --surface: var(--color-bg-panel);
@@ -401,7 +401,6 @@
   --surface-alpha-98: rgba(39, 39, 42, 0.98);
   --surface-bg-alpha-12: rgba(24, 24, 27, 0.12);
   --surface-bg-alpha-92: rgba(24, 24, 27, 0.92);
-  --surface-raised-alpha-96: rgba(39, 39, 42, 0.96);
   --surface-raised-alpha-98: rgba(39, 39, 42, 0.98);
   --primary-alpha-18: color-mix(in srgb, var(--color-primary) 18%, transparent);
   --primary-alpha-32: color-mix(in srgb, var(--color-primary) 32%, transparent);
@@ -502,27 +501,27 @@
 
 :root[data-theme="dark"][data-brand-tone="blue"] {
   --color-primary: #2563eb;
-  --color-primary-hover: #93c5fd;
+  --color-primary-hover: #60a5fa;
 }
 
 :root[data-theme="dark"][data-brand-tone="indigo"] {
   --color-primary: #4f46e5;
-  --color-primary-hover: #a5b4fc;
+  --color-primary-hover: #818cf8;
 }
 
 :root[data-theme="dark"][data-brand-tone="violet"] {
   --color-primary: #7c3aed;
-  --color-primary-hover: #c4b5fd;
+  --color-primary-hover: #a78bfa;
 }
 
 :root[data-theme="dark"][data-brand-tone="coral"] {
   --color-primary: #c2410c;
-  --color-primary-hover: #fdba74;
+  --color-primary-hover: #fb923c;
 }
 
 :root[data-theme="dark"][data-brand-tone="amber"] {
   --color-primary: #b45309;
-  --color-primary-hover: #fbbf24;
+  --color-primary-hover: #f97316;
 }
 
 :root[data-ui-density="comfortable"] {

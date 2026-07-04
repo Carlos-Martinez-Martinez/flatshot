@@ -181,7 +181,7 @@ button, .status-dot, .asset-state, .preflight-chip, .change-chip, .state-chip {
 }
 
 .gallery-column .asset-state.adjusted > span, .gallery-column .asset-state.adjusted em {
-  color: var(--color-primary);
+  color: var(--semantic-selection);
 }
 
 .gallery-column .asset-state em {

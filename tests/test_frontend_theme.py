@@ -30,6 +30,12 @@ def css_token_value(block: str, token: str) -> str:
     return match.group(1).strip()
 
 
+def css_rule(source: str, selector: str) -> str:
+    match = re.search(rf"(?m)^{re.escape(selector)}\s*\{{(?P<body>[^}}]*)\}}", source)
+    assert match, f"{selector} rule not found"
+    return match.group("body")
+
+
 def relative_luminance(hex_color: str) -> float:
     assert re.fullmatch(r"#[0-9a-fA-F]{6}", hex_color), hex_color
     channels = [int(hex_color[index:index + 2], 16) / 255 for index in (1, 3, 5)]
@@ -89,11 +95,11 @@ def test_dark_brand_tones_keep_text_accent_legible():
     inverse = css_token_value(dark_block, "--color-text-inverse")
 
     expected_hover = {
-        "blue": "#93c5fd",
-        "indigo": "#a5b4fc",
-        "violet": "#c4b5fd",
-        "coral": "#fdba74",
-        "amber": "#fbbf24",
+        "blue": "#60a5fa",
+        "indigo": "#818cf8",
+        "violet": "#a78bfa",
+        "coral": "#fb923c",
+        "amber": "#f97316",
     }
     for tone, hover in expected_hover.items():
         block = css_block(tokens, f':root[data-theme="dark"][data-brand-tone="{tone}"]')
@@ -101,6 +107,82 @@ def test_dark_brand_tones_keep_text_accent_legible():
         assert css_token_value(block, "--color-primary-hover") == hover
         assert contrast_ratio(css_token_value(block, "--color-primary"), inverse) >= 4.5
         assert contrast_ratio(hover, surface) >= 4.5
+
+
+def test_active_accent_text_uses_accessible_selection_token():
+    tokens = TOKENS_CSS_PATH.read_text(encoding="utf-8")
+    root_block = css_block(tokens, ":root")
+    dark_block = css_block(tokens, ':root[data-theme="dark"]')
+    navigation_css = (FRONTEND_DIR / "css" / "03-components" / "navigation-controls.css").read_text(encoding="utf-8")
+    states_css = (FRONTEND_DIR / "css" / "08-states-responsive" / "states.css").read_text(encoding="utf-8")
+    gallery_css = (FRONTEND_DIR / "css" / "04-batch-gallery" / "gallery-shell.css").read_text(encoding="utf-8")
+    all_css = "\n".join(path.read_text(encoding="utf-8") for path in (FRONTEND_DIR / "css").rglob("*.css"))
+
+    assert css_token_value(root_block, "--semantic-selection") == "var(--color-primary-hover)"
+    assert css_token_value(dark_block, "--semantic-selection") == "var(--color-primary-hover)"
+    assert css_token_value(root_block, "--rail-accent") == "var(--semantic-selection)"
+    assert ".segmented.compact" in navigation_css
+    assert "grid-auto-columns: minmax(0, 1fr);" in navigation_css
+    assert ".segmented button.active, .inspector-tabs button.active" in states_css
+    assert "color: var(--semantic-selection);" in states_css
+    assert ".segmented button.active {\n  border-color: var(--color-accent-border);" not in states_css
+    assert ".gallery-filter button.active" in gallery_css
+    assert ".gallery-view-switch" in gallery_css
+    assert "min-width: calc(var(--control-height) * 6);" in gallery_css
+    assert not re.search(r"(?<!-)color:\s*var\(--color-accent-hover\);", all_css)
+    assert "color: var(--color-primary);" not in gallery_css
+    assert not re.search(r"(?<!-)color:\s*var\(--color-primary-hover\);", all_css)
+
+
+def test_gallery_rail_uses_brand_tint_in_light_and_dark():
+    tokens = TOKENS_CSS_PATH.read_text(encoding="utf-8")
+    root_block = css_block(tokens, ":root")
+    dark_block = css_block(tokens, ':root[data-theme="dark"]')
+    gallery_css = (FRONTEND_DIR / "css" / "04-batch-gallery" / "gallery-shell.css").read_text(encoding="utf-8")
+    batch_rail_css = (FRONTEND_DIR / "css" / "04-batch-gallery" / "batch-rail.css").read_text(encoding="utf-8")
+    source_import_css = (FRONTEND_DIR / "css" / "04-batch-gallery" / "source-import.css").read_text(encoding="utf-8")
+    viewer_css = (FRONTEND_DIR / "css" / "05-viewer" / "viewer-shell.css").read_text(encoding="utf-8")
+    adjustments_css = (FRONTEND_DIR / "css" / "06-inspector-export" / "adjustments-presets.css").read_text(encoding="utf-8")
+
+    assert "--gallery-rail" not in tokens
+    assert "--batch-rail-accent" not in tokens
+    assert css_token_value(root_block, "--rail-bg") == "color-mix(in srgb, var(--color-surface) 88%, var(--color-primary) 12%)"
+    assert css_token_value(dark_block, "--rail-bg") == "color-mix(in srgb, var(--color-surface) 84%, var(--color-primary) 16%)"
+    assert css_token_value(root_block, "--rail-border") == "color-mix(in srgb, var(--color-border) 78%, var(--color-primary) 22%)"
+    assert css_token_value(dark_block, "--rail-border") == "color-mix(in srgb, var(--color-border) 68%, var(--color-primary) 32%)"
+    for css, selector in (
+        (gallery_css, ".gallery-column"),
+        (batch_rail_css, ".batch-rail"),
+    ):
+        rule = css_rule(css, selector)
+        assert "background: var(--rail-bg);" in rule
+        assert "border-right: var(--border-width) solid var(--rail-border);" in rule
+    for selector in (
+        ".gallery-view-switch",
+        ".gallery-output-control select",
+        ".batch-search__box",
+    ):
+        rule = css_rule(gallery_css, selector)
+        assert "border-color: var(--rail-border);" in rule
+        assert "background: color-mix(in srgb, var(--rail-bg) 82%, var(--color-primary) 18%);" in rule
+    search_input_rule = css_rule(gallery_css, ".batch-search__box input")
+    assert "appearance: none;" in search_input_rule
+    assert "-webkit-appearance: none;" in search_input_rule
+    assert "background: transparent;" in search_input_rule
+    assert "border-radius: 0;" in search_input_rule
+    assert "font-weight: var(--font-weight-bold);" in css_rule(gallery_css, ".gallery-search > span")
+    assert ".settings-panel .search-field input" in adjustments_css
+    assert not re.search(r"(?m)^\.search-field input\b", adjustments_css)
+    assert ".gallery-view-switch.segmented button:hover:not(:disabled)" in gallery_css
+    assert "background: color-mix(in srgb, var(--rail-bg) 76%, var(--color-primary) 24%);" in gallery_css
+    assert ".gallery-header.gallery-toolbar" in gallery_css
+    assert "background: transparent;" in gallery_css
+    assert "border-bottom: var(--border-width) solid var(--rail-border);" in gallery_css
+    assert ".source-panel.batch-rail__source" in source_import_css
+    assert "background: transparent;" in source_import_css
+    assert "border-bottom: var(--border-width) solid var(--rail-border);" in source_import_css
+    assert not re.search(r"\.batch-panel[^{}]*\{[^{}]*background:", viewer_css)
+    assert not re.search(r"\.gallery-column[^{}]*\{[^{}]*background:", viewer_css)
 
 
 def test_brand_tone_loads_early_and_reuses_theme_tokens():

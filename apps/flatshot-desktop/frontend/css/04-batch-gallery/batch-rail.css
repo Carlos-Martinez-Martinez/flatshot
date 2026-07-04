@@ -154,7 +154,7 @@
   width: auto;
   display: flex;
   flex-direction: column;
-  border-right: var(--border-width) solid var(--color-border);
+  border-right: var(--border-width) solid var(--rail-border);
   padding: 0;
   color: var(--color-text);
 }
@@ -163,7 +163,7 @@
   padding-top: var(--space-3);
   padding-bottom: var(--space-2);
   padding: 13px var(--space-3) 11px;
-  border-bottom: var(--border-width) solid var(--color-border);
+  border-bottom: var(--border-width) solid var(--rail-border);
 }
 
 .batch-rail__title-row {
@@ -206,7 +206,7 @@
 .batch-rail__badge.is-ready, .batch-rail__badge.is-active, .change-chip.ready, .state-chip.ready, .state-chip.exported {
   border-color: var(--color-accent-border);
   background: var(--color-accent-soft);
-  color: var(--color-accent-hover);
+  color: var(--semantic-selection);
 }
 
 .batch-rail__badge.is-warning, .change-chip.dirty, .state-chip.warning {

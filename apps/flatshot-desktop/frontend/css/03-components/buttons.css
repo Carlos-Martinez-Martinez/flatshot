@@ -18,7 +18,7 @@
   min-height: var(--control-height);
   border: 0;
   background: transparent;
-  color: var(--color-accent-hover);
+  color: var(--semantic-selection);
   font-weight: var(--font-weight-semibold);
   box-shadow: none;
 }
@@ -85,6 +85,7 @@ button.primary {
 }
 
 .segmented button {
+  width: 100%;
   border-radius: var(--radius-xs);
   font-size: var(--font-size-xs);
   min-height: var(--control-height);
@@ -102,7 +103,7 @@ button.primary {
 .ghost-action {
   border-color: transparent;
   background: transparent;
-  color: var(--color-primary);
+  color: var(--semantic-selection);
 }
 
 :where(button[data-action], button[data-filter], button[data-gallery-view], button[data-preview-mode], button[data-preview-bg], button[data-lighting-preset], button[data-review-scenario], button[data-inspector-tab], button[data-output-profile-close], button[data-output-profile-reset], button[data-output-profile-save]):where(:not(.primary):not(.active):not(.danger):not(.danger-subtle):not(.btn-linklike):not(.ghost-action):not(.icon-button)) {
@@ -114,7 +115,7 @@ button.primary {
 .btn-linklike, .ghost-action {
   border-color: transparent;
   background: transparent;
-  color: var(--semantic-primary);
+  color: var(--semantic-selection);
 }
 
 .danger, .danger-subtle {

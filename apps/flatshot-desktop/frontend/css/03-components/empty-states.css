@@ -37,7 +37,7 @@
   display: none;
 }
 .empty-state.onboarding .empty-icon svg {
-  width: var(--icon-size-lg); height: var(--icon-size-lg); fill: none; stroke: var(--color-primary-hover);
+  width: var(--icon-size-lg); height: var(--icon-size-lg); fill: none; stroke: var(--semantic-selection);
   stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
 }
 
@@ -63,16 +63,16 @@
 .app-shell[data-ui-state="no_folder"] .onboarding-background.is-visible { display: block; }
 :root[data-onboarding-background="disabled"] .app-shell[data-ui-state="no_folder"] .onboarding-background.is-visible { display: none; }
 .onboarding-background.is-fallback::before { content: ""; position: absolute; inset: -5%; opacity: 0.72; background: radial-gradient(circle at 18% 22%, color-mix(in srgb, var(--color-primary) 32%, transparent), transparent 24%), radial-gradient(circle at 48% 52%, color-mix(in srgb, var(--color-primary) 18%, transparent), transparent 30%), radial-gradient(circle at 74% 68%, var(--info-alpha-26), transparent 26%), repeating-linear-gradient(128deg, color-mix(in srgb, var(--color-primary) 20%, transparent) 0 1px, transparent 1px 52px); }
-.onboarding-background__slide { position: absolute; inset: -4%; opacity: 0; background-color: color-mix(in srgb, var(--color-accent) 58%, var(--color-bg) 42%); background-position: center; background-size: cover; background-repeat: no-repeat; background-blend-mode: luminosity; filter: grayscale(1) saturate(1.05) contrast(1.08) brightness(1.06); mix-blend-mode: normal; transform: scale(1.03); transition: opacity var(--duration-onboarding-fade) var(--ease-standard), transform var(--duration-onboarding-drift) var(--ease-standard), background-color var(--duration-onboarding-fade) var(--ease-standard), filter var(--duration-onboarding-fade) var(--ease-standard); }
+.onboarding-background__slide { position: absolute; inset: -4%; opacity: 0; background-color: color-mix(in srgb, var(--color-accent) 62%, var(--color-bg) 38%); background-position: center; background-size: cover; background-repeat: no-repeat; background-blend-mode: luminosity; filter: saturate(1.08) contrast(1.08) brightness(1.06); mix-blend-mode: normal; transform: scale(1.03); transition: opacity var(--duration-onboarding-fade) var(--ease-standard), transform var(--duration-onboarding-drift) var(--ease-standard), background-color var(--duration-onboarding-fade) var(--ease-standard), filter var(--duration-onboarding-fade) var(--ease-standard); }
 .onboarding-background__slide.is-active { opacity: 0.92; transform: scale(1); }
-:root[data-theme="dark"] .onboarding-background__slide { background-color: color-mix(in srgb, var(--color-accent) 46%, var(--color-bg) 54%); filter: grayscale(1) saturate(0.95) contrast(1.12) brightness(0.52); }
+:root[data-theme="dark"] .onboarding-background__slide { background-color: color-mix(in srgb, var(--color-accent) 58%, var(--color-bg) 42%); filter: saturate(1.08) contrast(1.12) brightness(0.5); }
 :root[data-theme="dark"] .onboarding-background__slide.is-active { opacity: 0.7; }
 
 .folder-drop-message {
   width: var(--workflow-inline-width); min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto;
   align-items: center; gap: var(--space-2); border: var(--border-width) solid var(--color-accent-border);
   border-radius: var(--radius-sm); background: var(--color-primary-soft); padding: var(--space-2) var(--space-3);
-  color: var(--color-primary-hover); text-align: left;
+  color: var(--semantic-selection); text-align: left;
 }
 .folder-drop-message span, .recent-folder-row strong, .recent-folder-row small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .folder-drop-message button, .recent-folder-row .icon-button { width: var(--control-height); min-width: var(--control-height); padding: 0; }

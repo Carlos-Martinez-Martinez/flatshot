@@ -174,8 +174,8 @@
   gap: var(--space-3);
   margin: 0;
   border: 0;
-  border-bottom: var(--border-width) solid var(--color-border);
-  background: var(--color-bg-panel);
+  border-bottom: var(--border-width) solid var(--rail-border);
+  background: transparent;
 }
 
 .batch-source__row {
@@ -229,7 +229,7 @@
 }
 
 .batch-rail > .source-panel.batch-rail__source {
-  border-bottom: var(--border-width) solid var(--color-border);
+  border-bottom: var(--border-width) solid var(--rail-border);
 }
 
 .source-panel.batch-rail__source .source-panel-heading, .source-panel.batch-rail__source .batch-source__row {
@@ -259,7 +259,7 @@
 }
 
 .batch-diagnostics summary, .advanced-block summary {
-  color: var(--color-accent);
+  color: var(--semantic-selection);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
 }

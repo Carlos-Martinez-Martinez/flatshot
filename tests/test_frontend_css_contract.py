@@ -68,7 +68,7 @@ def test_frontend_loads_only_modular_css_in_contract_order():
 
 
 def test_frontend_assets_share_css_module_cache_token():
-    assert audit_css.stylesheet_versions(FRONTEND_DIR / "index.html") == {"20260703-ux-ui-sprint-54"}
+    assert audit_css.stylesheet_versions(FRONTEND_DIR / "index.html") == {"20260704-rail-accent"}
 
 
 def test_css_modules_keep_cascade_contract():

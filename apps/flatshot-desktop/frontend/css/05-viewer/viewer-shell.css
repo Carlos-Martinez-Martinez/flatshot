@@ -1,12 +1,6 @@
 @layer flatshot {
 /* Viewer: preview panel shell. */
 
-.batch-panel, .preview-panel, .settings-panel {
-  min-width: 0;
-  min-height: 0;
-  background: var(--surface);
-}
-
 .preview-debug {
   display: grid;
   gap: var(--space-2);
@@ -31,7 +25,7 @@
   min-height: 0;
 }
 
-.batch-panel, .gallery-column, .preview-panel, .settings-panel {
+.preview-panel, .settings-panel {
   min-width: 0;
   min-height: 0;
   background: var(--color-bg-panel);

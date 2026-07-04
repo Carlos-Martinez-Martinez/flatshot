@@ -152,7 +152,7 @@
 .batch-rail__eyebrow, .batch-rail__section-title, .gallery-eyebrow, .eyebrow, .batch-source__copy > span, .text-field span, .form-grid span, .advanced-grid span, .search-field span {
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-bold);
   letter-spacing: var(--letter-spacing-caps);
   text-transform: uppercase;
 }
@@ -163,12 +163,20 @@
 }
 
 .batch-search__box input {
+  appearance: none;
+  -webkit-appearance: none;
   box-shadow: none;
   font-size: var(--font-size-sm);
   min-height: var(--control-size-compact);
   border: 0;
+  border-radius: 0;
   background: transparent;
   padding: 0;
+  color: var(--color-text);
+}
+
+.batch-search__box input::-webkit-search-cancel-button, .batch-search__box input::-webkit-search-decoration {
+  -webkit-appearance: none;
 }
 
 .batch-search__box button {
@@ -238,7 +246,7 @@
 .gallery-search > span {
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-bold);
   display: block;
 }
 
@@ -258,7 +266,12 @@
 .batch-search__box:focus-within {
   border-color: var(--color-accent-border);
   box-shadow: var(--shadow-focus);
-  background: var(--color-surface);
+  background: color-mix(in srgb, var(--rail-bg) 76%, var(--color-primary) 24%);
+}
+
+.batch-search__box:hover {
+  border-color: color-mix(in srgb, var(--rail-border) 58%, var(--color-primary) 42%);
+  background: color-mix(in srgb, var(--rail-bg) 78%, var(--color-primary) 22%);
 }
 
 .gallery-filter button:hover:not(:disabled) {
@@ -270,7 +283,7 @@
   box-shadow: none;
   border-color: var(--color-accent-border);
   background: var(--color-primary-soft);
-  color: var(--color-primary-hover);
+  color: var(--semantic-selection);
 }
 
 .batch-panel, .app-shell[data-ui-state="no_folder"] .gallery-column, .app-shell[data-ui-state="scanning"] .gallery-column, .app-shell[data-ui-state="batch_empty"] .gallery-column, .app-shell[data-ui-state="scan_empty"] .gallery-column, .app-shell[data-ui-state="no_folder"] .settings-panel, .app-shell[data-ui-state="scanning"] .settings-panel {
@@ -286,8 +299,8 @@
   flex: 0 0 auto;
   min-width: 0;
   display: grid;
-  border-bottom: var(--border-width) solid var(--color-border);
-  background: linear-gradient(180deg, var(--surface-alpha-96), var(--surface-raised-alpha-96));
+  border-bottom: var(--border-width) solid var(--rail-border);
+  background: transparent;
   grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
   gap: var(--space-3);
@@ -313,7 +326,7 @@
 .gallery-toolbar__fields {
   display: grid;
   gap: var(--space-2);
-  border-top: var(--border-width) solid var(--color-border);
+  border-top: var(--border-width) solid var(--rail-border);
   padding-top: var(--space-3);
 }
 
@@ -372,8 +385,15 @@
   width: 100%;
   min-width: 0;
   min-height: var(--control-size-lg);
+  border-color: var(--rail-border);
   border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--rail-bg) 82%, var(--color-primary) 18%);
   font-size: var(--font-size-sm);
+}
+
+.gallery-output-control select:hover:not(:disabled), .gallery-output-control select:focus-visible {
+  border-color: color-mix(in srgb, var(--rail-border) 58%, var(--color-primary) 42%);
+  background: color-mix(in srgb, var(--rail-bg) 76%, var(--color-primary) 24%);
 }
 
 .gallery-filter {
@@ -403,8 +423,8 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: transparent;
-  border-right: var(--border-width) solid var(--color-border);
+  background: var(--rail-bg);
+  border-right: var(--border-width) solid var(--rail-border);
   grid-column: 1;
   grid-row: 2;
   min-height: 0;
@@ -427,10 +447,16 @@
 
 .gallery-view-switch {
   width: 100%;
-  min-width: 0;
+  min-width: calc(var(--control-height) * 6);
+  border-color: var(--rail-border);
   border-radius: var(--radius-sm);
-  background: var(--color-bg-muted);
+  background: color-mix(in srgb, var(--rail-bg) 82%, var(--color-primary) 18%);
   justify-self: stretch;
+}
+
+.gallery-view-switch.segmented button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--rail-bg) 76%, var(--color-primary) 24%);
+  color: var(--semantic-selection);
 }
 
 .gallery-search {
@@ -475,9 +501,9 @@
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-sm);
   padding: 0 var(--space-3);
-  border-color: var(--color-border);
+  border-color: var(--rail-border);
   min-height: var(--control-size-lg);
-  background: var(--color-surface);
+  background: color-mix(in srgb, var(--rail-bg) 82%, var(--color-primary) 18%);
   min-width: 0;
 }
 

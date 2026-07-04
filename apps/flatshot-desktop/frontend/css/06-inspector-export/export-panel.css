@@ -305,7 +305,7 @@
   white-space: nowrap;
   border-color: transparent;
   background: transparent;
-  color: var(--color-accent-hover);
+  color: var(--semantic-selection);
   font-weight: var(--font-weight-bold);
 }
 

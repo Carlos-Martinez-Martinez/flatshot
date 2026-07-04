@@ -38,14 +38,14 @@
   min-height: var(--control-height);
   border-color: transparent;
   background: transparent;
-  color: var(--color-primary);
+  color: var(--semantic-selection);
   font-weight: var(--font-weight-semibold);
 }
 
 .inspector-summary__action button:hover:not(:disabled), .inspector-output-card__actions button:hover:not(:disabled), .inspector-compact-row button:hover:not(:disabled), .inspector-alert__actions button:hover:not(:disabled) {
   border-color: var(--color-accent-border);
   background: var(--color-primary-soft);
-  color: var(--color-primary-hover);
+  color: var(--semantic-selection);
 }
 
 .inspector-output-card__head strong {
@@ -110,7 +110,7 @@
 .inspector-output-card__actions button:hover:not(:disabled), .inspector-compact-row .selected-image-card__actions button:hover:not(:disabled) {
   border-color: var(--color-accent-border);
   background: var(--color-accent-soft);
-  color: var(--color-accent-hover);
+  color: var(--semantic-selection);
 }
 
 .inspector-compact-row {

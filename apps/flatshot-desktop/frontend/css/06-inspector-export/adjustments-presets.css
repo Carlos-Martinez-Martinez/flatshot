@@ -89,7 +89,7 @@
   background: var(--warning-soft);
 }
 
-.search-field input, .text-field input, .form-grid select, .advanced-grid input, .advanced-grid select {
+.settings-panel .search-field input, .settings-panel .text-field input, .settings-panel .form-grid select, .settings-panel .advanced-grid input, .settings-panel .advanced-grid select {
   border-color: var(--line-soft);
   border-radius: var(--radius-sm);
   background: var(--bg-panel);

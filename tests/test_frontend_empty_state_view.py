@@ -454,6 +454,7 @@ def test_onboarding_background_styles_are_perceptible_without_blocking_controls(
     assert "background-repeat: no-repeat;" in slide_rule
     assert "background-color: color-mix(in srgb, var(--color-accent)" in slide_rule
     assert "background-blend-mode: luminosity;" in slide_rule
+    assert "grayscale(" not in slide_rule
     assert "hue-rotate" not in slide_rule
     assert "background-color var(--duration-onboarding-fade)" in slide_rule
 
@@ -469,5 +470,6 @@ def test_onboarding_background_styles_are_perceptible_without_blocking_controls(
     dark_slide_rule = css.split(dark_slide_selector, 1)[1].split("}", 1)[0]
     dark_active_slide_rule = css.split(dark_active_selector, 1)[1].split("}", 1)[0]
     assert "background-color: color-mix(in srgb, var(--color-accent)" in dark_slide_rule
+    assert "grayscale(" not in dark_slide_rule
     assert "brightness(0." in dark_slide_rule
     assert "opacity: 0." in dark_active_slide_rule

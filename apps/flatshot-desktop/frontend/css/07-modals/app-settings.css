@@ -3,11 +3,11 @@
 
 .app-settings-backdrop { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: var(--space-8); background: var(--ink-alpha-32); }
 
-.app-settings-backdrop:not(.is-hidden) {
+.app-settings-backdrop.is-opening {
   animation: modal-backdrop-in var(--duration-fast) ease-out both;
 }
 
-.app-settings-backdrop:not(.is-hidden) > section, .app-settings-backdrop:not(.is-hidden) .guide-manager-panel {
+.app-settings-backdrop.is-opening > section, .app-settings-backdrop.is-opening .guide-manager-panel {
   animation: modal-dialog-in var(--duration-standard) ease-out both;
 }
 
@@ -26,7 +26,7 @@
 @keyframes modal-dialog-out { from { opacity: 1; transform: translateY(0) scale(1); } to { opacity: 0; transform: translateY(6px) scale(0.99); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .app-settings-backdrop:not(.is-hidden), .app-settings-backdrop:not(.is-hidden) > section, .app-settings-backdrop:not(.is-hidden) .guide-manager-panel, .app-settings-backdrop.is-closing, .app-settings-backdrop.is-closing > section, .app-settings-backdrop.is-closing .guide-manager-panel {
+  .app-settings-backdrop.is-opening, .app-settings-backdrop.is-opening > section, .app-settings-backdrop.is-opening .guide-manager-panel, .app-settings-backdrop.is-closing, .app-settings-backdrop.is-closing > section, .app-settings-backdrop.is-closing .guide-manager-panel {
     animation: none;
   }
 }

@@ -5,13 +5,9 @@
   }
   root.FlatShotInspectorContextView = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  const escapeHtml = globalThis.FlatShotFormatters?.escapeHtml || function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  };
+  const formatterHelpers = globalThis.FlatShotFormatters
+    || (typeof require === "function" ? require("./formatters.js") : null);
+  const escapeHtml = (value) => formatterHelpers.escapeHtml(value);
 
   function inspectorSubviewHeaderHtml(options = {}) {
     const detail = options.detail || "";
@@ -44,12 +40,23 @@
     return "summary";
   }
 
+  function inspectorSummaryCardKeys(options = {}) {
+    const keys = ["lot", "aspect", "output"];
+    if (options.complexityMode === "advanced") {
+      keys.push("selectedImage");
+    }
+    if (options.hasIssues) {
+      keys.push("issues");
+    }
+    return keys;
+  }
+
   function inspectorSubviewHeaderState(options = {}) {
     const mode = options.mode || "summary";
     const isPresetManager = mode === "advanced" && Boolean(options.presetEditorOpen);
     const warningCount = Number(options.warningCount) || 0;
     const labels = {
-      output: ["Exportación", options.outputEditMode ? "Editar formato de salida" : options.outputLabel],
+      output: ["Exportación", options.outputEditMode ? "Editar salida" : options.outputLabel],
       advanced: [
         isPresetManager ? "Gestionar ajustes" : "Editar ajuste",
         options.activePreset,
@@ -129,7 +136,7 @@
         <div class="context-header">
           <span class="eyebrow">Preparación</span>
           <strong>Seleccionar carpeta</strong>
-          <small>El ajuste de imagen y los formatos se preparan automáticamente.</small>
+          <small>El ajuste de imagen y las salidas se preparan automáticamente.</small>
         </div>
         ${preflightHtml}
         <div class="default-stack">
@@ -172,6 +179,7 @@
     contextualPreflightRows,
     escapeHtml,
     inspectorMode,
+    inspectorSummaryCardKeys,
     inspectorSubviewHeaderState,
     inspectorSubviewHeaderHtml,
   };

@@ -109,7 +109,11 @@ http://127.0.0.1:4173?bridge=http://127.0.0.1:8766
 3. Review the batch list, omitted files and preview.
 4. Choose a preset and adjust the visible settings.
 5. Open `Salida`, verify format, size, destination and naming.
-6. Use `Exportar N`.
+6. Use `Procesar N imágenes`.
+
+When the batch is ready and has no blocking issues, `Ctrl+Shift+E` runs a quick
+export with the active output profile. `Ctrl+E` keeps the normal export action
+and confirmation flow for warnings.
 
 The frontend calls:
 
@@ -118,6 +122,9 @@ The frontend calls:
 - `GET /presets`;
 - `POST /folders/pick`;
 - `POST /folders/scan`;
+- `POST /folders/scan/jobs`;
+- `GET /folders/scan/jobs/{jobId}`;
+- `POST /folders/scan/jobs/{jobId}/cancel`;
 - `POST /preview/render`;
 - `GET /images/thumbnail`;
 - `POST /exports/prepare`;
@@ -138,6 +145,12 @@ http://127.0.0.1:4173?dev=1
 
 Open `Debug` and switch mode or scenario there.
 
+## Frontend Modules
+
+The app still boots through the classic ordered script loader for compatibility.
+`state-stores.mjs` is the first native ES module migration point; it mirrors the
+classic `state-stores.js` contract and is checked by `tests/test_frontend_app_state.py`.
+
 ## Verification Checklist
 
 For UI/bridge changes, manually check the affected subset:
@@ -157,3 +170,13 @@ For UI/bridge changes, manually check the affected subset:
 
 The frontend does not process images. Export, preview and presets remain in
 Python services behind the bridge.
+
+## Local Checks
+
+From the repository root:
+
+```bash
+python scripts/check_all.py
+python scripts/e2e_smoke.py
+python scripts/benchmark_shadow_v2.py --smoke --runs 1
+```

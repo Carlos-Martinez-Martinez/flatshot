@@ -39,6 +39,14 @@ function handleDocumentKeydown(event) {
     return;
   }
 
+  if (command && event.shiftKey && event.key.toLowerCase() === "e") {
+    event.preventDefault();
+    if (isExportReady() && state.exportStatus !== "running") {
+      quickExport();
+    }
+    return;
+  }
+
   if (command && event.key.toLowerCase() === "e") {
     event.preventDefault();
     if (isExportReady() && state.exportStatus !== "running") {

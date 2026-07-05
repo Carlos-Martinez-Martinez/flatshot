@@ -7,8 +7,18 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function (outputProfileHelpers) {
   function bridgeImagePaths(images = []) {
     return images
-      .filter((image) => image?.source === "bridge" && image.path)
+      .filter((image) => image?.source === "bridge" && image.path && !bridgeImageId(image))
       .map((image) => image.path);
+  }
+
+  function bridgeImageId(image) {
+    return String(image?.bridgeImageId || image?.imageId || "").trim();
+  }
+
+  function bridgeImageIds(images = []) {
+    return images
+      .filter((image) => image?.source === "bridge" && bridgeImageId(image))
+      .map((image) => bridgeImageId(image));
   }
 
   function failedBridgeExportImages(images = [], completedItems = []) {
@@ -39,9 +49,11 @@
     const primary = primaryOutputProfile(profiles, options.activeOutputProfileId, options.fallbackProfile);
     const seenVariantIds = new Set();
     return {
+      imageIds: bridgeImageIds(options.images),
       imagePaths: bridgeImagePaths(options.images),
       presetName: options.presetName,
       settings: options.settings,
+      curveData: options.curveData || options.scaleCurve || null,
       imageOverrides: options.imageOverrides,
       export: {
         format: primary.format,
@@ -61,6 +73,7 @@
   }
 
   return {
+    bridgeImageIds,
     bridgeImagePaths,
     buildBridgeExportPayload,
     failedBridgeExportImages,

@@ -53,6 +53,18 @@ def test_build_frontend_app_url_passes_non_default_bridge_url():
     assert app_url == "http://127.0.0.1:4174?bridge=http%3A%2F%2F127.0.0.1%3A8766"
 
 
+def test_build_frontend_app_url_includes_bridge_token():
+    frontend_url = "http://127.0.0.1:4174"
+    bridge_url = "http://127.0.0.1:8766"
+
+    app_url = run_dev.build_frontend_app_url(frontend_url, bridge_url, bridge_token="secret")
+
+    assert app_url == (
+        "http://127.0.0.1:4174?"
+        "bridge=http%3A%2F%2F127.0.0.1%3A8766&bridgeToken=secret"
+    )
+
+
 def test_build_frontend_app_url_keeps_default_bridge_url_clean():
     frontend_url = "http://127.0.0.1:4174"
     bridge_url = "http://127.0.0.1:8765"

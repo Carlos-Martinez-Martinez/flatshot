@@ -5,24 +5,28 @@ from __future__ import annotations
 import threading
 from pathlib import Path
 from typing import Any, Callable, Mapping
+from uuid import uuid4
 
 from flatshot.application.config_paths import ConfigPathResolver
 from flatshot.application.export_config_service import ExportConfigService
+from flatshot.application.export_preflight import ensure_export_space
+from flatshot.application.folder_scan_jobs import FolderScanJob
 from flatshot.application.export_runner import ExportRunner
 from flatshot.application.folder_scanner import FolderScanner
 from flatshot.application.preset_service import PresetService
 from flatshot.application.preview_service import PreviewService
 from flatshot.application.settings_service import SettingsService
 from flatshot.bridge import app_info as bridge_app_info
-from flatshot.bridge import export_endpoints, export_requests, preferences, preset_endpoints, preview_endpoints
+from flatshot.bridge import export_endpoints, export_requests, preferences, preset_endpoints
+from flatshot.bridge import preview_endpoints, scan_job_endpoints, scan_requests
 from flatshot.bridge.errors import BridgeError, InvalidRequestError
+from flatshot.bridge.export_job_repository import ExportJobRepository
 from flatshot.bridge.export_jobs import BridgeExportJob, ExportRunnerFactory
+from flatshot.bridge.image_registry import BridgeImageRegistry
 from flatshot.bridge.onboarding_assets import onboarding_assets_folder, open_folder_with_system
 from flatshot.bridge.path_policy import TrustedPathPolicy
-from flatshot.bridge.serialization import (
-    batch_scan_result_to_dict,
-    serialize_path,
-)
+from flatshot.bridge.serialization import batch_scan_result_to_dict, serialize_path
+from flatshot.utils.thumbnail_cache import ThumbnailCache
 
 
 class FlatShotBridgeService:
@@ -41,6 +45,9 @@ class FlatShotBridgeService:
         max_concurrent_exports: int = 1,
         max_retained_jobs: int = 20,
         path_policy: TrustedPathPolicy | None = None,
+        thumbnail_cache: ThumbnailCache | None = None,
+        image_registry: BridgeImageRegistry | None = None,
+        export_job_repository: ExportJobRepository | None = None,
     ) -> None:
         self.folder_scanner = folder_scanner or FolderScanner()
         self.preview_service = preview_service or PreviewService()
@@ -52,8 +59,15 @@ class FlatShotBridgeService:
         self.max_concurrent_exports = max_concurrent_exports
         self.max_retained_jobs = max(1, int(max_retained_jobs))
         self.path_policy = path_policy or TrustedPathPolicy()
+        self.thumbnail_cache = thumbnail_cache
+        self.image_registry = image_registry or BridgeImageRegistry()
+        self.export_job_repository = export_job_repository or ExportJobRepository(
+            self.config_resolver.config_dir(create=False) / "export-manifests"
+        )
         self._jobs: dict[str, BridgeExportJob] = {}
         self._jobs_lock = threading.Lock()
+        self._scan_jobs: dict[str, FolderScanJob] = {}
+        self._scan_jobs_lock = threading.Lock()
 
     def health(self) -> dict[str, Any]:
         return {
@@ -84,29 +98,52 @@ class FlatShotBridgeService:
         return preferences.save_ui_preferences(self, payload)
 
     def scan_folders(self, payload: Mapping[str, Any]) -> dict[str, Any]:
-        if not isinstance(payload, Mapping):
-            raise InvalidRequestError("Expected a JSON object.")
+        folders, image_overrides, verify_images, recursive = self._scan_request(payload)
+        result = self.folder_scanner.scan_folders(
+            folders,
+            dict(image_overrides),
+            verify_images=verify_images,
+            recursive=recursive,
+        )
+        return batch_scan_result_to_dict(result, image_id_for_path=self.image_registry.register)
 
-        raw_folders = payload.get("folders")
-        if not isinstance(raw_folders, list):
-            raise InvalidRequestError("Field 'folders' must be a list of paths.")
+    def start_scan_job(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+        folders, image_overrides, verify_images, recursive = self._scan_request(payload)
+        job = FolderScanJob(
+            job_id=uuid4().hex,
+            folders=folders,
+            image_overrides=dict(image_overrides),
+            scanner=self.folder_scanner,
+            verify_images=verify_images,
+            recursive=recursive,
+        )
+        with self._scan_jobs_lock:
+            self._prune_finished_scan_jobs_locked(reserve_slots=1)
+            self._scan_jobs[job.job_id] = job
+        job.start()
+        return scan_job_endpoints.scan_job_snapshot(job, image_id_for_path=self.image_registry.register)
 
-        folders: list[Path] = []
-        for index, folder in enumerate(raw_folders):
-            if not isinstance(folder, str) or not folder.strip():
-                raise InvalidRequestError(f"Field 'folders[{index}]' must be a non-empty path string.")
-            path = Path(folder).expanduser()
-            folders.append(path)
-            self.path_policy.register_root(path)
+    def scan_job_status(
+        self,
+        job_id: str,
+        *,
+        image_offset: int = 0,
+        image_limit: int | None = None,
+    ) -> dict[str, Any]:
+        return scan_job_endpoints.scan_job_snapshot(
+            self._scan_job(job_id),
+            image_offset=image_offset,
+            image_limit=image_limit,
+            image_id_for_path=self.image_registry.register,
+        )
 
-        image_overrides = payload.get("imageOverrides", {})
-        if image_overrides is None:
-            image_overrides = {}
-        if not isinstance(image_overrides, Mapping):
-            raise InvalidRequestError("Field 'imageOverrides' must be an object when provided.")
+    def cancel_scan_job(self, job_id: str) -> dict[str, Any]:
+        job = self._scan_job(job_id)
+        job.cancel()
+        return scan_job_endpoints.scan_job_snapshot(job, image_id_for_path=self.image_registry.register)
 
-        result = self.folder_scanner.scan_folders(folders, dict(image_overrides))
-        return batch_scan_result_to_dict(result)
+    def _scan_request(self, payload: Mapping[str, Any]) -> tuple[list[Path], dict, bool, bool]:
+        return scan_requests.parse_scan_request(payload, self.path_policy)
 
     def pick_folder(self, payload: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(payload, Mapping):
@@ -176,12 +213,19 @@ class FlatShotBridgeService:
     def _export_requests(self, payload: Mapping[str, Any]):
         return export_requests.build_export_requests(self, payload)
 
-    @staticmethod
-    def _validate_export_outputs(requests) -> None:
-        export_requests.validate_export_outputs(requests)
+    def _validate_export_outputs(self, requests) -> None:
+        export_requests.validate_export_outputs(requests, path_policy=self.path_policy)
+
+    def _ensure_export_space(self, requests) -> None:
+        ensure_export_space(requests)
 
     def _export_config(self, raw_export: Any):
         return export_requests.build_export_config(self.export_config_service, raw_export)
+
+    def _thumbnail_cache(self) -> ThumbnailCache:
+        if self.thumbnail_cache is None:
+            self.thumbnail_cache = ThumbnailCache(self.config_resolver.config_dir() / "thumbnail-cache")
+        return self.thumbnail_cache
 
     def _job(self, job_id: str) -> BridgeExportJob:
         if not isinstance(job_id, str) or not job_id.strip():
@@ -190,6 +234,15 @@ class FlatShotBridgeService:
             job = self._jobs.get(job_id)
         if job is None:
             raise BridgeError("job_not_found", "Exportación no encontrada.", status=404)
+        return job
+
+    def _scan_job(self, job_id: str) -> FolderScanJob:
+        if not isinstance(job_id, str) or not job_id.strip():
+            raise InvalidRequestError("Scan job id is required.")
+        with self._scan_jobs_lock:
+            job = self._scan_jobs.get(job_id)
+        if job is None:
+            raise BridgeError("scan_job_not_found", "Escaneo no encontrado.", status=404)
         return job
 
     def _prune_finished_jobs_locked(self, *, reserve_slots: int = 0) -> None:
@@ -208,8 +261,27 @@ class FlatShotBridgeService:
         for job_id, _job in finished_jobs[:remove_count]:
             del self._jobs[job_id]
 
+    def _prune_finished_scan_jobs_locked(self, *, reserve_slots: int = 0) -> None:
+        retained_limit = max(0, self.max_retained_jobs - max(0, int(reserve_slots)))
+        finished_jobs = sorted(
+            (
+                (job_id, job)
+                for job_id, job in self._scan_jobs.items()
+                if job.is_terminal
+            ),
+            key=lambda item: item[1].retention_timestamp,
+        )
+        remove_count = len(finished_jobs) - retained_limit
+        if remove_count <= 0:
+            return
+        for job_id, _job in finished_jobs[:remove_count]:
+            del self._scan_jobs[job_id]
+
     def _validate_image_path_access(self, path: Path) -> None:
         self.path_policy.validate_image_path(path)
+
+    def _validate_output_path_access(self, path: Path) -> None:
+        self.path_policy.validate_output_path(path)
 
     @staticmethod
     def _folder_picker_initial_path(value: Any) -> Path | None:

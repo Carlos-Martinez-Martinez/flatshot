@@ -105,7 +105,7 @@ function renderTop() {
     const showFormat = state.batch !== "none" && state.batch !== "scanning";
     formatButton.hidden = !showFormat;
     formatButton.disabled = !showFormat || state.exportStatus === "running";
-    formatButton.title = "Formatos de salida";
+    formatButton.title = "Salidas";
   }
   const inspectorButton = $(".top-inspector-action");
   if (inspectorButton) {

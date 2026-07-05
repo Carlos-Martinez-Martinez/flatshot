@@ -3,7 +3,8 @@ function imageThumbnailSrc(image) {
     return "";
   }
   if (image.source === "bridge") {
-    return image.thumbnailUrl || (image.path ? bridgeThumbnailUrl(image.path) : "");
+    const bridgeImageId = image.bridgeImageId || image.imageId || "";
+    return image.thumbnailUrl || (image.path || bridgeImageId ? bridgeThumbnailUrl(image.path, 128, bridgeImageId) : "");
   }
   return galleryHelpers.mockThumbnailDataUrl(image);
 }
@@ -228,6 +229,7 @@ async function renderFallbackThumbnail({ imageId, sourceSrc }) {
     method: "POST",
     body: JSON.stringify({
       imagePath: image.path,
+      imageId: image.bridgeImageId || image.imageId || "",
       ...thumbnailTargetSize(),
       settings: bridgePreviewSettings(),
       localOverride: currentImageOverride(image),

@@ -94,7 +94,7 @@ function settingsWithLocalOverride(settings = state.settings, override = current
     next.opacity = Math.max(0, Math.min(100, Number(next.opacity || 0) + local.shadow_delta));
   }
   if (Object.prototype.hasOwnProperty.call(local, "blur_delta")) {
-    next.blur = Math.max(0, Math.min(100, Number(next.blur || 0) + local.blur_delta));
+    next.blur = Math.max(0, Math.min(80, Number(next.blur || 0) + local.blur_delta));
   }
   return normalizeSettings(next);
 }

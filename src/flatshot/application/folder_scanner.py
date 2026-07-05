@@ -36,6 +36,9 @@ class FolderScanner:
         folders: Iterable[str | Path],
         image_overrides: dict | None = None,
         progress_callback: Callable[[int, int], None] | None = None,
+        verify_images: bool = True,
+        recursive: bool = False,
+        cancellation_token=None,
     ) -> BatchScanResult:
         cb = progress_callback if progress_callback is not None else self._progress_callback
         overrides = dict(image_overrides or {})
@@ -43,7 +46,15 @@ class FolderScanner:
         total = len(folder_list)
         folder_results: list[FolderScanResult] = []
         for idx, folder in enumerate(folder_list):
-            result = self._scan_folder(Path(folder), overrides)
+            if _is_cancelled(cancellation_token):
+                break
+            result = self._scan_folder(
+                Path(folder),
+                overrides,
+                verify_images=verify_images,
+                recursive=recursive,
+                cancellation_token=cancellation_token,
+            )
             folder_results.append(result)
             if cb is not None:
                 cb(idx + 1, total)
@@ -75,7 +86,15 @@ class FolderScanner:
             omitted_by_category=omitted_by_category,
         )
 
-    def _scan_folder(self, folder: Path, image_overrides: dict) -> FolderScanResult:
+    def _scan_folder(
+        self,
+        folder: Path,
+        image_overrides: dict,
+        *,
+        verify_images: bool = True,
+        recursive: bool = False,
+        cancellation_token=None,
+    ) -> FolderScanResult:
         exists = folder.exists()
         is_dir = folder.is_dir()
         errors: list[str] = []
@@ -97,7 +116,7 @@ class FolderScanner:
             )
 
         try:
-            entries = sorted(folder.iterdir(), key=lambda path: path.name.lower())
+            entries = self._folder_entries(folder, recursive=recursive)
         except OSError as exc:
             return FolderScanResult(
                 folder=folder,
@@ -111,6 +130,22 @@ class FolderScanner:
         omitted: list[OmittedScanItem] = []
 
         for entry in entries:
+            if _is_cancelled(cancellation_token):
+                break
+
+            if entry.is_symlink() and entry.is_dir():
+                omitted.append(
+                    OmittedScanItem(
+                        path=entry,
+                        name=entry.name,
+                        reason="symlink_not_scanned",
+                        detail="Enlace de carpeta no escaneado",
+                        category="ignored",
+                        severity="ignored",
+                    )
+                )
+                continue
+
             if entry.is_dir():
                 omitted.append(
                     OmittedScanItem(
@@ -144,7 +179,7 @@ class FolderScanner:
                 )
                 continue
 
-            if not self._is_readable_png(entry):
+            if verify_images and not self._is_readable_png(entry):
                 omitted.append(
                     OmittedScanItem(
                         path=entry,
@@ -189,6 +224,23 @@ class FolderScanner:
         )
 
     @staticmethod
+    def _folder_entries(folder: Path, *, recursive: bool = False) -> list[Path]:
+        entries = sorted(folder.iterdir(), key=lambda path: path.name.lower())
+        if not recursive:
+            return entries
+
+        collected: list[Path] = []
+        for entry in entries:
+            if entry.is_dir():
+                if entry.is_symlink():
+                    collected.append(entry)
+                else:
+                    collected.extend(FolderScanner._folder_entries(entry, recursive=True))
+            else:
+                collected.append(entry)
+        return collected
+
+    @staticmethod
     def _is_readable_png(path: Path) -> bool:
         try:
             with Image.open(path) as image:
@@ -206,3 +258,7 @@ class FolderScanner:
         if suffix in IGNORED_SYSTEM_SUFFIXES:
             return "temporary_or_config_file", "Archivo temporal o de configuración ignorado"
         return "unsupported_extension", f"Extensión no admitida: {path.suffix or 'sin extensión'}"
+
+
+def _is_cancelled(cancellation_token) -> bool:
+    return bool(getattr(cancellation_token, "cancelled", False))

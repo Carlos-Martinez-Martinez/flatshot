@@ -205,6 +205,30 @@ class TestProcessValidation:
         
         assert exc_info.value.code == 1
 
+    def test_process_rejects_file_input(self, tmp_path):
+        """Test process rejects an input path that is a file, not a folder."""
+        from flatshot.cli import process_folder
+        import argparse
+
+        file_path = tmp_path / "item.png"
+        file_path.write_bytes(b"not a folder")
+
+        args = argparse.Namespace(
+            input=str(file_path),
+            preset=None,
+            output=None,
+            size=None,
+            format="JPG",
+            suffix=None,
+            template=None,
+            dry_run=False,
+        )
+
+        with pytest.raises(SystemExit) as exc_info:
+            process_folder(args)
+
+        assert exc_info.value.code == 1
+
 
 class TestDryRun:
     """Tests for dry-run functionality."""
@@ -242,3 +266,29 @@ class TestDryRun:
         
         captured = capsys.readouterr()
         assert "DRY RUN" in captured.out
+
+    def test_dry_run_accepts_uppercase_png_extension(self, tmp_path, capsys):
+        """Test that uppercase .PNG files are included in CLI processing."""
+        from flatshot.cli import process_folder
+        import argparse
+        from PIL import Image
+
+        test_folder = tmp_path / "test_images"
+        test_folder.mkdir()
+        Image.new("RGBA", (100, 100), (255, 0, 0, 255)).save(test_folder / "test.PNG")
+
+        args = argparse.Namespace(
+            input=str(test_folder),
+            preset=None,
+            output="_TEST_OUTPUT",
+            size="400x600",
+            format="JPG",
+            suffix="_test",
+            template=None,
+            dry_run=True,
+        )
+
+        process_folder(args)
+
+        captured = capsys.readouterr()
+        assert "Found 1 images" in captured.out

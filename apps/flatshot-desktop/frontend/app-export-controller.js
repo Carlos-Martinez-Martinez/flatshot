@@ -94,15 +94,24 @@ function bridgeExportPayload(options = {}) {
     presetName: state.activePreset,
     profiles: exportOutputProfiles(),
     settings: bridgePreviewSettings(),
+    curveData: state.curveData || state.scaleCurve || null,
   });
 }
 
 function retryableFailedExportImages() {
-  return exportPayloadHelpers.failedBridgeExportImages(exportableImages(), state.exportCompletedItems);
+  return exportPayloadHelpers.failedBridgeExportImages(exportableImages(), retryableFailedExportItems());
+}
+
+function retryableFailedExportItems() {
+  return state.exportFailedItems.length ? state.exportFailedItems : state.exportCompletedItems;
 }
 
 function retryFailedExport() {
   startExport({ retryFailedOnly: true, confirmed: true });
+}
+
+function quickExport() {
+  startExport({ confirmed: true, quick: true });
 }
 
 function exportVariantPayloadFromProfile(profile, index, seenVariantIds = new Set()) {
@@ -144,7 +153,7 @@ function clearBridgeExportPoll() {
 
 function applyBridgeExportStatus(payload) {
   Object.assign(state, exportStateHelpers.bridgeStatusPatch(payload, state));
-  state.errors = exportStateHelpers.bridgeStatusErrors(payload, state.exportCompletedItems, state.exportIssues);
+  state.errors = exportStateHelpers.bridgeStatusErrors(payload, retryableFailedExportItems(), state.exportIssues);
   if (["completed", "partial", "failed"].includes(state.exportStatus)) {
     rememberCurrentExportHistory();
   }

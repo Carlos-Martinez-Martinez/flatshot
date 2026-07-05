@@ -73,6 +73,7 @@
       exportStatus: "blocked",
       progress: 0,
       processed: 0,
+      scanJobId: null,
       exportJobId: null,
       exportDestinations: [],
       exportMessages: [],
@@ -91,7 +92,25 @@
       scanDiagnostics: emptyDiagnostics,
       scanStatus: folders.length === 1 ? "Escaneando ruta" : `Escaneando ${folders.length} rutas`,
       statusText: "Escaneando ruta",
-      bridgeLastResponse: "Solicitando /folders/scan",
+      bridgeLastResponse: "Solicitando /folders/scan/jobs",
+    };
+  }
+
+  function scanJobProgressState(snapshot = {}) {
+    const progress = snapshot.progress || {};
+    const processed = Number(progress.processed) || 0;
+    const total = Number(progress.total) || 0;
+    const percent = Number(progress.percent) || 0;
+    const stopping = snapshot.status === "cancelling";
+    const label = stopping
+      ? "Deteniendo escaneo..."
+      : total ? `Escaneando ${processed}/${total}` : "Escaneando";
+    return {
+      progress: percent,
+      processed,
+      scanStatus: label,
+      statusText: label,
+      bridgeLastResponse: `scan job ${snapshot.jobId || ""} · ${snapshot.status || "running"}`,
     };
   }
 
@@ -111,6 +130,28 @@
       scanStatus: "Conexión local no disponible",
       scanIssues: [{ level: "error", title: "Conexión local no disponible", detail: message }],
       statusText: "No se pudo escanear",
+    };
+  }
+
+  function scanCancelledState(emptyDiagnostics = {}) {
+    return {
+      batch: "none",
+      batchSource: "none",
+      selectedImageId: null,
+      previewStatus: "empty",
+      previewData: null,
+      previewError: "",
+      exportStatus: "blocked",
+      progress: 0,
+      processed: 0,
+      scanJobId: null,
+      scanDiagnostics: emptyDiagnostics,
+      bridgeStatus: "connected",
+      bridgeMessage: "Escaneo cancelado",
+      bridgeLastResponse: "scan cancelado",
+      scanStatus: "Escaneo cancelado",
+      scanIssues: [],
+      statusText: "Escaneo cancelado",
     };
   }
 
@@ -311,6 +352,8 @@
     normalBridgeMessage,
     scanEmptyState,
     scanFailureState,
+    scanJobProgressState,
+    scanCancelledState,
     scanReadyState,
     scanStartState,
     sourceBadgeClass,

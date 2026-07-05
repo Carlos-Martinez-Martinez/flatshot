@@ -7,11 +7,11 @@ from typing import Any, Mapping
 
 from PIL import Image
 
-from flatshot.application.contracts import PreviewRequest
+from flatshot.application.contracts import PreviewRequest, RenderConfiguration
 from flatshot.bridge.errors import BridgeError, InvalidRequestError
-from flatshot.bridge.payload_helpers import positive_int, preview_settings
+from flatshot.bridge.image_registry import payload_image_path
+from flatshot.bridge.payload_helpers import curve_data_payload, positive_int, preview_settings
 from flatshot.bridge.serialization import preview_result_to_dict
-from flatshot.bridge.validation import preview_image_path
 from flatshot.core.models import SHADOW_ENGINE_DEFAULT, normalize_shadow_settings
 from flatshot.core.overrides import apply_image_override, normalize_image_override
 from flatshot.core.scaling import find_subject_bbox
@@ -26,7 +26,7 @@ def render_preview(service, payload: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(payload, Mapping):
         raise InvalidRequestError("Expected a JSON object.")
 
-    image_path = preview_image_path(payload)
+    image_path = payload_image_path(service, payload)
     service._validate_image_path_access(image_path)
     target_size = preview_target_size(payload)
     settings = normalize_shadow_settings(
@@ -35,16 +35,20 @@ def render_preview(service, payload: Mapping[str, Any]) -> dict[str, Any]:
     )
     local_override = normalize_image_override(payload.get("localOverride", {}))
     preview_shadow_settings = apply_image_override(settings, local_override)
+    curve_data = curve_data_payload(payload)
+    render_config = RenderConfiguration(settings=preview_shadow_settings, curve_data=curve_data)
 
     started = perf_counter()
     try:
         result = service.preview_service.render_preview(
             PreviewRequest(
                 image_path=image_path,
-                settings=preview_shadow_settings,
+                settings=render_config.settings,
                 target_size=target_size,
+                curve_data=render_config.curve_data,
                 scale_factor=1.0,
                 is_preview=True,
+                render_config=render_config,
             )
         )
     except BridgeError:
@@ -60,7 +64,7 @@ def render_preview_binary(service, payload: Mapping[str, Any]) -> tuple[str, byt
     if not isinstance(payload, Mapping):
         raise InvalidRequestError("Expected a JSON object.")
 
-    image_path = preview_image_path(payload)
+    image_path = payload_image_path(service, payload)
     service._validate_image_path_access(image_path)
     target_size = preview_target_size(payload)
     settings = normalize_shadow_settings(
@@ -69,15 +73,19 @@ def render_preview_binary(service, payload: Mapping[str, Any]) -> tuple[str, byt
     )
     local_override = normalize_image_override(payload.get("localOverride", {}))
     preview_shadow_settings = apply_image_override(settings, local_override)
+    curve_data = curve_data_payload(payload)
+    render_config = RenderConfiguration(settings=preview_shadow_settings, curve_data=curve_data)
 
     try:
         result = service.preview_service.render_preview(
             PreviewRequest(
                 image_path=image_path,
-                settings=preview_shadow_settings,
+                settings=render_config.settings,
                 target_size=target_size,
+                curve_data=render_config.curve_data,
                 scale_factor=1.0,
                 is_preview=True,
+                render_config=render_config,
             )
         )
     except BridgeError:
@@ -95,9 +103,14 @@ def render_thumbnail(service, payload: Mapping[str, Any]) -> tuple[str, bytes]:
     if not isinstance(payload, Mapping):
         raise InvalidRequestError("Expected a JSON object.")
 
-    image_path = preview_image_path(payload)
+    image_path = payload_image_path(service, payload)
     service._validate_image_path_access(image_path)
     size = min(positive_int(payload.get("size"), "size", default=DEFAULT_THUMBNAIL_SIDE), MAX_THUMBNAIL_SIDE)
+
+    thumbnail_cache = service._thumbnail_cache()
+    cached = thumbnail_cache.get(image_path, size)
+    if cached is not None:
+        return "image/png", cached
 
     try:
         with Image.open(image_path) as opened:
@@ -109,7 +122,9 @@ def render_thumbnail(service, payload: Mapping[str, Any]) -> tuple[str, bytes]:
 
     buffer = BytesIO()
     thumbnail.save(buffer, format="PNG")
-    return "image/png", buffer.getvalue()
+    payload_bytes = buffer.getvalue()
+    thumbnail_cache.put(image_path, size, payload_bytes)
+    return "image/png", payload_bytes
 
 
 def preview_target_size(payload: Mapping[str, Any]) -> tuple[int, int]:

@@ -5,13 +5,9 @@
   }
   root.FlatShotInspectorReviewView = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  const escapeHtml = globalThis.FlatShotFormatters?.escapeHtml || function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  };
+  const formatterHelpers = globalThis.FlatShotFormatters
+    || (typeof require === "function" ? require("./formatters.js") : null);
+  const escapeHtml = (value) => formatterHelpers.escapeHtml(value);
 
   function lotInspectorSummaryHtml(options = {}) {
     const counts = options.counts || {};
@@ -105,7 +101,7 @@
       <button type="button" data-action="previous-image"${canNavigate ? "" : " disabled"}>Anterior</button>
       <button type="button" data-action="next-image"${canNavigate ? "" : " disabled"}>Siguiente</button>
       ${issues.length ? '<button type="button" data-action="review-errors">Revisar avisos</button>' : ""}
-      <button type="button" data-action="open-app-settings">Formatos</button>
+      <button type="button" data-action="open-app-settings">Salidas</button>
       ${hasLocal ? '<button type="button" data-action="reset-local-adjustment">Restablecer al lote</button>' : '<button type="button" data-action="open-advanced">Editar ajuste</button>'}
     </div>
   `;

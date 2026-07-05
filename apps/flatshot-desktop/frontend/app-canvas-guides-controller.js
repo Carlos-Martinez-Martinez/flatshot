@@ -127,14 +127,16 @@ function renderGuideManager() {
   let modal = $("#guide-manager-modal");
   if (!state.guideManagerOpen) {
     if (modal) {
+      syncModalVisibility(modal, false, { exitMs: 0 });
       modal.remove();
     }
     return;
   }
+  const shouldOpenModal = !modal;
   if (!modal) {
     modal = document.createElement("div");
     modal.id = "guide-manager-modal";
-    modal.className = "app-settings-backdrop guide-manager-modal";
+    modal.className = "app-settings-backdrop guide-manager-modal is-hidden";
     document.body.appendChild(modal);
   }
   modal.innerHTML = guideViewHelpers.guideManagerHtml({
@@ -144,6 +146,9 @@ function renderGuideManager() {
     draft: state.guideDraft,
     hiddenIds: state.hiddenGuideSystemIds,
   });
+  if (shouldOpenModal) {
+    syncModalVisibility(modal, true);
+  }
 }
 function selectedGuideSystem() {
   return state.guideSystems.find((system) => system.id === state.selectedGuideSystemId) || null;

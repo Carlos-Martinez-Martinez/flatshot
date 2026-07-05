@@ -123,7 +123,7 @@ assert.equal(grid.includes('class="batch-detail-metric"'), true);
 assert.equal(grid.includes("<span>Encontrados</span>"), true);
 assert.equal(grid.includes("<h3>Entrada</h3>"), true);
 assert.equal(grid.includes("<h3>Lote</h3>"), false);
-assert.equal(grid.includes("<h3>Formatos activos</h3>"), true);
+assert.equal(grid.includes("<h3>Salidas activas</h3>"), true);
 assert.equal(grid.includes("<h3>Incidencias</h3>"), true);
 assert.equal(grid.includes("Entrada &lt;uno&gt;"), true);
 assert.equal(grid.includes('title="C:/Entrada/&quot;uno&quot;"'), true);
@@ -131,7 +131,7 @@ assert.equal(grid.includes('class="batch-detail-output"'), true);
 assert.equal(grid.includes('class="batch-detail-problem warning"'), true);
 
 const emptyGrid = helpers.batchDetailGridHtml({{ counts: {{}} }});
-assert.equal(emptyGrid.includes("Sin formatos activos."), true);
+assert.equal(emptyGrid.includes("Sin salidas activas."), true);
 assert.equal(emptyGrid.includes("Sin incidencias."), true);
 assert.equal(emptyGrid.includes("batch-detail-secondary--single"), true);
 

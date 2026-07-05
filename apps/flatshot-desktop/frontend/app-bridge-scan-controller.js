@@ -131,17 +131,116 @@ async function scanBridgeFolder() {
       const presetPayload = await bridgeRequest("/presets");
       applyBridgePresets(presetPayload);
     }
-    const response = await bridgeRequest("/folders/scan", {
-      method: "POST",
-      body: JSON.stringify({ folders, imageOverrides: state.imageOverrides }),
-    });
+    const response = await requestBridgeScan(folders);
     applyBridgeScanResult(response);
   } catch (error) {
+    if (scanResultPageHelpers.isScanCancelledError(error)) {
+      Object.assign(state, scanStateHelpers.scanCancelledState(emptyScanDiagnostics()));
+      render();
+      return;
+    }
     const message = bridgeErrorMessage(error);
     Object.assign(state, scanStateHelpers.scanFailureState(message, emptyScanDiagnostics()));
   }
 
   render();
+}
+
+async function requestBridgeScan(folders) {
+  try {
+    return await startBridgeScanJob(folders);
+  } catch (error) {
+    if (!scanResultPageHelpers.isScanJobUnsupportedError(error)) {
+      throw error;
+    }
+    return fallbackBridgeScan(folders);
+  }
+}
+
+async function startBridgeScanJob(folders) {
+  const started = await bridgeRequest("/folders/scan/jobs", {
+    method: "POST",
+    body: JSON.stringify(scanResultPageHelpers.scanJobPayload(folders, state)),
+  });
+  if (!started.jobId) {
+    throw new Error("El bridge no devolvió job de escaneo.");
+  }
+  state.scanJobId = started.jobId;
+  return pollBridgeScanJob(started.jobId, started);
+}
+
+async function pollBridgeScanJob(jobId, snapshot) {
+  let current = snapshot;
+  while (current && !["completed", "cancelled", "failed"].includes(current.status)) {
+    Object.assign(state, scanStateHelpers.scanJobProgressState(current));
+    render();
+    await scanResultPageHelpers.scanJobDelay(250);
+    current = await bridgeRequest(scanResultPageHelpers.scanJobStatusUrl(jobId, 0), {
+      timeoutMs: 5000,
+    });
+  }
+  if (current?.status === "completed" && current.result) {
+    state.scanJobId = null;
+    return collectBridgeScanJobResultPages(jobId, current.result);
+  }
+  if (current?.status === "cancelled") {
+    state.scanJobId = null;
+    throw new Error("Escaneo cancelado.");
+  }
+  state.scanJobId = null;
+  throw new Error((current?.errors || []).join(" · ") || "No se pudo completar el escaneo.");
+}
+
+async function collectBridgeScanJobResultPages(jobId, firstResult) {
+  let merged = firstResult;
+  let page = firstResult.page || null;
+  while (page?.hasMore) {
+    const offset = scanResultPageHelpers.nextScanResultOffset(page);
+    const next = await bridgeRequest(scanResultPageHelpers.scanJobStatusUrl(jobId, offset), {
+      timeoutMs: 5000,
+    });
+    if (next?.status !== "completed" || !next.result) {
+      throw new Error("No se pudo recuperar una página del escaneo.");
+    }
+    merged = scanResultPageHelpers.mergeBridgeScanResultPages(merged, next.result);
+    page = next.result.page || null;
+  }
+  return merged;
+}
+
+async function cancelBridgeScan() {
+  const jobId = state.scanJobId;
+  if (!jobId) {
+    return;
+  }
+  Object.assign(state, scanStateHelpers.scanJobProgressState({
+    jobId, status: "cancelling", progress: { processed: state.processed, total: state.processed, percent: state.progress },
+  }));
+  render();
+  try {
+    const cancelled = await bridgeRequest(scanResultPageHelpers.scanJobCancelUrl(jobId), {
+      method: "POST",
+      body: JSON.stringify({}),
+      timeoutMs: 5000,
+    });
+    Object.assign(state, scanStateHelpers.scanJobProgressState(cancelled));
+  } catch (error) {
+    state.statusText = bridgeErrorMessage(error);
+  }
+  render();
+}
+
+function fallbackBridgeScan(folders) {
+  return bridgeRequest("/folders/scan", {
+    method: "POST",
+    body: JSON.stringify(scanResultPageHelpers.scanJobPayload(folders, state)),
+  });
+}
+
+function includeSubfoldersAndScan() {
+  state.scanRecursive = true;
+  state.statusText = "Incluyendo subcarpetas";
+  return scanBridgeFolder();
 }
 
 function persistBridgeScanPath(path = parseFolderInput(state.bridgeScanPath)[0] || "") {
@@ -277,8 +376,9 @@ function bridgeImageToItem(image, folderIndex, imageIndex) {
     status: image.hasLocalOverride ? "adjusted" : "ready",
     exportable: true,
     source: "bridge",
+    bridgeImageId: image.imageId || "",
     path: image.path,
-    thumbnailUrl: bridgeThumbnailUrl(image.path),
+    thumbnailUrl: bridgeThumbnailUrl(image.path, 128, image.imageId || ""),
     originalUrl: "",
   };
 }

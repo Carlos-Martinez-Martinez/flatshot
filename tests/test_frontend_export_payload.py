@@ -40,10 +40,11 @@ require({json.dumps(str(OUTPUT_PROFILES_PATH))});
 const helpers = require({json.dumps(str(HELPER_PATH))});
 
 const images = [
-  {{ id: "a", source: "bridge", path: "C:/lote/a.png" }},
+  {{ id: "a", source: "bridge", bridgeImageId: "img_a", path: "C:/lote/a.png" }},
   {{ id: "b", source: "mock", path: "C:/lote/b.png" }},
   {{ id: "c", source: "bridge", path: "" }},
-  {{ id: "d", source: "bridge", path: "C:/lote/d.png" }},
+  {{ id: "d", source: "bridge", imageId: "img_d", path: "C:/lote/d.png" }},
+  {{ id: "e", source: "bridge", path: "C:/lote/e.png" }},
 ];
 const profiles = [
   {{
@@ -74,16 +75,18 @@ const profiles = [
   }},
 ];
 const settings = {{ opacity: 20, blur: 14 }};
+const curveData = {{ xp: [0, 1], fp: [0.9, 1.1], base_fill: 0.5 }};
 const imageOverrides = {{ "C:/lote/a.png": {{ opacity: 10 }} }};
 
-assert.deepEqual(helpers.bridgeImagePaths(images), ["C:/lote/a.png", "C:/lote/d.png"]);
+assert.deepEqual(helpers.bridgeImagePaths(images), ["C:/lote/e.png"]);
+assert.deepEqual(helpers.bridgeImageIds(images), ["img_a", "img_d"]);
 assert.deepEqual(helpers.failedBridgeExportImages(images, [
   {{ name: "a.png", path: "C:/lote/a.png", success: false }},
   {{ name: "d.png", path: "C:/lote/d.png", success: true }},
   {{ name: "missing.png", path: "C:/lote/missing.png", success: false }},
   {{ name: "legacy.png", success: false }},
 ]), [
-  {{ id: "a", source: "bridge", path: "C:/lote/a.png" }},
+  {{ id: "a", source: "bridge", bridgeImageId: "img_a", path: "C:/lote/a.png" }},
 ]);
 assert.equal(helpers.primaryOutputProfile(profiles, "missing", profiles[1]), profiles[0]);
 assert.equal(helpers.primaryOutputProfile(profiles, "web_rgb230", profiles[1]), profiles[0]);
@@ -97,12 +100,15 @@ const payload = helpers.buildBridgeExportPayload({{
   presetName: "Luz cenital",
   profiles,
   settings,
+  curveData,
 }});
 
 assert.deepEqual(payload, {{
-  imagePaths: ["C:/lote/a.png", "C:/lote/d.png"],
+  imageIds: ["img_a", "img_d"],
+  imagePaths: ["C:/lote/e.png"],
   presetName: "Luz cenital",
   settings,
+  curveData,
   imageOverrides,
   export: {{
     format: "JPG",

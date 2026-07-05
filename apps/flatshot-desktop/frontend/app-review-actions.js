@@ -34,6 +34,8 @@ function runVisibleAction(action) {
     reviewOutput();
   } else if (action === "start-export") {
     startExport();
+  } else if (action === "quick-export") {
+    quickExport();
   } else if (action === "open-output") {
     openOutputFolder();
   } else if (action === "copy-output-path") {

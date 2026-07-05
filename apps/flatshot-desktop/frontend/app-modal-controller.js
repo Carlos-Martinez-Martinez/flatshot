@@ -10,13 +10,13 @@ function openAppSettings() {
     : {
       ...currentOutputProfileData(),
       id: outputProfileHelpers.uniqueOutputProfileId("formato-personalizado", Date.now()),
-      name: "Formato personalizado",
+      name: "Salida personalizada",
     };
   state.appSettingsOpen = true;
   state.outputProfileEditorId = profile.id;
   state.outputProfileDraft = { ...profile };
   state.outputDeleteConfirmId = "";
-  state.statusText = "Formatos de salida";
+  state.statusText = "Salidas";
   render();
   queueModalFocus("#app-settings-modal", "[data-action='close-app-settings']");
 }
@@ -45,7 +45,7 @@ function cancelOutputProfileDraft() {
   state.outputProfileEditorId = fallback?.id || "";
   state.outputProfileDraft = null;
   state.outputDeleteConfirmId = "";
-  state.statusText = "Formato descartado";
+  state.statusText = "Salida descartada";
   render();
 }
 

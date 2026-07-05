@@ -68,6 +68,19 @@ La versión portátil se genera en:
 release\FlatShotPortable
 ```
 
+## Configuración local
+
+FlatShot guarda ajustes, presets y manifests de exportación en la carpeta de
+configuración local de la aplicación:
+
+- Windows: `%LOCALAPPDATA%\FlatShot`
+- macOS: `~/Library/Preferences/FlatShot`
+- Linux: `$XDG_CONFIG_HOME/flatshot` o `~/.config/flatshot`
+
+Si existe configuración antigua en la raíz de configuración del sistema,
+FlatShot la copia a la carpeta namespaced al arrancar sin borrar los archivos
+anteriores.
+
 ## Uso básico
 
 - Importa una carpeta con imágenes PNG.
@@ -94,10 +107,24 @@ python -m pip install -r requirements-dev.txt
 ```
 
 ```bash
-python -m pytest
-python -m ruff check .
-python scripts/audit_css.py --check
+python scripts/check_all.py
 python scripts/build_portable.py --skip-venv
+```
+
+`check_all.py` ejecuta la suite de pytest, ruff, la auditoría CSS, el smoke E2E
+estático del frontend y el smoke de regresión visual/asset. Para comprobar solo
+el smoke visual/asset del frontend:
+
+```bash
+python scripts/e2e_smoke.py
+python scripts/visual_regression_smoke.py
+```
+
+Para una comprobación rápida del benchmark de render sin lanzar el benchmark
+completo:
+
+```bash
+python scripts/benchmark_shadow_v2.py --smoke --runs 1
 ```
 
 Si cambia la interfaz o la exportación, abre FlatShot y revisa al menos una

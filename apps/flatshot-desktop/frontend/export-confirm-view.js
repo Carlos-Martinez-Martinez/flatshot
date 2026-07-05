@@ -5,13 +5,9 @@
   }
   root.FlatShotExportConfirmView = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  const escapeHtml = globalThis.FlatShotFormatters?.escapeHtml || function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  };
+  const formatterHelpers = globalThis.FlatShotFormatters
+    || (typeof require === "function" ? require("./formatters.js") : null);
+  const escapeHtml = (value) => formatterHelpers.escapeHtml(value);
 
   function exportConfirmRiskHtml(risk) {
     const icon = risk.blocking ? "!" : "⚠";
@@ -65,7 +61,7 @@
         <span aria-hidden="true">✓</span>
         <div>
           <strong>Sin avisos</strong>
-          <small>El lote se exportará con el formato activo.</small>
+          <small>El lote se exportará con la salida activa.</small>
         </div>
       </div>
     `;

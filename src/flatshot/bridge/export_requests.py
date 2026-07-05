@@ -4,16 +4,21 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Mapping
 
-from flatshot.application.contracts import ExportJobRequest
+from pydantic import ValidationError
+
+from flatshot.application.contracts import ExportJobRequest, RenderConfiguration
+from flatshot.application.export_job_builder import build_export_job_requests
 from flatshot.application.export_runner import OutputPathValidationError, validate_export_requests_outputs
 from flatshot.bridge.errors import BridgeError, InvalidRequestError
+from flatshot.bridge.image_registry import payload_export_image_paths
+from flatshot.bridge.path_policy import TrustedPathPolicy
 from flatshot.bridge.payload_helpers import (
     backgroundColorTuple,
+    curve_data_payload,
     export_size,
     optional_string,
     preview_settings,
 )
-from flatshot.bridge.validation import export_image_paths
 from flatshot.core.models import SHADOW_ENGINE_DEFAULT, ExportConfig, normalize_shadow_settings
 from flatshot.core.overrides import normalize_image_override
 
@@ -22,7 +27,7 @@ def build_export_requests(service, payload: Mapping[str, Any]) -> tuple[list[Exp
     if not isinstance(payload, Mapping):
         raise InvalidRequestError("Expected a JSON object.")
 
-    image_paths = export_image_paths(payload.get("imagePaths"))
+    image_paths = payload_export_image_paths(service, payload)
     for image_path in image_paths:
         service._validate_image_path_access(image_path)
     settings = normalize_shadow_settings(
@@ -43,33 +48,38 @@ def build_export_requests(service, payload: Mapping[str, Any]) -> tuple[list[Exp
     errors = service.export_config_service.validate(export_config)
     if errors:
         raise InvalidRequestError(errors[0])
-
-    grouped: dict[Path, list[Path]] = {}
-    for image_path in image_paths:
-        grouped.setdefault(image_path.parent, []).append(image_path)
+    render_config = RenderConfiguration(
+        settings=settings,
+        curve_data=curve_data_payload(payload),
+        preset_name=optional_string(payload.get("presetName")),
+    )
 
     return (
-        [
-            ExportJobRequest(
-                input_folder=folder,
-                input_files=sorted(paths),
-                settings=settings,
-                export_config=export_config,
-                curve_data=None,
-                preset_name=optional_string(payload.get("presetName")),
-                image_overrides=image_overrides,
-            )
-            for folder, paths in sorted(grouped.items(), key=lambda item: str(item[0]))
-        ],
+        build_export_job_requests(
+            image_paths,
+            export_config=export_config,
+            render_config=render_config,
+            image_overrides=image_overrides,
+        ),
         export_config,
     )
 
 
-def validate_export_outputs(requests: list[ExportJobRequest]) -> None:
+def validate_export_outputs(
+    requests: list[ExportJobRequest],
+    *,
+    path_policy: TrustedPathPolicy | None = None,
+) -> None:
     try:
-        validate_export_requests_outputs(requests)
+        planned_outputs = validate_export_requests_outputs(requests)
     except OutputPathValidationError as exc:
         raise BridgeError("export_output_collision", str(exc), status=409) from exc
+
+    if path_policy is None:
+        return
+
+    for item in planned_outputs:
+        path_policy.validate_output_path(Path(item["save_path"]))
 
 
 def build_export_config(export_config_service, raw_export: Any) -> ExportConfig:
@@ -105,4 +115,9 @@ def build_export_config(export_config_service, raw_export: Any) -> ExportConfig:
         "custom_output_path": custom_output_path,
         "variants": raw_export.get("variants", []),
     }
-    return export_config_service.build_from_settings(settings)
+    try:
+        return export_config_service.build_from_settings(settings)
+    except ValidationError as exc:
+        first_error = exc.errors()[0] if exc.errors() else {}
+        message = str(first_error.get("msg") or exc)
+        raise InvalidRequestError(message) from exc

@@ -33,8 +33,8 @@ assert.equal(helpers.imageCountLabel(1), "1 imagen");
 assert.equal(helpers.imageCountLabel(3), "3 imágenes");
 assert.equal(helpers.exportActionLabel(4, 1), "Procesar 4 imágenes");
 assert.equal(helpers.exportActionLabel(4, 2), "Procesar 8 archivos");
-assert.equal(helpers.outputCountLabel(1), "1 formato");
-assert.equal(helpers.outputCountLabel(3), "3 formatos");
+assert.equal(helpers.outputCountLabel(1), "1 salida");
+assert.equal(helpers.outputCountLabel(3), "3 salidas");
 assert.equal(helpers.adjustedCountLabel(1), "1 ajustada");
 assert.equal(helpers.adjustedCountLabel(2), "2 ajustadas");
 assert.deepEqual(helpers.batchPillState({{ issueCount: 2, adjustedCount: 3 }}), {{
@@ -120,7 +120,7 @@ assert.equal(helpers.batchDestinationLine({{
 assert.equal(helpers.batchDestinationLine({{
   destinationMode: "custom",
   destinationValue: "C:/Export",
-}}), "C:/Export");
+}}), "Export");
 assert.equal(helpers.batchDestinationLine({{
   destinationMode: "source",
   destinationValue: "",
@@ -130,7 +130,7 @@ assert.equal(helpers.batchDestinationLine({{
   destinationValue: "Salida",
 }}), "Junto al origen · Salida");
 assert.equal(helpers.batchDestinationLine({{
-  profileDestinations: ["WEB", "WEB"],
+  profileDestinations: ["C:/Export/WEB", "C:/Export/WEB"],
 }}), "WEB");
 assert.equal(helpers.batchDestinationLine({{
   profileDestinations: ["WEB", "PNG", "WEB"],
@@ -171,17 +171,20 @@ assert.equal(metric.includes('title="7 &quot;total&quot;"'), true);
 const diagnostics = helpers.diagnosticsHtml({{
   hasScanError: true,
   diagnostics: {{
-    totalOmitted: 2,
-    omittedByReason: {{ read_error: 1, unsupported_extension: 1 }},
+    totalOmitted: 3,
+    omittedByReason: {{ read_error: 1, unsupported_extension: 1, subfolder_not_scanned: 1 }},
     omitted: [
       {{ name: "bad <one>.txt", path: 'C:/bad "one".txt', reason: "unsupported_extension" }},
       {{ name: "fail.png", path: "C:/fail.png", detail: "No abre" }},
+      {{ name: "nested", path: "C:/nested", reason: "subfolder_not_scanned" }},
     ],
   }},
 }});
 assert.equal(diagnostics.includes('class="batch-diagnostics" open'), true);
-assert.equal(diagnostics.includes("Ver diagnóstico"), true);
+assert.equal(diagnostics.includes("Ver ignorados"), true);
+assert.equal(diagnostics.includes("Hay subcarpetas omitidas"), true);
 assert.equal(diagnostics.includes("Error de lectura"), true);
+assert.equal(diagnostics.includes("Subcarpeta no escaneada"), true);
 assert.equal(diagnostics.includes("bad &lt;one&gt;.txt"), true);
 assert.equal(diagnostics.includes('title="C:/bad &quot;one&quot;.txt"'), true);
 

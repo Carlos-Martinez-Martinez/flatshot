@@ -34,21 +34,19 @@ function renderBatchSummary() {
 function batchOutputLine() {
   const profiles = exportOutputProfiles();
   if (!profiles.length) {
-    return "Sin formatos activos";
+    return "Sin salidas activas";
   }
   return batchViewHelpers.batchOutputLine({
     background: state.background,
     format: state.format,
-    profileLines: profiles.length > 1
-      ? profiles.map((profile) => `${profile.format} ${outputProfileHelpers.outputProfileSize(profile).replace("x", "×")}`)
-      : [],
+    profileLines: profiles.length > 1 ? profiles.map((profile) => `${profile.format} ${outputProfileHelpers.outputProfileSize(profile).replace("x", "×")}`) : [],
     size: state.size,
   });
 }
 
 function outputProfilesSummaryLabel(profiles = exportOutputProfiles()) {
   if (!profiles.length) {
-    return "Sin formatos activos";
+    return "Sin salidas activas";
   }
   return batchViewHelpers.outputProfilesSummaryLabel({
     backgroundLabel: settingsViewHelpers.backgroundLabel(state.background),
@@ -279,7 +277,7 @@ function renderGalleryOutputControl() {
   }
   const context = galleryActiveOutputContext();
   const customOption = context.id === "__custom"
-    ? `<option value="__custom">Formato personalizado · ${escapeHtml(context.label)}</option>`
+    ? `<option value="__custom">Salida personalizada · ${escapeHtml(context.label)}</option>`
     : "";
   select.innerHTML = `${customOption}${profiles.map((profile) => {
     return `<option value="${escapeHtml(profile.id)}">${escapeHtml(profile.name)}</option>`;
@@ -330,6 +328,7 @@ function emptyBatchNoteHtml() {
     ignored: ignoredOmissions().length,
     ignoredSummary: ignoredSummaryText(),
     scanStatus: state.scanStatus,
+    subfoldersOmitted: ignoredOmissions().filter((item) => item.reason === "subfolder_not_scanned").length,
   });
 }
 

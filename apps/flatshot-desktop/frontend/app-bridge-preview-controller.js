@@ -12,10 +12,13 @@ async function requestBridgePreview(image) {
   try {
     const previewImage = await bridgeClientHelpers.requestPreviewImage(normalizedBridgeUrl(), {
       signal: controller.signal,
+      imageId: image.bridgeImageId || image.imageId || "",
       imagePath: image.path,
       targetSize: previewTargetSize(),
       settings: bridgePreviewSettings(),
       localOverride: currentImageOverride(image),
+      curveData: state.curveData || state.scaleCurve || null,
+      authToken: state.bridgeToken,
     });
     window.clearTimeout(timer);
 

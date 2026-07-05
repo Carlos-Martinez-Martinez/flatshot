@@ -45,6 +45,15 @@ def test_topbar_exposes_single_batch_entry_action():
     assert 'Nuevo lote' not in top_actions
 
 
+def test_product_html_uses_salidas_and_ajustes_language():
+    html = (FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
+
+    assert ">Salidas<" in html
+    assert 'aria-label="Fondos guardados"' in html
+    assert "Formatos" not in html
+    assert "Presets de fondo" not in html
+
+
 def test_topbar_actions_follow_workflow_order():
     html = (FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
 
@@ -92,6 +101,22 @@ def test_topbar_active_preset_is_status_text_outside_action_group():
     assert "activePreset.replaceChildren" in topbar_js
 
 
+def test_topbar_export_status_actions_stay_in_header_row():
+    topbar_css = (FRONTEND_DIR / "css" / "02-layout" / "topbar.css").read_text(encoding="utf-8")
+    viewer_toolbar_css = (FRONTEND_DIR / "css" / "05-viewer" / "viewer-toolbar.css").read_text(encoding="utf-8")
+
+    actions_rule = topbar_css.split("\n.top-actions {", 1)[1].split("}", 1)[0]
+    active_preset_status_rule = topbar_css.split('.app-shell[data-status-footer="true"] .top-active-preset {', 1)[1].split("}", 1)[0]
+    viewer_toolbar_setup_rule = viewer_toolbar_css.split("{", 1)[0]
+
+    assert ".top-actions" not in viewer_toolbar_setup_rule
+    assert ".top-summary" not in viewer_toolbar_setup_rule
+    assert ".brand-block" not in viewer_toolbar_setup_rule
+    assert "display: grid;" in actions_rule
+    assert "grid-row: 1;" in actions_rule
+    assert "display: none;" in active_preset_status_rule
+
+
 def test_primary_toolbar_controls_use_stable_icon_names():
     html = (FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
     buttons_css = (FRONTEND_DIR / "css" / "03-components" / "buttons.css").read_text(encoding="utf-8")
@@ -123,7 +148,7 @@ def test_dev_review_controls_are_hidden_outside_dev_mode():
 
     assert '<button type="button" class="dev-only" data-action="toggle-inspector">Diagnóstico</button>' in html
     assert '<details class="debug-panel dev-only" id="debug-panel">' in html
-    assert 'data-action="open-qa-lab"' in html
+    assert 'data-action="open-qa-lab"' not in html
     assert '<details class="review-panel dev-only">' not in html
     assert "html:not(.dev-mode) :is(" in debug_css
     assert ".dev-only" in debug_css

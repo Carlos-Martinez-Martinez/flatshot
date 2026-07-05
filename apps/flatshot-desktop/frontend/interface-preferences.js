@@ -7,6 +7,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   const DEFAULTS = Object.freeze({
     density: "compact",
+    complexityMode: "simple",
     reduceMotion: false,
     showRecentFolders: true,
     onboardingBackground: true,
@@ -15,6 +16,7 @@
     fileNameDisplay: "always",
   });
   const densityValues = new Set(["compact", "comfortable"]);
+  const complexityModeValues = new Set(["simple", "advanced"]);
   const thumbnailSizeValues = new Set(["small", "medium", "large"]);
   const fileNameDisplayValues = new Set(["always", "hover", "none"]);
 
@@ -60,6 +62,7 @@
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
     return {
       density: normalizeChoice(source.density, densityValues, DEFAULTS.density),
+      complexityMode: normalizeChoice(source.complexityMode, complexityModeValues, DEFAULTS.complexityMode),
       reduceMotion: source.reduceMotion === true,
       showRecentFolders: source.showRecentFolders === false ? false : DEFAULTS.showRecentFolders,
       onboardingBackground: source.onboardingBackground === false ? false : DEFAULTS.onboardingBackground,
@@ -94,6 +97,7 @@
     const root = documentRef?.documentElement;
     if (root?.dataset) {
       root.dataset.uiDensity = normalized.density;
+      root.dataset.complexityMode = normalized.complexityMode;
       root.dataset.motion = normalized.reduceMotion ? "reduced" : "auto";
       root.dataset.onboardingBackground = normalized.onboardingBackground ? "enabled" : "disabled";
       root.dataset.thumbnailSize = normalized.thumbnailSize;

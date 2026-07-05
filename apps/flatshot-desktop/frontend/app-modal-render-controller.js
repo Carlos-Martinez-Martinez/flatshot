@@ -44,6 +44,9 @@ function renderExportConfirm() {
 }
 
 function renderQaLab() {
+  if (typeof devMode !== "undefined" && devMode && typeof qaLabViewHelpers !== "undefined") {
+    qaLabViewHelpers.ensureQaLabModal(document);
+  }
   const modal = $("#qa-lab-modal");
   if (!modal) {
     return;
@@ -72,8 +75,8 @@ function exportConfirmSummaryRows() {
   return [
     ["Imágenes", `${exportable} exportable${exportable === 1 ? "" : "s"}`],
     {
-      label: "Formatos",
-      value: profileCount ? `${profileCount} formato${profileCount === 1 ? "" : "s"} activo${profileCount === 1 ? "" : "s"}` : "Sin formatos activos",
+      label: "Salidas",
+      value: profileCount ? `${profileCount} salida${profileCount === 1 ? "" : "s"} activa${profileCount === 1 ? "" : "s"}` : "Sin salidas activas",
       items: exportConfirmFormatRows(profiles),
     },
     {
@@ -83,7 +86,7 @@ function exportConfirmSummaryRows() {
     },
     {
       label: "Nombres de salida",
-      value: profileCount ? "" : "Sin formatos activos",
+      value: profileCount ? "" : "Sin salidas activas",
       items: exportConfirmOutputNameRows(profiles),
     },
   ];

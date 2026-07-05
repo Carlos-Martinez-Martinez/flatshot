@@ -38,7 +38,7 @@ function renderAccessibilityHints() {
   setControlHint($("#top-primary-action"), topPrimaryHint(visible));
   setControlHint($("#top-secondary-action"), visible.secondaryAction ? `${visible.secondaryAction.label}. Atajo: Ctrl+E si exporta.` : "");
   setControlHint($("[data-action='open-batch-detail']"), "Abrir detalle del lote");
-  setControlHint($("[data-action='open-app-settings']"), "Abrir formatos de salida");
+  setControlHint($("[data-action='open-app-settings']"), "Abrir salidas");
   setControlHint($("[data-action='toggle-inspector']"), "Mostrar u ocultar detalle técnico");
   setControlHint($("#image-search"), "Buscar por nombre, referencia o ruta");
   setControlHint($("#image-search-clear"), "Limpiar búsqueda");
@@ -69,7 +69,7 @@ function renderAccessibilityHints() {
   });
 
   const previewModeHints = {
-    processed: "Ver previsualización con el formato activo",
+    processed: "Ver previsualización con la salida activa",
     original: "Ver imagen original",
     compare: "Comparar original y previsualización",
   };

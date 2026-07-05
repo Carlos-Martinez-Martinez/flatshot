@@ -9,20 +9,24 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
 INDEX_PATH = FRONTEND_DIR / "index.html"
+QA_LAB_VIEW_PATH = FRONTEND_DIR / "qa-lab-view.js"
 
 
 def test_dev_visual_scenarios_live_in_qa_lab_not_primary_batch_ui():
     html = INDEX_PATH.read_text(encoding="utf-8")
+    qa_lab_view = QA_LAB_VIEW_PATH.read_text(encoding="utf-8")
 
     assert 'data-action="load-mock-batch"' not in html
     assert '<details class="review-panel dev-only">' not in html
-    assert 'data-action="open-qa-lab"' in html
-    assert 'id="qa-lab-modal"' in html
-    assert "QA Lab" in html
-    assert "Estados visuales" in html
-    assert "Estados simulados" in html
-    assert 'data-review-scenario="batch-ready"' in html
-    assert 'data-action="close-qa-lab"' in html
+    assert 'data-action="open-qa-lab"' not in html
+    assert 'id="qa-lab-modal"' not in html
+    assert "qa-lab-view.js" in html
+    assert 'id="qa-lab-modal"' in qa_lab_view
+    assert "QA Lab" in qa_lab_view
+    assert "Estados visuales" in qa_lab_view
+    assert "Estados simulados" in qa_lab_view
+    assert 'data-review-scenario="batch-ready"' in qa_lab_view
+    assert 'data-action="close-qa-lab"' in qa_lab_view
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend workflow checks")

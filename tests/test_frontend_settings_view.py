@@ -38,6 +38,8 @@ def test_adjustment_editor_actions_use_explicit_scope_labels():
     html = INDEX_PATH.read_text(encoding="utf-8")
 
     assert 'data-action="cancel-adjustment-edit"' in html
+    assert 'data-action="reset-settings"' in html
+    assert "Restaurar recomendado" in html
     assert 'data-action="apply-global-adjustment"' in html
     assert "Aplicar al lote sin guardar" in html
     assert 'data-action="save-preset"' in html

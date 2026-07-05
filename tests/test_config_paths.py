@@ -27,14 +27,14 @@ def test_config_path_resolver_uses_environment_override(tmp_path):
     assert resolver.config_dir() == configured
 
 
-def test_default_user_config_dir_matches_current_windows_qt_fallback_shape():
+def test_default_user_config_dir_is_namespaced_on_windows():
     path = ConfigPathResolver.default_user_config_dir(
         environ={"LOCALAPPDATA": r"C:\Users\demo\AppData\Local"},
         home=Path(r"C:\Users\demo"),
         platform="win32",
     )
 
-    assert path == Path(r"C:\Users\demo\AppData\Local")
+    assert path == Path(r"C:\Users\demo\AppData\Local") / "FlatShot"
 
 
 def test_default_user_config_dir_uses_xdg_config_home_on_linux(tmp_path):
@@ -44,4 +44,33 @@ def test_default_user_config_dir_uses_xdg_config_home_on_linux(tmp_path):
         platform="linux",
     )
 
-    assert path == tmp_path / "xdg"
+    assert path == tmp_path / "xdg" / "flatshot"
+
+
+def test_default_user_config_dir_is_namespaced_on_macos(tmp_path):
+    path = ConfigPathResolver.default_user_config_dir(
+        environ={},
+        home=tmp_path / "home",
+        platform="darwin",
+    )
+
+    assert path == tmp_path / "home" / "Library" / "Preferences" / "FlatShot"
+
+
+def test_config_path_resolver_migrates_legacy_default_files(tmp_path):
+    legacy_root = tmp_path / "LocalAppData"
+    legacy_root.mkdir()
+    (legacy_root / "settings.json").write_text('{"format": "PNG"}', encoding="utf-8")
+    (legacy_root / "presets.json").write_text('{"Legacy": {"opacity": 20}}', encoding="utf-8")
+    resolver = ConfigPathResolver(
+        environ={"LOCALAPPDATA": str(legacy_root)},
+        home=tmp_path / "home",
+        platform="win32",
+    )
+
+    config_dir = resolver.config_dir()
+
+    assert config_dir == legacy_root / "FlatShot"
+    assert (config_dir / "settings.json").read_text(encoding="utf-8") == '{"format": "PNG"}'
+    assert (config_dir / "presets.json").read_text(encoding="utf-8") == '{"Legacy": {"opacity": 20}}'
+    assert (legacy_root / "settings.json").exists()

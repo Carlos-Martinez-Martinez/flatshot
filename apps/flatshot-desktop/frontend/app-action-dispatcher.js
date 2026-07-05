@@ -17,6 +17,7 @@ const actionDispatcher = actionHandlerHelpers.createActionDispatcher({
   "close-preferences": () => closePreferences(),
   "set-theme-preference": (target) => setThemePreference(target),
   "set-ui-density": (target) => setUiDensity(target),
+  "set-complexity-mode": (target) => setComplexityMode(target),
   "toggle-reduced-motion": () => toggleReducedMotion(),
   "toggle-show-recent-folders": () => toggleShowRecentFolders(),
   "toggle-onboarding-background": () => toggleOnboardingBackground(),
@@ -33,6 +34,8 @@ const actionDispatcher = actionHandlerHelpers.createActionDispatcher({
   "clear-folder-drop-message": () => clearFolderDropMessage(),
   "pick-output-profile-destination": () => { void pickOutputProfileDestination(); },
   "scan-bridge-folder": () => { void scanBridgeFolder(); },
+  "cancel-scan": () => { void cancelBridgeScan(); },
+  "include-subfolders": () => { void includeSubfoldersAndScan(); },
   "clear-batch": () => clearBatch(),
   "force-preview-error": () => {
     if (hasBatch()) {
@@ -65,12 +68,14 @@ const actionDispatcher = actionHandlerHelpers.createActionDispatcher({
     }
   },
   "open-advanced": () => {
+    enableAdvancedInspectorMode();
     state.inspectorTab = "advanced";
     pendingAdvancedDisclosure = "appearance-section";
     state.statusText = "Ajustes";
     render();
   },
   "open-image-adjustment": () => {
+    enableAdvancedInspectorMode();
     state.inspectorTab = "advanced";
     state.presetEditorOpen = false;
     pendingAdvancedDisclosure = "local-adjustment";
@@ -162,6 +167,7 @@ const actionDispatcher = actionHandlerHelpers.createActionDispatcher({
   "pause-export": () => pauseExport(),
   "stop-export": () => stopExport(),
   "start-export": () => startExport(),
+  "quick-export": () => quickExport(),
   "retry-failed-export": () => retryFailedExport(),
   "review-errors": () => reviewWarnings(),
   "review-warnings": () => reviewWarnings(),

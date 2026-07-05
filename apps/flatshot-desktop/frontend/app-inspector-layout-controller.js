@@ -135,11 +135,15 @@ function inspectorCardsHtml() {
     return "";
   }
 
-  return [
-    lotInspectorCardHtml(),
-    aspectInspectorCardHtml(),
-    outputInspectorCardHtml(),
-    selectedImageInspectorCardHtml(),
-    issuesInspectorCardHtml(),
-  ].filter(Boolean).join("");
+  const cardRenderers = {
+    lot: lotInspectorCardHtml,
+    aspect: aspectInspectorCardHtml,
+    output: outputInspectorCardHtml,
+    selectedImage: selectedImageInspectorCardHtml,
+    issues: issuesInspectorCardHtml,
+  };
+  return inspectorContextViewHelpers.inspectorSummaryCardKeys({
+    complexityMode: state.interfacePreferences.complexityMode,
+    hasIssues: actionableIssueRows().length > 0,
+  }).map((key) => cardRenderers[key]?.() || "").filter(Boolean).join("");
 }

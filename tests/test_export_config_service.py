@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import pytest
+from pydantic import ValidationError
+
 from flatshot.application.export_config_service import ExportConfigService
 from flatshot.core.models import ExportConfig, ExportVariant, WEB_RGB230, WHITE_RGB255
 
@@ -39,6 +42,18 @@ def test_validate_accepts_normal_subfolder_config():
     assert service.validate(config) == []
 
 
+@pytest.mark.parametrize("folder_name", ["../escape", "C:/escape", "/tmp/escape", ".", "Salida//Web"])
+def test_export_config_rejects_unsafe_output_folder_name(folder_name):
+    with pytest.raises(ValidationError):
+        ExportConfig(output_destination="subfolder", output_folder_name=folder_name)
+
+
+def test_export_config_normalizes_safe_relative_output_folder_name():
+    config = ExportConfig(output_destination="subfolder", output_folder_name=r"Salida\Web")
+
+    assert config.output_folder_name == "Salida/Web"
+
+
 def test_validate_reports_custom_destination_without_path():
     service = ExportConfigService()
     config = ExportConfig(output_destination="custom", custom_output_path=None)
@@ -48,7 +63,7 @@ def test_validate_reports_custom_destination_without_path():
 
 def test_validate_reports_invalid_dimensions_format_destination_folder_and_template():
     service = ExportConfigService()
-    config = ExportConfig(
+    config = ExportConfig.model_construct(
         format="GIF",
         output_width=0,
         output_height=-1,
@@ -67,7 +82,7 @@ def test_validate_reports_invalid_dimensions_format_destination_folder_and_templ
 
 def test_validate_reports_empty_subfolder_name_for_subfolder_destination():
     service = ExportConfigService()
-    config = ExportConfig(output_destination="subfolder", output_folder_name="")
+    config = ExportConfig.model_construct(output_destination="subfolder", output_folder_name="")
 
     assert "El nombre de la subcarpeta de salida no puede estar vacío." in service.validate(config)
 

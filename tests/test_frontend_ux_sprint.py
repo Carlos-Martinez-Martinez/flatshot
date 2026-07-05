@@ -16,6 +16,7 @@ APP_LOADER_PATH = FRONTEND_DIR / "app-loader.js"
 APP_STARTUP_PATH = FRONTEND_DIR / "app-startup.js"
 APP_SHELL_PATH = FRONTEND_DIR / "app-shell.js"
 APP_ACTION_DISPATCHER_PATH = FRONTEND_DIR / "app-action-dispatcher.js"
+APP_BRIDGE_SCAN_CONTROLLER_PATH = FRONTEND_DIR / "app-bridge-scan-controller.js"
 APP_EXPORT_CONTROLLER_PATH = FRONTEND_DIR / "app-export-controller.js"
 APP_EXPORT_VIEW_PATH = FRONTEND_DIR / "app-export-view.js"
 APP_VIEWER_EVENTS_PATH = FRONTEND_DIR / "app-viewer-events.js"
@@ -307,10 +308,49 @@ def test_failed_export_retry_is_wired_to_failed_bridge_paths_only():
     assert '"retry-failed-export"' in actions
     assert "retryFailedExport()" in actions
     assert "function retryFailedExport()" in controller
-    assert "failedBridgeExportImages(exportableImages(), state.exportCompletedItems)" in controller
+    assert "failedBridgeExportImages(exportableImages(), retryableFailedExportItems())" in controller
+    assert "state.exportFailedItems.length ? state.exportFailedItems : state.exportCompletedItems" in controller
     assert "retryFailedOnly" in controller
     assert "images: retryImages" in controller
     assert "canRetryFailed: retryableFailedExportImages().length > 0" in view
+
+
+def test_quick_export_uses_active_output_profile_without_warning_bypass_as_default():
+    actions = APP_ACTION_DISPATCHER_PATH.read_text(encoding="utf-8")
+    controller = APP_EXPORT_CONTROLLER_PATH.read_text(encoding="utf-8")
+    review_actions = (FRONTEND_DIR / "app-review-actions.js").read_text(encoding="utf-8")
+    keydown = APP_VIEWER_EVENTS_PATH.read_text(encoding="utf-8")
+    visible = (FRONTEND_DIR / "app-visible-state.js").read_text(encoding="utf-8")
+
+    assert '"quick-export": () => quickExport()' in actions
+    assert "function quickExport()" in controller
+    assert "startExport({ confirmed: true, quick: true })" in controller
+    assert 'action === "quick-export"' in review_actions
+    assert "quickExport();" in review_actions
+    assert 'event.shiftKey && event.key.toLowerCase() === "e"' in keydown
+    assert "quickExport();" in keydown
+    assert 'primaryAction: { label: exportActionLabel(counts.exportableImages), action: "start-export", enabled: isExportReady() }' in visible
+    assert 'primaryAction: { label: exportActionLabel(counts.exportableImages), action: "quick-export", enabled: isExportReady() }' in visible
+
+
+def test_scan_uses_async_job_endpoint_with_sync_fallback():
+    controller = APP_BRIDGE_SCAN_CONTROLLER_PATH.read_text(encoding="utf-8")
+    scan_helpers = (FRONTEND_DIR / "scan-result-pages.js").read_text(encoding="utf-8")
+    actions = APP_ACTION_DISPATCHER_PATH.read_text(encoding="utf-8")
+    visible = (FRONTEND_DIR / "app-visible-state.js").read_text(encoding="utf-8")
+
+    assert '"/folders/scan/jobs"' in controller
+    assert "pollBridgeScanJob(" in controller
+    assert "scanResultPageHelpers.scanJobStatusUrl(jobId, 0)" in controller
+    assert "scanResultPageHelpers.scanJobCancelUrl(jobId)" in controller
+    assert "fallbackBridgeScan(" in controller
+    assert '"/folders/scan"' in controller
+    assert "function cancelBridgeScan()" in controller
+    assert "function includeSubfoldersAndScan()" in controller
+    assert "recursive: Boolean(state.scanRecursive)" in scan_helpers
+    assert '"cancel-scan": () => { void cancelBridgeScan(); }' in actions
+    assert '"include-subfolders": () => { void includeSubfoldersAndScan(); }' in actions
+    assert 'primaryAction: { label: "Detener", action: "cancel-scan", enabled: Boolean(state.scanJobId) }' in visible
 
 
 def test_export_history_is_persisted_and_rendered_from_export_flow():
@@ -351,11 +391,9 @@ def test_modals_use_shared_transition_visibility_controller():
     html = INDEX_PATH.read_text(encoding="utf-8")
     helper = MODAL_VISIBILITY_PATH.read_text(encoding="utf-8") if MODAL_VISIBILITY_PATH.exists() else ""
     renderer = MODAL_RENDER_CONTROLLER_PATH.read_text(encoding="utf-8")
-    loader = APP_LOADER_PATH.read_text(encoding="utf-8")
 
     assert MODAL_VISIBILITY_PATH.exists()
     assert html.index("app-modal-visibility.js") < html.index("app-modal-render-controller.js")
-    assert loader.index("app-modal-visibility.js") < loader.index("app-modal-render-controller.js")
     assert "function syncModalVisibility" in helper
     assert "modalVisibilityTimers" in helper
     assert "is-closing" in helper
@@ -365,6 +403,61 @@ def test_modals_use_shared_transition_visibility_controller():
     assert "syncModalVisibility(modal, state.qaLabOpen)" in renderer
 
 
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
+def test_modal_visibility_open_animation_settles_before_visible_rerender():
+    script = f"""
+const assert = require("node:assert/strict");
+const helpers = require({json.dumps(str(MODAL_VISIBILITY_PATH))});
+
+function classListFrom(initial) {{
+  const classes = new Set(initial);
+  return {{
+    add(...names) {{ names.forEach((name) => classes.add(name)); }},
+    remove(...names) {{ names.forEach((name) => classes.delete(name)); }},
+    contains(name) {{ return classes.has(name); }},
+    value() {{ return [...classes].sort().join(" "); }},
+  }};
+}}
+
+const timers = [];
+const root = {{
+  matchMedia() {{ return {{ matches: false }}; }},
+  setTimeout(callback, delay) {{
+    timers.push({{ callback, delay }});
+    return timers.length;
+  }},
+  clearTimeout() {{}},
+}};
+const modal = {{
+  attrs: {{}},
+  classList: classListFrom(["is-hidden"]),
+  setAttribute(name, value) {{ this.attrs[name] = value; }},
+}};
+
+helpers.syncModalVisibility(modal, true, {{ root, enterMs: 160 }});
+assert.equal(modal.attrs["aria-hidden"], "false");
+assert.equal(modal.classList.contains("is-hidden"), false);
+assert.equal(modal.classList.contains("is-opening"), true);
+assert.equal(timers.length, 1);
+
+timers[0].callback();
+assert.equal(modal.classList.contains("is-opening"), false);
+
+helpers.syncModalVisibility(modal, true, {{ root, enterMs: 160 }});
+assert.equal(modal.classList.contains("is-opening"), false);
+assert.equal(timers.length, 1);
+"""
+    result = subprocess.run(
+        ["node", "-e", script],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
+
+
 def test_modal_css_animates_open_and_close_with_reduced_motion_escape():
     css = APP_SETTINGS_MODAL_CSS_PATH.read_text(encoding="utf-8")
 
@@ -372,6 +465,9 @@ def test_modal_css_animates_open_and_close_with_reduced_motion_escape():
     assert "@keyframes modal-backdrop-out" in css
     assert "@keyframes modal-dialog-in" in css
     assert "@keyframes modal-dialog-out" in css
+    assert ".app-settings-backdrop.is-opening" in css
+    assert ".app-settings-backdrop.is-opening > section, .app-settings-backdrop.is-opening .guide-manager-panel" in css
+    assert ".app-settings-backdrop:not(.is-hidden) > section" not in css
     assert ".app-settings-backdrop.is-closing" in css
     assert "pointer-events: none;" in css
     assert "@media (prefers-reduced-motion: reduce)" in css

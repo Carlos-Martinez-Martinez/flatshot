@@ -183,7 +183,7 @@ function renderOutputProfileDeleteConfirm(profile) {
   const detail = $("#output-delete-confirm-detail");
   if (detail) {
     detail.textContent = isOpen
-      ? `Se eliminará "${profile.name}" de los formatos guardados. No se tocarán imágenes ni exportaciones anteriores.`
+      ? `Se eliminará "${profile.name}" de las salidas guardadas. No se tocarán imágenes ni exportaciones anteriores.`
       : "";
   }
 

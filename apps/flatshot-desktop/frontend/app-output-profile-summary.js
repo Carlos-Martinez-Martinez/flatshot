@@ -13,14 +13,14 @@ function renderOutputProfileSelect() {
 function outputProfileDisplayName() {
   const profiles = exportOutputProfiles();
   if (!profiles.length) {
-    return "Sin formatos activos";
+    return "Sin salidas activas";
   }
   if (profiles.length > 1) {
     return batchViewHelpers.outputCountLabel(profiles.length);
   }
   const profile = activeOutputProfile();
   if (!profile || !outputMatchesProfile(profile)) {
-    return "Formato personalizado";
+    return "Salida personalizada";
   }
   return profile.name;
 }
@@ -35,7 +35,7 @@ function outputProfileManagerRows() {
 
 function outputProfileSummaryLine(profile) {
   if (!profile) {
-    return "Formato sin configurar";
+    return "Salida sin configurar";
   }
   return `${profile.format} · ${outputProfileHelpers.outputProfileSize(profile).replace("x", " × ")} · ${settingsViewHelpers.backgroundLabel(profile.background)}`;
 }

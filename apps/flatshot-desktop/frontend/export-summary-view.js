@@ -5,22 +5,18 @@
   }
   root.FlatShotExportSummaryView = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  const escapeHtml = globalThis.FlatShotFormatters?.escapeHtml || function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  };
+  const formatterHelpers = globalThis.FlatShotFormatters
+    || (typeof require === "function" ? require("./formatters.js") : null);
+  const escapeHtml = (value) => formatterHelpers.escapeHtml(value);
 
   function exportEditActionsHtml() {
     return `
     <div class="inspector-actionbar output-edit-actions">
       <button type="button" data-action="cancel-output-edit">Cancelar</button>
       <button type="button" class="primary" data-action="apply-output-edit">Aplicar al lote sin guardar</button>
-      <button type="button" data-action="save-output-current-profile">Guardar formato</button>
+      <button type="button" data-action="save-output-current-profile">Guardar salida</button>
       <button type="button" data-action="save-output-as-new">Guardar como nuevo</button>
-      <button type="button" class="btn-linklike" data-action="open-app-settings">Gestionar formatos</button>
+      <button type="button" class="btn-linklike" data-action="open-app-settings">Gestionar salidas</button>
     </div>
   `;
   }
@@ -28,8 +24,8 @@
   function exportPresetActionsHtml() {
     return `
     <div class="inspector-actionbar">
-      <button type="button" class="primary" data-action="open-app-settings">Gestionar formatos</button>
-      <button type="button" data-action="new-output-profile">Nuevo formato</button>
+      <button type="button" class="primary" data-action="open-app-settings">Gestionar salidas</button>
+      <button type="button" data-action="new-output-profile">Nueva salida</button>
     </div>
   `;
   }
@@ -38,7 +34,7 @@
     return `
     <div class="temporary-output-notice${compact ? " temporary-output-notice--compact" : ""}">
       <strong>Cambios sin guardar</strong>
-      <span>${compact ? "Aplica al lote o guarda el formato." : "El formato actual no coincide con un formato guardado."}</span>
+      <span>${compact ? "Aplica al lote o guarda la salida." : "La salida actual no coincide con una salida guardada."}</span>
     </div>
   `;
   }
@@ -54,8 +50,9 @@
       </div>
     `;
     }).join("");
-    const extraRows = totalProfiles > 4
-      ? `<div class="preset-summary-row"><span>Más</span><strong>${escapeHtml(`${totalProfiles - 4} formatos más`)}</strong></div>`
+    const extraCount = totalProfiles - 4;
+    const extraRows = extraCount > 0
+      ? `<div class="preset-summary-row"><span>Más</span><strong>${escapeHtml(`${extraCount} salida${extraCount === 1 ? "" : "s"} más`)}</strong></div>`
       : "";
     return `${visibleRows}${extraRows}`;
   }
@@ -76,7 +73,7 @@
     return `
     <div class="compact-panel">
       <div>
-        <span>Formato</span>
+        <span>Salida</span>
         <strong>${escapeHtml(options.displayName || "")}</strong>
       </div>
       <small>${escapeHtml(options.presetSummary || "")}</small>
@@ -96,7 +93,7 @@
     return `
     <div class="preset-summary-card">
       <div class="preset-summary-main">
-        <span>${escapeHtml(hasMultipleOutputs ? "Formatos activos" : "Formato activo")}</span>
+        <span>${escapeHtml(hasMultipleOutputs ? "Salidas activas" : "Salida activa")}</span>
         <strong>${escapeHtml(options.displayName || "")}</strong>
         ${hasMultipleOutputs ? `<small>${escapeHtml(`${outputCount} archivos previstos`)}</small>` : ""}
       </div>
@@ -115,7 +112,7 @@
       </div>
       <div class="preset-summary-row">
         <span>Destino</span>
-        <strong title="${escapeHtml(options.destinationText || "")}">${escapeHtml(options.destinationText || "")}</strong>
+        <strong title="${escapeHtml(options.destinationText || "")}">${escapeHtml(formatterHelpers.displayPath(options.destinationText))}</strong>
       </div>
       <div class="preset-summary-row">
         <span>Nombre final</span>

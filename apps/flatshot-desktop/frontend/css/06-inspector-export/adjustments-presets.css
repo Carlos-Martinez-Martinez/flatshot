@@ -171,8 +171,38 @@
 }
 
 .appearance-section {
+  position: relative;
   border-top: var(--border-width) solid var(--color-border);
   padding-top: var(--space-4);
+}
+
+.appearance-section__reset {
+  position: absolute;
+  top: var(--space-2-5);
+  right: calc(var(--space-4) + var(--disclosure-chevron-size) + var(--space-4));
+  z-index: 1;
+  min-width: 0;
+  min-height: var(--control-height);
+  border-color: transparent;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--color-text-muted);
+  padding-inline: var(--space-2);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  opacity: 0.78;
+}
+
+.appearance-section__reset:hover:not(:disabled), .appearance-section__reset:focus-visible {
+  border-color: var(--color-border);
+  background: var(--color-bg-soft);
+  color: var(--color-text-strong);
+  opacity: 1;
+}
+
+.appearance-section__reset:disabled {
+  opacity: 0.32;
+  cursor: default;
 }
 
 .preset-section .section-title, .appearance-section > .section-title {

@@ -56,6 +56,14 @@
     };
   }
 
+  function resetPresetButtonState(presetDirty) {
+    return {
+      disabled: !presetDirty,
+      label: "Restaurar valores por defecto",
+      title: presetDirty ? "Restaurar valores por defecto" : "Sin cambios que restaurar",
+    };
+  }
+
   function deletePresetButtonState(presetCount) {
     const canDelete = Number(presetCount) > 1;
     return {
@@ -138,6 +146,7 @@
     presetDirtyLabel,
     presetListHtml,
     presetSourceLabel,
+    resetPresetButtonState,
     savePresetButtonState,
   };
 });

@@ -65,6 +65,13 @@ function renderSettings() {
   savePresetButton.title = savePresetState.title;
   savePresetButton.textContent = savePresetState.text;
   savePresetButton.classList.toggle("primary", savePresetState.primary);
+  const resetSettingsButton = $("#reset-settings-inline");
+  if (resetSettingsButton) {
+    const resetPresetState = settingsViewHelpers.resetPresetButtonState(state.presetDirty);
+    resetSettingsButton.disabled = resetPresetState.disabled;
+    resetSettingsButton.title = resetPresetState.title;
+    resetSettingsButton.setAttribute("aria-label", resetPresetState.label);
+  }
   const deletePresetButton = $("#delete-preset");
   if (deletePresetButton) {
     const deletePresetState = settingsViewHelpers.deletePresetButtonState(presetItems.length);

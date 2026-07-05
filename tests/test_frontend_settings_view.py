@@ -53,6 +53,25 @@ def test_adjustment_editor_actions_use_explicit_scope_labels():
     assert "Restablecer lote" in html
 
 
+def test_main_controls_offer_subtle_default_reset():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+    main_controls_index = html.index("<strong>Controles principales</strong>")
+    section_start = html.rindex(
+        '<details class="settings-section inspector-disclosure appearance-section"',
+        0,
+        main_controls_index,
+    )
+    section_end = html.index('<details class="settings-section inspector-disclosure advanced-block"', main_controls_index)
+    section = html[section_start:section_end]
+
+    assert 'id="reset-settings-inline"' in section
+    assert 'class="appearance-section__reset ghost-action"' in section
+    assert 'data-action="reset-settings"' in section
+    assert 'aria-label="Restaurar valores por defecto"' in section
+    assert 'title="Restaurar valores por defecto"' in section
+    assert ">Por defecto</button>" in section
+
+
 def test_studio_lighting_panel_is_available_in_advanced_settings():
     html = INDEX_PATH.read_text(encoding="utf-8")
 
@@ -210,6 +229,16 @@ assert.deepEqual(helpers.savePresetButtonState(false), {{
   primary: false,
   text: "Guardar ajuste",
   title: "Sin cambios pendientes",
+}});
+assert.deepEqual(helpers.resetPresetButtonState(true), {{
+  disabled: false,
+  label: "Restaurar valores por defecto",
+  title: "Restaurar valores por defecto",
+}});
+assert.deepEqual(helpers.resetPresetButtonState(false), {{
+  disabled: true,
+  label: "Restaurar valores por defecto",
+  title: "Sin cambios que restaurar",
 }});
 assert.deepEqual(helpers.deletePresetButtonState(1), {{
   disabled: true,

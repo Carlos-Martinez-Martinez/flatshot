@@ -29,17 +29,23 @@ class TrustedPathPolicy:
             self._roots.add(resolved)
 
     def validate_image_path(self, path: Path) -> None:
+        self._validate_path(path, message="Imagen fuera de las carpetas importadas.")
+
+    def validate_output_path(self, path: Path) -> None:
+        self._validate_path(path, message="Destino fuera de las carpetas importadas.")
+
+    def _validate_path(self, path: Path, *, message: str) -> None:
         with self._lock:
             roots = tuple(self._roots)
         if not roots:
-            return
+            raise BridgeError("path_not_allowed", message, status=403)
 
         try:
-            resolved = Path(path).expanduser().resolve()
+            resolved = Path(path).expanduser().resolve(strict=False)
         except OSError as exc:
-            raise BridgeError("path_not_allowed", "Imagen fuera de las carpetas importadas.", status=403) from exc
+            raise BridgeError("path_not_allowed", message, status=403) from exc
 
         if any(resolved == root or root in resolved.parents for root in roots):
             return
 
-        raise BridgeError("path_not_allowed", "Imagen fuera de las carpetas importadas.", status=403)
+        raise BridgeError("path_not_allowed", message, status=403)

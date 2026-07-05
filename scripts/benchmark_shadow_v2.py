@@ -172,7 +172,9 @@ def benchmark_case(size: tuple[int, int], product: str, background: str, alpha: 
     return result
 
 
-def build_cases(quick: bool) -> list[tuple[tuple[int, int], str, str, str]]:
+def build_cases(quick: bool, smoke: bool = False) -> list[tuple[tuple[int, int], str, str, str]]:
+    if smoke:
+        return [((120, 160), "small", "white", "clean")]
     if quick:
         return [((1800, 2400), "large", "white", "complex")]
 
@@ -188,6 +190,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Benchmark FlatShot shadow renderers.")
     parser.add_argument("--runs", type=int, default=5, help="Runs per metric.")
     parser.add_argument("--quick", action="store_true", help="Run only the 1800x2400 reference case.")
+    parser.add_argument("--smoke", action="store_true", help="Run a tiny case suitable for test and CI smoke checks.")
     parser.add_argument("--include-save", action="store_true", help="Also measure export with PNG save.")
     parser.add_argument("--engine", choices=["realistic_v2", "studio_2_5d"], default="realistic_v2", help="Shadow engine to benchmark.")
     parser.add_argument("--json", dest="json_path", help="Optional output JSON path.")
@@ -196,7 +199,7 @@ def main() -> int:
     runs = max(1, args.runs)
     results = [
         benchmark_case(size, product, background, alpha, runs, args.include_save, args.engine)
-        for size, product, background, alpha in build_cases(args.quick)
+        for size, product, background, alpha in build_cases(args.quick, args.smoke)
     ]
 
     print(f"FlatShot {args.engine} benchmark")

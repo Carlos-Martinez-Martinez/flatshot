@@ -7,13 +7,9 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   const DEFAULT_LIMIT = 8;
 
-  function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  }
+  const formatterHelpers = globalThis.FlatShotFormatters
+    || (typeof require === "function" ? require("./formatters.js") : null);
+  const escapeHtml = (value) => formatterHelpers.escapeHtml(value);
 
   function readExportHistory(storage, key) {
     try {

@@ -367,7 +367,7 @@ function deleteBackgroundPreset() {
     renderOutputProfileModalState();
     return;
   }
-  const confirmed = window.confirm(`Eliminar fondo "${preset.name}"?\n\nEl formato en edición volverá a gris claro si estaba usando este fondo.`);
+  const confirmed = window.confirm(`Eliminar fondo "${preset.name}"?\n\nLa salida en edición volverá a gris claro si estaba usando este fondo.`);
   if (!confirmed) {
     return;
   }
@@ -376,7 +376,7 @@ function deleteBackgroundPreset() {
   state.backgroundPresetEditor = null;
   const resetDraft = resetDeletedBackgroundPresetDraft(deletedValue);
   state.statusText = resetDraft
-    ? `Fondo eliminado: ${preset.name}. Formato en edición: gris claro`
+    ? `Fondo eliminado: ${preset.name}. Salida en edición: gris claro`
     : `Fondo eliminado: ${preset.name}`;
   persistBackgroundPresets();
   render();

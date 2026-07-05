@@ -44,24 +44,35 @@ function getVisibleAppState() {
       title: state.exportStatus === "partial" ? "Exportación finalizada con avisos" : "Exportación finalizada",
       subtitle: `${processed}/${total} imágenes exportadas · ${destination}`,
       topSummary: compactHeaderStatusText(),
-      primaryAction: { label: "Abrir destino", action: "open-output", enabled: Boolean(outputDestinationToOpen()) },
+      primaryAction: {
+        label: outputBrowserGroups().length > 1 ? state.outputBrowserOpen ? "Ocultar salidas" : "Ver salidas" : "Abrir destino",
+        action: outputBrowserGroups().length > 1 ? "browse-outputs" : "open-output",
+        enabled: outputBrowserGroups().length > 1 || Boolean(outputDestinationToOpen()),
+      },
       secondaryAction: { label: "Exportar de nuevo", action: "start-export", enabled: isExportReady() },
-      nextStep: outputDestinationToOpen() ? "Abrir carpeta de salida" : "Revisar resultado de exportación",
+      nextStep: outputBrowserGroups().length > 1 ? "Ver salidas exportadas" : "Abrir carpeta de salida",
       counts,
     };
   }
 
   if (state.exportStatus === "failed") {
     const issue = firstBlockingIssue();
+    const outputBlocker = hasOutputConfigurationIssue();
     return {
       id: "ready_with_blockers",
       tone: "error",
-      title: "Exportación con errores",
+      title: outputBlocker ? "Salida a corregir" : "Exportación con errores",
       subtitle: issue?.detail || "Revisa el detalle antes de continuar.",
       topSummary: compactHeaderStatusText(),
-      primaryAction: { label: "Ver error", action: "review-warnings", enabled: true },
-      secondaryAction: isExportReady() ? { label: "Exportar de nuevo", action: "start-export", enabled: true } : null,
-      nextStep: "Revisar error",
+      primaryAction: {
+        label: outputBlocker && isExportReady() ? "Exportar de nuevo" : outputBlocker ? "Corregir salida" : "Ver error",
+        action: outputBlocker && isExportReady() ? "start-export" : outputBlocker ? "edit-output" : "review-warnings",
+        enabled: true,
+      },
+      secondaryAction: outputBlocker && isExportReady()
+        ? { label: "Corregir salida", action: "edit-output", enabled: true }
+        : !outputBlocker && isExportReady() ? { label: "Exportar de nuevo", action: "start-export", enabled: true } : null,
+      nextStep: outputBlocker && isExportReady() ? "Exportar de nuevo o corregir salida" : outputBlocker ? "Corregir salida" : "Revisar error",
       counts,
     };
   }
@@ -73,7 +84,7 @@ function getVisibleAppState() {
       title: "Escaneando carpeta...",
       subtitle: state.scanStatus || "Leyendo imágenes",
       topSummary: compactHeaderStatusText(),
-      primaryAction: { label: "Escaneando", action: "", enabled: false },
+      primaryAction: { label: "Detener", action: "cancel-scan", enabled: Boolean(state.scanJobId) },
       secondaryAction: null,
       nextStep: "Escaneando carpeta",
       counts,
@@ -146,7 +157,7 @@ function getVisibleAppState() {
     title: "Lote listo",
     subtitle: `${summary}${counts.ignoredFiles ? ` · ${ignoredNeutralText(counts.ignoredFiles)}` : ""} · ${output} · ${destination}`,
     topSummary: compactHeaderStatusText(),
-    primaryAction: { label: exportActionLabel(counts.exportableImages), action: "start-export", enabled: isExportReady() },
+    primaryAction: { label: exportActionLabel(counts.exportableImages), action: "quick-export", enabled: isExportReady() },
     secondaryAction: null,
     nextStep: exportActionLabel(counts.exportableImages),
     counts,
@@ -156,4 +167,16 @@ function getVisibleAppState() {
 function readyBatchSummaryText(counts = batchCounts()) {
   const readyText = preflightHelpers.readyImagesText(counts.filesFound > 0 || counts.exportableImages > 0 ? counts.exportableImages : 0);
   return batchViewHelpers.readyBatchSummaryText(counts, batchViewHelpers.detectedFormatLabel(activeImages()), readyText);
+}
+
+function outputBrowserGroups() {
+  const destinations = state.exportDestinations.length
+    ? state.exportDestinations
+    : Array.isArray(state.exportResult?.destinations)
+      ? state.exportResult.destinations
+      : [];
+  return exportResultViewHelpers.outputBrowserGroups({
+    items: state.exportCompletedItems,
+    destinations,
+  });
 }

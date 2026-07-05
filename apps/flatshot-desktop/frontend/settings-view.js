@@ -5,13 +5,9 @@
   }
   root.FlatShotSettingsView = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  const escapeHtml = globalThis.FlatShotFormatters?.escapeHtml || function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  };
+  const formatterHelpers = globalThis.FlatShotFormatters
+    || (typeof require === "function" ? require("./formatters.js") : null);
+  const escapeHtml = (value) => formatterHelpers.escapeHtml(value);
 
   function presetChipHtml(preset = {}, activePreset = "") {
     const active = preset.name === activePreset;
@@ -57,6 +53,14 @@
       primary: Boolean(presetDirty),
       text: "Guardar ajuste",
       title: presetDirty ? "Guardar el ajuste activo" : "Sin cambios pendientes",
+    };
+  }
+
+  function resetPresetButtonState(presetDirty) {
+    return {
+      disabled: !presetDirty,
+      label: "Restaurar valores por defecto",
+      title: presetDirty ? "Restaurar valores por defecto" : "Sin cambios que restaurar",
     };
   }
 
@@ -142,6 +146,7 @@
     presetDirtyLabel,
     presetListHtml,
     presetSourceLabel,
+    resetPresetButtonState,
     savePresetButtonState,
   };
 });

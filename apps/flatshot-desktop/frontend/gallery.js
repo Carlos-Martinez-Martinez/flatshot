@@ -20,13 +20,9 @@
     return basename(name).replace(/\.[^.\\/]+$/, "") || basename(name) || "Imagen";
   }
 
-  const escapeHtml = globalThis.FlatShotFormatters?.escapeHtml || function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  };
+  const formatterHelpers = globalThis.FlatShotFormatters
+    || (typeof require === "function" ? require("./formatters.js") : null);
+  const escapeHtml = (value) => formatterHelpers.escapeHtml(value);
 
   function imageSearchText(image) {
     const name = String(image?.name || "");
@@ -278,13 +274,22 @@
 
   function emptyBatchNoteHtml(options = {}) {
     const ignored = Number(options.ignored) || 0;
+    const subfoldersOmitted = Number(options.subfoldersOmitted) || 0;
     const detail = ignored
       ? `Esta carpeta no contiene PNG válidos. ${options.ignoredSummary || ""}.`
       : options.scanStatus || "Esta carpeta no contiene imágenes compatibles.";
+    const subfolderAction = subfoldersOmitted
+      ? `<button type="button" data-action="include-subfolders">Incluir subcarpetas</button>`
+      : "";
+    const ignoredAction = ignored
+      ? `<button type="button" data-action="open-batch-detail">Ver ignorados</button>`
+      : "";
     return `
     <strong>No se encontraron imágenes compatibles</strong>
     <span>${escapeHtml(detail)}</span>
     <button type="button" class="primary" data-action="pick-bridge-folder">Elegir otra carpeta</button>
+    ${subfolderAction}
+    ${ignoredAction}
   `;
   }
 

@@ -52,12 +52,12 @@ assert.equal(currentRow.includes("Destino · Salida &lt;web&gt;"), true);
 assert.equal(currentRow.includes("active-output-row__preview-badge"), false);
 assert.equal(currentRow.includes("active-output-row__edit"), true);
 assert.equal(currentRow.includes('data-action="edit-output-profile"'), true);
-assert.equal(currentRow.includes('aria-label="Editar formato Web &lt;gris&gt;"'), true);
-assert.equal(currentRow.includes('title="Editar formato Web &lt;gris&gt;"'), true);
+assert.equal(currentRow.includes('aria-label="Editar salida Web &lt;gris&gt;"'), true);
+assert.equal(currentRow.includes('title="Editar salida Web &lt;gris&gt;"'), true);
 assert.equal(currentRow.includes('class="button-icon" aria-hidden="true"'), true);
-assert.equal(currentRow.includes('class="visually-hidden">Editar formato</span>'), true);
+assert.equal(currentRow.includes('class="visually-hidden">Editar salida</span>'), true);
 assert.equal(currentRow.includes('data-action="select-output-profile"'), false);
-assert.equal(currentRow.includes(">Editar formato</button>"), false);
+assert.equal(currentRow.includes(">Editar salida</button>"), false);
 assert.equal(currentRow.includes("Principal"), false);
 assert.equal(currentRow.includes("disabled"), true);
 
@@ -90,17 +90,17 @@ assert.equal(selectableRow.includes('aria-pressed="false"'), true);
 assert.equal(selectableRow.includes('title="Seleccionar Zalando para previsualizar"'), true);
 assert.equal(selectableRow.includes("active-output-row__preview-badge"), false);
 assert.equal(selectableRow.includes('class="active-output-row__edit" data-action="edit-output-profile"'), true);
-assert.equal(selectableRow.includes(">Editar formato</button>"), false);
+assert.equal(selectableRow.includes(">Editar salida</button>"), false);
 
 const notice = helpers.outputTemporaryNoticeHtml();
-assert.equal(notice.includes("Cambios sin guardar en este formato"), true);
+assert.equal(notice.includes("Cambios sin guardar en esta salida"), true);
 assert.equal(notice.includes('data-action="save-output-current-profile"'), true);
 assert.equal(notice.includes('data-action="discard-output-overrides"'), true);
 
 const card = helpers.outputInspectorCardHtml({{
   activeCount: 2,
   totalFiles: 8,
-  formulaLabel: "4 imágenes x 2 formatos = 8 archivos",
+  formulaLabel: "4 imágenes x 2 salidas = 8 archivos",
   readyLabel: "4 imágenes listas",
   dirty: true,
   rows: [
@@ -108,15 +108,15 @@ const card = helpers.outputInspectorCardHtml({{
     {{ id: "white", name: "Blanco", enabled: true, active: false, canToggle: true, summary: "PNG" }},
   ],
 }});
-assert.equal(card.includes("2 formatos activos"), true);
+assert.equal(card.includes("2 salidas activas"), true);
 assert.equal(card.includes("4 imágenes listas"), false);
-assert.equal(card.includes("4 imágenes x 2 formatos = 8 archivos"), false);
+assert.equal(card.includes("4 imágenes x 2 salidas = 8 archivos"), false);
 assert.equal(card.includes("active-output-list"), true);
 assert.equal(card.includes("Cambios sin guardar"), true);
 assert.equal(card.includes('data-action="new-output-profile"'), true);
 assert.equal(card.includes('data-action="open-app-settings"'), true);
-assert.equal(card.includes(">Gestionar formatos</button>"), true);
-assert.equal(card.includes(">Nuevo formato</button>"), true);
+assert.equal(card.includes(">Gestionar salidas</button>"), true);
+assert.equal(card.includes(">Nueva salida</button>"), true);
 
 const pendingCard = helpers.outputInspectorCardHtml({{
   activeCount: 1,
@@ -136,9 +136,9 @@ const blockedCard = helpers.outputInspectorCardHtml({{
   dirty: false,
   rows: [],
 }});
-assert.equal(blockedCard.includes("0 formatos activos"), true);
+assert.equal(blockedCard.includes("0 salidas activas"), true);
 assert.equal(blockedCard.includes("4 imágenes listas"), false);
-assert.equal(blockedCard.includes("Selecciona al menos un formato"), true);
+assert.equal(blockedCard.includes("Selecciona al menos una salida"), true);
 """
     result = subprocess.run(
         ["node", "-e", script],

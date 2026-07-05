@@ -25,6 +25,7 @@ class ExportRenderTask:
     cache_path: Path
     task_args: tuple
     display_name: str
+    needs_snapshot: bool = False
 
 @dataclass
 class ExportPlan:
@@ -39,6 +40,8 @@ def build_export_plan(
     request: ExportJobRequest,
     image_items: list[tuple[Path, str, Path]],
     cache: RenderCache,
+    *,
+    snapshot_inputs: bool = False,
 ) -> ExportPlan:
     enabled_variants = get_enabled_export_variants(request.export_config)
     curve_data_dict = request.curve_data.model_dump() if request.curve_data else None
@@ -105,6 +108,7 @@ def build_export_plan(
                 cache_path=cache.get_cached_path(key, fmt),
                 task_args=task_args,
                 display_name=display_name,
+                needs_snapshot=snapshot_inputs,
             )
             planned_outputs.append(
                 {

@@ -1,6 +1,6 @@
 @layer flatshot {
 /* Viewer: preview header, mode controls and zoom/navigation. */
-.brand-block, .top-summary, .top-actions, .bottom-actions, .preview-toolbar, .zoom-controls, .button-row { min-width: 0; display: flex; align-items: center; gap: var(--space-2); }
+.bottom-actions, .preview-toolbar, .zoom-controls, .button-row { min-width: 0; display: flex; align-items: center; gap: var(--space-2); }
 .brand-copy, .preview-title-block, .image-copy, .folder-item > div, .section-title > div { min-width: 0; }
 .brand-copy strong, .brand-copy span, .source-panel-heading strong, .source-panel-heading span, .folder-item strong, .folder-item small, .image-copy strong, .image-copy small, .preview-title-block h2, .preview-title-block span, #top-status-text, #preview-meta, #bottom-status, .result-path strong, .result-issues span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .section-title, .source-panel-heading { min-width: 0; display: flex; justify-content: space-between; gap: var(--space-3); }

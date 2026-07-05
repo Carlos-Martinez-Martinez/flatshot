@@ -65,7 +65,6 @@ def test_guide_preferences_are_ui_preferences_not_export_preferences():
 
 def test_canvas_guides_toolbar_overlay_and_controller_are_wired():
     html = INDEX_PATH.read_text(encoding="utf-8")
-    loader = (FRONTEND_DIR / "app-loader.js").read_text(encoding="utf-8")
 
     assert 'class="viewer-control-group viewer-guides"' in html
     assert 'id="guide-overlay"' in html
@@ -76,7 +75,7 @@ def test_canvas_guides_toolbar_overlay_and_controller_are_wired():
     assert 'class="visually-hidden">Sistemas de guías</span>' in html
     guide_block = html[html.index('class="viewer-control-group viewer-guides"'):html.index('class="zoom-controls"', html.index('class="viewer-control-group viewer-guides"'))]
     assert guide_block.index('class="button-icon"') < guide_block.index('id="guides-active-count"')
-    assert loader.index("app-canvas-guides-controller.js") < loader.index("app-preview-controller.js")
+    assert html.index("app-canvas-guides-controller.js") < html.index("app-preview-controller.js")
 
 
 def test_canvas_guide_actions_are_registered_and_popover_closes_transiently():
@@ -150,7 +149,8 @@ def test_canvas_guide_manager_uses_existing_modal_shell():
     view = VIEW_HELPER_PATH.read_text(encoding="utf-8")
     source = f"{controller}\n{view}"
 
-    assert 'modal.className = "app-settings-backdrop guide-manager-modal"' in controller
+    assert 'modal.className = "app-settings-backdrop guide-manager-modal is-hidden"' in controller
+    assert "syncModalVisibility(modal, true)" in controller
     assert "guideViewHelpers.guideManagerHtml" in controller
     assert 'class="app-settings-dialog guide-manager-panel"' in source
     assert 'class="app-settings-header"' in source

@@ -5,13 +5,9 @@
   }
   root.FlatShotEmptyStateView = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  const escapeHtml = globalThis.FlatShotFormatters?.escapeHtml || function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  };
+  const formatterHelpers = globalThis.FlatShotFormatters
+    || (typeof require === "function" ? require("./formatters.js") : null);
+  const escapeHtml = (value) => formatterHelpers.escapeHtml(value);
   const recentFolderHelpers = globalThis.FlatShotRecentFolders || {
     basename(path) {
       return String(path || "").split(/[\\/]+/).pop() || String(path || "");
@@ -94,7 +90,7 @@
       ${recentFoldersHtml(options.recentFolders)}
       <div class="empty-state__actions">
         <button type="button" class="ghost-action" data-action="pick-bridge-folder">Buscar carpeta</button>
-        <button type="button" class="ghost-action" data-action="open-app-settings">Gestionar formatos</button>
+        <button type="button" class="ghost-action" data-action="open-app-settings">Gestionar salidas</button>
         ${qaLabActionHtml}
       </div>
     </div>

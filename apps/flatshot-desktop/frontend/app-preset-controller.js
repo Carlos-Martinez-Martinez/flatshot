@@ -67,6 +67,7 @@ function exportPresetCollection() {
 }
 
 function openPresetEditor() {
+  enableAdvancedInspectorMode();
   state.presetEditorOpen = true;
   state.outputEditMode = false;
   state.inspectorTab = "advanced";

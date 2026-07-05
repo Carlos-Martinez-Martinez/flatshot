@@ -60,7 +60,7 @@ assert.equal(readyHtml.includes('Archivos existentes'), false);
 const multiOutputHtml = helpers.exportConfirmHtml({{
   risks: [],
   summaryRows: [
-    {{ label: "Formatos", value: "3 formatos", items: ["Percha web (JPG)", "Zalando (JPG)", "JPG Baja (JPG)"] }},
+    {{ label: "Salidas", value: "3 salidas", items: ["Percha web (JPG)", "Zalando (JPG)", "JPG Baja (JPG)"] }},
     {{ label: "Nombres de salida", items: [
       {{ label: "Percha web (JPG)", value: "Capa 1.jpg" }},
       {{ label: "Zalando (JPG)", value: "Capa 1.jpg" }},

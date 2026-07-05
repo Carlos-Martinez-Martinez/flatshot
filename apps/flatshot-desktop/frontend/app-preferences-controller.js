@@ -73,6 +73,46 @@ function updateInterfacePreference(patch, statusText) {
   render();
 }
 
+function normalizedComplexityMode(value) {
+  return value === "advanced" ? "advanced" : "simple";
+}
+
+function closeAdvancedSubviewForSimpleMode() {
+  if (state.inspectorTab !== "advanced" && !state.presetEditorOpen) {
+    return;
+  }
+  state.inspectorTab = "review";
+  state.presetEditorOpen = false;
+  state.advancedDisclosureKey = "";
+  pendingAdvancedDisclosure = "";
+}
+
+function setComplexityMode(target) {
+  const complexityMode = normalizedComplexityMode(target?.dataset?.complexityMode || target?.value);
+  state.interfacePreferences = interfacePreferenceHelpers.normalizeInterfacePreferences({
+    ...state.interfacePreferences,
+    complexityMode,
+  });
+  if (complexityMode === "simple") {
+    closeAdvancedSubviewForSimpleMode();
+  }
+  persistInterfacePreferences();
+  state.statusText = complexityMode === "advanced" ? "Modo avanzado" : "Modo simple";
+  render();
+}
+
+function enableAdvancedInspectorMode() {
+  const current = interfacePreferenceHelpers.normalizeInterfacePreferences(state.interfacePreferences);
+  if (current.complexityMode === "advanced") {
+    return;
+  }
+  state.interfacePreferences = interfacePreferenceHelpers.normalizeInterfacePreferences({
+    ...current,
+    complexityMode: "advanced",
+  });
+  persistInterfacePreferences();
+}
+
 function setUiDensity(target) {
   const rawDensity = target?.dataset?.uiDensity || target?.value;
   const density = rawDensity === "comfortable" ? "comfortable" : "compact";
@@ -160,6 +200,8 @@ function handlePreferenceSelectChange(target) {
     setThemePreference(target);
   } else if (key === "brandTone") {
     setBrandTone(target?.value);
+  } else if (key === "complexityMode") {
+    setComplexityMode(target);
   } else if (key === "density") {
     setUiDensity(target);
   } else if (key === "thumbnailSize") {

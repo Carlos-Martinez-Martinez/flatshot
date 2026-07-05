@@ -21,8 +21,12 @@ def serialize_path(path: str | Path) -> str:
     return Path(path).as_posix()
 
 
-def image_file_info_to_dict(image: ImageFileInfo) -> dict[str, Any]:
-    return {
+def image_file_info_to_dict(
+    image: ImageFileInfo,
+    *,
+    image_id: str | None = None,
+) -> dict[str, Any]:
+    payload = {
         "path": serialize_path(image.path),
         "name": image.name,
         "stem": image.stem,
@@ -30,6 +34,9 @@ def image_file_info_to_dict(image: ImageFileInfo) -> dict[str, Any]:
         "sizeBytes": image.size_bytes,
         "hasLocalOverride": image.has_local_override,
     }
+    if image_id:
+        payload["imageId"] = image_id
+    return payload
 
 
 def omitted_scan_item_to_dict(item: OmittedScanItem) -> dict[str, Any]:
@@ -44,12 +51,24 @@ def omitted_scan_item_to_dict(item: OmittedScanItem) -> dict[str, Any]:
     }
 
 
-def folder_scan_result_to_dict(folder: FolderScanResult) -> dict[str, Any]:
+def folder_scan_result_to_dict(
+    folder: FolderScanResult,
+    *,
+    images: list[ImageFileInfo] | None = None,
+    image_id_for_path=None,
+) -> dict[str, Any]:
+    folder_images = folder.images if images is None else images
     return {
         "path": serialize_path(folder.folder),
         "exists": folder.exists,
         "isDir": folder.is_dir,
-        "images": [image_file_info_to_dict(image) for image in folder.images],
+        "images": [
+            image_file_info_to_dict(
+                image,
+                image_id=image_id_for_path(image.path) if image_id_for_path else None,
+            )
+            for image in folder_images
+        ],
         "errors": list(folder.errors),
         "filesFound": folder.files_found,
         "validImages": len(folder.images),
@@ -58,9 +77,31 @@ def folder_scan_result_to_dict(folder: FolderScanResult) -> dict[str, Any]:
     }
 
 
-def batch_scan_result_to_dict(result: BatchScanResult) -> dict[str, Any]:
-    return {
-        "folders": [folder_scan_result_to_dict(folder) for folder in result.folders],
+def batch_scan_result_to_dict(
+    result: BatchScanResult,
+    *,
+    image_offset: int = 0,
+    image_limit: int | None = None,
+    image_id_for_path=None,
+) -> dict[str, Any]:
+    page_requested = image_limit is not None or image_offset > 0
+    offset = max(0, int(image_offset))
+    limit = None if image_limit is None else max(0, int(image_limit))
+    total_images = sum(len(folder.images) for folder in result.folders)
+    folders = [
+        folder_scan_result_to_dict(
+            folder,
+            images=_folder_page_images(folder, offset, limit, cursor),
+            image_id_for_path=image_id_for_path,
+        )
+        for folder, cursor in _folder_image_cursors(result.folders)
+    ] if page_requested else [
+        folder_scan_result_to_dict(folder, image_id_for_path=image_id_for_path)
+        for folder in result.folders
+    ]
+
+    payload = {
+        "folders": folders,
         "totalFolders": result.total_folders,
         "totalImages": result.total_images,
         "adjustedImages": result.adjusted_images,
@@ -70,6 +111,45 @@ def batch_scan_result_to_dict(result: BatchScanResult) -> dict[str, Any]:
         "omittedByCategory": dict(result.omitted_by_category),
         "errors": list(result.errors),
     }
+    if page_requested:
+        returned = sum(len(folder["images"]) for folder in folders)
+        payload["page"] = {
+            "imageOffset": offset,
+            "imageLimit": limit,
+            "imageCount": returned,
+            "totalImages": total_images,
+            "hasMore": offset + returned < total_images,
+        }
+    return payload
+
+
+def _folder_image_cursors(folders: list[FolderScanResult]) -> list[tuple[FolderScanResult, int]]:
+    cursor = 0
+    cursors = []
+    for folder in folders:
+        cursors.append((folder, cursor))
+        cursor += len(folder.images)
+    return cursors
+
+
+def _folder_page_images(
+    folder: FolderScanResult,
+    image_offset: int,
+    image_limit: int | None,
+    cursor: int,
+) -> list[ImageFileInfo]:
+    if image_limit is None:
+        start = max(0, image_offset - cursor)
+        return list(folder.images[start:])
+
+    end = image_offset + image_limit
+    folder_start = cursor
+    folder_end = cursor + len(folder.images)
+    if end <= folder_start or image_offset >= folder_end:
+        return []
+    start = max(0, image_offset - folder_start)
+    stop = min(len(folder.images), end - folder_start)
+    return list(folder.images[start:stop])
 
 
 def categorized_presets_to_dict(categorized) -> dict[str, Any]:

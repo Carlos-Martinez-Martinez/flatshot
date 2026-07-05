@@ -23,6 +23,14 @@
     return normalizeBridgeUrl(bridgeParam, defaultBridgeUrl);
   }
 
+  function initialBridgeTokenFromSearch(search) {
+    try {
+      return String(new URLSearchParams(search || "").get("bridgeToken") || "").trim();
+    } catch (error) {
+      return "";
+    }
+  }
+
   function resolveRuntimeBridgeUrl(options = {}) {
     return normalizeBridgeUrl(
       options.currentBridgeUrl,
@@ -31,6 +39,7 @@
   }
 
   return {
+    initialBridgeTokenFromSearch,
     initialBridgeUrlFromSearch,
     normalizeBridgeUrl,
     resolveRuntimeBridgeUrl,

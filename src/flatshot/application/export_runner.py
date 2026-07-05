@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import shutil
-import tempfile
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from pathlib import Path
 from time import time
@@ -42,8 +41,12 @@ from flatshot.application.export_naming import (
 )
 from flatshot.application.export_planning import ExportPlan as ExportPlan
 from flatshot.application.export_planning import ExportRenderTask, build_export_plan
-from flatshot.application.export_workers import copy_stable, process_single_image
-from flatshot.core.overrides import override_key
+from flatshot.application.export_snapshots import (
+    cleanup_snapshot_folder,
+    queue_next_render_task,
+    source_image_items,
+)
+from flatshot.application.export_workers import process_single_image
 from flatshot.utils.render_cache import RenderCache
 
 DEFAULT_MAX_EXPORT_WORKERS = 4
@@ -101,9 +104,14 @@ class ExportRunner:
         cache: RenderCache | None = None
 
         try:
-            image_items = self._snapshot_image_items(request)
+            image_items = source_image_items(request)
             cache = RenderCache()
-            plan = build_export_plan(request, image_items, cache)
+            plan = build_export_plan(
+                request,
+                image_items,
+                cache,
+                snapshot_inputs=request.input_files is not None,
+            )
             if plan.source_total == 0:
                 result = ExportJobResult(True, 0, 0, 0, 0.0, destinations)
                 self._emit(ExportFinishedEvent(True, 0, 0, 0, 0.0))
@@ -184,31 +192,6 @@ class ExportRunner:
         self._emit(ExportFinishedEvent(success, completed_count, total, error_count, duration))
         return result
 
-    def _snapshot_image_items(self, request: ExportJobRequest) -> list[tuple[Path, str, Path]]:
-        if request.input_files is not None:
-            source_files = [Path(p) for p in request.input_files]
-            source_files = [p for p in source_files if p.is_file() and p.suffix.lower() == ".png"]
-            snap_dir = Path(tempfile.mkdtemp(prefix="flatshot_snap_"))
-            self._snapshot_dir = snap_dir
-            image_items = []
-            for src in source_files:
-                dest = snap_dir / src.name
-                if copy_stable(src, dest, self.copy_file):
-                    image_items.append((dest, override_key(src), src))
-            return image_items
-
-        return [
-            (f, override_key(f), f)
-            for f in request.input_folder.iterdir()
-            if f.is_file() and f.suffix.lower() == ".png"
-        ]
-
-    @staticmethod
-    def _base_output_folder(request: ExportJobRequest) -> Path:
-        if request.export_config.output_destination == "custom" and request.export_config.custom_output_path:
-            return Path(request.export_config.custom_output_path)
-        return request.input_folder / request.export_config.output_folder_name
-
     def _export_cached_tasks(
         self,
         cached_tasks: list[ExportRenderTask],
@@ -234,7 +217,7 @@ class ExportRunner:
                 self.copy_file(cache_path, save_path)
 
                 completed_count += 1
-                self._emit(ExportImageCompletedEvent(cached.display_name, True, cached.source_path))
+                self._emit(ExportImageCompletedEvent(cached.display_name, True, cached.source_path, save_path))
                 self._emit_progress(completed_count, total)
             except Exception as e:
                 self._emit(ExportLogEvent(f"Caché no válida para {cached.display_name}; renderizando normal ({e})"))
@@ -260,12 +243,20 @@ class ExportRunner:
                 in_flight = {}
 
                 for _ in range(min(max_workers, len(tasks))):
-                    try:
-                        task = next(pending_tasks)
-                        future = executor.submit(self.image_processor, task.task_args)
-                        in_flight[future] = task
-                    except StopIteration:
-                        break
+                    completed_count, error_count, self._snapshot_dir = queue_next_render_task(
+                        executor=executor,
+                        pending_tasks=pending_tasks,
+                        in_flight=in_flight,
+                        snapshot_dir=self._snapshot_dir,
+                        copy_file=self.copy_file,
+                        image_processor=self.image_processor,
+                        cancellation_token=self.cancellation_token,
+                        emit=self._emit,
+                        emit_progress=self._emit_progress,
+                        completed_count=completed_count,
+                        error_count=error_count,
+                        total=total,
+                    )
 
                 while in_flight and not self.cancellation_token.cancelled:
                     self.pause_token.wait_if_paused()
@@ -277,32 +268,42 @@ class ExportRunner:
                         continue
 
                     for future in done:
-                        task = in_flight.pop(future)
+                        task, snapshot_folder = in_flight.pop(future)
                         try:
                             success, msg, warning = future.result()
                         except Exception as exc:
                             success, msg, warning = False, f"Worker error: {exc}", None
+                        finally:
+                            cleanup_snapshot_folder(snapshot_folder)
 
                         if success:
                             self._store_render_cache(task, cache)
                             if warning:
                                 self._emit(ExportLogEvent(f"Aviso: {msg}: {warning}"))
-                            self._emit(ExportImageCompletedEvent(msg, True, task.source_path))
+                            self._emit(ExportImageCompletedEvent(msg, True, task.source_path, Path(task.save_path)))
                         else:
                             error_count += 1
                             self._emit(ExportLogEvent(f"Error: {msg}"))
-                            self._emit(ExportImageCompletedEvent(msg.split(":")[0], False, task.source_path))
+                            self._emit(ExportImageCompletedEvent(msg.split(":")[0], False, task.source_path, Path(task.save_path)))
 
                         completed_count += 1
                         self._emit_progress(completed_count, total)
 
                         if not self.cancellation_token.cancelled and not self.pause_token.paused:
-                            try:
-                                task = next(pending_tasks)
-                                future = executor.submit(self.image_processor, task.task_args)
-                                in_flight[future] = task
-                            except StopIteration:
-                                pass
+                            completed_count, error_count, self._snapshot_dir = queue_next_render_task(
+                                executor=executor,
+                                pending_tasks=pending_tasks,
+                                in_flight=in_flight,
+                                snapshot_dir=self._snapshot_dir,
+                                copy_file=self.copy_file,
+                                image_processor=self.image_processor,
+                                cancellation_token=self.cancellation_token,
+                                emit=self._emit,
+                                emit_progress=self._emit_progress,
+                                completed_count=completed_count,
+                                error_count=error_count,
+                                total=total,
+                            )
         except Exception as exc:
             self._emit(ExportLogEvent(f"Error en el proceso de exportación: {exc}"))
 

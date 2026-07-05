@@ -34,6 +34,9 @@ def test_preferences_modal_is_dedicated_to_interface_preferences():
     assert '<option value="system">Sistema</option>' in modal
     assert 'data-preference-select="brandTone"' in modal
     assert 'data-preference-select="density"' in modal
+    assert 'data-preference-select="complexityMode"' in modal
+    assert '<option value="simple">Simple</option>' in modal
+    assert '<option value="advanced">Avanzado</option>' in modal
     assert 'class="preference-toggle" data-action="toggle-reduced-motion"' in modal
     assert 'class="preference-toggle" data-action="toggle-show-recent-folders"' in modal
     assert 'class="preference-toggle" data-action="toggle-onboarding-background"' in modal
@@ -89,10 +92,13 @@ def test_preferences_actions_state_and_modal_visibility_are_wired():
     assert "preferencesOpen: false" in app
     assert "interfacePreferenceHelpers.applyInterfacePreferences(document, state.interfacePreferences);" in shell
     assert 'shell.dataset.uiDensity = state.interfacePreferences.density;' in shell
+    assert 'shell.dataset.complexityMode = state.interfacePreferences.complexityMode;' in shell
     assert 'shell.dataset.thumbnailSize = state.interfacePreferences.thumbnailSize;' in shell
     assert 'shell.dataset.fileNameDisplay = state.interfacePreferences.fileNameDisplay;' in shell
     assert 'shell.dataset.onboardingBackground = state.interfacePreferences.onboardingBackground ? "enabled" : "disabled";' in shell
     assert "function handlePreferenceSelectChange(" in (FRONTEND_DIR / "app-preferences-controller.js").read_text(encoding="utf-8")
+    assert "function setComplexityMode(" in preferences
+    assert "function enableAdvancedInspectorMode()" in preferences
     assert "function setStartupAdjustmentFromCurrent()" in preferences
     assert "function clearStartupAdjustmentPreference()" in preferences
     assert "function applyStartupAdjustmentPreference(" in preset_workflow
@@ -104,6 +110,7 @@ def test_preferences_actions_state_and_modal_visibility_are_wired():
         "close-preferences",
         "set-theme-preference",
         "set-ui-density",
+        "set-complexity-mode",
         "toggle-reduced-motion",
         "toggle-show-recent-folders",
         "toggle-onboarding-background",
@@ -157,6 +164,7 @@ function fakeDocument() {{
 
 assert.deepEqual(helpers.defaultInterfacePreferences(), {{
   density: "compact",
+  complexityMode: "simple",
   reduceMotion: false,
   showRecentFolders: true,
   onboardingBackground: true,
@@ -167,6 +175,7 @@ assert.deepEqual(helpers.defaultInterfacePreferences(), {{
 
 assert.deepEqual(helpers.normalizeInterfacePreferences({{
   density: "comfortable",
+  complexityMode: "advanced",
   reduceMotion: true,
   showRecentFolders: false,
   onboardingBackground: false,
@@ -179,6 +188,7 @@ assert.deepEqual(helpers.normalizeInterfacePreferences({{
   fileNameDisplay: "hover",
 }}), {{
   density: "comfortable",
+  complexityMode: "advanced",
   reduceMotion: true,
   showRecentFolders: false,
   onboardingBackground: false,
@@ -193,6 +203,7 @@ assert.deepEqual(helpers.normalizeInterfacePreferences({{
 
 assert.deepEqual(helpers.normalizeInterfacePreferences({{
   density: "wide",
+  complexityMode: "expert",
   reduceMotion: "yes",
   showRecentFolders: "no",
   onboardingBackground: "no",
@@ -226,9 +237,10 @@ assert.deepEqual(helpers.readInterfacePreferences(fakeStorage({{ prefs: "{{" }})
 assert.deepEqual(helpers.readInterfacePreferences(fakeStorage({{}}, true), "prefs"), helpers.defaultInterfacePreferences());
 
 const documentRef = fakeDocument();
-helpers.applyInterfacePreferences(documentRef, {{ density: "comfortable", reduceMotion: true, onboardingBackground: false, thumbnailSize: "large", fileNameDisplay: "none" }});
+helpers.applyInterfacePreferences(documentRef, {{ density: "comfortable", complexityMode: "advanced", reduceMotion: true, onboardingBackground: false, thumbnailSize: "large", fileNameDisplay: "none" }});
 assert.deepEqual(documentRef.documentElement.dataset, {{
   uiDensity: "comfortable",
+  complexityMode: "advanced",
   motion: "reduced",
   onboardingBackground: "disabled",
   thumbnailSize: "large",

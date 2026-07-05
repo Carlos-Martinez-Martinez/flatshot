@@ -259,6 +259,15 @@ assert.equal(
   helpers.emptyBatchNoteHtml({{ ignored: 1, ignoredSummary: "1 archivo temporal" }}).includes("Esta carpeta no contiene PNG válidos. 1 archivo temporal."),
   true,
 );
+const subfolderEmpty = helpers.emptyBatchNoteHtml({{
+  ignored: 2,
+  ignoredSummary: "2 subcarpetas no escaneadas",
+  subfoldersOmitted: 2,
+}});
+assert.equal(subfolderEmpty.includes('data-action="include-subfolders"'), true);
+assert.equal(subfolderEmpty.includes("Incluir subcarpetas"), true);
+assert.equal(subfolderEmpty.includes('data-action="open-batch-detail"'), true);
+assert.equal(subfolderEmpty.includes("Ver ignorados"), true);
 assert.equal(
   helpers.emptyBatchNoteHtml({{ ignored: 0, scanStatus: "Sin compatibles" }}).includes("Sin compatibles"),
   true,

@@ -5,6 +5,8 @@
   }
   root.FlatShotAppState = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  const stateStoreHelpers = globalThis.FlatShotAppStateStores || {};
+
   function hasBatch(state = {}) {
     return state.batch === "ready" || state.batch === "scanning";
   }
@@ -114,7 +116,7 @@
       issues.push({ level: "error", title: "Sin ajuste de imagen", detail: "Selecciona un ajuste de imagen." });
     }
     if (exportProfiles.length === 0) {
-      issues.push({ level: "error", title: "Sin formatos activos", detail: "Selecciona al menos un formato de salida." });
+      issues.push({ level: "error", title: "Sin salidas activas", detail: "Selecciona al menos una salida." });
     }
     if (!String(state.naming || "").trim()) {
       issues.push({ level: "error", title: "Nombre de archivo vacío", detail: "Define una plantilla de nombre." });
@@ -126,7 +128,7 @@
       outputProfileValidation(outputProfileRawFromProfile(profile)).errors.forEach((message) => {
         issues.push({
           level: "error",
-          title: "Formato incompleto",
+          title: "Salida incompleta",
           detail: `${profile.name}: ${message}`,
         });
       });
@@ -178,6 +180,25 @@
     };
   }
 
+  function stateStoreSnapshot(state = {}) {
+    if (typeof stateStoreHelpers.stateStoreSnapshot === "function") {
+      return stateStoreHelpers.stateStoreSnapshot(state);
+    }
+    return { app: { ...state } };
+  }
+
+  function stateStoreFields(name) {
+    return typeof stateStoreHelpers.stateStoreFields === "function"
+      ? stateStoreHelpers.stateStoreFields(name)
+      : [];
+  }
+
+  function storeNames() {
+    return typeof stateStoreHelpers.storeNames === "function"
+      ? stateStoreHelpers.storeNames()
+      : ["app"];
+  }
+
   return {
     activeFolders,
     activeImages,
@@ -192,6 +213,9 @@
     isMockBatch,
     lowResolutionImageCount,
     selectedImage,
+    stateStoreFields,
+    stateStoreSnapshot,
+    storeNames,
     uiState,
     validationIssues,
   };

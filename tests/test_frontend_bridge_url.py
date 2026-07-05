@@ -29,6 +29,16 @@ assert.equal(
 );
 
 assert.equal(
+  helpers.initialBridgeTokenFromSearch("?bridgeToken=abc123"),
+  "abc123"
+);
+
+assert.equal(
+  helpers.initialBridgeTokenFromSearch("?bridgeToken=%20%20"),
+  ""
+);
+
+assert.equal(
   helpers.resolveRuntimeBridgeUrl({{
     currentBridgeUrl: "http://127.0.0.1:8765",
     restoredBridgeUrl: "http://127.0.0.1:8766",

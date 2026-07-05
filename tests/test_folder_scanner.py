@@ -82,6 +82,72 @@ def test_scan_reports_subfolders_and_corrupt_png(tmp_path):
     assert omitted["nested"].severity == "ignored"
 
 
+def test_scan_fast_mode_skips_png_verification(tmp_path):
+    _png(tmp_path / "valid.png")
+    broken = tmp_path / "broken.png"
+    broken.write_bytes(b"not a real png")
+
+    verified = FolderScanner().scan_folders([tmp_path], verify_images=True)
+    fast = FolderScanner().scan_folders([tmp_path], verify_images=False)
+
+    assert [image.name for image in verified.folders[0].images] == ["valid.png"]
+    assert verified.omitted_by_reason == {"read_error": 1}
+    assert [image.name for image in fast.folders[0].images] == ["broken.png", "valid.png"]
+    assert fast.total_omitted == 0
+
+
+def test_scan_fast_mode_handles_large_flat_batches(tmp_path):
+    for index in range(1000):
+        (tmp_path / f"item-{index:04d}.png").write_bytes(b"not opened in fast mode")
+
+    result = FolderScanner().scan_folders([tmp_path], verify_images=False)
+
+    assert result.total_folders == 1
+    assert result.total_files == 1000
+    assert result.total_images == 1000
+    assert result.total_omitted == 0
+    assert result.folders[0].images[0].name == "item-0000.png"
+    assert result.folders[0].images[-1].name == "item-0999.png"
+
+
+def test_scan_recursive_mode_includes_nested_images(tmp_path):
+    root_png = _png(tmp_path / "root.png")
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    nested_png = _png(nested / "inside.png")
+
+    default = FolderScanner().scan_folders([tmp_path])
+    recursive = FolderScanner().scan_folders([tmp_path], recursive=True)
+
+    assert [image.path for image in default.folders[0].images] == [root_png]
+    assert default.omitted_by_reason == {"subfolder_not_scanned": 1}
+    assert [image.path for image in recursive.folders[0].images] == [nested_png, root_png]
+    assert recursive.total_files == 2
+    assert recursive.total_omitted == 0
+
+
+def test_scan_recursive_mode_does_not_follow_symlinked_directories(tmp_path, monkeypatch):
+    root_png = _png(tmp_path / "root.png")
+    link = tmp_path / "linked"
+    link.mkdir()
+    _png(link / "inside.png")
+
+    original_is_symlink = Path.is_symlink
+
+    def fake_is_symlink(path: Path) -> bool:
+        return path == link or original_is_symlink(path)
+
+    monkeypatch.setattr(Path, "is_symlink", fake_is_symlink)
+
+    result = FolderScanner().scan_folders([tmp_path], recursive=True)
+
+    assert [image.path for image in result.folders[0].images] == [root_png]
+    assert result.omitted_by_reason == {"symlink_not_scanned": 1}
+    omitted = result.folders[0].omitted[0]
+    assert omitted.path == link
+    assert omitted.detail == "Enlace de carpeta no escaneado"
+
+
 def test_scan_classifies_system_and_temp_files_as_ignored(tmp_path):
     _png(tmp_path / "valid.png")
     (tmp_path / "Thumbs.db").write_bytes(b"cache")

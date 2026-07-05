@@ -299,6 +299,70 @@ class TestAplicarEfectos:
         assert result.mode == "RGB"
         assert abs(int(arr.sum()) - 22290180) <= 5000
 
+    @pytest.mark.parametrize(
+        ("engine_name", "expected_sum"),
+        [
+            ("realistic_v2", 22149618),
+            ("studio_2_5d", 22080705),
+        ],
+    )
+    def test_modern_shadow_engines_golden_synthetic_output(self, engine_name, expected_sum):
+        """Modern renderers keep small synthetic output stable within tolerance."""
+        img = Image.new("RGBA", (80, 120), (0, 0, 0, 0))
+        img.paste(Image.new("RGBA", (40, 70), (128, 128, 128, 255)), (20, 25))
+        settings = ShadowSettings(
+            shadow_engine=engine_name,
+            adaptive_zoom=False,
+            angle=180,
+            distance=18,
+            blur=12,
+            opacity=35,
+            noise=0,
+            contact_blur=6,
+            padding=10,
+        )
+
+        result = ShadowEngine.aplicar_efectos(img, settings, (180, 240))
+        arr = np.asarray(result, dtype=np.int64)
+
+        assert result.mode == "RGB"
+        assert abs(int(arr.sum()) - expected_sum) <= 5000
+
+    def test_adaptive_scale_golden_synthetic_output(self):
+        """Adaptive scaling keeps a small transparent output stable within tolerance."""
+        img = Image.new("RGBA", (90, 140), (0, 0, 0, 0))
+        img.paste(Image.new("RGBA", (34, 96), (90, 120, 180, 255)), (28, 24))
+        settings = ShadowSettings(
+            shadow_engine="realistic_v2",
+            adaptive_zoom=True,
+            transparent_bg=True,
+            angle=180,
+            distance=12,
+            blur=8,
+            opacity=30,
+            noise=0,
+            contact_blur=4,
+            padding=12,
+        )
+
+        result = ShadowEngine.aplicar_efectos(
+            img,
+            settings,
+            (180, 260),
+            scale_factor=1.0,
+            curve_data=CurveData(
+                xp=[0.0, 0.35, 0.60, 0.85, 1.10, 1.40, 3.0],
+                fp=[0.80, 0.80, 0.90, 1.00, 0.95, 0.90, 0.90],
+            ),
+        )
+        arr = np.asarray(result, dtype=np.int64)
+        alpha_sum = int(np.asarray(result.getchannel("A"), dtype=np.int64).sum())
+
+        assert result.mode == "RGBA"
+        assert result.getbbox() == (49, 22, 132, 238)
+        assert abs(int(arr.sum()) - 9594010) <= 5000
+        assert abs(alpha_sum - 3768226) <= 5000
+
     def test_realistic_v2_is_deterministic_with_noise(self, sample_image):
         settings = ShadowSettings(
             shadow_engine="realistic_v2",
@@ -337,7 +401,7 @@ class TestAplicarEfectos:
                     blur=18,
                     contact_blur=6,
                     opacity=45,
-                    noise=25,
+                    noise=20,
                 )
             )
         ).shadow
@@ -663,7 +727,7 @@ class TestAplicarEfectos:
     def test_studio_2_5d_light_types_produce_distinct_shadows(self):
         base = {
             "shadow_engine": "studio_2_5d",
-            "distance": 90,
+            "distance": 80,
             "blur": 24,
             "contact_blur": 9,
             "opacity": 45,

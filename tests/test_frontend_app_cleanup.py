@@ -1,3 +1,4 @@
+import json
 import re
 import subprocess
 import sys
@@ -68,7 +69,13 @@ def test_app_js_no_longer_contains_domain_sections():
 
 
 def test_app_domain_scripts_are_loaded_in_order():
-    loader_source = (FRONTEND_DIR / "app-loader.js").read_text(encoding="utf-8")
+    html = INDEX_PATH.read_text(encoding="utf-8")
+    manifest_match = re.search(
+        r'<script type="application/json" id="flatshot-app-loader-manifest">\s*(?P<body>\[.*?\])\s*</script>',
+        html,
+        re.DOTALL,
+    )
+    assert manifest_match
 
     expected_order = [
         "app-globals.js",
@@ -102,6 +109,7 @@ def test_app_domain_scripts_are_loaded_in_order():
         "app-topbar-bridge.js",
         "app-gallery-controller.js",
         "app-thumbnail-controller.js",
+        "app-modal-visibility.js",
         "app-modal-render-controller.js",
         "app-canvas-guides-controller.js",
         "app-preview-controller.js",
@@ -130,9 +138,25 @@ def test_app_domain_scripts_are_loaded_in_order():
         "app-startup.js",
     ]
 
-    positions = [loader_source.index(script) for script in expected_order]
+    assert json.loads(manifest_match.group("body")) == expected_order
 
-    assert positions == sorted(positions)
+
+def test_app_loader_uses_html_manifest_as_single_script_order_source():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+    loader_source = (FRONTEND_DIR / "app-loader.js").read_text(encoding="utf-8")
+    manifest_match = re.search(
+        r'<script type="application/json" id="flatshot-app-loader-manifest">\s*(?P<body>\[.*?\])\s*</script>',
+        html,
+        re.DOTALL,
+    )
+
+    assert manifest_match
+    manifest = json.loads(manifest_match.group("body"))
+    assert manifest[0] == "app-globals.js"
+    assert manifest[-1] == "app-startup.js"
+    assert "app-loader.js" not in manifest
+    assert "flatshot-app-loader-manifest" in loader_source
+    assert not re.search(r"APP_SCRIPT_ORDER\s*=\s*\[", loader_source)
 
 
 def test_app_domain_scripts_are_loaded_through_loader_only():
@@ -185,6 +209,24 @@ def test_mock_data_does_not_own_helper_alias_globals():
 
     for alias in forbidden_aliases:
         assert alias not in source
+
+
+def test_view_helpers_do_not_duplicate_escape_html_fallbacks():
+    allowed = {"error-boundary.js", "formatters.js"}
+    offenders = []
+    duplicate_patterns = [
+        "function escapeHtml(value)",
+        'replaceAll("&", "&amp;")',
+        'replaceAll("<", "&lt;")',
+    ]
+    for path in sorted(FRONTEND_DIR.glob("*.js")):
+        if path.name in allowed:
+            continue
+        source = path.read_text(encoding="utf-8")
+        if any(pattern in source for pattern in duplicate_patterns):
+            offenders.append(path.name)
+
+    assert offenders == []
 
 
 def test_frontend_audit_check_mode_passes_current_contract():

@@ -203,7 +203,7 @@
               <button type="button" class="top-folder-action" data-action="pick-bridge-folder" data-icon="folder-open"><span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 6.5A2.5 2.5 0 0 1 5.5 4H10l2 2.5h6.5A2.5 2.5 0 0 1 21 9v8.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"></path><path d="M3 10h18"></path></svg></span>Carpeta</button>
             </div>
             <div class="top-action-cluster top-action-cluster--config" aria-label="Exportación">
-              <button type="button" class="top-format-action" data-action="open-app-settings" data-icon="sliders"><span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h8M16 7h4M4 17h4M12 17h8"></path><path d="M12 5v4M8 15v4"></path></svg></span>Formatos</button>
+              <button type="button" class="top-format-action" data-action="open-app-settings" data-icon="sliders"><span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h8M16 7h4M4 17h4M12 17h8"></path><path d="M12 5v4M8 15v4"></path></svg></span>Salidas</button>
               <button type="button" class="top-inspector-action" data-action="toggle-responsive-inspector" data-icon="sliders" hidden>Ajustes</button>
             </div>
             <div class="top-action-cluster top-action-cluster--run" aria-label="Procesamiento">
@@ -216,7 +216,6 @@
               <div class="debug-content">
                 <button type="button" data-action="check-bridge">Comprobar bridge</button>
                 <button type="button" data-action="clear-batch">Limpiar lote</button>
-                <button type="button" data-action="open-qa-lab">QA Lab</button>
                 <label class="text-field compact-field">
                   <span>URL bridge</span>
                   <input id="bridge-url" type="url" value="http://127.0.0.1:8765" />
@@ -289,12 +288,12 @@
             <ul class="import-requirements" aria-label="Requisitos de importación">
               <li>Carpeta local</li>
               <li>Imágenes PNG</li>
-              <li>Formatos configurables después</li>
+              <li>Salidas configurables después</li>
             </ul>
           </section>
 
           <section class="batch-summary batch-rail__summary" id="batch-summary" aria-live="polite"></section>
-          <div class="folder-list batch-format" id="folder-list" aria-label="Formato del lote" hidden></div>
+          <div class="folder-list batch-format" id="folder-list" aria-label="Salida del lote" hidden></div>
 
         </aside>
 
@@ -454,6 +453,7 @@
                 </div>
                 <div class="button-row preset-actions">
                   <button type="button" data-action="cancel-adjustment-edit">Cancelar</button>
+                  <button type="button" data-action="reset-settings">Restaurar recomendado</button>
                   <button type="button" class="primary" data-action="apply-global-adjustment">Aplicar al lote sin guardar</button>
                   <button type="button" id="save-preset" data-action="save-preset">Guardar ajuste</button>
                   <button type="button" data-action="save-preset-as-new">Guardar como nuevo</button>
@@ -469,6 +469,7 @@
                 <small>Ajuste global</small>
               </span>
             </summary>
+            <button type="button" class="appearance-section__reset ghost-action" id="reset-settings-inline" data-action="reset-settings" aria-label="Restaurar valores por defecto" title="Restaurar valores por defecto">Por defecto</button>
             <div class="inspector-disclosure__body control-stack">
               <label class="control-row">
                 <span>Opacidad</span>
@@ -647,7 +648,7 @@
 
             <div class="output-profile-row">
               <label>
-                <span>Formatos</span>
+                <span>Salidas</span>
                 <select id="output-profile-select"></select>
               </label>
               <button type="button" class="btn-linklike" data-action="open-app-settings">Cambiar</button>
@@ -744,55 +745,6 @@
         </section>
       </div>
 
-      <div class="app-settings-backdrop qa-lab-backdrop is-hidden dev-only" id="qa-lab-modal" role="dialog" aria-modal="true" aria-labelledby="qa-lab-title" aria-hidden="true">
-        <section class="app-settings-dialog qa-lab-dialog">
-          <header class="app-settings-header">
-            <div>
-              <span class="eyebrow">Diagnóstico</span>
-              <h2 id="qa-lab-title">QA Lab</h2>
-              <small>Estados visuales simulados fuera del flujo principal.</small>
-            </div>
-            <button type="button" class="icon-button" data-action="close-qa-lab" aria-label="Cerrar QA Lab">×</button>
-          </header>
-          <div class="qa-lab-body" id="qa-lab-body">
-            <section class="qa-lab-section">
-              <div class="qa-lab-section-heading">
-                <h3>Estados visuales</h3>
-                <small>Estados simulados para revisar la interfaz sin depender de archivos reales.</small>
-              </div>
-              <div class="review-grid" aria-label="Estados visuales simulados">
-                <button type="button" data-review-scenario="initial">Sin lote</button>
-                <button type="button" data-review-scenario="batch-ready">Lote listo</button>
-                <button type="button" data-review-scenario="empty-folder">Carpeta vacía</button>
-                <button type="button" data-review-scenario="preview-loading">Vista cargando</button>
-                <button type="button" data-review-scenario="preview-warning">Vista con aviso</button>
-                <button type="button" data-review-scenario="preview-error">Error de vista</button>
-                <button type="button" data-review-scenario="export-blocked">Exportación bloqueada</button>
-                <button type="button" data-review-scenario="export-ready">Exportación lista</button>
-                <button type="button" data-review-scenario="export-running">En curso</button>
-                <button type="button" data-review-scenario="export-completed">Completada</button>
-                <button type="button" data-review-scenario="export-partial">Con errores</button>
-                <button type="button" data-review-scenario="export-failed">Fallida</button>
-              </div>
-            </section>
-            <section class="qa-lab-section">
-              <div class="qa-lab-section-heading">
-                <h3>Bridge real</h3>
-                <small>Comprobaciones que usan la misma ruta local que producción.</small>
-              </div>
-              <div class="review-actions">
-                <button type="button" data-action="check-bridge">Bridge health</button>
-                <button type="button" data-action="scan-bridge-folder">Escaneo real</button>
-                <button type="button" data-action="force-preview-error">Error de vista</button>
-              </div>
-            </section>
-          </div>
-          <footer class="app-settings-footer">
-            <button type="button" data-action="close-qa-lab">Cerrar</button>
-          </footer>
-        </section>
-      </div>
-
       <div class="app-settings-backdrop is-hidden" id="preferences-modal" role="dialog" aria-modal="true" aria-labelledby="preferences-title">
         <section class="app-settings-dialog preferences-dialog">
           <header class="app-settings-header">
@@ -851,6 +803,19 @@
                   <select data-preference-select="density">
                     <option value="compact">Compacta</option>
                     <option value="comfortable">Cómoda</option>
+                  </select>
+                </label>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Modo de trabajo</strong>
+                  <small>Panel principal simple o completo.</small>
+                </div>
+                <label class="preference-select">
+                  <span class="visually-hidden">Modo de trabajo</span>
+                  <select data-preference-select="complexityMode">
+                    <option value="simple">Simple</option>
+                    <option value="advanced">Avanzado</option>
                   </select>
                 </label>
               </div>
@@ -984,14 +949,14 @@
           <header class="app-settings-header">
             <div>
               <span class="eyebrow">Exportación</span>
-              <h2 id="app-settings-title">Formatos de salida</h2>
+              <h2 id="app-settings-title">Salidas</h2>
               <small id="app-settings-subtitle">Configura las salidas del lote.</small>
             </div>
             <button type="button" class="icon-button" data-action="close-app-settings" aria-label="Cerrar ajustes">×</button>
           </header>
 
           <div class="app-settings-content">
-            <aside class="output-format-list" aria-label="Formatos de salida">
+            <aside class="output-format-list" aria-label="Salidas">
               <div class="settings-toolbar">
                 <div>
                   <small id="output-profile-count">0 activos de 0</small>
@@ -1012,7 +977,7 @@
                 <section class="format-form-section format-section-file">
                   <h3>Archivo</h3>
                   <label class="text-field format-field-wide">
-                    <span>Nombre del formato</span>
+                    <span>Nombre de salida</span>
                     <input id="profile-name-input" type="text" autocomplete="off" />
                     <small class="field-message" data-profile-field-message="name"></small>
                   </label>
@@ -1058,7 +1023,7 @@
                           <select id="profile-background-input"></select>
                           <small class="field-message" data-profile-field-message="background"></small>
                         </label>
-                        <div class="background-preset-actions" aria-label="Presets de fondo">
+                        <div class="background-preset-actions" aria-label="Fondos guardados">
                           <button type="button" data-action="edit-background-preset" aria-label="Editar fondo" title="Editar fondo"><span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></span><span class="visually-hidden">Editar fondo</span></button>
                           <button type="button" data-action="new-background-preset" aria-label="Nuevo fondo" title="Nuevo fondo"><span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg></span><span class="visually-hidden">Nuevo fondo</span></button>
                           <button type="button" data-action="delete-background-preset" aria-label="Eliminar fondo" title="Eliminar fondo"><span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v5"></path><path d="M14 11v5"></path></svg></span><span class="visually-hidden">Eliminar fondo</span></button>
@@ -1104,11 +1069,11 @@
           <footer class="app-settings-footer">
             <div class="output-delete-confirm" id="output-delete-confirm" hidden aria-live="polite">
               <div class="output-delete-confirm-copy">
-                <strong id="output-delete-confirm-title">Eliminar formato</strong>
+                <strong id="output-delete-confirm-title">Eliminar salida</strong>
                 <small id="output-delete-confirm-detail"></small>
               </div>
               <button type="button" data-action="cancel-output-delete">Cancelar</button>
-              <button type="button" class="danger" data-action="confirm-output-delete">Eliminar formato</button>
+              <button type="button" class="danger" data-action="confirm-output-delete">Eliminar salida</button>
             </div>
             <span id="output-profile-unsaved" class="settings-footer-note"></span>
             <button type="button" data-output-profile-close data-action="cancel-output-profile-draft" hidden>Cancelar</button>
@@ -1183,8 +1148,10 @@
     <script src="./preflight.js?v=20260704-search-focus"></script>
     <script src="./batch-view.js?v=20260704-search-focus"></script>
     <script src="./scan-state.js?v=20260704-search-focus"></script>
+    <script src="./scan-result-pages.js?v=20260704-search-focus"></script>
     <script src="./export-confirm-view.js?v=20260704-search-focus"></script>
     <script src="./empty-state-view.js?v=20260704-search-focus"></script>
+    <script src="./qa-lab-view.js?v=20260704-search-focus"></script>
     <script src="./batch-detail-view.js?v=20260704-search-focus"></script>
     <script src="./gallery.js?v=20260704-search-focus"></script>
     <script src="./preview-view.js?v=20260704-search-focus"></script>
@@ -1205,6 +1172,8 @@
     <script src="./recent-folders.js?v=20260704-search-focus"></script>
     <script src="./folder-drop.js?v=20260704-search-focus"></script>
     <script src="./adjustment-history.js?v=20260704-search-focus"></script>
+    <script src="./state-stores.mjs?v=20260704-search-focus" type="module"></script>
+    <script src="./state-stores.js?v=20260704-search-focus"></script>
     <script src="./app-state.js?v=20260704-search-focus"></script>
     <script src="./onboarding-background.js?v=20260704-search-focus"></script>
     <script type="application/json" id="flatshot-app-loader-manifest">

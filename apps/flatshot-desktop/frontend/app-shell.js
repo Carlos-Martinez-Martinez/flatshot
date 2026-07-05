@@ -28,6 +28,7 @@ function renderShell() {
   shell.dataset.brandTone = state.brandTone;
   document.documentElement.dataset.themePreference = state.themePreference;
   shell.dataset.uiDensity = state.interfacePreferences.density;
+  shell.dataset.complexityMode = state.interfacePreferences.complexityMode;
   shell.dataset.reduceMotion = state.interfacePreferences.reduceMotion ? "true" : "false";
   shell.dataset.thumbnailSize = state.interfacePreferences.thumbnailSize;
   shell.dataset.fileNameDisplay = state.interfacePreferences.fileNameDisplay;
@@ -95,6 +96,7 @@ function renderPreferenceControls() {
   const preferences = interfacePreferenceHelpers.normalizeInterfacePreferences(state.interfacePreferences);
   const values = {
     brandTone: themeHelpers.normalizeBrandTone(state.brandTone),
+    complexityMode: preferences.complexityMode,
     density: preferences.density,
     fileNameDisplay: preferences.fileNameDisplay,
     theme: themePreference,

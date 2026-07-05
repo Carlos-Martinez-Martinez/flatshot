@@ -65,6 +65,11 @@
 }
 
 .top-summary {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
   justify-content: flex-start;
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);

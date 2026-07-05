@@ -5,13 +5,9 @@
   }
   root.FlatShotTopStatusView = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  const escapeHtml = globalThis.FlatShotFormatters?.escapeHtml || function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  };
+  const formatterHelpers = globalThis.FlatShotFormatters
+    || (typeof require === "function" ? require("./formatters.js") : null);
+  const escapeHtml = (value) => formatterHelpers.escapeHtml(value);
 
   function countLabel(value, singular, plural) {
     const count = Number(value) || 0;
@@ -52,7 +48,7 @@
       return exportStatus === "partial" ? `Exportado con avisos · ${processed}/${total}` : `Exportado · ${processed}/${total}`;
     }
     if (exportStatus === "failed") {
-      return "Exportación fallida";
+      return options.hasOutputBlocker ? "Revisar salida" : "Exportación fallida";
     }
     if (batch === "scanning") {
       return "Escaneando...";
@@ -153,11 +149,20 @@
     if (action === "start-export") {
       return `${primaryAction.label}. Atajo: Ctrl+E`;
     }
+    if (action === "quick-export") {
+      return `${primaryAction.label} con la salida activa. Atajo: Ctrl+Shift+E`;
+    }
     if (action === "pick-bridge-folder") {
       return "Seleccionar carpeta de entrada";
     }
     if (action === "review-warnings") {
       return "Revisar avisos del lote";
+    }
+    if (action === "edit-output") {
+      return "Corregir destino, sufijo o nombre de salida";
+    }
+    if (action === "browse-outputs") {
+      return "Ver salidas exportadas";
     }
     if (action === "open-output") {
       return "Abrir carpeta de salida";
@@ -192,9 +197,9 @@
     const selectedIndex = Number(options.selectedIndex);
     const selectedText = selectedIndex >= 0 ? `Imagen ${selectedIndex + 1}/${imageCount}` : "Sin selección";
     const destination = Number(options.outputCount) > 1
-      ? countLabel(options.outputCount, "formato", "formatos")
+      ? countLabel(options.outputCount, "salida", "salidas")
       : options.destinationMode === "custom"
-        ? options.destinationValue || "sin destino"
+        ? (options.destinationValue ? formatterHelpers.displayPath(options.destinationValue) : "sin destino")
         : `origen / ${options.destinationValue}`;
 
     if (exportStatus === "running") {
@@ -212,7 +217,7 @@
       return `Última exportación con avisos · ${processed}/${total} archivos`;
     }
     if (exportStatus === "failed") {
-      return `Exportación fallida · ${options.firstErrorDetail || "Revisa avisos"}`;
+      return `${options.hasOutputBlocker ? "Revisa salida" : "Exportación fallida"} · ${options.firstErrorDetail || "Revisa avisos"}`;
     }
     if (batch === "none") {
       return "Sin lote · Elige una carpeta para empezar";
@@ -226,7 +231,7 @@
 
     const warnings = Number(counts.nonBlockingWarnings) || 0;
     const warningText = warnings ? ` · ${countLabel(warnings, "aviso", "avisos")}` : "";
-    return `${Number(counts.exportableImages) || 0} exportables · ${selectedText}${warningText} · Formato: ${destination}`;
+    return `${Number(counts.exportableImages) || 0} exportables · ${selectedText}${warningText} · Salida: ${destination}`;
   }
 
   return {

@@ -262,7 +262,7 @@ assert.equal(state.outputProfileDraft.background, "rgb230");
 assert.equal(backgroundSelect.value, "rgb230");
 assert.equal(backgroundSelect.innerHTML.includes("Actual ·"), false);
 assert.equal(state.outputProfiles[0].background, customValue);
-assert.equal(state.statusText, "Fondo eliminado: Fondo rojo. Formato en edición: gris claro");
+assert.equal(state.statusText, "Fondo eliminado: Fondo rojo. Salida en edición: gris claro");
 assert.equal(persisted, true);
 assert.equal(rendered, true);
 """
@@ -302,7 +302,7 @@ const heading = helpers.outputProfileEditorHeadingHtml({{
   isPersisted: true,
   summary: "JPG · 1800x2400",
 }});
-assert.equal(heading.includes("Formato seleccionado"), true);
+assert.equal(heading.includes("Salida seleccionada"), true);
 assert.equal(heading.includes("Web &lt;gris&gt;"), true);
 assert.equal(heading.includes("Usar en este lote"), true);
 assert.equal(heading.includes("data-output-profile-draft-enabled"), true);
@@ -312,12 +312,12 @@ assert.equal(heading.includes("Editado"), false);
 assert.equal(heading.includes("Activo en este lote"), false);
 assert.equal(heading.includes('status-badge ready'), false);
 assert.equal(helpers.outputProfileEditorHeadingHtml({{
-  profile: {{ name: "Nuevo formato" }},
+  profile: {{ name: "Nueva salida" }},
   validation: {{ errors: [] }},
   enabled: false,
   isPersisted: false,
   new: true,
-}}).includes("Formato nuevo"), false);
+}}).includes("Salida nueva"), false);
 
 const invalidHeading = helpers.outputProfileEditorHeadingHtml({{
   profile,
@@ -346,7 +346,7 @@ const validationHtml = helpers.outputProfileValidationHtml({{
   errors: ["Formato invalido"],
   warnings: ["Falta {{original}}"],
 }});
-assert.equal(validationHtml.includes("Revisa el formato"), true);
+assert.equal(validationHtml.includes("Revisa la salida"), true);
 assert.equal(validationHtml.includes('class="error"'), true);
 assert.equal(validationHtml.includes('class="warning"'), true);
 
@@ -459,7 +459,7 @@ assert.equal(helpers.destinationCompactLabel({{
 assert.equal(helpers.destinationCompactLabel({{
   destinationMode: "custom",
   destinationValue: "C:/Export",
-}}), "C:/Export");
+}}), "Export");
 assert.equal(helpers.destinationCompactLabel({{
   destinationMode: "source",
   destinationValue: "",
@@ -477,7 +477,7 @@ assert.equal(helpers.profileDestinationLabel({{
 assert.equal(helpers.profileDestinationLabel({{
   destinationMode: "custom",
   destinationValue: "C:/Export",
-}}), "C:/Export");
+}}), "Export");
 assert.equal(helpers.profileDestinationLabel({{
   destinationMode: "source",
   destinationValue: "",
@@ -548,7 +548,7 @@ assert.equal(helpers.destinationFallbackLabel({{
   destinationMode: "custom",
   destinationValue: "C:/Export",
   destinations: [],
-}}), "C:/Export");
+}}), "Export");
 assert.equal(helpers.destinationFallbackLabel({{
   destinationMode: "source",
   destinationValue: "",
@@ -576,7 +576,7 @@ assert.deepEqual(helpers.outputProfileFooterState({{
   closeLabel: "Cerrar",
   closeHidden: true,
   deleteDisabled: true,
-  deleteTitle: "Debe quedar al menos un formato",
+  deleteTitle: "Debe quedar al menos una salida",
   resetDisabled: true,
   resetHidden: true,
   resetLabel: "Descartar",
@@ -598,7 +598,7 @@ assert.deepEqual(helpers.outputProfileFooterState({{
   closeLabel: "Cerrar",
   closeHidden: true,
   deleteDisabled: false,
-  deleteTitle: "Eliminar formato seleccionado",
+  deleteTitle: "Eliminar salida seleccionada",
   resetDisabled: true,
   resetHidden: true,
   resetLabel: "Descartar",
@@ -620,7 +620,7 @@ assert.deepEqual(helpers.outputProfileFooterState({{
   closeLabel: "Cancelar",
   closeHidden: false,
   deleteDisabled: false,
-  deleteTitle: "Descartar formato nuevo",
+  deleteTitle: "Descartar salida nueva",
   resetDisabled: true,
   resetHidden: true,
   resetLabel: "Descartar",
@@ -628,14 +628,14 @@ assert.deepEqual(helpers.outputProfileFooterState({{
   saveHidden: false,
   saveLabel: "Guardar cambios",
   noteClass: "settings-footer-note warning",
-  noteText: "Formato nuevo sin guardar",
+  noteText: "Salida nueva sin guardar",
 }});
 
 assert.deepEqual(helpers.outputProfileFooterState({{
   draft: {{ enabled: true }},
   dirty: true,
   isPersisted: true,
-  noticeText: "Guarda o descarta los cambios antes de cambiar de formato.",
+  noticeText: "Guarda o descarta los cambios antes de cambiar de salida.",
   profileCount: 2,
   validation: {{ errors: [] }},
 }}), {{
@@ -643,7 +643,7 @@ assert.deepEqual(helpers.outputProfileFooterState({{
   closeLabel: "Cerrar",
   closeHidden: true,
   deleteDisabled: false,
-  deleteTitle: "Eliminar formato seleccionado",
+  deleteTitle: "Eliminar salida seleccionada",
   resetDisabled: false,
   resetHidden: false,
   resetLabel: "Descartar",
@@ -651,7 +651,7 @@ assert.deepEqual(helpers.outputProfileFooterState({{
   saveHidden: false,
   saveLabel: "Guardar cambios",
   noteClass: "settings-footer-note warning",
-  noteText: "Guarda o descarta los cambios antes de cambiar de formato.",
+  noteText: "Guarda o descarta los cambios antes de cambiar de salida.",
 }});
 
 assert.deepEqual(helpers.outputProfileFooterState({{
@@ -665,7 +665,7 @@ assert.deepEqual(helpers.outputProfileFooterState({{
   closeLabel: "Cerrar",
   closeHidden: true,
   deleteDisabled: false,
-  deleteTitle: "Eliminar formato seleccionado",
+  deleteTitle: "Eliminar salida seleccionada",
   resetDisabled: false,
   resetHidden: false,
   resetLabel: "Descartar",

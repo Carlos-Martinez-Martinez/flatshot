@@ -5,13 +5,9 @@
   }
   root.FlatShotExportPreflightView = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  const escapeHtml = globalThis.FlatShotFormatters?.escapeHtml || function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  };
+  const formatterHelpers = globalThis.FlatShotFormatters
+    || (typeof require === "function" ? require("./formatters.js") : null);
+  const escapeHtml = (value) => formatterHelpers.escapeHtml(value);
 
   function issueItemHtml(row = {}) {
     const action = row.imageId
@@ -118,7 +114,7 @@
     const warningCount = Number(options.warningCount) || 0;
     const onlyIgnored = rows.length > 0 && warningCount === 0 && Number(counts.errors) === 0;
     const footerAction = counts.errors
-      ? '<button type="button" class="primary" data-action="edit-output">Revisar salida</button>'
+      ? '<button type="button" class="primary" data-action="edit-output">Corregir salida</button>'
       : "";
 
     if (!rows.length) {
@@ -135,7 +131,7 @@
         ? `${rows.length} ignorado${rows.length === 1 ? "" : "s"}`
         : `${warningCount || rows.length} aviso${(warningCount || rows.length) === 1 ? "" : "s"}`;
     const detailText = counts.errors
-      ? "Resuelve los bloqueos antes de exportar."
+      ? "Corrige la salida para continuar."
       : onlyIgnored
         ? "No afectan a la exportación."
         : "Puedes revisar sin bloquear la exportación.";

@@ -366,7 +366,7 @@ assert.equal(initial.includes('class="ghost-action" data-action="pick-bridge-fol
 assert.equal(initial.includes(">Buscar carpeta</button>"), true);
 assert.equal(initial.includes(">Seleccionar carpeta</button>"), false);
 assert.equal(initial.includes('data-action="open-app-settings"'), true);
-assert.equal(initial.includes("Gestionar formatos"), true);
+assert.equal(initial.includes("Gestionar salidas"), true);
 assert.equal(initial.includes('data-action="open-qa-lab"'), false);
 assert.equal(initial.includes('class="folder-entry-inline"'), true);
 assert.equal(initial.includes('class="manual-path-inline"'), false);

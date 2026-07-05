@@ -5,13 +5,9 @@
   }
   root.FlatShotOutputProfileView = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  const escapeHtml = globalThis.FlatShotFormatters?.escapeHtml || function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  };
+  const formatterHelpers = globalThis.FlatShotFormatters
+    || (typeof require === "function" ? require("./formatters.js") : null);
+  const escapeHtml = (value) => formatterHelpers.escapeHtml(value);
 
   function outputProfileEditorHeadingHtml(options = {}) {
     const profile = options.profile || {};
@@ -22,12 +18,12 @@
     return `
     <div class="format-editor-title">
       <div>
-        <span class="eyebrow">Formato seleccionado</span>
-        <strong>${escapeHtml(profile.name || "Formato sin nombre")}</strong>
+        <span class="eyebrow">Salida seleccionada</span>
+        <strong>${escapeHtml(profile.name || "Salida sin nombre")}</strong>
       </div>
       <div class="format-editor-controls">
         ${errors.length ? `<span class="status-badge error">${escapeHtml("Revisar campos")}</span>` : ""}
-        <label class="output-profile-toggle format-editor-toggle" title="${escapeHtml("Usar este formato en el lote")}">
+        <label class="output-profile-toggle format-editor-toggle" title="${escapeHtml("Usar esta salida en el lote")}">
           <span class="switch-label">Usar en este lote</span>
           <input type="checkbox" data-output-profile-draft-enabled ${enabled ? "checked" : ""} />
           <span class="switch-track" aria-hidden="true"></span>
@@ -65,7 +61,7 @@
       ...warnings.map((message) => ({ tone: "warning", message })),
     ];
     return `
-    <strong>${errors.length ? "Revisa el formato" : "Aviso"}</strong>
+    <strong>${errors.length ? "Revisa la salida" : "Aviso"}</strong>
     ${rows.map((row) => `<span class="${escapeHtml(row.tone)}">${escapeHtml(row.message)}</span>`).join("")}
   `;
   }
@@ -75,7 +71,7 @@
     const selected = Boolean(options.selected);
     const enabled = Boolean(options.enabled);
     const dirty = Boolean(options.dirty);
-    const title = dirty ? `${profile.name || "Formato"} · Cambios sin guardar` : profile.name || "Formato";
+    const title = dirty ? `${profile.name || "Salida"} · Cambios sin guardar` : profile.name || "Salida";
 
     return `
       <article class="output-profile-option${selected ? " selected" : ""}${enabled ? " enabled" : ""}${dirty ? " is-unsaved" : ""}">
@@ -111,6 +107,10 @@
 
   function basename(path) {
     return String(path || "").split(/[\\/]/).filter(Boolean).pop() || "";
+  }
+
+  function displayPath(path) {
+    return basename(path) || String(path || "");
   }
 
   function imageFileStem(name) {
@@ -155,7 +155,7 @@
       return "Sin destino";
     }
     if (profile.destinationMode === "custom") {
-      return profile.destinationValue || "Carpeta personalizada";
+      return profile.destinationValue ? displayPath(profile.destinationValue) : "Carpeta personalizada";
     }
     return profile.destinationValue || "Salida";
   }
@@ -170,7 +170,7 @@
 
   function destinationCompactLabel(options = {}) {
     if (options.destinationMode === "custom") {
-      return options.destinationValue || "Sin destino";
+      return options.destinationValue ? displayPath(options.destinationValue) : "Sin destino";
     }
     return options.destinationValue || "Salida";
   }
@@ -205,7 +205,7 @@
       return uniqueDestinations.length === 1 ? uniqueDestinations[0] : `${uniqueDestinations.length} destinos`;
     }
     if (options.destinationMode === "custom") {
-      return options.destinationValue || "Carpeta de salida sin configurar";
+      return options.destinationValue ? displayPath(options.destinationValue) : "Carpeta de salida sin configurar";
     }
     return options.destinationValue || "Salida";
   }
@@ -226,7 +226,7 @@
       closeLabel: isNew ? "Cancelar" : "Cerrar",
       closeHidden: !isNew,
       deleteDisabled,
-      deleteTitle: deleteDisabled ? "Debe quedar al menos un formato" : isPersisted ? "Eliminar formato seleccionado" : "Descartar formato nuevo",
+      deleteTitle: deleteDisabled ? "Debe quedar al menos una salida" : isPersisted ? "Eliminar salida seleccionada" : "Descartar salida nueva",
       resetDisabled: !dirty || isNew,
       resetHidden: !dirty || isNew,
       resetLabel: "Descartar",
@@ -239,7 +239,7 @@
         : noticeText
           ? noticeText
           : isNew
-          ? "Formato nuevo sin guardar"
+          ? "Salida nueva sin guardar"
           : dirty
             ? `${changeCount} ${changeCount === 1 ? "cambio sin guardar" : "cambios sin guardar"}`
             : "Cambios guardados",

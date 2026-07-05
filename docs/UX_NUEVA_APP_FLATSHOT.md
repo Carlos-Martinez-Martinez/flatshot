@@ -196,6 +196,11 @@ Estructura recomendada:
 
 `Avanzado` debe estar plegado por defecto.
 
+La preferencia `Modo de trabajo` deja el panel principal en modo simple por
+defecto: lote, ajuste, salida y avisos accionables. El modo `Avanzado` añade la
+tarjeta de imagen seleccionada al resumen, y las acciones de edición de ajuste
+abren deliberadamente la subvista avanzada.
+
 ### Exportacion
 
 Debe resolver:

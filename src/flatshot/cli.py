@@ -6,9 +6,12 @@ import argparse
 import sys
 from pathlib import Path
 
-from flatshot.application.contracts import ExportJobRequest
+from pydantic import ValidationError
+
+from flatshot.application.contracts import RenderConfiguration
 from flatshot.application.config_paths import ConfigPathResolver
 from flatshot.application.events import ExportImageCompletedEvent, ExportLogEvent, ExportProgressEvent
+from flatshot.application.export_job_builder import build_export_job_requests
 from flatshot.application.export_runner import ExportRunner
 from flatshot.application.log_service import ActivityLogService
 from flatshot.application.preset_service import PresetService
@@ -114,6 +117,9 @@ def process_folder(args):
     if not input_folder.exists():
         print(f"Error: Folder '{input_folder}' does not exist.")
         sys.exit(1)
+    if not input_folder.is_dir():
+        print(f"Error: Input '{input_folder}' is not a folder.")
+        sys.exit(1)
     
     app_settings = _load_app_settings()
 
@@ -146,17 +152,26 @@ def process_folder(args):
         width, height = 1800, 2400
     
     # Build export config
-    export_config = ExportConfig(
-        output_folder_name=args.output or "_SALIDA_CLI",
-        suffix=args.suffix or "_PRO",
-        format=args.format or "JPG",
-        output_width=width,
-        output_height=height,
-        naming_template=args.template or "{original}{suffix}"
-    )
-    
+    try:
+        export_config = ExportConfig(
+            output_folder_name=args.output or "_SALIDA_CLI",
+            suffix=args.suffix or "_PRO",
+            format=args.format or "JPG",
+            output_width=width,
+            output_height=height,
+            naming_template=args.template or "{original}{suffix}",
+        )
+    except ValidationError as exc:
+        first_error = exc.errors()[0] if exc.errors() else {}
+        print(f"Error: Invalid export configuration: {first_error.get('msg') or exc}")
+        sys.exit(1)
+
     # Find images
-    images = list(input_folder.glob("*.png"))
+    images = sorted(
+        path
+        for path in input_folder.iterdir()
+        if path.is_file() and path.suffix.lower() == ".png"
+    )
     total = len(images)
     
     if total == 0:
@@ -179,13 +194,17 @@ def process_folder(args):
     logger = _log_service()
     logger.log_export_start(str(input_folder), total, args.preset)
 
-    request = ExportJobRequest(
-        input_folder=input_folder,
-        input_files=sorted(images),
+    render_config = RenderConfiguration(
         settings=settings,
-        export_config=export_config,
         curve_data=curve_data,
     )
+    requests = build_export_job_requests(
+        images,
+        export_config=export_config,
+        render_config=render_config,
+        image_overrides={},
+    )
+    request = requests[0]
     result = ExportRunner(event_sink=CliExportSink(logger)).run(request)
 
     logger.log_export_complete(str(input_folder), result.processed, result.total, result.duration)

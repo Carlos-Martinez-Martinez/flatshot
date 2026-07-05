@@ -16,7 +16,7 @@ function galleryActiveOutputContext() {
     background: profile?.background || state.background || "rgb230",
     id: matchesSavedProfile ? profile.id : "__custom",
     label: outputProfileCompactLabel(profile),
-    name: matchesSavedProfile ? profile.name : "Formato personalizado",
+    name: matchesSavedProfile ? profile.name : "Salida personalizada",
     profile,
     summary: outputProfileSummaryLine(profile),
   };
@@ -56,7 +56,7 @@ function setActiveOutputProfileReference(profileId, options = {}) {
   }
   state.activeOutputProfileId = profile.id;
   syncOutputProfileState(profile);
-  state.statusText = options.statusText || `Formato activo: ${profile.name}`;
+  state.statusText = options.statusText || `Salida activa: ${profile.name}`;
   persistOutputProfiles();
   if (options.render !== false) {
     render();
@@ -69,7 +69,7 @@ function reassignActiveOutputProfileReference(options = {}) {
   if (!next) {
     state.activeOutputProfileId = "";
     state.exportStatus = isExportReady() ? "ready" : "blocked";
-    state.statusText = options.statusText || "Sin formatos activos";
+    state.statusText = options.statusText || "Sin salidas activas";
     persistOutputProfiles();
     if (options.render !== false) {
       render();
@@ -78,7 +78,7 @@ function reassignActiveOutputProfileReference(options = {}) {
   }
   setActiveOutputProfileReference(next.id, {
     render: options.render,
-    statusText: options.statusText || `Formato activo: ${next.name}`,
+    statusText: options.statusText || `Salida activa: ${next.name}`,
   });
   return next;
 }
@@ -119,7 +119,7 @@ function currentOutputProfileData() {
   const size = outputProfileHelpers.parseOutputSize(state.size);
   return outputProfileHelpers.normalizeOutputProfile({
     id: state.activeOutputProfileId || outputProfileHelpers.uniqueOutputProfileId("actual"),
-    name: activeOutputProfile()?.name || "Formato actual",
+    name: activeOutputProfile()?.name || "Salida actual",
     enabled: Boolean(activeOutputProfile()?.enabled),
     format: state.format,
     width: size.width,

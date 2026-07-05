@@ -35,8 +35,10 @@ assert.deepEqual(helpers.exportStartState({{ scenario: "export-running", resetCo
   exportDestinations: [],
   exportMessages: [],
   exportCompletedItems: [],
+  exportFailedItems: [],
   exportIssues: [],
   exportResult: null,
+  outputBrowserOpen: false,
   errors: [],
   paused: false,
   statusText: "Preparando exportación",
@@ -55,6 +57,26 @@ assert.deepEqual(helpers.bridgeRunFailureState("timeout"), {{
   errors: [{{ level: "error", title: "Exportación fallida", detail: "timeout" }}],
   statusText: "Exportación fallida",
 }});
+assert.deepEqual(helpers.bridgeRunFailureState("Hay archivos de salida repetidos o ya existentes. Cambia el destino, el sufijo o el patrón de nombre antes de exportar."), {{
+  exportStatus: "failed",
+  progress: 0,
+  processed: 0,
+  exportIssues: [{{ level: "error", title: "Salida a corregir", detail: "Hay archivos de salida repetidos o ya existentes. Cambia el destino, el sufijo o el patrón de nombre antes de exportar." }}],
+  exportResult: null,
+  errors: [{{ level: "error", title: "Salida a corregir", detail: "Hay archivos de salida repetidos o ya existentes. Cambia el destino, el sufijo o el patrón de nombre antes de exportar." }}],
+  statusText: "Revisa salida",
+}});
+assert.equal(helpers.isOutputConfigurationIssue({{
+  level: "error",
+  title: "Salida a corregir",
+  detail: "Las variantes Percha web y JPG Baja generarían el mismo archivo. Cambia el sufijo o la subcarpeta.",
+}}), true);
+assert.deepEqual(helpers.clearOutputConfigurationIssues([
+  {{ level: "error", title: "Salida a corregir", detail: "Hay archivos de salida repetidos." }},
+  {{ level: "error", title: "Worker", detail: "timeout" }},
+]), [
+  {{ level: "error", title: "Worker", detail: "timeout" }},
+]);
 
 assert.deepEqual(helpers.bridgeProgressUnavailableState("offline"), {{
   exportStatus: "failed",
@@ -81,6 +103,7 @@ const previous = {{
   exportDestinations: ["C:/old"],
   exportMessages: ["prev"],
   exportCompletedItems: [],
+  exportFailedItems: [{{ name: "prev-failed.png", path: "C:/prev-failed.png", success: false }}],
   exportIssues: [],
   exportResult: {{ success: false }},
 }};
@@ -90,6 +113,7 @@ assert.deepEqual(helpers.bridgeStatusPatch({{
   destinations: ["C:/out"],
   messages: ["ok"],
   completedItems: [{{ name: "a", success: true }}],
+  failedItems: [{{ name: "old-failed.png", path: "C:/old-failed.png", success: false }}],
   issues: [{{ level: "error", title: "A", detail: "B" }}],
   result: {{ success: true }},
   progress: {{ percent: 100, processed: 3, total: 3 }},
@@ -99,6 +123,7 @@ assert.deepEqual(helpers.bridgeStatusPatch({{
   exportDestinations: ["C:/out"],
   exportMessages: ["ok"],
   exportCompletedItems: [{{ name: "a", success: true }}],
+  exportFailedItems: [{{ name: "old-failed.png", path: "C:/old-failed.png", success: false }}],
   exportIssues: [{{ level: "error", title: "A", detail: "B" }}],
   exportResult: {{ success: true }},
   progress: 0,
@@ -107,6 +132,12 @@ assert.deepEqual(helpers.bridgeStatusPatch({{
   exportStatus: "completed",
   statusText: "Exportación completada · 3/3",
 }});
+
+assert.deepEqual(helpers.bridgeStatusPatch({{
+  status: "partial",
+  progress: {{ processed: 2, total: 3 }},
+  completedItems: [{{ name: "recent-failed.png", path: "C:/recent-failed.png", success: false }}],
+}}, previous).exportFailedItems, previous.exportFailedItems);
 
 assert.equal(helpers.bridgeStatusPatch({{ status: "partial", progress: {{ percent: 80, processed: 2, total: 3 }} }}, previous).statusText, "Exportación con avisos");
 assert.equal(helpers.bridgeStatusPatch({{ status: "failed", progress: {{ processed: 2 }} }}, previous).statusText, "Exportación fallida");

@@ -5,13 +5,9 @@
   }
   root.FlatShotBatchDetailView = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  const escapeHtml = globalThis.FlatShotFormatters?.escapeHtml || function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  };
+  const formatterHelpers = globalThis.FlatShotFormatters
+    || (typeof require === "function" ? require("./formatters.js") : null);
+  const escapeHtml = (value) => formatterHelpers.escapeHtml(value);
 
   function batchDetailRowHtml(label, value, title = "") {
     const text = value === null || value === undefined || value === "" ? "Pendiente" : String(value);
@@ -105,8 +101,8 @@
       </section>
 
       <section class="batch-detail-section batch-detail-section--outputs">
-        <h3>Formatos activos</h3>
-        ${options.outputRowsHtml || '<span class="batch-detail-muted">Sin formatos activos.</span>'}
+        <h3>Salidas activas</h3>
+        ${options.outputRowsHtml || '<span class="batch-detail-muted">Sin salidas activas.</span>'}
       </section>
 
       <div class="batch-detail-secondary${secondaryClass}">

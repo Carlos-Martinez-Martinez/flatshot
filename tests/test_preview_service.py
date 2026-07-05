@@ -2,6 +2,7 @@ from PIL import Image
 
 import flatshot.application.preview_service as preview_service_module
 from flatshot.application.contracts import PreviewRequest, TilePreviewRequest
+from flatshot.application.export_workers import process_single_image
 from flatshot.application.preview_service import PreviewService
 from flatshot.core.engine import ShadowEngine
 from flatshot.core.models import CurveData, ShadowSettings
@@ -95,6 +96,51 @@ def test_render_preview_accepts_image_path(tmp_path):
     assert result.width == 32
     assert result.height == 32
     assert len(result.bytes_rgb) == result.width * result.height * 3
+
+
+def test_final_preview_matches_png_export_worker_output(tmp_path):
+    source_path = tmp_path / "source.png"
+    export_path = tmp_path / "source_PRO.png"
+    _image((28, 22)).save(source_path)
+    settings = ShadowSettings(
+        opacity=0,
+        blur=0,
+        noise=0,
+        bg_color=(12, 34, 56),
+        transparent_bg=False,
+    )
+    curve = _curve()
+    target_size = (48, 40)
+
+    preview = PreviewService().render_preview(
+        PreviewRequest(
+            image_path=source_path,
+            settings=settings.model_dump(),
+            curve_data=curve.model_dump(),
+            target_size=target_size,
+            scale_factor=1.0,
+            is_preview=False,
+        )
+    )
+    success, _display_name, warning = process_single_image(
+        (
+            source_path,
+            export_path,
+            settings.model_dump(),
+            target_size,
+            "PNG",
+            curve.model_dump(),
+            None,
+            source_path.name,
+        )
+    )
+
+    assert success is True
+    assert warning is None
+    with Image.open(export_path) as exported:
+        exported_rgb = exported.convert("RGB")
+        assert exported_rgb.size == (preview.width, preview.height)
+        assert exported_rgb.tobytes("raw", "RGB") == preview.bytes_rgb
 
 
 def test_render_tile_preview_returns_processed_and_original_payloads(tmp_path):

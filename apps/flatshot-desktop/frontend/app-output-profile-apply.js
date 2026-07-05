@@ -8,6 +8,7 @@ function applyOutputProfile(profileId, options = {}) {
     state.outputProfileDraft = { ...state.outputProfileDraft, enabled: true };
   }
   const applied = setActiveOutputProfileReference(profile.id, options);
+  globalThis.clearOutputConfigurationFailures?.();
   refreshBridgePreviewForAppliedOutputProfile(options);
   return applied;
 }
@@ -34,13 +35,14 @@ function setOutputProfileEnabled(profileId, enabled) {
   }
 
   if (profile.enabled && !enabledActiveOutputProfile()) {
-    setActiveOutputProfileReference(profile.id, { render: false, statusText: `Formato activo: ${profile.name}` });
+    setActiveOutputProfileReference(profile.id, { render: false, statusText: `Salida activa: ${profile.name}` });
   } else if (!profile.enabled && wasActiveReference) {
-    reassignActiveOutputProfileReference({ render: false, statusText: `Formato desactivado: ${profile.name}` });
+    reassignActiveOutputProfileReference({ render: false, statusText: `Salida desactivada: ${profile.name}` });
   }
 
   state.exportStatus = isExportReady() ? "ready" : "blocked";
-  state.statusText = profile.enabled ? `Formato activo: ${profile.name}` : `Formato desactivado: ${profile.name}`;
+  globalThis.clearOutputConfigurationFailures?.();
+  state.statusText = profile.enabled ? `Salida activa: ${profile.name}` : `Salida desactivada: ${profile.name}`;
   persistOutputProfiles();
   render();
 }

@@ -108,7 +108,7 @@
       : null;
     return {
       id: String(source.id || uniqueOutputProfileId("formato", index)).trim(),
-      name: outputProfileNameForDisplay(String(source.name || `Formato ${index + 1}`).trim()),
+      name: outputProfileNameForDisplay(String(source.name || `Salida ${index + 1}`).trim()),
       enabled: typeof source.enabled === "boolean" ? source.enabled : false,
       format,
       width,
@@ -238,7 +238,7 @@
     };
 
     if (!String(raw.name || "").trim()) {
-      addError("name", "Pon un nombre al formato.");
+      addError("name", "Pon un nombre a la salida.");
     }
     if (!["JPG", "PNG"].includes(normalizeExportFormat(raw.format))) {
       addError("format", "Elige JPG o PNG como tipo de archivo.");

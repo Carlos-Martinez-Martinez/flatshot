@@ -6,6 +6,7 @@ from flatshot.core.models import (
     SHADOW_ENGINE_COMPAT,
     SHADOW_ENGINE_DEFAULT,
     SHADOW_ENGINE_STUDIO_2_5D,
+    SHADOW_SETTING_LIMITS,
     WEB_RGB230,
     WHITE_RGB255,
     ExportVariant,
@@ -60,6 +61,29 @@ class TestShadowSettings:
         
         settings = ShadowSettings(angle=359)
         assert settings.angle == 359
+
+    def test_shadow_setting_ranges_are_enforced_by_model(self):
+        """Canonical adjustment ranges are enforced outside bridge payloads."""
+        valid = {
+            key: maximum
+            for key, (_minimum, maximum) in SHADOW_SETTING_LIMITS.items()
+        }
+        settings = ShadowSettings(**valid)
+
+        assert settings.distance == SHADOW_SETTING_LIMITS["distance"][1]
+        assert settings.padding == SHADOW_SETTING_LIMITS["padding"][1]
+        assert settings.scale_adjustment == SHADOW_SETTING_LIMITS["scale_adjustment"][1]
+
+        invalid = {
+            key: maximum + 1
+            for key, (_minimum, maximum) in SHADOW_SETTING_LIMITS.items()
+        }
+        for key, value in invalid.items():
+            with pytest.raises(ValueError, match=key):
+                ShadowSettings(**{key: value})
+
+        with pytest.raises(ValueError, match="scale_adjustment"):
+            ShadowSettings(scale_adjustment=SHADOW_SETTING_LIMITS["scale_adjustment"][0] - 1)
     
     def test_model_dump(self):
         """Test model serialization."""

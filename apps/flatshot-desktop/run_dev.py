@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import secrets
 import socket
 import subprocess
 import sys
@@ -85,10 +86,15 @@ def resolve_port(requested_port: int | None, default_port: int, label: str) -> i
     return port
 
 
-def build_frontend_app_url(frontend_url: str, bridge_url: str | None) -> str:
-    if not bridge_url or bridge_url == f"http://{HOST}:{DEFAULT_BRIDGE_PORT}":
+def build_frontend_app_url(frontend_url: str, bridge_url: str | None, *, bridge_token: str = "") -> str:
+    params = {}
+    if bridge_url and bridge_url != f"http://{HOST}:{DEFAULT_BRIDGE_PORT}":
+        params["bridge"] = bridge_url
+    if bridge_token:
+        params["bridgeToken"] = bridge_token
+    if not params:
         return frontend_url
-    return f"{frontend_url}?{urlencode({'bridge': bridge_url})}"
+    return f"{frontend_url}?{urlencode(params)}"
 
 
 def wait_for_url(url: str, *, timeout: float = 10.0) -> bool:
@@ -131,8 +137,9 @@ def main(argv: list[str] | None = None) -> int:
     bridge_port = None if args.no_bridge else resolve_port(args.bridge_port, DEFAULT_BRIDGE_PORT, "bridge")
     frontend_port = resolve_port(args.frontend_port, DEFAULT_FRONTEND_PORT, "frontend")
     bridge_url = f"http://{HOST}:{bridge_port}" if bridge_port is not None else None
+    bridge_token = secrets.token_urlsafe(24) if bridge_url is not None else ""
     frontend_url = f"http://{HOST}:{frontend_port}"
-    frontend_app_url = build_frontend_app_url(frontend_url, bridge_url)
+    frontend_app_url = build_frontend_app_url(frontend_url, bridge_url, bridge_token=bridge_token)
     processes: list[tuple[str, subprocess.Popen]] = []
 
     if not FRONTEND_DIR.exists():
@@ -153,6 +160,8 @@ def main(argv: list[str] | None = None) -> int:
                     str(bridge_port),
                     "--allowed-origin",
                     frontend_url,
+                    "--auth-token",
+                    bridge_token,
                 ],
             )
             processes.append(("bridge", bridge_process))

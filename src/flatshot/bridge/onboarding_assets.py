@@ -29,3 +29,20 @@ def open_folder_with_system(path: Path) -> None:
         subprocess.Popen(["open", str(resolved)])
         return
     subprocess.Popen(["xdg-open", str(resolved)])
+
+
+def reveal_path_with_system(path: Path) -> None:
+    resolved = path.expanduser().resolve(strict=True)
+    if sys.platform.startswith("win"):
+        subprocess.Popen(_windows_explorer_select_command(resolved))
+        return
+    if sys.platform == "darwin":
+        subprocess.Popen(["open", "-R", str(resolved)])
+        return
+    target = resolved.parent if resolved.is_file() else resolved
+    subprocess.Popen(["xdg-open", str(target)])
+
+
+def _windows_explorer_select_command(path: Path) -> str:
+    # Explorer reliably selects paths with spaces when the path, not the whole switch, is quoted.
+    return f'explorer.exe /select,"{path}"'

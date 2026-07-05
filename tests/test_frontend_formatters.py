@@ -36,6 +36,8 @@ const helpers = require({json.dumps(str(HELPER_PATH))});
 assert.equal(helpers.basename("C:/lote/Camisa blanca.png"), "Camisa blanca.png");
 assert.equal(helpers.basename("C:\\\\lote\\\\sub\\\\"), "sub");
 assert.equal(helpers.basename(""), "");
+assert.equal(helpers.displayPath("C:/lote/Export"), "Export");
+assert.equal(helpers.displayPath(""), "");
 
 assert.equal(helpers.imageFileStem("C:/lote/Camisa blanca.png"), "Camisa blanca");
 assert.equal(helpers.imageFileStem("sin-extension"), "sin-extension");

@@ -120,12 +120,20 @@ def script_names(index_path: Path = INDEX_PATH) -> list[str]:
     ]
 
 
-def app_loader_script_order(path: Path = FRONTEND_DIR / APP_LOADER_SCRIPT) -> list[str]:
-    source = path.read_text(encoding="utf-8")
-    match = re.search(r"APP_SCRIPT_ORDER\s*=\s*\[(?P<body>.*?)\];", source, re.DOTALL)
+def app_loader_script_order(index_path: Path = INDEX_PATH) -> list[str]:
+    source = index_path.read_text(encoding="utf-8")
+    match = re.search(
+        r'<script type="application/json" id="flatshot-app-loader-manifest">\s*(?P<body>\[.*?\])\s*</script>',
+        source,
+        re.DOTALL,
+    )
     if not match:
         return []
-    return re.findall(r'"([^"]+\.js)"', match.group("body"))
+    try:
+        parsed = json.loads(match.group("body"))
+    except json.JSONDecodeError:
+        return []
+    return [name for name in parsed if isinstance(name, str) and name.endswith(".js")]
 
 
 def line_count(path: Path) -> int:

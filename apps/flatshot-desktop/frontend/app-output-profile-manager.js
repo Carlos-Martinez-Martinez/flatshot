@@ -11,7 +11,7 @@ function setOutputProfileDraftEnabled(enabled) {
 
 function selectOutputProfileDraft(profileId) {
   if (state.appSettingsOpen && outputProfileHasUnsavedChanges()) {
-    showOutputProfileUnsavedNotice("Guarda o descarta los cambios antes de cambiar de formato.");
+    showOutputProfileUnsavedNotice("Guarda o descarta los cambios antes de cambiar de salida.");
     return;
   }
   const profile = outputProfileManagerRows().find((item) => item.id === profileId);
@@ -22,13 +22,13 @@ function selectOutputProfileDraft(profileId) {
   state.outputProfileDraft = { ...profile };
   state.outputProfileNotice = "";
   state.outputDeleteConfirmId = "";
-  state.statusText = `Editando formato: ${profile.name}`;
+  state.statusText = `Editando salida: ${profile.name}`;
   render();
 }
 
 function editOutputProfileFromInspector(profileId) {
   if (state.appSettingsOpen && outputProfileHasUnsavedChanges()) {
-    showOutputProfileUnsavedNotice("Guarda o descarta los cambios antes de cambiar de formato.");
+    showOutputProfileUnsavedNotice("Guarda o descarta los cambios antes de cambiar de salida.");
     return;
   }
   const profile = outputProfileManagerRows().find((item) => item.id === profileId);
@@ -44,14 +44,14 @@ function editOutputProfileFromInspector(profileId) {
   state.outputProfileDraft = { ...profile };
   state.outputProfileNotice = "";
   state.outputDeleteConfirmId = "";
-  state.statusText = `Editando formato: ${profile.name}`;
+  state.statusText = `Editando salida: ${profile.name}`;
   render();
   queueModalFocus("#app-settings-modal", "[data-action='close-app-settings']");
 }
 
 function newOutputProfile() {
   if (state.appSettingsOpen && outputProfileHasUnsavedChanges()) {
-    showOutputProfileUnsavedNotice("Guarda o descarta los cambios antes de crear otro formato.");
+    showOutputProfileUnsavedNotice("Guarda o descarta los cambios antes de crear otra salida.");
     return;
   }
   const source = currentOutputProfileData();
@@ -60,14 +60,14 @@ function newOutputProfile() {
   state.outputProfileDraft = {
     ...source,
     id,
-    name: "Nuevo formato",
+    name: "Nueva salida",
     enabled: false,
   };
   state.outputProfileNotice = "";
   state.outputDeleteConfirmId = "";
   state.preferencesOpen = false;
   state.appSettingsOpen = true;
-  state.statusText = "Nuevo formato de salida";
+  state.statusText = "Nueva salida";
   render();
 }
 
@@ -82,14 +82,14 @@ function duplicateOutputProfile() {
   state.outputProfileDraft = {
     ...source,
     id,
-    name: `${source.name || "Formato"} copia`,
+    name: `${source.name || "Salida"} copia`,
     enabled: false,
   };
   state.outputProfileNotice = "";
   state.outputDeleteConfirmId = "";
   state.preferencesOpen = false;
   state.appSettingsOpen = true;
-  state.statusText = "Formato duplicado";
+  state.statusText = "Salida duplicada";
   render();
 }
 
@@ -103,7 +103,7 @@ function commitOutputProfileDraft() {
   const draft = outputProfileDraftFromForm();
   const saved = outputProfileHelpers.normalizeOutputProfile({
     ...draft,
-    name: draft.name.trim() || "Formato sin nombre",
+    name: draft.name.trim() || "Salida sin nombre",
   });
   const index = state.outputProfiles.findIndex((profile) => profile.id === saved.id);
   if (index >= 0) {
@@ -118,8 +118,10 @@ function commitOutputProfileDraft() {
   state.outputDeleteConfirmId = "";
   if (saved.id === state.activeOutputProfileId && saved.enabled) {
     syncOutputProfileState(saved);
+    globalThis.clearOutputConfigurationFailures?.();
   } else if (saved.id === state.activeOutputProfileId && !saved.enabled) {
     reassignActiveOutputProfileReference({ render: false });
+    globalThis.clearOutputConfigurationFailures?.();
   }
   persistOutputProfiles();
   return state.outputProfiles.find((profile) => profile.id === saved.id) || saved;
@@ -130,7 +132,7 @@ function saveOutputProfile(options = {}) {
   if (!saved) {
     return null;
   }
-  state.statusText = `Formato guardado: ${saved.name}`;
+  state.statusText = `Salida guardada: ${saved.name}`;
   if (options.render !== false) {
     render();
   }
@@ -145,13 +147,13 @@ function deleteManagedOutputProfile() {
     state.outputProfileEditorId = fallback?.id || "";
     state.outputProfileDraft = fallback ? { ...fallback } : null;
     state.outputDeleteConfirmId = "";
-    state.statusText = "Formato descartado";
+    state.statusText = "Salida descartada";
     render();
     return;
   }
   if (state.outputProfiles.length <= 1) {
     state.outputDeleteConfirmId = "";
-    state.statusText = "Debe quedar al menos un formato";
+    state.statusText = "Debe quedar al menos una salida";
     render();
     return;
   }
@@ -178,7 +180,7 @@ function confirmDeleteManagedOutputProfile() {
   }
   if (state.outputProfiles.length <= 1) {
     state.outputDeleteConfirmId = "";
-    state.statusText = "Debe quedar al menos un formato";
+    state.statusText = "Debe quedar al menos una salida";
     render();
     return;
   }
@@ -186,7 +188,7 @@ function confirmDeleteManagedOutputProfile() {
   const deletedName = profile.name;
   state.outputProfiles = state.outputProfiles.filter((item) => item.id !== profileId);
   if (state.activeOutputProfileId === profileId) {
-    reassignActiveOutputProfileReference({ render: false, statusText: `Formato eliminado: ${deletedName}` });
+    reassignActiveOutputProfileReference({ render: false, statusText: `Salida eliminada: ${deletedName}` });
   }
   const nextDraft = state.outputProfiles.find((profile) => profile.id === state.outputProfileEditorId)
     || state.outputProfiles.find((profile) => profile.id === state.activeOutputProfileId)
@@ -195,7 +197,7 @@ function confirmDeleteManagedOutputProfile() {
   state.outputProfileDraft = nextDraft ? { ...nextDraft } : null;
   state.outputDeleteConfirmId = "";
   persistOutputProfiles();
-  state.statusText = `Formato eliminado: ${deletedName}`;
+  state.statusText = `Salida eliminada: ${deletedName}`;
   render();
 }
 
@@ -207,7 +209,7 @@ function resetOutputProfileDraft() {
   state.outputProfileEditorId = original.id;
   state.outputProfileNotice = "";
   state.outputDeleteConfirmId = "";
-  state.statusText = "Cambios del formato descartados";
+  state.statusText = "Cambios de la salida descartados";
   render();
 }
 

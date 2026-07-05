@@ -1,4 +1,6 @@
 import threading
+import shutil
+from pathlib import Path
 
 import pytest
 from PIL import Image
@@ -126,7 +128,12 @@ def test_export_runner_exports_one_png_to_subfolder(tmp_path):
     assert output.exists()
     assert output.parent in result.destinations
     assert any(isinstance(event, ExportProgressEvent) and event.percent == 100 for event in sink.events)
-    assert any(isinstance(event, ExportImageCompletedEvent) and event.success for event in sink.events)
+    assert any(
+        isinstance(event, ExportImageCompletedEvent)
+        and event.success
+        and event.output_path == output
+        for event in sink.events
+    )
 
 
 def test_export_runner_writes_render_cache_after_normal_render(monkeypatch, tmp_path):
@@ -281,6 +288,88 @@ def test_export_runner_honors_cancellation_before_rendering(tmp_path):
     assert result.processed == 0
     assert result.total == 1
     assert not (tmp_path / "_SALIDA_PRO" / "source_PRO.png").exists()
+
+
+def test_export_runner_snapshots_explicit_files_progressively(tmp_path):
+    files = []
+    for index in range(3):
+        source = tmp_path / f"source-{index}.png"
+        Image.new("RGBA", (8, 8), (120, 80, 40, 255)).save(source)
+        files.append(source)
+
+    snapshot_counts_during_render = []
+    copied_sources = []
+
+    def copy_file(src, dest):
+        src = Path(src)
+        dest = Path(dest)
+        if dest.parent.parent.name.startswith("flatshot_snap_"):
+            copied_sources.append(src.name)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        return shutil.copy2(src, dest)
+
+    def processor(args):
+        img_path, save_path, *_rest = args
+        img_path = Path(img_path)
+        snapshot_counts_during_render.append(len(list(img_path.parent.glob("*.png"))))
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(save_path).write_bytes(b"rendered")
+        return True, img_path.name, None
+
+    runner = ExportRunner(
+        executor_factory=InlineExecutor,
+        image_processor=processor,
+        copy_file=copy_file,
+        max_workers=1,
+    )
+
+    result = runner.run(_request_with_files(tmp_path, files))
+
+    assert result.success
+    assert copied_sources == [path.name for path in files]
+    assert snapshot_counts_during_render == [1, 1, 1]
+
+
+def test_export_runner_reports_unstable_snapshot_sources(tmp_path):
+    stable = tmp_path / "stable.png"
+    unstable = tmp_path / "unstable.png"
+    Image.new("RGBA", (8, 8), (120, 80, 40, 255)).save(stable)
+    Image.new("RGBA", (8, 8), (20, 40, 60, 255)).save(unstable)
+    sink = CollectingSink()
+
+    def copy_file(src, dest):
+        src = Path(src)
+        if src == unstable:
+            raise OSError("simulated network read failure")
+        Path(dest).parent.mkdir(parents=True, exist_ok=True)
+        return shutil.copy2(src, dest)
+
+    def processor(args):
+        _img_path, save_path, *_rest = args
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(save_path).write_bytes(b"rendered")
+        return True, Path(save_path).name, None
+
+    runner = ExportRunner(
+        event_sink=sink,
+        executor_factory=InlineExecutor,
+        image_processor=processor,
+        copy_file=copy_file,
+        max_workers=1,
+    )
+
+    result = runner.run(_request_with_files(tmp_path, [stable, unstable]))
+
+    assert not result.success
+    assert result.processed == 2
+    assert result.total == 2
+    assert result.errors == 1
+    failed_items = [
+        event for event in sink.events
+        if isinstance(event, ExportImageCompletedEvent) and not event.success
+    ]
+    assert len(failed_items) == 1
+    assert failed_items[0].image_name == "unstable.png"
 
 
 def test_pause_token_blocks_until_resume():

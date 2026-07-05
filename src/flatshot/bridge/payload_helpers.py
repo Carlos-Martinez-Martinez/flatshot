@@ -4,6 +4,8 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from flatshot.bridge.errors import InvalidRequestError
+from flatshot.core.models import SHADOW_SETTING_LIMITS, CurveData
+from flatshot.core.scaling import DEFAULT_SCALE_CURVE, normalize_curve_data
 
 PREVIEW_SETTING_ALIASES = {
     "transparentBg": "transparent_bg",
@@ -32,19 +34,7 @@ PREVIEW_SETTING_KEYS = {
     "transparent_bg",
     "bg_color",
 }
-PREVIEW_SETTING_LIMITS = {
-    "angle": (0, 360),
-    "distance": (0, 80),
-    "blur": (0, 80),
-    "spread": (0, 20),
-    "fusion": (0, 20),
-    "opacity": (0, 100),
-    "noise": (0, 20),
-    "padding": (0, 30),
-    "contact_blur": (0, 40),
-    "contraction": (0, 80),
-    "scale_adjustment": (-30, 30),
-}
+PREVIEW_SETTING_LIMITS = SHADOW_SETTING_LIMITS
 
 
 def positive_int(value: Any, field_name: str, *, default: int) -> int:
@@ -121,6 +111,20 @@ def preview_settings(raw_settings: Any) -> dict[str, Any]:
             else:
                 settings[normalized_key] = value
     return settings
+
+
+def curve_data_payload(payload: Mapping[str, Any]) -> CurveData:
+    raw_curve = payload.get("curveData")
+    if raw_curve is None:
+        raw_curve = payload.get("scaleCurve")
+    if raw_curve is None:
+        raw_curve = DEFAULT_SCALE_CURVE.copy()
+    if not isinstance(raw_curve, Mapping):
+        raise InvalidRequestError("Field 'curveData' must be an object when provided.")
+    try:
+        return normalize_curve_data(raw_curve)
+    except (TypeError, ValueError) as exc:
+        raise InvalidRequestError("Field 'curveData' is not a valid scale curve.") from exc
 
 
 def export_size(raw_export: Mapping[str, Any]) -> tuple[int, int]:

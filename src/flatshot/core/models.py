@@ -12,6 +12,19 @@ SHADOW_ENGINE_STUDIO_2_5D = "studio_2_5d"
 SHADOW_ENGINE_DEFAULT: ShadowEngineName = SHADOW_ENGINE_REALISTIC_V2
 SHADOW_ENGINE_COMPAT: ShadowEngineName = SHADOW_ENGINE_LEGACY
 VALID_SHADOW_ENGINES = {SHADOW_ENGINE_REALISTIC_V2, SHADOW_ENGINE_LEGACY, SHADOW_ENGINE_STUDIO_2_5D}
+SHADOW_SETTING_LIMITS: Dict[str, Tuple[int, int]] = {
+    "angle": (0, 360),
+    "distance": (0, 80),
+    "blur": (0, 80),
+    "spread": (0, 20),
+    "fusion": (0, 20),
+    "opacity": (0, 100),
+    "noise": (0, 20),
+    "padding": (0, 30),
+    "contact_blur": (0, 40),
+    "contraction": (0, 80),
+    "scale_adjustment": (-30, 30),
+}
 
 
 class StudioLight(BaseModel):
@@ -28,18 +41,26 @@ class LightingScene(BaseModel):
     ambient_intensity: float = Field(0.25, ge=0.0, le=1.0)
 
 class ShadowSettings(BaseModel):
-    angle: int = Field(180, ge=0, le=360)
-    distance: int = 25
-    blur: int = 30
-    spread: int = 0
-    fusion: int = 1
-    opacity: int = 20
-    noise: int = 2
-    padding: int = 10
-    contact_blur: int = 10
-    contraction: int = 0
+    angle: int = Field(180, ge=SHADOW_SETTING_LIMITS["angle"][0], le=SHADOW_SETTING_LIMITS["angle"][1])
+    distance: int = Field(25, ge=SHADOW_SETTING_LIMITS["distance"][0], le=SHADOW_SETTING_LIMITS["distance"][1])
+    blur: int = Field(30, ge=SHADOW_SETTING_LIMITS["blur"][0], le=SHADOW_SETTING_LIMITS["blur"][1])
+    spread: int = Field(0, ge=SHADOW_SETTING_LIMITS["spread"][0], le=SHADOW_SETTING_LIMITS["spread"][1])
+    fusion: int = Field(1, ge=SHADOW_SETTING_LIMITS["fusion"][0], le=SHADOW_SETTING_LIMITS["fusion"][1])
+    opacity: int = Field(20, ge=SHADOW_SETTING_LIMITS["opacity"][0], le=SHADOW_SETTING_LIMITS["opacity"][1])
+    noise: int = Field(2, ge=SHADOW_SETTING_LIMITS["noise"][0], le=SHADOW_SETTING_LIMITS["noise"][1])
+    padding: int = Field(10, ge=SHADOW_SETTING_LIMITS["padding"][0], le=SHADOW_SETTING_LIMITS["padding"][1])
+    contact_blur: int = Field(
+        10,
+        ge=SHADOW_SETTING_LIMITS["contact_blur"][0],
+        le=SHADOW_SETTING_LIMITS["contact_blur"][1],
+    )
+    contraction: int = Field(0, ge=SHADOW_SETTING_LIMITS["contraction"][0], le=SHADOW_SETTING_LIMITS["contraction"][1])
     adaptive_zoom: bool = True
-    scale_adjustment: int = Field(0, ge=-30, le=30)
+    scale_adjustment: int = Field(
+        0,
+        ge=SHADOW_SETTING_LIMITS["scale_adjustment"][0],
+        le=SHADOW_SETTING_LIMITS["scale_adjustment"][1],
+    )
     shadow_engine: ShadowEngineName = SHADOW_ENGINE_DEFAULT
     lighting_scene: LightingScene = Field(default_factory=LightingScene)
     transparent_bg: bool = False
@@ -72,6 +93,36 @@ def _coerce_rgb_tuple(value: Any) -> Tuple[int, int, int]:
             raise ValueError("RGB channels must be between 0 and 255")
         rgb.append(numeric)
     return tuple(rgb)  # type: ignore[return-value]
+
+
+def _normalize_relative_folder(value: Any, *, field_label: str) -> str:
+    text = str(value).strip()
+    if not text:
+        raise ValueError(f"{field_label} cannot be empty")
+    if text.startswith(("/", "\\")) or ":" in text:
+        raise ValueError(f"{field_label} must be a relative folder")
+    parts = re.split(r"[\\/]", text)
+    if any(part in {"", ".", ".."} for part in parts):
+        raise ValueError(f"{field_label} cannot contain empty or parent parts")
+    return "/".join(parts)
+
+
+def _normalize_export_format(value: Any, *, field_label: str) -> str:
+    text = str(value or "JPG").strip().upper().lstrip(".")
+    if text == "JPEG":
+        text = "JPG"
+    if text not in {"JPG", "PNG"}:
+        raise ValueError(f"{field_label} must be JPG or PNG")
+    return text
+
+
+def _validate_filename_affix(value: Any, *, field_label: str) -> str:
+    text = str(value)
+    if any(sep in text for sep in ("/", "\\")):
+        raise ValueError(f"{field_label} cannot contain path separators")
+    if any(ord(ch) < 32 for ch in text):
+        raise ValueError(f"{field_label} cannot contain control characters")
+    return text
 
 
 def normalize_shadow_settings(
@@ -158,12 +209,7 @@ class ExportVariant(BaseModel):
     @field_validator("suffix")
     @classmethod
     def _validate_suffix(cls, value: str) -> str:
-        text = str(value)
-        if any(sep in text for sep in ("/", "\\")):
-            raise ValueError("Variant suffix cannot contain path separators")
-        if any(ord(ch) < 32 for ch in text):
-            raise ValueError("Variant suffix cannot contain control characters")
-        return text
+        return _validate_filename_affix(value, field_label="Variant suffix")
 
     @field_validator("output_subfolder")
     @classmethod
@@ -173,11 +219,7 @@ class ExportVariant(BaseModel):
         text = str(value).strip()
         if not text:
             return None
-        if text.startswith(("/", "\\")) or ":" in text:
-            raise ValueError("Variant output subfolder must be relative")
-        if any(part in {"", ".", ".."} for part in re.split(r"[\\/]+", text)):
-            raise ValueError("Variant output subfolder cannot contain empty or parent parts")
-        return text.replace("\\", "/")
+        return _normalize_relative_folder(text, field_label="Variant output subfolder")
 
     @field_validator("output_folder_name")
     @classmethod
@@ -187,11 +229,7 @@ class ExportVariant(BaseModel):
         text = str(value).strip()
         if not text:
             return None
-        if text.startswith(("/", "\\")) or ":" in text:
-            raise ValueError("Variant output folder name must be relative")
-        if any(part in {"", ".", ".."} for part in re.split(r"[\\/]+", text)):
-            raise ValueError("Variant output folder name cannot contain empty or parent parts")
-        return text.replace("\\", "/")
+        return _normalize_relative_folder(text, field_label="Variant output folder name")
 
     @field_validator("output_destination")
     @classmethod
@@ -226,12 +264,7 @@ class ExportVariant(BaseModel):
     def _validate_format(cls, value: Optional[str]) -> Optional[str]:
         if value is None:
             return None
-        text = str(value).strip().upper().lstrip(".")
-        if text == "JPEG":
-            text = "JPG"
-        if text not in {"JPG", "PNG"}:
-            raise ValueError("Variant format must be JPG, PNG or None")
-        return text
+        return _normalize_export_format(value, field_label="Variant format")
 
     @field_validator("max_file_size_kb", mode="before")
     @classmethod
@@ -263,6 +296,50 @@ class ExportConfig(BaseModel):
     # Destination mode: 'subfolder' (create in each source) or 'custom' (single folder)
     output_destination: str = "subfolder"
     custom_output_path: Optional[str] = None
+
+    @field_validator("output_folder_name")
+    @classmethod
+    def _validate_output_folder_name(cls, value: str) -> str:
+        return _normalize_relative_folder(value, field_label="La subcarpeta de salida")
+
+    @field_validator("suffix")
+    @classmethod
+    def _validate_suffix(cls, value: str) -> str:
+        return _validate_filename_affix(value, field_label="Export suffix")
+
+    @field_validator("format")
+    @classmethod
+    def _validate_format(cls, value: str) -> str:
+        return _normalize_export_format(value, field_label="Export format")
+
+    @field_validator("bg_color", mode="before")
+    @classmethod
+    def _validate_bg_color(cls, value: Any) -> Tuple[int, int, int]:
+        return _coerce_rgb_tuple(value)
+
+    @field_validator("output_destination")
+    @classmethod
+    def _validate_output_destination(cls, value: str) -> str:
+        text = str(value).strip().lower()
+        if text not in {"subfolder", "custom"}:
+            raise ValueError("Export output destination must be subfolder or custom")
+        return text
+
+    @field_validator("custom_output_path")
+    @classmethod
+    def _validate_custom_output_path(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
+
+    @field_validator("naming_template")
+    @classmethod
+    def _validate_naming_template(cls, value: str) -> str:
+        text = str(value)
+        if not text.strip():
+            raise ValueError("Export naming template cannot be empty")
+        return _validate_filename_affix(text, field_label="Export naming template")
 
 
 WEB_RGB230 = ExportVariant(

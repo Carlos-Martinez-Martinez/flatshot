@@ -105,7 +105,7 @@ function renderTop() {
     const showFormat = state.batch !== "none" && state.batch !== "scanning";
     formatButton.hidden = !showFormat;
     formatButton.disabled = !showFormat || state.exportStatus === "running";
-    formatButton.title = "Formatos de salida";
+    formatButton.title = "Salidas";
   }
   const inspectorButton = $(".top-inspector-action");
   if (inspectorButton) {
@@ -179,6 +179,7 @@ function compactHeaderStatusText() {
     exportableImages: counts.exportableImages,
     filesFound: counts.filesFound,
     formatLabel: batchViewHelpers.detectedFormatLabel(images),
+    hasOutputBlocker: hasOutputConfigurationIssue(),
     ignoredFiles: counts.ignoredFiles,
     imageCount: images.length,
     nonBlockingWarnings: counts.nonBlockingWarnings,

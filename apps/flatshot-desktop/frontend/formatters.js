@@ -9,6 +9,11 @@
     return String(path || "").split(/[\\/]/).filter(Boolean).pop() || "";
   }
 
+  function displayPath(path) {
+    const name = basename(path);
+    return name || String(path || "");
+  }
+
   function imageFileStem(name) {
     return basename(name).replace(/\.[^.\\/]+$/, "") || basename(name) || "Imagen";
   }
@@ -89,6 +94,7 @@
     basename,
     capabilitiesSummary,
     debugUrlLabel,
+    displayPath,
     escapeHtml,
     formatBytes,
     imageFileStem,

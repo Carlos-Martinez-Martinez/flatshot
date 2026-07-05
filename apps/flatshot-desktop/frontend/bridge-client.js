@@ -31,6 +31,9 @@
     if (message.startsWith("HTTP ")) {
       return `Error del servidor local: ${message}`;
     }
+    if ((error?.status || error?.bridgeCode) && message) {
+      return message;
+    }
     if (message) {
       return `Conexión local no disponible: ${message}`;
     }

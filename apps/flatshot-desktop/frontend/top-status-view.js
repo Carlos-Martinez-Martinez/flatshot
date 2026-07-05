@@ -48,7 +48,7 @@
       return exportStatus === "partial" ? `Exportado con avisos · ${processed}/${total}` : `Exportado · ${processed}/${total}`;
     }
     if (exportStatus === "failed") {
-      return "Exportación fallida";
+      return options.hasOutputBlocker ? "Revisar salida" : "Exportación fallida";
     }
     if (batch === "scanning") {
       return "Escaneando...";
@@ -158,6 +158,12 @@
     if (action === "review-warnings") {
       return "Revisar avisos del lote";
     }
+    if (action === "edit-output") {
+      return "Corregir destino, sufijo o nombre de salida";
+    }
+    if (action === "browse-outputs") {
+      return "Ver salidas exportadas";
+    }
     if (action === "open-output") {
       return "Abrir carpeta de salida";
     }
@@ -211,7 +217,7 @@
       return `Última exportación con avisos · ${processed}/${total} archivos`;
     }
     if (exportStatus === "failed") {
-      return `Exportación fallida · ${options.firstErrorDetail || "Revisa avisos"}`;
+      return `${options.hasOutputBlocker ? "Revisa salida" : "Exportación fallida"} · ${options.firstErrorDetail || "Revisa avisos"}`;
     }
     if (batch === "none") {
       return "Sin lote · Elige una carpeta para empezar";

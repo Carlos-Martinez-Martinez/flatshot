@@ -38,6 +38,7 @@ function renderExport() {
     activeOutputCount: activeOutputProfiles.length,
     outputCount,
     profileRows: activeOutputProfiles.map((profile) => ({
+      backgroundLabel: settingsViewHelpers.backgroundLabel(profile.background),
       format: profile.format,
       name: profile.name,
       size: outputProfileHelpers.outputProfileSize(profile),
@@ -172,7 +173,7 @@ function renderExportResult() {
   const target = $("#export-result");
   const resultStatuses = ["running", "completed", "partial", "failed"];
   const shouldShow = resultStatuses.includes(state.exportStatus) || state.exportJobId || state.exportResult;
-  const historyHtml = exportHistoryHelpers.exportHistoryHtml(state.exportHistory);
+  const historyHtml = state.outputBrowserOpen ? "" : exportHistoryHelpers.exportHistoryHtml(state.exportHistory);
   if (!shouldShow) {
     target.innerHTML = historyHtml;
     return;
@@ -188,9 +189,19 @@ function renderExportResult() {
       : [];
   const issues = state.exportIssues.length ? state.exportIssues : state.errors;
   const items = Array.isArray(state.exportCompletedItems) ? state.exportCompletedItems.slice(-8) : [];
+  const outputGroups = exportResultViewHelpers.outputBrowserGroups({
+    items: state.exportCompletedItems,
+    destinations,
+  });
+  const outputBrowserHtml = state.outputBrowserOpen
+    ? exportResultViewHelpers.exportOutputBrowserHtml({
+      groups: outputGroups,
+      total: Math.max(0, processed - errors) || items.filter((item) => item.success !== false).length,
+    })
+    : "";
   const title = exportResultTitle();
   const meta = exportResultMeta(processed, total, errors);
-  const actionsHtml = exportResultActionsHtml(issues, destinations);
+  const actionsHtml = exportResultActionsHtml(issues, destinations, outputGroups);
 
   target.innerHTML = exportResultViewHelpers.exportResultHtml({
     status: state.exportStatus,
@@ -204,6 +215,7 @@ function renderExportResult() {
     currentFileLabel: currentExportFileLabel(),
     issues,
     issueSummary: exportIssueActionText(issues[0]),
+    outputBrowserHtml,
     items,
     actionsHtml,
   }) + historyHtml;
@@ -236,14 +248,19 @@ function exportIssueActionText(issue) {
   });
 }
 
-function exportResultActionsHtml(issues, destinations) {
+function exportResultActionsHtml(issues, destinations, outputGroups = []) {
+  const hasOutputBlocker = issues.some(exportStateHelpers.isOutputConfigurationIssue);
   return exportResultViewHelpers.exportResultActionsHtml({
     status: state.exportStatus,
     issues,
     destinations,
+    canEditOutput: hasOutputBlocker,
+    canBrowseOutputs: outputGroups.length > 1,
     canOpenOutput: Boolean(outputDestinationToOpen()),
     canRetry: isExportReady(),
     canRetryFailed: retryableFailedExportImages().length > 0,
+    hasOutputBlocker,
+    outputBrowserOpen: state.outputBrowserOpen,
   });
 }
 
@@ -280,6 +297,7 @@ function beginOutputEdit() {
 function applyOutputEdit() {
   state.outputDraft = null;
   state.outputEditMode = false;
+  clearOutputConfigurationFailures();
   state.exportStatus = isExportReady() ? "ready" : "blocked";
   state.statusText = "Salida aplicada al lote";
   persistExportPreferences();
@@ -315,6 +333,7 @@ function saveCurrentOutputProfile() {
   state.outputProfiles = outputProfileHelpers.normalizeOutputProfileList(state.outputProfiles, state.activeOutputProfileId);
   state.outputDraft = null;
   state.outputEditMode = false;
+  clearOutputConfigurationFailures();
   state.exportStatus = isExportReady() ? "ready" : "blocked";
   state.statusText = "Salida guardada";
   persistOutputProfiles();
@@ -339,6 +358,7 @@ function saveCurrentOutputAsNewProfile() {
   state.outputProfileDraft = { ...profile };
   state.outputDraft = null;
   state.outputEditMode = false;
+  clearOutputConfigurationFailures();
   persistOutputProfiles();
   state.statusText = `Nueva salida: ${profile.name}`;
   render();
@@ -352,6 +372,21 @@ function discardOutputOverrides() {
   state.outputDraft = null;
   state.outputEditMode = false;
   applyOutputProfile(profile.id, { statusText: "Cambios sin guardar descartados" });
+}
+
+function clearOutputConfigurationFailures() {
+  const nextErrors = exportStateHelpers.clearOutputConfigurationIssues(state.errors);
+  const nextExportIssues = exportStateHelpers.clearOutputConfigurationIssues(state.exportIssues);
+  const changed = nextErrors.length !== state.errors.length || nextExportIssues.length !== state.exportIssues.length;
+  if (!changed) {
+    return false;
+  }
+  state.errors = nextErrors;
+  state.exportIssues = nextExportIssues;
+  if (state.exportStatus === "failed") {
+    state.exportStatus = isExportReady() ? "ready" : "blocked";
+  }
+  return true;
 }
 
 function exportStatusLabel(ready) {

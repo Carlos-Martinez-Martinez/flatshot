@@ -118,8 +118,10 @@ function commitOutputProfileDraft() {
   state.outputDeleteConfirmId = "";
   if (saved.id === state.activeOutputProfileId && saved.enabled) {
     syncOutputProfileState(saved);
+    globalThis.clearOutputConfigurationFailures?.();
   } else if (saved.id === state.activeOutputProfileId && !saved.enabled) {
     reassignActiveOutputProfileReference({ render: false });
+    globalThis.clearOutputConfigurationFailures?.();
   }
   persistOutputProfiles();
   return state.outputProfiles.find((profile) => profile.id === saved.id) || saved;

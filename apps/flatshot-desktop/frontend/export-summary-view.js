@@ -42,17 +42,25 @@
   function profileSummaryRowsHtml(rows = [], totalProfiles = rows.length) {
     const visibleRows = rows.slice(0, 4).map((profile) => {
       const size = profile.size || "";
+      const displaySize = size.replace("x", " × ");
+      const metaItems = [displaySize, profile.backgroundLabel, profile.destinationLabel].filter(Boolean);
+      const meta = [profile.format, ...metaItems].filter(Boolean).join(" · ");
       const title = `${profile.name || ""} · ${size} · ${profile.destinationLabel || ""}`;
       return `
-      <div class="preset-summary-row">
-        <span>${escapeHtml(profile.format || "")}</span>
-        <strong title="${escapeHtml(title)}">${escapeHtml(`${profile.name || ""} · ${size.replace("x", " × ")}`)}</strong>
+      <div class="preset-summary-output-row">
+        ${profile.format ? `<span class="preset-summary-output-badge">${escapeHtml(profile.format)}</span>` : ""}
+        <div class="preset-summary-output-copy">
+          <strong title="${escapeHtml(title)}">${escapeHtml(profile.name || "")}</strong>
+          <div class="preset-summary-output-meta" title="${escapeHtml(meta)}">
+            ${metaItems.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+          </div>
+        </div>
       </div>
     `;
     }).join("");
     const extraCount = totalProfiles - 4;
     const extraRows = extraCount > 0
-      ? `<div class="preset-summary-row"><span>Más</span><strong>${escapeHtml(`${extraCount} salida${extraCount === 1 ? "" : "s"} más`)}</strong></div>`
+      ? `<div class="preset-summary-more">${escapeHtml(`${extraCount} salida${extraCount === 1 ? "" : "s"} más`)}</div>`
       : "";
     return `${visibleRows}${extraRows}`;
   }
@@ -90,14 +98,7 @@
     const outputCount = Number(options.outputCount) || 0;
     const temporaryNoticeHtml = options.temporaryNoticeHtml || "";
     const warningSummaryHtml = options.warningSummaryHtml || "";
-    return `
-    <div class="preset-summary-card">
-      <div class="preset-summary-main">
-        <span>${escapeHtml(hasMultipleOutputs ? "Salidas activas" : "Salida activa")}</span>
-        <strong>${escapeHtml(options.displayName || "")}</strong>
-        ${hasMultipleOutputs ? `<small>${escapeHtml(`${outputCount} archivos previstos`)}</small>` : ""}
-      </div>
-      ${hasMultipleOutputs ? profileSummaryRowsHtml(profileRows, activeOutputCount) : ""}
+    const singleOutputRowsHtml = hasMultipleOutputs ? "" : `
       <div class="preset-summary-row">
         <span>Formato</span>
         <strong>${escapeHtml(options.formatLabel || "")}</strong>
@@ -122,6 +123,15 @@
         <span>Ejemplo</span>
         <strong title="${escapeHtml(options.example || "")}">${escapeHtml(options.example || "")}</strong>
       </div>
+    `;
+    return `
+    <div class="preset-summary-card${hasMultipleOutputs ? " preset-summary-card--multi" : ""}">
+      <div class="preset-summary-main">
+        <span>${escapeHtml(hasMultipleOutputs ? "Salidas" : "Salida")}</span>
+        <strong>${escapeHtml(hasMultipleOutputs ? `${activeOutputCount} activas` : options.displayName || "")}</strong>
+        <small>${escapeHtml(hasMultipleOutputs ? `${outputCount} archivos previstos` : options.presetSummary || "")}</small>
+      </div>
+      ${hasMultipleOutputs ? `<div class="preset-summary-outputs">${profileSummaryRowsHtml(profileRows, activeOutputCount)}</div>` : singleOutputRowsHtml}
     </div>
     ${warningSummaryHtml}
     ${temporaryNoticeHtml}

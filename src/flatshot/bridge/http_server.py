@@ -69,6 +69,10 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(self.server.service.load_ui_preferences())
             elif path == "/assets/onboarding/open":
                 raise MethodNotAllowedError("Use POST for /assets/onboarding/open.")
+            elif path == "/folders/open":
+                raise MethodNotAllowedError("Use POST for /folders/open.")
+            elif path == "/files/reveal":
+                raise MethodNotAllowedError("Use POST for /files/reveal.")
             elif path == "/images/thumbnail":
                 query = parse_qs(parsed.query)
                 image_id = _single_query_value(query, "imageId", required=False)
@@ -122,6 +126,10 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(self.server.service.cancel_scan_job(_scan_job_id(path)))
             elif path == "/folders/pick":
                 self._send_json(self.server.service.pick_folder(self._read_json_body()))
+            elif path == "/folders/open":
+                self._send_json(self.server.service.open_folder(self._read_json_body()))
+            elif path == "/files/reveal":
+                self._send_json(self.server.service.reveal_path(self._read_json_body()))
             elif path == "/preview/render-image":
                 mime_type, body, width, height, warning = self.server.service.render_preview_binary(self._read_json_body())
                 self._send_binary(body, content_type=mime_type, width=width, height=height, warning=warning)

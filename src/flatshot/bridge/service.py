@@ -18,12 +18,12 @@ from flatshot.application.preview_service import PreviewService
 from flatshot.application.settings_service import SettingsService
 from flatshot.bridge import app_info as bridge_app_info
 from flatshot.bridge import export_endpoints, export_requests, preferences, preset_endpoints
-from flatshot.bridge import preview_endpoints, scan_job_endpoints, scan_requests
+from flatshot.bridge import folder_endpoints, preview_endpoints, scan_job_endpoints, scan_requests
 from flatshot.bridge.errors import BridgeError, InvalidRequestError
 from flatshot.bridge.export_job_repository import ExportJobRepository
 from flatshot.bridge.export_jobs import BridgeExportJob, ExportRunnerFactory
 from flatshot.bridge.image_registry import BridgeImageRegistry
-from flatshot.bridge.onboarding_assets import onboarding_assets_folder, open_folder_with_system
+from flatshot.bridge.onboarding_assets import open_folder_with_system, reveal_path_with_system
 from flatshot.bridge.path_policy import TrustedPathPolicy
 from flatshot.bridge.serialization import batch_scan_result_to_dict, serialize_path
 from flatshot.utils.thumbnail_cache import ThumbnailCache
@@ -42,6 +42,7 @@ class FlatShotBridgeService:
         config_resolver: ConfigPathResolver | None = None,
         folder_picker: Callable[[Path | None], Path | None] | None = None,
         folder_opener: Callable[[Path], None] | None = None,
+        path_revealer: Callable[[Path], None] | None = None,
         max_concurrent_exports: int = 1,
         max_retained_jobs: int = 20,
         path_policy: TrustedPathPolicy | None = None,
@@ -56,6 +57,7 @@ class FlatShotBridgeService:
         self.config_resolver = config_resolver or ConfigPathResolver()
         self.folder_picker = folder_picker or pick_folder_with_tk
         self.folder_opener = folder_opener or open_folder_with_system
+        self.path_revealer = path_revealer or reveal_path_with_system
         self.max_concurrent_exports = max_concurrent_exports
         self.max_retained_jobs = max(1, int(max_retained_jobs))
         self.path_policy = path_policy or TrustedPathPolicy()
@@ -164,18 +166,17 @@ class FlatShotBridgeService:
         return {"ok": True, "selected": True, "path": serialize_path(selected)}
 
     def open_onboarding_assets_folder(self) -> dict[str, Any]:
-        folder = onboarding_assets_folder()
-        try:
-            folder.mkdir(parents=True, exist_ok=True)
-        except OSError as exc:
-            raise BridgeError("folder_open_unavailable", "No se pudo preparar la carpeta de fondos.", status=503) from exc
-        try:
-            self.folder_opener(folder)
-        except BridgeError:
-            raise
-        except Exception as exc:
-            raise BridgeError("folder_open_unavailable", "No se pudo abrir la carpeta de fondos.", status=503) from exc
-        return {"ok": True, "path": serialize_path(folder)}
+        return folder_endpoints.open_onboarding_assets_folder(self.folder_opener)
+
+    def open_folder(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+        return folder_endpoints.open_folder(
+            payload,
+            path_policy=self.path_policy,
+            folder_opener=self.folder_opener,
+        )
+
+    def reveal_path(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+        return folder_endpoints.reveal_path(payload, path_policy=self.path_policy, path_revealer=self.path_revealer)
 
     def render_preview(self, payload: Mapping[str, Any]) -> dict[str, Any]:
         return preview_endpoints.render_preview(self, payload)

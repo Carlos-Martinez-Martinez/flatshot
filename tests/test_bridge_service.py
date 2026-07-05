@@ -15,6 +15,7 @@ from flatshot.application.preset_service import PresetService
 from flatshot.bridge.errors import BridgeError, InvalidRequestError, error_response
 from flatshot.bridge.export_job_repository import ExportJobRepository
 from flatshot.bridge.export_jobs import BridgeExportJob
+from flatshot.bridge import onboarding_assets
 from flatshot.bridge.serialization import image_file_info_to_dict, serialize_path
 from flatshot.bridge.service import FlatShotBridgeService
 from flatshot.application.contracts import BatchScanResult, ExportJobResult, FolderScanResult, ImageFileInfo, PreviewResult
@@ -790,6 +791,73 @@ def test_bridge_open_onboarding_assets_folder_uses_frontend_assets_dir(tmp_path)
     assert opened == [assets_dir]
 
 
+def test_bridge_open_folder_uses_trusted_output_path(tmp_path):
+    source = tmp_path / "source"
+    output = source / "Salida"
+    output.mkdir(parents=True)
+    opened: list[Path] = []
+    service = _allow_roots(
+        FlatShotBridgeService(
+            config_resolver=ConfigPathResolver(tmp_path / "config"),
+            folder_opener=lambda path: opened.append(path),
+        ),
+        source,
+    )
+
+    response = service.open_folder({"path": str(output)})
+
+    assert response == {"ok": True, "path": serialize_path(output)}
+    assert opened == [output]
+
+
+def test_bridge_open_folder_rejects_untrusted_path(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    service = _allow_roots(_service(tmp_path / "config"), source)
+
+    with pytest.raises(BridgeError) as exc_info:
+        service.open_folder({"path": str(outside)})
+
+    assert exc_info.value.code == "path_not_allowed"
+
+
+def test_bridge_reveal_output_path_uses_trusted_output_path(tmp_path):
+    source = tmp_path / "source"
+    output = source / "Salida"
+    output.mkdir(parents=True)
+    exported = output / "item_PRO.png"
+    exported.write_bytes(b"export")
+    revealed = []
+    service = _allow_roots(
+        FlatShotBridgeService(
+            config_resolver=ConfigPathResolver(tmp_path / "config"),
+            path_revealer=lambda path: revealed.append(path),
+        ),
+        source,
+    )
+
+    response = service.reveal_path({"path": str(exported)})
+
+    assert response == {"ok": True, "path": serialize_path(exported)}
+    assert revealed == [exported]
+
+
+def test_reveal_path_with_system_uses_windows_select_command_with_quoted_path(tmp_path, monkeypatch):
+    exported = tmp_path / "OneDrive - Live Española S.A" / "Salida" / "Capa 1.png"
+    exported.parent.mkdir(parents=True)
+    exported.write_bytes(b"export")
+    calls = []
+
+    monkeypatch.setattr(onboarding_assets.sys, "platform", "win32")
+    monkeypatch.setattr(onboarding_assets.subprocess, "Popen", lambda command: calls.append(command))
+
+    onboarding_assets.reveal_path_with_system(exported)
+
+    assert calls == [f'explorer.exe /select,"{exported.resolve()}"']
+
+
 def test_bridge_render_preview_returns_png_payload(tmp_path):
     image = _png(tmp_path / "source.png")
     service = _allow_roots(_service(tmp_path / "config"), image.parent)
@@ -978,6 +1046,7 @@ def test_bridge_start_export_writes_output_and_reports_progress(tmp_path):
     assert final["progress"] == {"processed": 1, "total": 1, "percent": 100}
     assert final["result"]["success"] is True
     assert (source / "_OUT" / "item_PRO.png").exists()
+    assert final["completedItems"][0]["outputPath"] == serialize_path(source / "_OUT" / "item_PRO.png")
 
 
 def test_bridge_start_export_writes_manifest(tmp_path):
@@ -1373,6 +1442,7 @@ def test_bridge_start_export_reports_structured_item_errors(tmp_path):
     assert "fallo controlado" in final["issues"][0]["detail"]
     assert final["completedItems"][0] == {
         "name": "item.png",
+        "outputPath": serialize_path(source / "_OUT" / "item_PRO.png"),
         "path": png.as_posix(),
         "success": False,
     }

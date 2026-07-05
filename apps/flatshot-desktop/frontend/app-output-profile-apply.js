@@ -8,6 +8,7 @@ function applyOutputProfile(profileId, options = {}) {
     state.outputProfileDraft = { ...state.outputProfileDraft, enabled: true };
   }
   const applied = setActiveOutputProfileReference(profile.id, options);
+  globalThis.clearOutputConfigurationFailures?.();
   refreshBridgePreviewForAppliedOutputProfile(options);
   return applied;
 }
@@ -40,6 +41,7 @@ function setOutputProfileEnabled(profileId, enabled) {
   }
 
   state.exportStatus = isExportReady() ? "ready" : "blocked";
+  globalThis.clearOutputConfigurationFailures?.();
   state.statusText = profile.enabled ? `Salida activa: ${profile.name}` : `Salida desactivada: ${profile.name}`;
   persistOutputProfiles();
   render();

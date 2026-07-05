@@ -59,6 +59,14 @@ function preflightCounts() {
   return preflightHelpers.preflightCounts(preflightIssues());
 }
 
+function outputConfigurationIssues() {
+  return [...state.errors, ...state.exportIssues].filter(exportStateHelpers.isOutputConfigurationIssue);
+}
+
+function hasOutputConfigurationIssue() {
+  return outputConfigurationIssues().length > 0;
+}
+
 function exportConfirmationRisks() {
   const counts = batchCounts();
   const risks = [];

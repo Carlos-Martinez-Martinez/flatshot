@@ -304,6 +304,50 @@ def test_bridge_http_open_onboarding_assets_folder(tmp_path):
     assert get_data["error"]["code"] == "method_not_allowed"
 
 
+def test_bridge_http_open_folder_uses_service_folder_opener(tmp_path):
+    source = tmp_path / "source"
+    output = source / "Salida"
+    output.mkdir(parents=True)
+    opened: list[Path] = []
+    service = FlatShotBridgeService(
+        config_resolver=ConfigPathResolver(tmp_path / "config"),
+        folder_opener=lambda path: opened.append(path),
+    )
+    service.path_policy.register_root(source)
+
+    with running_bridge(tmp_path / "config", service=service) as port:
+        status, data = request_json(port, "POST", "/folders/open", {"path": str(output)})
+        get_status, get_data = request_json(port, "GET", "/folders/open")
+
+    assert status == 200
+    assert data == {"ok": True, "path": output.as_posix()}
+    assert opened == [output]
+
+
+def test_bridge_http_reveal_path_uses_service_path_revealer(tmp_path):
+    source = tmp_path / "source"
+    output = source / "Salida"
+    output.mkdir(parents=True)
+    exported = output / "item_PRO.png"
+    exported.write_bytes(b"export")
+    revealed = []
+    service = FlatShotBridgeService(
+        config_resolver=ConfigPathResolver(tmp_path / "config"),
+        path_revealer=lambda path: revealed.append(path),
+    )
+    service.path_policy.register_root(source)
+
+    with running_bridge(tmp_path / "config", service=service) as port:
+        status, data = request_json(port, "POST", "/files/reveal", {"path": str(exported)})
+        get_status, get_data = request_json(port, "GET", "/files/reveal")
+
+    assert status == 200
+    assert data == {"ok": True, "path": exported.as_posix()}
+    assert revealed == [exported]
+    assert get_status == 405
+    assert get_data["error"]["code"] == "method_not_allowed"
+
+
 def test_bridge_http_render_preview(tmp_path):
     source = tmp_path / "source"
     source.mkdir()

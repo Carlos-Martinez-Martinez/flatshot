@@ -172,8 +172,11 @@ const actionDispatcher = actionHandlerHelpers.createActionDispatcher({
   "review-errors": () => reviewWarnings(),
   "review-warnings": () => reviewWarnings(),
   "review-output": () => beginOutputEdit(),
-  "open-output": () => openOutputFolder(),
-  "copy-output-path": () => { void copyOutputPath(); },
+  "open-output": () => { void openOutputFolder(); },
+  "browse-outputs": () => browseOutputs(),
+  "open-output-folder": (target) => { void openOutputFolder(target); },
+  "reveal-output-file": (target) => { void revealOutputFile(target); },
+  "copy-output-path": (target) => { void copyOutputPath(target); },
   "primary": () => primaryAction(),
   "secondary-primary": () => runVisibleAction(getVisibleAppState().secondaryAction?.action),
 });

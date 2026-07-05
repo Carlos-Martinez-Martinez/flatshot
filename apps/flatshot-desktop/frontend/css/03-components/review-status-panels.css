@@ -70,6 +70,109 @@
   font-size: var(--font-size-sm);
 }
 
+.result-header__copy {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-0-5);
+}
+
+.result-header__label {
+  color: currentColor;
+  opacity: 0.78;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
+
+.result-header__metric {
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  min-height: var(--control-size-sm);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  padding: 0 var(--space-2);
+  color: currentColor;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.result-output-browser {
+  display: grid;
+  gap: 0;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: var(--space-3);
+}
+
+.result-output-browser__header, .result-output-group__head, .result-output-file {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.result-output-browser__header span, .result-output-group small {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.result-output-browser__header {
+  align-items: end;
+  padding-bottom: var(--space-2);
+}
+
+.result-output-browser__header strong {
+  color: var(--color-text-strong);
+  font-size: var(--font-size-md);
+}
+
+.result-output-group {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+  border-top: var(--border-width) solid var(--color-border);
+  padding: var(--space-2) 0;
+}
+
+.result-output-group:last-child {
+  padding-bottom: 0;
+}
+
+.result-output-group__head > div,
+.result-output-file > div {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-0-5);
+}
+
+.result-output-group__label,
+.result-output-file__label {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
+
+.result-output-group__head strong, .result-output-file strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+}
+
+.result-output-files {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.result-output-group__head button,
+.result-output-file button {
+  min-height: var(--control-size-compact);
+}
+
 .lot-summary-card {
   display: grid;
   gap: var(--space-3);

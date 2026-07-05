@@ -38,6 +38,7 @@ assert.deepEqual(helpers.exportStartState({{ scenario: "export-running", resetCo
   exportFailedItems: [],
   exportIssues: [],
   exportResult: null,
+  outputBrowserOpen: false,
   errors: [],
   paused: false,
   statusText: "Preparando exportación",
@@ -56,6 +57,26 @@ assert.deepEqual(helpers.bridgeRunFailureState("timeout"), {{
   errors: [{{ level: "error", title: "Exportación fallida", detail: "timeout" }}],
   statusText: "Exportación fallida",
 }});
+assert.deepEqual(helpers.bridgeRunFailureState("Hay archivos de salida repetidos o ya existentes. Cambia el destino, el sufijo o el patrón de nombre antes de exportar."), {{
+  exportStatus: "failed",
+  progress: 0,
+  processed: 0,
+  exportIssues: [{{ level: "error", title: "Salida a corregir", detail: "Hay archivos de salida repetidos o ya existentes. Cambia el destino, el sufijo o el patrón de nombre antes de exportar." }}],
+  exportResult: null,
+  errors: [{{ level: "error", title: "Salida a corregir", detail: "Hay archivos de salida repetidos o ya existentes. Cambia el destino, el sufijo o el patrón de nombre antes de exportar." }}],
+  statusText: "Revisa salida",
+}});
+assert.equal(helpers.isOutputConfigurationIssue({{
+  level: "error",
+  title: "Salida a corregir",
+  detail: "Las variantes Percha web y JPG Baja generarían el mismo archivo. Cambia el sufijo o la subcarpeta.",
+}}), true);
+assert.deepEqual(helpers.clearOutputConfigurationIssues([
+  {{ level: "error", title: "Salida a corregir", detail: "Hay archivos de salida repetidos." }},
+  {{ level: "error", title: "Worker", detail: "timeout" }},
+]), [
+  {{ level: "error", title: "Worker", detail: "timeout" }},
+]);
 
 assert.deepEqual(helpers.bridgeProgressUnavailableState("offline"), {{
   exportStatus: "failed",

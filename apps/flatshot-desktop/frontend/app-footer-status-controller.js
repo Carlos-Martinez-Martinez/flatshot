@@ -137,6 +137,7 @@ function statusBarText() {
     exportStatus: state.exportStatus,
     exportableImageCount: exportableImages().length,
     firstErrorDetail: state.errors[0]?.detail,
+    hasOutputBlocker: hasOutputConfigurationIssue(),
     imageCount: images.length,
     outputCount: exportOutputCount(),
     paused: state.paused,

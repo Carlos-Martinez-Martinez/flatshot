@@ -329,7 +329,7 @@ function updateLightingNumberFieldFromInput(input, options = {}) {
 }
 
 function handleFormatSelectChange(event) {
-  state.format = outputProfileHelpers.normalizeExportFormat(event.target.value);
+  state.format = outputProfileHelpers.normalizeExportFormat(event.target.value); globalThis.clearOutputConfigurationFailures?.();
   if (state.format !== "JPG") {
     state.maxFileSizeKb = null;
   }
@@ -350,7 +350,7 @@ function handleSizeSelectInput(event) {
 }
 
 function handleSizeSelectChange(event) {
-  state.size = outputProfileHelpers.parseOutputSize(event.target.value).normalized;
+  state.size = outputProfileHelpers.parseOutputSize(event.target.value).normalized; globalThis.clearOutputConfigurationFailures?.();
   state.statusText = `Tamaño: ${state.size}`;
   persistExportPreferences();
   const image = selectedImage();
@@ -362,7 +362,7 @@ function handleSizeSelectChange(event) {
 }
 
 function handleBackgroundSelectChange(event) {
-  state.background = outputProfileHelpers.normalizeBackgroundValue(event.target.value, state.background);
+  state.background = outputProfileHelpers.normalizeBackgroundValue(event.target.value, state.background); globalThis.clearOutputConfigurationFailures?.();
   state.statusText = `Fondo: ${settingsViewHelpers.backgroundLabel(state.background)}`;
   persistExportPreferences();
   const image = selectedImage();
@@ -375,7 +375,7 @@ function handleBackgroundSelectChange(event) {
 
 function handleDestinationModeChange(event) {
   state.destinationMode = event.target.value;
-  state.destinationValue = state.destinationMode === "custom" ? "" : "Salida";
+  state.destinationValue = state.destinationMode === "custom" ? "" : "Salida"; globalThis.clearOutputConfigurationFailures?.();
   state.exportStatus = isExportReady() ? "ready" : "blocked";
   state.statusText = state.destinationMode === "custom" ? "Carpeta de salida sin configurar" : "Destino junto al origen";
   persistExportPreferences();
@@ -383,7 +383,7 @@ function handleDestinationModeChange(event) {
 }
 
 function handleDestinationInput(event) {
-  state.destinationValue = event.target.value;
+  state.destinationValue = event.target.value; globalThis.clearOutputConfigurationFailures?.();
   state.exportStatus = isExportReady() ? "ready" : "blocked";
   state.statusText = state.destinationValue.trim() ? "Carpeta de salida configurada" : "Carpeta de salida sin configurar";
   persistExportPreferences();
@@ -391,7 +391,7 @@ function handleDestinationInput(event) {
 }
 
 function handleNamingInput(event) {
-  state.naming = event.target.value;
+  state.naming = event.target.value; globalThis.clearOutputConfigurationFailures?.();
   state.exportStatus = isExportReady() ? "ready" : "blocked";
   state.statusText = state.naming.trim() ? "Nombre de archivo actualizado" : "Nombre de archivo vacío";
   persistExportPreferences();

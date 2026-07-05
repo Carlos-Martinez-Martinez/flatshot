@@ -122,7 +122,7 @@
   display: none;
 }
 
-.preset-summary-card, .compact-panel, .warning-summary, .context-panel, .export-result, .issue-list {
+.preset-summary-card, .compact-panel, .warning-summary, .context-panel, .export-result, .issue-list, .preset-summary-output-row, .preset-summary-output-copy {
   min-width: 0;
 }
 
@@ -147,6 +147,89 @@
   white-space: nowrap;
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
+}
+
+.preset-summary-card--multi {
+  gap: var(--space-3);
+}
+
+.preset-summary-outputs {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.preset-summary-output-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-2);
+  border-top: var(--border-width) solid var(--color-border);
+  padding-top: var(--space-2);
+}
+
+.preset-summary-output-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.preset-summary-output-copy {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.preset-summary-output-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-size-xs);
+  border: var(--border-width) solid var(--color-accent-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--semantic-selection);
+  padding: 0 var(--space-2);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-compact);
+}
+
+.preset-summary-output-row strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.preset-summary-output-meta {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.preset-summary-output-meta span {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-panel);
+  color: var(--color-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px var(--space-2);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-compact);
+}
+
+.preset-summary-more {
+  border-top: var(--border-width) solid var(--color-border);
+  color: var(--color-text-muted);
+  padding-top: var(--space-2);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-compact);
 }
 
 .settings-panel.is-inspector-subview .export-section, .settings-panel.is-inspector-subview .warning-section {

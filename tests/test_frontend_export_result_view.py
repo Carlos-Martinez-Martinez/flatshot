@@ -115,15 +115,30 @@ const partialRetry = helpers.exportResultActionsHtml({{
 assert.equal(partialRetry.includes('data-action="retry-failed-export"'), true);
 assert.equal(partialRetry.includes("Reintentar fallidas"), true);
 
+const outputBlockerActions = helpers.exportResultActionsHtml({{
+  status: "failed",
+  issues: [{{ title: "Salida a corregir", detail: "Hay archivos de salida repetidos." }}],
+  destinations: [],
+  canEditOutput: true,
+  hasOutputBlocker: true,
+  canRetry: true,
+  canRetryFailed: false,
+}});
+assert.equal(outputBlockerActions.includes('class="primary" data-action="start-export"'), true);
+assert.equal(outputBlockerActions.includes(">Exportar de nuevo</button>"), true);
+assert.equal(outputBlockerActions.includes(">Corregir salida</button>"), true);
+
 const manyDestinations = helpers.exportResultActionsHtml({{
   status: "completed",
   issues: [],
   destinations: ["a", "b", "c", "d", "e"],
   canOpenOutput: true,
+  canBrowseOutputs: true,
   canRetry: false,
 }});
 assert.equal(manyDestinations.includes("2 carpetas más"), true);
-assert.equal(manyDestinations.includes(">Abrir carpeta principal</button>"), true);
+assert.equal(manyDestinations.includes(">Ver salidas</button>"), true);
+assert.equal(manyDestinations.includes('data-action="browse-outputs"'), true);
 assert.equal(manyDestinations.includes('data-action="copy-output-path"'), true);
 
 const singleDestination = helpers.exportResultActionsHtml({{
@@ -136,10 +151,37 @@ const singleDestination = helpers.exportResultActionsHtml({{
 assert.equal(singleDestination.includes(">Abrir carpeta</button>"), true);
 assert.equal(singleDestination.includes(">Copiar ruta</button>"), true);
 
+const groupedOutputs = helpers.outputBrowserGroups({{
+  items: [
+    {{ name: "a_WEB.jpg", outputPath: "C:/Out/Web/a_WEB.jpg", success: true }},
+    {{ name: "a_BAJA.jpg", outputPath: "D:/Archive/Baja/a_BAJA.jpg", success: true }},
+    {{ name: "fallida.jpg", outputPath: "D:/Archive/Baja/fallida.jpg", success: false }},
+  ],
+  destinations: ["C:/Out/Web", "D:/Archive/Baja"],
+}});
+assert.equal(groupedOutputs.length, 2);
+assert.deepEqual(groupedOutputs.map((group) => [group.folder, group.items.length]), [
+  ["C:/Out/Web", 1],
+  ["D:/Archive/Baja", 1],
+]);
+
+const browserHtml = helpers.exportOutputBrowserHtml({{
+  groups: groupedOutputs,
+  total: 2,
+}});
+assert.equal(browserHtml.includes("2 archivos en 2 carpetas"), true);
+assert.equal(browserHtml.includes('class="result-output-group__label">Carpeta</span>'), true);
+assert.equal(browserHtml.includes('class="result-output-file__label">Archivo</span>'), true);
+assert.equal(browserHtml.includes('data-action="open-output-folder"'), true);
+assert.equal(browserHtml.includes('data-output-folder="C:/Out/Web"'), true);
+assert.equal(browserHtml.includes('data-action="reveal-output-file"'), false);
+assert.equal(browserHtml.includes("Mostrar archivo"), false);
+assert.equal(browserHtml.includes("fallida.jpg"), false);
+
 const html = helpers.exportResultHtml({{
-  status: "running",
-  title: "Exportando",
-  meta: "1/2 imágenes",
+  status: "completed",
+  title: "Exportación completada",
+  meta: "2/2 exportadas",
   processed: 1,
   total: 2,
   errors: 0,
@@ -148,19 +190,23 @@ const html = helpers.exportResultHtml({{
   currentFileLabel: 'camisa <azul>.png',
   issues: [{{ title: "Aviso" }}],
   issueSummary: "Aviso <uno>",
+  outputBrowserHtml: browserHtml,
   items: [
     {{ name: "ok.jpg", success: true }},
     {{ name: "bad.jpg", success: false }},
   ],
   actionsHtml: '<div class="result-actions"><button type="button">X</button></div>',
 }});
-assert.equal(html.includes('class="result-header running"'), true);
-assert.equal(html.includes('C:/Salida/&quot;uno&quot;'), true);
-assert.equal(html.includes('camisa &lt;azul&gt;.png'), true);
+assert.equal(html.includes('class="result-header ready"'), true);
+assert.equal(html.includes('class="result-header__label">Resultado</span>'), true);
+assert.equal(html.includes('class="result-header__metric">2/2 exportadas</span>'), true);
+assert.equal(html.includes('class="result-path'), false);
+assert.equal(html.includes('class="result-items"'), false);
+assert.equal(html.includes('C:/Salida/&quot;uno&quot;'), false);
+assert.equal(html.includes('camisa &lt;azul&gt;.png'), false);
 assert.equal(html.includes('Aviso &lt;uno&gt;'), true);
-assert.equal(html.includes('class="result-item ready"'), true);
-assert.equal(html.includes('class="result-item error"'), true);
 assert.equal(html.includes('class="result-actions"'), true);
+assert.equal(html.includes('class="result-output-browser"'), true);
 
 const fallbackHtml = helpers.exportResultHtml({{
   status: "completed",

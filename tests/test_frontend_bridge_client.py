@@ -45,6 +45,10 @@ assert.equal(helpers.thumbnailUrl("http://127.0.0.1:8765", "", 96), "");
 assert.equal(helpers.errorMessage({{ name: "AbortError" }}), "La conexión local tardó demasiado. Verifica que FlatShot esté funcionando.");
 assert.equal(helpers.errorMessage(new Error("HTTP 500")), "Error del servidor local: HTTP 500");
 assert.equal(helpers.errorMessage(new Error("offline")), "Conexión local no disponible: offline");
+const outputCollision = new Error("Hay archivos de salida repetidos o ya existentes.");
+outputCollision.status = 409;
+outputCollision.bridgeCode = "export_output_collision";
+assert.equal(helpers.errorMessage(outputCollision), "Hay archivos de salida repetidos o ya existentes.");
 
 let calls = 0;
 global.fetch = async (url, options) => {{

@@ -51,6 +51,7 @@
       "exportFailedItems",
       "exportIssues",
       "exportResult",
+      "outputBrowserOpen",
       "exportHistory",
       "exportPollTimer",
       "progress",

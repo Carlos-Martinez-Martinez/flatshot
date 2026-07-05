@@ -66,6 +66,10 @@ assert.equal(helpers.compactHeaderStatusText({{
   exportableImages: 5,
 }}), "Exportado con avisos · 4/5");
 assert.equal(helpers.compactHeaderStatusText({{ exportStatus: "failed" }}), "Exportación fallida");
+assert.equal(helpers.compactHeaderStatusText({{
+  exportStatus: "failed",
+  hasOutputBlocker: true,
+}}), "Revisar salida");
 assert.equal(helpers.compactHeaderStatusText({{ batch: "scanning" }}), "Escaneando...");
 assert.equal(helpers.compactHeaderStatusText({{ batch: "none" }}), "Sin lote");
 assert.equal(helpers.compactHeaderStatusText({{
@@ -127,6 +131,9 @@ assert.equal(helpers.topPrimaryHint({{
 assert.equal(helpers.topPrimaryHint({{
   primaryAction: {{ action: "review-warnings", label: "Revisar" }},
 }}), "Revisar avisos del lote");
+assert.equal(helpers.topPrimaryHint({{
+  primaryAction: {{ action: "browse-outputs", label: "Ver salidas" }},
+}}), "Ver salidas exportadas");
 assert.equal(helpers.topPrimaryHint({{
   primaryAction: {{ action: "open-output", label: "Abrir" }},
 }}), "Abrir carpeta de salida");
@@ -263,6 +270,11 @@ assert.equal(helpers.statusBarText({{
   exportStatus: "failed",
   firstErrorDetail: "Destino ocupado",
 }}), "Exportación fallida · Destino ocupado");
+assert.equal(helpers.statusBarText({{
+  exportStatus: "failed",
+  hasOutputBlocker: true,
+  firstErrorDetail: "Hay archivos de salida repetidos.",
+}}), "Revisa salida · Hay archivos de salida repetidos.");
 assert.equal(helpers.statusBarText({{
   batch: "ready",
   counts: {{ exportableImages: 3, nonBlockingWarnings: 1 }},

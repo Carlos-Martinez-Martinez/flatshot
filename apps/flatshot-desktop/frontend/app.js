@@ -125,6 +125,7 @@ const state = {
   preferencesOpen: false,
   batchDetailOpen: false,
   exportConfirmOpen: false,
+  outputBrowserOpen: false,
   qaLabOpen: false,
   exportConfirmRisks: [],
   exportConfirmOptions: null,

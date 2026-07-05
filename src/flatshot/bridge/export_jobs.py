@@ -201,6 +201,8 @@ class BridgeExportJob:
                 item = {"name": event.image_name, "success": event.success}
                 if event.source_path:
                     item["path"] = serialize_path(event.source_path)
+                if event.output_path:
+                    item["outputPath"] = serialize_path(event.output_path)
                 self._record_completed_item_locked(item)
                 if not event.success:
                     self.errors += 1

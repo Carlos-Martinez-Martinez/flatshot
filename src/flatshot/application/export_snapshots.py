@@ -87,7 +87,7 @@ def queue_next_render_task(
             error_count += 1
             completed_count += 1
             emit(ExportLogEvent(f"Error: {exc}"))
-            emit(ExportImageCompletedEvent(exc.task.source_path.name, False, exc.task.source_path))
+            emit(ExportImageCompletedEvent(exc.task.source_path.name, False, exc.task.source_path, exc.task.save_path))
             emit_progress(completed_count, total)
             continue
         future = executor.submit(image_processor, prepared.task_args)

@@ -304,6 +304,7 @@ def test_failed_export_retry_is_wired_to_failed_bridge_paths_only():
     actions = APP_ACTION_DISPATCHER_PATH.read_text(encoding="utf-8")
     controller = APP_EXPORT_CONTROLLER_PATH.read_text(encoding="utf-8")
     view = APP_EXPORT_VIEW_PATH.read_text(encoding="utf-8")
+    visible = (FRONTEND_DIR / "app-visible-state.js").read_text(encoding="utf-8")
 
     assert '"retry-failed-export"' in actions
     assert "retryFailedExport()" in actions
@@ -313,6 +314,10 @@ def test_failed_export_retry_is_wired_to_failed_bridge_paths_only():
     assert "retryFailedOnly" in controller
     assert "images: retryImages" in controller
     assert "canRetryFailed: retryableFailedExportImages().length > 0" in view
+    assert "canRetry: isExportReady()" in view
+    assert "canRetry: !hasOutputBlocker && isExportReady()" not in view
+    assert 'label: outputBlocker && isExportReady() ? "Exportar de nuevo" : outputBlocker ? "Corregir salida" : "Ver error"' in visible
+    assert 'action: outputBlocker && isExportReady() ? "start-export" : outputBlocker ? "edit-output" : "review-warnings"' in visible
 
 
 def test_quick_export_uses_active_output_profile_without_warning_bypass_as_default():
@@ -331,6 +336,15 @@ def test_quick_export_uses_active_output_profile_without_warning_bypass_as_defau
     assert "quickExport();" in keydown
     assert 'primaryAction: { label: exportActionLabel(counts.exportableImages), action: "start-export", enabled: isExportReady() }' in visible
     assert 'primaryAction: { label: exportActionLabel(counts.exportableImages), action: "quick-export", enabled: isExportReady() }' in visible
+
+
+def test_completed_export_primary_action_browses_multiple_output_groups():
+    visible = (FRONTEND_DIR / "app-visible-state.js").read_text(encoding="utf-8")
+    actions = APP_ACTION_DISPATCHER_PATH.read_text(encoding="utf-8")
+
+    assert 'label: outputBrowserGroups().length > 1 ? state.outputBrowserOpen ? "Ocultar salidas" : "Ver salidas" : "Abrir destino"' in visible
+    assert 'action: outputBrowserGroups().length > 1 ? "browse-outputs" : "open-output"' in visible
+    assert '"browse-outputs": () => browseOutputs()' in actions
 
 
 def test_scan_uses_async_job_endpoint_with_sync_fallback():
@@ -363,7 +377,7 @@ def test_export_history_is_persisted_and_rendered_from_export_flow():
     assert "rememberCurrentExportHistory" in controller
     assert "exportHistoryHelpers.rememberExportHistory" in controller
     assert "STORAGE_KEYS.exportHistory" in controller
-    assert "exportHistoryHelpers.exportHistoryHtml(state.exportHistory)" in view
+    assert 'state.outputBrowserOpen ? "" : exportHistoryHelpers.exportHistoryHtml(state.exportHistory)' in view
 
 
 def test_responsive_inspector_has_drawer_toggle_under_1120px():

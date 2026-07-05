@@ -128,7 +128,12 @@ def test_export_runner_exports_one_png_to_subfolder(tmp_path):
     assert output.exists()
     assert output.parent in result.destinations
     assert any(isinstance(event, ExportProgressEvent) and event.percent == 100 for event in sink.events)
-    assert any(isinstance(event, ExportImageCompletedEvent) and event.success for event in sink.events)
+    assert any(
+        isinstance(event, ExportImageCompletedEvent)
+        and event.success
+        and event.output_path == output
+        for event in sink.events
+    )
 
 
 def test_export_runner_writes_render_cache_after_normal_render(monkeypatch, tmp_path):

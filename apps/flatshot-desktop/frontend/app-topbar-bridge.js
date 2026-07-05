@@ -179,6 +179,7 @@ function compactHeaderStatusText() {
     exportableImages: counts.exportableImages,
     filesFound: counts.filesFound,
     formatLabel: batchViewHelpers.detectedFormatLabel(images),
+    hasOutputBlocker: hasOutputConfigurationIssue(),
     ignoredFiles: counts.ignoredFiles,
     imageCount: images.length,
     nonBlockingWarnings: counts.nonBlockingWarnings,

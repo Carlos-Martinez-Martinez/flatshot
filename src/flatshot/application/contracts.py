@@ -92,6 +92,7 @@ class ExportJobResult:
     errors: int
     duration: float
     destinations: list[Path] = field(default_factory=list)
+    fatal_error: str | None = None
 
 
 @dataclass(frozen=True)

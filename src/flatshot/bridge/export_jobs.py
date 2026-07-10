@@ -119,6 +119,7 @@ class BridgeExportJob:
         error_count = 0
         destinations = list(self.destinations)
         success = True
+        fatal_error: str | None = None
 
         try:
             for request in self.requests:
@@ -133,10 +134,11 @@ class BridgeExportJob:
                     pause_token=self.pause_token,
                 )
                 result = runner.run(request)
-                completed_offset += result.total
+                completed_offset += result.processed
                 error_count += result.errors
                 destinations.extend(result.destinations)
                 success = success and result.success
+                fatal_error = fatal_error or result.fatal_error
 
                 with self._lock:
                     self.processed = max(self.processed, min(completed_offset, self.total_outputs))
@@ -162,6 +164,16 @@ class BridgeExportJob:
                         )
                 else:
                     self.status = "completed"
+                if fatal_error and not self.issues:
+                    self._append_bounded(
+                        self.issues,
+                        {
+                            "level": "error",
+                            "title": "Exportación",
+                            "detail": fatal_error,
+                        },
+                    )
+                    self.status = "failed"
                 self._finished_at = perf_counter()
                 self.destinations = sorted(set(destinations), key=lambda path: str(path))
                 self.result = ExportJobResult(
@@ -171,6 +183,7 @@ class BridgeExportJob:
                     errors=error_count,
                     duration=self._duration_seconds_locked(),
                     destinations=self.destinations,
+                    fatal_error=fatal_error,
                 )
                 self.percent = 100 if self.status == "completed" else self.percent
                 self._write_manifest_locked()
@@ -187,6 +200,7 @@ class BridgeExportJob:
                     errors=self.errors,
                     duration=self._duration_seconds_locked(),
                     destinations=self.destinations,
+                    fatal_error=str(exc) or exc.__class__.__name__,
                 )
                 self._write_manifest_locked()
 
@@ -317,6 +331,7 @@ class BridgeExportJob:
             "errors": self.result.errors,
             "durationMs": int(round(self.result.duration * 1000)),
             "destinations": [serialize_path(path) for path in self.result.destinations],
+            "fatalError": self.result.fatal_error,
         }
 
 

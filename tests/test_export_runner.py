@@ -184,6 +184,51 @@ def test_export_runner_honors_configured_max_workers(tmp_path):
     assert RecordingExecutor.created_workers == [2]
 
 
+def test_export_runner_reports_executor_construction_failure_as_fatal(tmp_path):
+    _source(tmp_path)
+
+    class RaisingExecutor:
+        def __init__(self, **_kwargs):
+            raise RuntimeError("executor unavailable")
+
+    runner = ExportRunner(executor_factory=RaisingExecutor)
+
+    result = runner.run(_request(tmp_path))
+
+    assert result.success is False
+    assert result.fatal_error
+    assert result.processed == 0
+
+
+def test_export_runner_cancellation_wakes_a_paused_pending_export(tmp_path):
+    _source(tmp_path)
+    pause_token = PauseToken()
+    cancellation_token = CancellationToken()
+    pause_token.pause()
+    result_holder = []
+
+    def run_export():
+        result_holder.append(
+            ExportRunner(
+                executor_factory=InlineExecutor,
+                pause_token=pause_token,
+                cancellation_token=cancellation_token,
+            ).run(_request(tmp_path))
+        )
+
+    thread = threading.Thread(target=run_export)
+    thread.start()
+
+    assert thread.is_alive()
+    cancellation_token.cancel()
+    thread.join(timeout=1)
+
+    assert not thread.is_alive()
+    assert result_holder
+    assert result_holder[0].success is False
+    assert result_holder[0].processed == 0
+
+
 def test_export_runner_exports_to_custom_destination(tmp_path):
     _source(tmp_path)
     custom_output = tmp_path / "custom-output"

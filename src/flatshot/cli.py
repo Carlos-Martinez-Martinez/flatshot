@@ -209,9 +209,13 @@ def process_folder(args):
 
     logger.log_export_complete(str(input_folder), result.processed, result.total, result.duration)
 
+    if not result.success:
+        detail = result.fatal_error or f"{result.errors} errores durante la exportación."
+        print(f"\n\n✗ Exportación incompleta: {result.processed}/{result.total} imágenes")
+        print(f"Error: {detail}")
+        raise SystemExit(1)
+
     print(f"\n\n✓ Completed: {result.processed}/{result.total} images in {result.duration:.1f}s")
-    if result.errors > 0:
-        print(f"✗ Errors: {result.errors}")
 
 
 def main():

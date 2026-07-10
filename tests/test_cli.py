@@ -292,3 +292,51 @@ class TestDryRun:
 
         captured = capsys.readouterr()
         assert "Found 1 images" in captured.out
+
+
+def test_process_failure_exits_nonzero_without_success_marker(monkeypatch, tmp_path, capsys):
+    from flatshot import cli
+    from flatshot.application.contracts import ExportJobResult
+    from flatshot.application.events import ExportLogEvent
+    from PIL import Image
+    import argparse
+
+    source = tmp_path / "failure-images"
+    source.mkdir()
+    Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(source / "item.png")
+
+    class FailingRunner:
+        def __init__(self, event_sink=None):
+            self.event_sink = event_sink
+
+        def run(self, request):
+            if self.event_sink:
+                self.event_sink.emit(ExportLogEvent("Error: Exportación: salida ya existente"))
+            return ExportJobResult(
+                success=False,
+                processed=0,
+                total=1,
+                errors=0,
+                duration=0.0,
+                fatal_error="salida ya existente",
+            )
+
+    monkeypatch.setattr(cli, "ExportRunner", FailingRunner)
+    monkeypatch.setattr(cli, "_load_app_settings", lambda: {})
+    monkeypatch.setattr(cli, "_log_service", lambda: MagicMock())
+    args = argparse.Namespace(
+        input=str(source),
+        preset=None,
+        output="_OUT",
+        size="8x8",
+        format="PNG",
+        suffix="_PRO",
+        template=None,
+        dry_run=False,
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli.process_folder(args)
+
+    assert exc_info.value.code != 0
+    assert "Completed" not in capsys.readouterr().out

@@ -1471,6 +1471,31 @@ def test_bridge_start_export_marks_false_runner_result_as_failed(tmp_path):
     assert final["issues"][0]["title"] == "Exportación"
 
 
+def test_bridge_start_export_keeps_zero_processed_result_at_zero(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    images = [_png(source / f"item-{index}.png") for index in range(3)]
+    service = FlatShotBridgeService(
+        config_resolver=ConfigPathResolver(tmp_path / "config"),
+        export_runner_factory=_false_result_export_runner_factory,
+    )
+    _allow_roots(service, source)
+
+    started = service.start_export(
+        {
+            "imagePaths": [str(path) for path in images],
+            "settings": {"opacity": 0, "blur": 0, "noise": 0},
+            "export": {"format": "PNG", "size": "8x8", "destinationValue": "_OUT"},
+        }
+    )
+    final = _wait_for_export(service, started["jobId"])
+
+    assert final["status"] == "failed"
+    assert final["progress"]["processed"] == 0
+    assert final["progress"]["total"] == 3
+    assert final["result"]["processed"] == 0
+
+
 def test_bridge_service_prunes_old_finished_export_jobs(tmp_path):
     source = tmp_path / "source"
     source.mkdir()

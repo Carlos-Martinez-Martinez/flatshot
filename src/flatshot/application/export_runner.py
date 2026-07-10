@@ -94,6 +94,7 @@ class ExportRunner:
         self.max_workers = max_workers
         self.executor = None
         self._snapshot_dir: Path | None = None
+        self._fatal_error: str | None = None
 
     def run(self, request: ExportJobRequest) -> ExportJobResult:
         start_time = time()
@@ -102,6 +103,7 @@ class ExportRunner:
         total = 0
         destinations: list[Path] = []
         cache: RenderCache | None = None
+        self._fatal_error = None
 
         try:
             image_items = source_image_items(request)
@@ -161,7 +163,7 @@ class ExportRunner:
                 tasks.extend(fallback)
 
             if tasks and not self.cancellation_token.cancelled:
-                self.pause_token.wait_if_paused()
+                self.pause_token.wait_if_paused(timeout=None, cancellation_token=self.cancellation_token)
                 if self.cancellation_token.cancelled:
                     self._emit(ExportLogEvent("Exportación cancelada."))
                 else:
@@ -174,6 +176,7 @@ class ExportRunner:
                     )
 
         except Exception as exc:
+            self._fatal_error = str(exc) or exc.__class__.__name__
             self._emit(ExportLogEvent(f"Error crítico en ExportRunner: {exc}"))
         finally:
             if cache is not None:
@@ -187,8 +190,21 @@ class ExportRunner:
                 self.executor.shutdown(wait=False, cancel_futures=True)
 
         duration = time() - start_time
-        success = not self.cancellation_token.cancelled and error_count == 0
-        result = ExportJobResult(success, completed_count, total, error_count, duration, destinations)
+        success = (
+            not self.cancellation_token.cancelled
+            and self._fatal_error is None
+            and error_count == 0
+            and completed_count == total
+        )
+        result = ExportJobResult(
+            success,
+            completed_count,
+            total,
+            error_count,
+            duration,
+            destinations,
+            self._fatal_error,
+        )
         self._emit(ExportFinishedEvent(success, completed_count, total, error_count, duration))
         return result
 
@@ -208,7 +224,8 @@ class ExportRunner:
         for cached in cached_tasks:
             if self.cancellation_token.cancelled:
                 break
-            self.pause_token.wait_if_paused()
+            if self.pause_token.wait_if_paused(timeout=None, cancellation_token=self.cancellation_token):
+                break
 
             try:
                 cache_path = cache.get_cached_path(cached.key, cached.fmt)
@@ -259,7 +276,8 @@ class ExportRunner:
                     )
 
                 while in_flight and not self.cancellation_token.cancelled:
-                    self.pause_token.wait_if_paused()
+                    if self.pause_token.wait_if_paused(timeout=None, cancellation_token=self.cancellation_token):
+                        break
                     if self.cancellation_token.cancelled:
                         break
 
@@ -305,6 +323,7 @@ class ExportRunner:
                                 total=total,
                             )
         except Exception as exc:
+            self._fatal_error = str(exc) or exc.__class__.__name__
             self._emit(ExportLogEvent(f"Error en el proceso de exportación: {exc}"))
 
         return completed_count, error_count

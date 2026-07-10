@@ -46,7 +46,7 @@ from flatshot.application.export_snapshots import (
     queue_next_render_task,
     source_image_items,
 )
-from flatshot.application.export_workers import process_single_image
+from flatshot.application.export_workers import commit_output_file, process_single_image
 from flatshot.utils.render_cache import RenderCache
 
 DEFAULT_MAX_EXPORT_WORKERS = 4
@@ -231,7 +231,15 @@ class ExportRunner:
                 cache_path = cache.get_cached_path(cached.key, cached.fmt)
                 save_path = Path(cached.save_path)
                 save_path.parent.mkdir(parents=True, exist_ok=True)
-                self.copy_file(cache_path, save_path)
+                temporary_path = save_path.with_name(f".{save_path.stem}.{uuid4().hex}{save_path.suffix}")
+                try:
+                    self.copy_file(cache_path, temporary_path)
+                    commit_output_file(temporary_path, save_path)
+                finally:
+                    try:
+                        temporary_path.unlink(missing_ok=True)
+                    except OSError:
+                        pass
 
                 completed_count += 1
                 self._emit(ExportImageCompletedEvent(cached.display_name, True, cached.source_path, save_path))

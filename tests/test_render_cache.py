@@ -53,6 +53,25 @@ def test_render_cache_key_changes_when_source_changes(tmp_path):
     assert before_key != after_key
 
 
+def test_render_cache_key_changes_when_content_changes_with_same_size_and_mtime(tmp_path):
+    source = tmp_path / "source.bin"
+    source.write_bytes(b"A" * 32)
+    fixed_ns = 1_700_000_000_000_000_000
+    import os
+
+    os.utime(source, ns=(fixed_ns, fixed_ns))
+    cache = RenderCache()
+    settings = {"opacity": 20}
+    curve = {"xp": [0.0, 1.0], "fp": [1.0, 1.0]}
+
+    before_key = cache.get_cache_key(str(source), settings, curve, (1800, 2400))
+    source.write_bytes(b"B" * 32)
+    os.utime(source, ns=(fixed_ns, fixed_ns))
+    after_key = cache.get_cache_key(str(source), settings, curve, (1800, 2400))
+
+    assert before_key != after_key
+
+
 def test_render_cache_key_changes_with_format_size_settings_curve_and_override(tmp_path):
     source = tmp_path / "source.png"
     Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(source)

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import os
 import shutil
-from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
+import os
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from time import time
 from typing import Callable, Protocol
@@ -14,7 +14,6 @@ from flatshot.application.contracts import ExportJobRequest, ExportJobResult
 from flatshot.application.events import (
     ExportEvent,
     ExportFinishedEvent,
-    ExportImageCompletedEvent,
     ExportLogEvent,
     ExportProgressEvent,
     ExportStartedEvent,
@@ -41,34 +40,15 @@ from flatshot.application.export_naming import (
 )
 from flatshot.application.export_planning import ExportPlan as ExportPlan
 from flatshot.application.export_planning import ExportRenderTask, build_export_plan
-from flatshot.application.export_snapshots import (
-    cleanup_snapshot_folder,
-    queue_next_render_task,
-    source_image_items,
+from flatshot.application.export_snapshots import source_image_items
+from flatshot.application.export_workers import process_single_image
+from flatshot.application.export_execution import (
+    MAX_EXPORT_WORKERS,
+    export_cached_tasks,
+    export_render_tasks,
+    resolve_export_max_workers,
 )
-from flatshot.application.export_workers import commit_output_file, process_single_image
 from flatshot.utils.render_cache import RenderCache
-
-DEFAULT_MAX_EXPORT_WORKERS = 4
-MAX_EXPORT_WORKERS = 8
-MAX_EXPORT_WORKERS_ENV = "FLATSHOT_MAX_WORKERS"
-
-
-def resolve_export_max_workers(configured_max_workers: int | None = None) -> int:
-    """Return a bounded export worker count for high-resolution renders."""
-    if configured_max_workers is not None:
-        return min(max(1, int(configured_max_workers)), MAX_EXPORT_WORKERS)
-
-    raw_env = os.environ.get(MAX_EXPORT_WORKERS_ENV)
-    if raw_env:
-        try:
-            return min(max(1, int(raw_env)), MAX_EXPORT_WORKERS)
-        except ValueError:
-            pass
-
-    cpu_workers = max(1, (os.cpu_count() or 2) - 1)
-    return min(cpu_workers, DEFAULT_MAX_EXPORT_WORKERS, MAX_EXPORT_WORKERS)
-
 
 class ExportEventSink(Protocol):
     def emit(self, event: ExportEvent) -> None: ...
@@ -217,39 +197,7 @@ class ExportRunner:
         error_count: int,
         total: int,
     ) -> tuple[int, int, list[ExportRenderTask]]:
-        if not cached_tasks:
-            return completed_count, error_count, []
-
-        fallback_tasks: list[ExportRenderTask] = []
-        self._emit(ExportLogEvent(f"Exportando {len(cached_tasks)} archivos desde caché..."))
-        for cached in cached_tasks:
-            if self.cancellation_token.cancelled:
-                break
-            if self.pause_token.wait_if_paused(timeout=None, cancellation_token=self.cancellation_token):
-                break
-
-            try:
-                cache_path = cache.get_cached_path(cached.key, cached.fmt)
-                save_path = Path(cached.save_path)
-                save_path.parent.mkdir(parents=True, exist_ok=True)
-                temporary_path = save_path.with_name(f".{save_path.stem}.{uuid4().hex}{save_path.suffix}")
-                try:
-                    self.copy_file(cache_path, temporary_path)
-                    commit_output_file(temporary_path, save_path)
-                finally:
-                    try:
-                        temporary_path.unlink(missing_ok=True)
-                    except OSError:
-                        pass
-
-                completed_count += 1
-                self._emit(ExportImageCompletedEvent(cached.display_name, True, cached.source_path, save_path))
-                self._emit_progress(completed_count, total)
-            except Exception as e:
-                self._emit(ExportLogEvent(f"Caché no válida para {cached.display_name}; renderizando normal ({e})"))
-                fallback_tasks.append(cached)
-
-        return completed_count, error_count, fallback_tasks
+        return export_cached_tasks(self, cached_tasks, cache, completed_count, error_count, total)
 
     def _export_render_tasks(
         self,
@@ -259,82 +207,7 @@ class ExportRunner:
         error_count: int,
         total: int,
     ) -> tuple[int, int]:
-        max_workers = resolve_export_max_workers(self.max_workers)
-        self._emit(ExportLogEvent(f"Procesando {len(tasks)} archivos restantes con {max_workers} núcleos..."))
-
-        try:
-            with self.executor_factory(max_workers=max_workers) as executor:
-                self.executor = executor
-                pending_tasks = iter(tasks)
-                in_flight = {}
-
-                for _ in range(min(max_workers, len(tasks))):
-                    completed_count, error_count, self._snapshot_dir = queue_next_render_task(
-                        executor=executor,
-                        pending_tasks=pending_tasks,
-                        in_flight=in_flight,
-                        snapshot_dir=self._snapshot_dir,
-                        copy_file=self.copy_file,
-                        image_processor=self.image_processor,
-                        cancellation_token=self.cancellation_token,
-                        emit=self._emit,
-                        emit_progress=self._emit_progress,
-                        completed_count=completed_count,
-                        error_count=error_count,
-                        total=total,
-                    )
-
-                while in_flight:
-                    if not self.cancellation_token.cancelled:
-                        if self.pause_token.wait_if_paused(timeout=None, cancellation_token=self.cancellation_token):
-                            continue
-
-                    done, _ = wait(set(in_flight), timeout=0.2, return_when=FIRST_COMPLETED)
-                    if not done:
-                        continue
-
-                    for future in done:
-                        task, snapshot_folder = in_flight.pop(future)
-                        try:
-                            success, msg, warning = future.result()
-                        except Exception as exc:
-                            success, msg, warning = False, f"Worker error: {exc}", None
-                        finally:
-                            cleanup_snapshot_folder(snapshot_folder)
-
-                        if success:
-                            self._store_render_cache(task, cache)
-                            if warning:
-                                self._emit(ExportLogEvent(f"Aviso: {msg}: {warning}"))
-                            self._emit(ExportImageCompletedEvent(msg, True, task.source_path, Path(task.save_path)))
-                        else:
-                            error_count += 1
-                            self._emit(ExportLogEvent(f"Error: {msg}"))
-                            self._emit(ExportImageCompletedEvent(msg.split(":")[0], False, task.source_path, Path(task.save_path)))
-
-                        completed_count += 1
-                        self._emit_progress(completed_count, total)
-
-                        if not self.cancellation_token.cancelled and not self.pause_token.paused:
-                            completed_count, error_count, self._snapshot_dir = queue_next_render_task(
-                                executor=executor,
-                                pending_tasks=pending_tasks,
-                                in_flight=in_flight,
-                                snapshot_dir=self._snapshot_dir,
-                                copy_file=self.copy_file,
-                                image_processor=self.image_processor,
-                                cancellation_token=self.cancellation_token,
-                                emit=self._emit,
-                                emit_progress=self._emit_progress,
-                                completed_count=completed_count,
-                                error_count=error_count,
-                                total=total,
-                            )
-        except Exception as exc:
-            self._fatal_error = str(exc) or exc.__class__.__name__
-            self._emit(ExportLogEvent(f"Error en el proceso de exportación: {exc}"))
-
-        return completed_count, error_count
+        return export_render_tasks(self, tasks, cache, completed_count, error_count, total)
 
     def _store_render_cache(self, task: ExportRenderTask, cache: RenderCache) -> None:
         cache_path = Path(task.cache_path)

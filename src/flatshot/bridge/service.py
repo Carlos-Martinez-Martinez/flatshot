@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import threading
 from pathlib import Path
-from time import perf_counter
 from typing import Any, Callable, Mapping
 from uuid import uuid4
 
@@ -19,10 +18,11 @@ from flatshot.application.preview_service import PreviewService
 from flatshot.application.settings_service import SettingsService
 from flatshot.bridge import app_info as bridge_app_info
 from flatshot.bridge import export_endpoints, export_requests, preferences, preset_endpoints
-from flatshot.bridge import folder_endpoints, preview_endpoints, scan_job_endpoints, scan_requests
+from flatshot.bridge import folder_endpoints, job_retention, lifecycle, preview_endpoints, scan_job_endpoints, scan_requests
 from flatshot.bridge.errors import BridgeError, InvalidRequestError
 from flatshot.bridge.export_job_repository import ExportJobRepository
 from flatshot.bridge.export_jobs import BridgeExportJob, ExportRunnerFactory
+from flatshot.bridge.folder_picker import pick_folder_with_tk
 from flatshot.bridge.image_registry import BridgeImageRegistry
 from flatshot.bridge.onboarding_assets import open_folder_with_system, reveal_path_with_system
 from flatshot.bridge.path_policy import TrustedPathPolicy
@@ -228,28 +228,7 @@ class FlatShotBridgeService:
         return job.snapshot()
 
     def shutdown(self, timeout: float = 5.0) -> bool:
-        """Cancel active background work and wait for worker threads to exit."""
-        with self._jobs_lock:
-            export_jobs = [
-                job for job in self._jobs.values()
-                if job.status in {"queued", "running", "paused", "cancelling"}
-            ]
-        with self._scan_jobs_lock:
-            scan_jobs = [
-                job for job in self._scan_jobs.values()
-                if job.status in {"queued", "running", "cancelling"}
-            ]
-        for job in export_jobs:
-            job.cancel()
-        for job in scan_jobs:
-            job.cancel()
-        deadline = perf_counter() + max(0.0, float(timeout))
-        all_stopped = True
-        for job in [*export_jobs, *scan_jobs]:
-            remaining = max(0.0, deadline - perf_counter())
-            if not job.join(remaining):
-                all_stopped = False
-        return all_stopped
+        return lifecycle.shutdown_service(self, timeout)
 
     def _export_requests(self, payload: Mapping[str, Any]):
         return export_requests.build_export_requests(self, payload)
@@ -295,39 +274,10 @@ class FlatShotBridgeService:
         return job
 
     def _prune_finished_jobs_locked(self, *, reserve_slots: int = 0) -> None:
-        retained_limit = max(0, self.max_retained_jobs - max(0, int(reserve_slots)))
-        finished_jobs = sorted(
-            (
-                (job_id, job)
-                for job_id, job in self._jobs.items()
-                if job.is_terminal
-            ),
-            key=lambda item: item[1].retention_timestamp,
-        )
-        remove_count = len(finished_jobs) - retained_limit
-        if remove_count <= 0:
-            return
-        for job_id, _job in finished_jobs[:remove_count]:
-            del self._jobs[job_id]
-            for key, mapped_job_id in list(self._export_idempotency.items()):
-                if mapped_job_id == job_id:
-                    del self._export_idempotency[key]
+        job_retention.prune_finished_export_jobs(self, reserve_slots=reserve_slots)
 
     def _prune_finished_scan_jobs_locked(self, *, reserve_slots: int = 0) -> None:
-        retained_limit = max(0, self.max_retained_jobs - max(0, int(reserve_slots)))
-        finished_jobs = sorted(
-            (
-                (job_id, job)
-                for job_id, job in self._scan_jobs.items()
-                if job.is_terminal
-            ),
-            key=lambda item: item[1].retention_timestamp,
-        )
-        remove_count = len(finished_jobs) - retained_limit
-        if remove_count <= 0:
-            return
-        for job_id, _job in finished_jobs[:remove_count]:
-            del self._scan_jobs[job_id]
+        job_retention.prune_finished_scan_jobs(self, reserve_slots=reserve_slots)
 
     def _validate_image_path_access(self, path: Path) -> None:
         self.path_policy.validate_image_path(path)
@@ -360,30 +310,3 @@ class FlatShotBridgeService:
         if config_dir.exists() and not config_dir.is_dir():
             raise BridgeError("config_path_invalid", "Config path is not a directory.", status=409)
         return SettingsService(config_dir / "settings.json")
-
-
-def pick_folder_with_tk(initial_path: Path | None = None) -> Path | None:
-    try:
-        import tkinter as tk
-        from tkinter import filedialog
-    except Exception as exc:
-        raise BridgeError("folder_picker_unavailable", "Selector de carpeta no disponible.", status=503) from exc
-
-    root = tk.Tk()
-    root.withdraw()
-    root.update()
-    try:
-        try:
-            root.attributes("-topmost", True)
-        except tk.TclError:
-            pass
-        selected = filedialog.askdirectory(
-            parent=root,
-            title="Seleccionar carpeta FlatShot",
-            initialdir=str(initial_path or Path.home()),
-            mustexist=True,
-        )
-    finally:
-        root.destroy()
-
-    return Path(selected).expanduser() if selected else None

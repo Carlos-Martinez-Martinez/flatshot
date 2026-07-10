@@ -74,8 +74,9 @@ def queue_next_render_task(
     completed_count: int,
     error_count: int,
     total: int,
+    allow_cancelled: bool = False,
 ) -> tuple[int, int, Path | None]:
-    while not cancellation_token.cancelled:
+    while allow_cancelled or not cancellation_token.cancelled:
         try:
             task = next(pending_tasks)
         except StopIteration:

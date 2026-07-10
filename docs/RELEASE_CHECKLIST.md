@@ -13,7 +13,7 @@ python scripts/audit_css.py --check
 python scripts/e2e_smoke.py
 python scripts/visual_regression_smoke.py
 python scripts/benchmark_shadow_v2.py --smoke --runs 1
-python scripts/build_portable.py --skip-venv
+python scripts/build_portable.py --skip-venv --release
 ```
 
 ## Manual Workflow Checks
@@ -47,7 +47,7 @@ or golden comparison that approved the change.
 
 ## Portable
 
-- `python scripts/build_portable.py --skip-venv` completes.
+- `python scripts/build_portable.py --skip-venv --release` completes without embedding `source_path.txt` or development autosync markers.
 - Portable runtime includes frontend, bridge and launcher files.
 - If dependencies changed, run the full portable build without `--skip-venv`.
 - Launch diagnostics remain available through `Diagnostico FlatShot.bat`.

@@ -51,6 +51,8 @@ const helpers = require({json.dumps(str(HELPER_PATH))});
 assert.equal(helpers.normalizeExportFormat("jpeg"), "JPG");
 assert.equal(helpers.normalizeExportFormat(".png"), "PNG");
 assert.equal(helpers.normalizeExportFormat("gif"), "JPG");
+assert.equal(helpers.MAX_EXPORT_SIDE, 12000);
+assert.equal(helpers.MAX_EXPORT_PIXELS, 100000000);
 
 assert.deepEqual(helpers.parseOutputSize("1200 x 1600"), {{
   width: 1200,
@@ -160,6 +162,33 @@ const invalidSizeLimit = helpers.outputProfileValidation({{
 }});
 assert.equal(invalidSizeLimit.fields.maxFileSizeKb, "error");
 assert.equal(invalidSizeLimit.errors.includes("El peso máximo debe ser un número mayor que 0 KB."), true);
+
+const oversized = helpers.outputProfileValidation({{
+  name: "Canal",
+  format: "PNG",
+  background: "transparent",
+  width: "12001",
+  height: "12000",
+  suffix: "_WEB",
+  naming: "{{original}}{{suffix}}",
+  destinationMode: "source",
+  destinationValue: "_WEB",
+}});
+assert.equal(oversized.fields.width, "error");
+assert.equal(oversized.errors.some((message) => message.includes("12000px")), true);
+
+const oversizedArea = helpers.outputProfileValidation({{
+  name: "Canal",
+  format: "PNG",
+  background: "transparent",
+  width: "10001",
+  height: "10000",
+  suffix: "_WEB",
+  naming: "{{original}}{{suffix}}",
+  destinationMode: "source",
+  destinationValue: "_WEB",
+}});
+assert.equal(oversizedArea.errors.some((message) => message.includes("100.000.000")), true);
 
 const customBackground = helpers.outputProfileValidation({{
   name: "Canal",

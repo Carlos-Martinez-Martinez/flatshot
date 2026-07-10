@@ -255,7 +255,15 @@ class FlatShotBridgeService:
         export_requests.validate_export_outputs(requests, path_policy=self.path_policy)
 
     def _ensure_export_space(self, requests) -> None:
-        ensure_export_space(requests)
+        destinations = []
+        for request in requests:
+            destinations.extend(
+                self.export_config_service.destinations_for_folders(
+                    [request.input_folder],
+                    request.export_config,
+                )
+            )
+        ensure_export_space(requests, checked_paths=destinations or None)
 
     def _export_config(self, raw_export: Any):
         return export_requests.build_export_config(self.export_config_service, raw_export)

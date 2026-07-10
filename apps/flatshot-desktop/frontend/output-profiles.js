@@ -5,6 +5,8 @@
   }
   root.FlatShotOutputProfiles = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  const MAX_EXPORT_SIDE = 12000;
+  const MAX_EXPORT_PIXELS = 100000000;
   function outputProfileNameForDisplay(name) {
     return String(name || "")
       .replace(/\bRGB\s*230\b/gi, "gris claro")
@@ -258,6 +260,16 @@
     if (!String(raw.height || "").trim() || !Number.isInteger(height) || height <= 0) {
       addError("height", "La altura debe ser un número mayor que 0.");
     }
+    if (Number.isInteger(width) && width > MAX_EXPORT_SIDE) {
+      addError("width", `La anchura no puede superar ${MAX_EXPORT_SIDE}px.`);
+    }
+    if (Number.isInteger(height) && height > MAX_EXPORT_SIDE) {
+      addError("height", `La altura no puede superar ${MAX_EXPORT_SIDE}px.`);
+    }
+    if (Number.isInteger(width) && Number.isInteger(height) && width > 0 && height > 0 && width * height > MAX_EXPORT_PIXELS) {
+      addError("width", `El área de exportación no puede superar ${MAX_EXPORT_PIXELS.toLocaleString("es-ES")} píxeles.`);
+      addError("height", `El área de exportación no puede superar ${MAX_EXPORT_PIXELS.toLocaleString("es-ES")} píxeles.`);
+    }
     if (invalidFilenameChars.test(String(raw.suffix || ""))) {
       addError("suffix", "El sufijo contiene caracteres no válidos.");
     }
@@ -308,5 +320,7 @@
     parseRgbBackground,
     rgbBackgroundValue,
     uniqueOutputProfileId,
+    MAX_EXPORT_SIDE,
+    MAX_EXPORT_PIXELS,
   };
 });

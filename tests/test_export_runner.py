@@ -15,8 +15,10 @@ from flatshot.application.events import (
 from flatshot.application.execution_control import CancellationToken, PauseToken
 from flatshot.application.export_runner import (
     ExportRunner,
+    MAX_EXPORT_WORKERS,
     OutputPathValidationError,
     build_export_plan,
+    resolve_export_max_workers,
     validate_export_requests_outputs,
 )
 from flatshot.application.export_workers import process_single_image
@@ -182,6 +184,10 @@ def test_export_runner_honors_configured_max_workers(tmp_path):
 
     assert result.success
     assert RecordingExecutor.created_workers == [2]
+
+
+def test_export_runner_caps_configured_worker_count():
+    assert resolve_export_max_workers(MAX_EXPORT_WORKERS + 10) == MAX_EXPORT_WORKERS
 
 
 def test_export_runner_reports_executor_construction_failure_as_fatal(tmp_path):

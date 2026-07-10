@@ -50,23 +50,24 @@ from flatshot.application.export_workers import commit_output_file, process_sing
 from flatshot.utils.render_cache import RenderCache
 
 DEFAULT_MAX_EXPORT_WORKERS = 4
+MAX_EXPORT_WORKERS = 8
 MAX_EXPORT_WORKERS_ENV = "FLATSHOT_MAX_WORKERS"
 
 
 def resolve_export_max_workers(configured_max_workers: int | None = None) -> int:
     """Return a bounded export worker count for high-resolution renders."""
     if configured_max_workers is not None:
-        return max(1, int(configured_max_workers))
+        return min(max(1, int(configured_max_workers)), MAX_EXPORT_WORKERS)
 
     raw_env = os.environ.get(MAX_EXPORT_WORKERS_ENV)
     if raw_env:
         try:
-            return max(1, int(raw_env))
+            return min(max(1, int(raw_env)), MAX_EXPORT_WORKERS)
         except ValueError:
             pass
 
     cpu_workers = max(1, (os.cpu_count() or 2) - 1)
-    return min(cpu_workers, DEFAULT_MAX_EXPORT_WORKERS)
+    return min(cpu_workers, DEFAULT_MAX_EXPORT_WORKERS, MAX_EXPORT_WORKERS)
 
 
 class ExportEventSink(Protocol):

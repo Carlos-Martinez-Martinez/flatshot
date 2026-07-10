@@ -1,6 +1,6 @@
 import re
 
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from typing import Any, Dict, List, Literal, Mapping, Optional, Tuple
 
 ShadowEngineName = Literal["realistic_v2", "legacy", "studio_2_5d"]
@@ -25,6 +25,8 @@ SHADOW_SETTING_LIMITS: Dict[str, Tuple[int, int]] = {
     "contraction": (0, 80),
     "scale_adjustment": (-30, 30),
 }
+MAX_EXPORT_SIDE = 12_000
+MAX_EXPORT_PIXELS = 100_000_000
 
 
 class StudioLight(BaseModel):
@@ -175,8 +177,8 @@ class ExportVariant(BaseModel):
 
     # Optional output format. None inherits ExportConfig.format.
     format: Optional[str] = None
-    output_width: Optional[int] = Field(None, ge=1)
-    output_height: Optional[int] = Field(None, ge=1)
+    output_width: Optional[int] = Field(None, ge=1, le=MAX_EXPORT_SIDE)
+    output_height: Optional[int] = Field(None, ge=1, le=MAX_EXPORT_SIDE)
     max_file_size_kb: Optional[int] = Field(None, ge=1)
 
     # Shadow adjustment for adapting one output version to a different background.
@@ -281,6 +283,12 @@ class ExportVariant(BaseModel):
             raise ValueError("Variant max file size must be a positive integer")
         return parsed
 
+    @model_validator(mode="after")
+    def _validate_pixel_area(self) -> "ExportVariant":
+        if self.output_width and self.output_height and self.output_width * self.output_height > MAX_EXPORT_PIXELS:
+            raise ValueError("Variant output pixel area exceeds the safe export limit")
+        return self
+
 class ExportConfig(BaseModel):
     output_folder_name: str = "_SALIDA_PRO"
     suffix: str = "_PRO"
@@ -289,8 +297,8 @@ class ExportConfig(BaseModel):
     bg_color: Tuple[int, int, int] = (230, 230, 230)
     variants: List[ExportVariant] = Field(default_factory=list)
     # New fields for configurable output size
-    output_width: int = 1800
-    output_height: int = 2400
+    output_width: int = Field(1800, ge=1, le=MAX_EXPORT_SIDE)
+    output_height: int = Field(2400, ge=1, le=MAX_EXPORT_SIDE)
     # Naming template: {original}, {suffix}, {folder}, {index:03d}
     naming_template: str = "{original}{suffix}"
     # Destination mode: 'subfolder' (create in each source) or 'custom' (single folder)
@@ -340,6 +348,12 @@ class ExportConfig(BaseModel):
         if not text.strip():
             raise ValueError("Export naming template cannot be empty")
         return _validate_filename_affix(text, field_label="Export naming template")
+
+    @model_validator(mode="after")
+    def _validate_pixel_area(self) -> "ExportConfig":
+        if self.output_width * self.output_height > MAX_EXPORT_PIXELS:
+            raise ValueError("Export output pixel area exceeds the safe export limit")
+        return self
 
 
 WEB_RGB230 = ExportVariant(

@@ -9,6 +9,8 @@ from flatshot.core.models import (
     SHADOW_SETTING_LIMITS,
     WEB_RGB230,
     WHITE_RGB255,
+    MAX_EXPORT_PIXELS,
+    MAX_EXPORT_SIDE,
     ExportVariant,
     LightingScene,
     ShadowSettings, ExportConfig, CurveData,
@@ -152,6 +154,13 @@ class TestExportConfig:
         assert config.output_width == 1800
         assert config.output_height == 2400
         assert config.naming_template == "{original}{suffix}"
+
+    def test_export_dimensions_have_side_and_pixel_limits(self):
+        with pytest.raises(ValueError, match="output_width"):
+            ExportConfig(output_width=MAX_EXPORT_SIDE + 1)
+
+        with pytest.raises(ValueError, match="pixel"):
+            ExportConfig(output_width=MAX_EXPORT_SIDE, output_height=MAX_EXPORT_SIDE)
     
     def test_naming_template_custom(self):
         """Test custom naming template."""

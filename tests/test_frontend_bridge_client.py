@@ -159,3 +159,45 @@ helpers.requestPreviewImage("http://127.0.0.1:8765/", {{
     )
 
     assert result.returncode == 0, result.stderr or result.stdout
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
+def test_bridge_client_retries_safe_reads_but_not_mutations():
+    script = f"""
+import {{ createRequire }} from "node:module";
+const require = createRequire(import.meta.url);
+const assert = require("node:assert/strict");
+const helpers = require({json.dumps(str(HELPER_PATH))});
+
+let postCalls = 0;
+global.fetch = async () => {{
+  postCalls += 1;
+  return {{ ok: false, status: 500, json: async () => ({{}}) }};
+}};
+try {{
+  await helpers.request("http://127.0.0.1:8765", "/exports/run", {{ method: "POST", body: "{{}}", timeoutMs: 1000 }});
+  throw new Error("expected POST failure");
+}} catch (error) {{
+  assert.equal(error.status, 500);
+  assert.equal(postCalls, 1);
+}}
+
+let getCalls = 0;
+global.fetch = async () => {{
+  getCalls += 1;
+  if (getCalls === 1) return {{ ok: false, status: 503, json: async () => ({{}}) }};
+  return {{ ok: true, json: async () => ({{ ok: true }}) }};
+}};
+const payload = await helpers.request("http://127.0.0.1:8765", "/health", {{ timeoutMs: 1000 }});
+assert.equal(payload.ok, true);
+assert.equal(getCalls, 2);
+"""
+    result = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout

@@ -73,6 +73,8 @@ async function startBridgeExport(options = {}) {
       method: "POST",
       body: JSON.stringify(bridgeExportPayload({ images: retryImages })),
       timeoutMs: 10000,
+      retries: 0,
+      headers: { "Idempotency-Key": exportIdempotencyKey() },
     });
     applyBridgeExportStatus(response);
     render();
@@ -82,6 +84,13 @@ async function startBridgeExport(options = {}) {
     Object.assign(state, exportStateHelpers.bridgeRunFailureState(message));
     render();
   }
+}
+
+function exportIdempotencyKey() {
+  if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  return `flatshot-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 function bridgeExportPayload(options = {}) {

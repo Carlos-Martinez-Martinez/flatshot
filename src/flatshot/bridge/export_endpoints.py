@@ -47,7 +47,19 @@ def prepare_export(service, payload: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def start_export(service, payload: Mapping[str, Any]) -> dict[str, Any]:
+def start_export(service, payload: Mapping[str, Any], *, idempotency_key: str | None = None) -> dict[str, Any]:
+    key = str(idempotency_key or "").strip()
+    if len(key) > 200:
+        raise BridgeError("invalid_idempotency_key", "La clave de idempotencia es demasiado larga.", status=400)
+    if key:
+        with service._jobs_lock:
+            existing_job_id = service._export_idempotency.get(key)
+            if existing_job_id:
+                existing_job = service._jobs.get(existing_job_id)
+                if existing_job is not None:
+                    return existing_job.snapshot()
+                del service._export_idempotency[key]
+
     requests, config = service._export_requests(payload)
     service._validate_export_outputs(requests)
     _validate_export_space(service, requests)
@@ -81,6 +93,8 @@ def start_export(service, payload: Mapping[str, Any]) -> dict[str, Any]:
                 status=409,
             )
         service._jobs[job_id] = job
+        if key:
+            service._export_idempotency[key] = job_id
     job.start()
     return job.snapshot()
 

@@ -1560,6 +1560,26 @@ def test_bridge_start_export_reserves_concurrent_slot(tmp_path):
     assert _wait_for_export(service, first["jobId"])["status"] == "partial"
 
 
+def test_bridge_start_export_reuses_job_for_same_idempotency_key(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    image = _png(source / "item.png")
+    service = _allow_roots(_export_service(tmp_path / "config"), source)
+    payload = {
+        "imagePaths": [str(image)],
+        "settings": {"opacity": 0, "blur": 0, "noise": 0},
+        "export": {"format": "PNG", "size": "8x8", "destinationValue": "_OUT"},
+    }
+
+    first = service.start_export(payload, idempotency_key="attempt-1")
+    final = _wait_for_export(service, first["jobId"])
+    repeated = service.start_export(payload, idempotency_key="attempt-1")
+
+    assert repeated["jobId"] == first["jobId"]
+    assert repeated["status"] == final["status"]
+    assert len(service._jobs) == 1
+
+
 def test_bridge_start_scan_enforces_active_scan_limit(tmp_path):
     source = tmp_path / "source"
     source.mkdir()

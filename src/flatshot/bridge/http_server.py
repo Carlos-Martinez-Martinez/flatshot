@@ -146,7 +146,13 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
             elif path == "/exports/prepare":
                 self._send_json(self.server.service.prepare_export(self._read_json_body()))
             elif path == "/exports/run":
-                self._send_json(self.server.service.start_export(self._read_json_body()), status=202)
+                self._send_json(
+                    self.server.service.start_export(
+                        self._read_json_body(),
+                        idempotency_key=self.headers.get("Idempotency-Key"),
+                    ),
+                    status=202,
+                )
             elif _is_export_job_action_path(path, "pause"):
                 self._send_json(self.server.service.pause_export(_export_job_id(path)))
             elif _is_export_job_action_path(path, "resume"):

@@ -70,6 +70,7 @@ class FlatShotBridgeService:
             self.config_resolver.config_dir(create=False) / "export-manifests"
         )
         self._jobs: dict[str, BridgeExportJob] = {}
+        self._export_idempotency: dict[str, str] = {}
         self._jobs_lock = threading.Lock()
         self._scan_jobs: dict[str, FolderScanJob] = {}
         self._scan_jobs_lock = threading.Lock()
@@ -203,8 +204,8 @@ class FlatShotBridgeService:
     def prepare_export(self, payload: Mapping[str, Any]) -> dict[str, Any]:
         return export_endpoints.prepare_export(self, payload)
 
-    def start_export(self, payload: Mapping[str, Any]) -> dict[str, Any]:
-        return export_endpoints.start_export(self, payload)
+    def start_export(self, payload: Mapping[str, Any], *, idempotency_key: str | None = None) -> dict[str, Any]:
+        return export_endpoints.start_export(self, payload, idempotency_key=idempotency_key)
 
     def export_status(self, job_id: str) -> dict[str, Any]:
         return self._job(job_id).snapshot()
@@ -306,6 +307,9 @@ class FlatShotBridgeService:
             return
         for job_id, _job in finished_jobs[:remove_count]:
             del self._jobs[job_id]
+            for key, mapped_job_id in list(self._export_idempotency.items()):
+                if mapped_job_id == job_id:
+                    del self._export_idempotency[key]
 
     def _prune_finished_scan_jobs_locked(self, *, reserve_slots: int = 0) -> None:
         retained_limit = max(0, self.max_retained_jobs - max(0, int(reserve_slots)))

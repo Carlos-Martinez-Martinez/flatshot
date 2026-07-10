@@ -70,7 +70,9 @@
       : { ...(options.headers || {}) };
     Object.assign(headers, authHeaders);
     const { timeoutMs: _timeoutMs, retries: _retries, authToken: _authToken, ...fetchOptions } = options;
-    const maxRetries = options.retries ?? DEFAULT_MAX_RETRIES;
+    const method = String(options.method || "GET").toUpperCase();
+    const retrySafeMethod = method === "GET" || method === "HEAD";
+    const maxRetries = options.retries ?? (retrySafeMethod ? DEFAULT_MAX_RETRIES : 0);
     let lastError = null;
 
     try {
@@ -95,7 +97,9 @@
           if (controller.signal.aborted) {
             break;
           }
-          if (attempt < maxRetries) {
+          const status = Number(err?.status || 0);
+          const retryableStatus = !status || status === 408 || status === 429 || status >= 500;
+          if (attempt < maxRetries && retryableStatus) {
             await abortableDelay(RETRY_DELAY_MS * Math.pow(2, attempt), controller.signal);
           }
         }

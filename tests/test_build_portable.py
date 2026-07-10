@@ -59,6 +59,8 @@ def test_release_portable_does_not_embed_development_source_pointer(tmp_path):
     )
 
     assert not (target / "source_path.txt").exists()
+    assert not (target / "development.flag").exists()
+    assert (target / "release.flag").read_text(encoding="utf-8") == "release\n"
     stamp = json.loads((target / ".autosync.json").read_text(encoding="utf-8"))
     assert stamp["source_root"] is None
     assert stamp["portable_mode"] == "release"
@@ -86,4 +88,13 @@ def test_runtime_manifest_excludes_dependency_files():
 
 
 def test_portable_window_dependency_is_recorded():
-    assert any(dependency.startswith("pywebview") for dependency in build_portable.PORTABLE_DEPENDENCIES)
+    assert any(dependency.startswith("pywebview==") for dependency in build_portable.PORTABLE_DEPENDENCIES)
+
+
+def test_portable_runtime_lock_is_present_and_constrained():
+    lock = (PROJECT_ROOT / "requirements.lock").read_text(encoding="utf-8")
+
+    assert "Pillow==" in lock
+    assert "numpy==" in lock
+    assert "pydantic==" in lock
+    assert not any(line.startswith(("Pillow>=", "numpy>=", "pydantic>=")) for line in lock.splitlines())

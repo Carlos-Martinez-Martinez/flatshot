@@ -1,0 +1,7 @@
+# Runtime lock used by portable release builds. Keep Python 3.10 on the last
+# NumPy line that supports it; newer interpreters use the current compatible
+# release. The unconstrained requirements.txt remains the developer source.
+Pillow==12.3.0
+numpy==2.2.6; python_version < "3.11"
+numpy==2.4.6; python_version >= "3.11"
+pydantic==2.13.4

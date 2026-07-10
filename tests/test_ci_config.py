@@ -13,6 +13,8 @@ def test_github_actions_ci_runs_core_quality_gates():
     assert "python -m ruff check ." in text
     assert "python scripts/audit_css.py --check" in text
     assert "python scripts/build_portable.py --skip-venv" in text
+    assert "python-version: [\"3.10\", \"3.11\", \"3.12\", \"3.13\"]" in text
+    assert "requirements.lock" in text
 
 
 def test_local_check_script_runs_frontend_e2e_smoke():

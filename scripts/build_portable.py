@@ -73,11 +73,14 @@ def build_portable(
     (target / "data").mkdir(exist_ok=True)
     (target / "portable.flag").write_text("portable\n", encoding="utf-8")
     source_pointer = target / "source_path.txt"
+    development_flag = target / "development.flag"
     if development:
         source_pointer.write_text(str(source_root), encoding="utf-8")
+        development_flag.write_text("development\n", encoding="utf-8")
         (target / "release.flag").unlink(missing_ok=True)
     else:
         source_pointer.unlink(missing_ok=True)
+        development_flag.unlink(missing_ok=True)
         (target / "release.flag").write_text("release\n", encoding="utf-8")
 
     sync_portable_app(source_root, target)
@@ -92,6 +95,7 @@ def validate_source_root(source_root: Path) -> None:
     required = [
         source_root / "pyproject.toml",
         source_root / "requirements.txt",
+        source_root / "requirements.lock",
         source_root / "src" / "flatshot" / "bridge" / "service.py",
         source_root / "apps" / "flatshot-desktop" / "frontend" / "index.html",
     ]
@@ -119,7 +123,10 @@ def ensure_portable_venv(source_root: Path, venv_dir: Path) -> None:
         venv.EnvBuilder(with_pip=True, clear=False).create(venv_dir)
 
     run_command([str(python_exe), "-m", "pip", "install", "--upgrade", "pip"], source_root, timeout=300)
-    run_command([str(python_exe), "-m", "pip", "install", "-r", str(source_root / "requirements.txt")], source_root, timeout=300)
+    runtime_requirements = source_root / "requirements.lock"
+    if not runtime_requirements.exists():
+        runtime_requirements = source_root / "requirements.txt"
+    run_command([str(python_exe), "-m", "pip", "install", "-r", str(runtime_requirements)], source_root, timeout=300)
     run_command([str(python_exe), "-m", "pip", "install", *PORTABLE_DEPENDENCIES], source_root, timeout=300)
 
 

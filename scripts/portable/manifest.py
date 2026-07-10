@@ -8,8 +8,8 @@ RUNTIME_SOURCE_DIRS = (
     Path("src") / "flatshot",
     Path("apps") / "flatshot-desktop" / "frontend",
 )
-DEPENDENCY_FILES = ("pyproject.toml", "requirements.txt")
-PORTABLE_DEPENDENCIES = ("pywebview>=6.0",)
+DEPENDENCY_FILES = ("pyproject.toml", "requirements.txt", "requirements.lock")
+PORTABLE_DEPENDENCIES = ("pywebview==6.2.1",)
 
 
 def source_manifest_hash(source_root: Path) -> str:

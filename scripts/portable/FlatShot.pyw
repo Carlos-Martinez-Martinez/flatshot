@@ -42,6 +42,8 @@ HOST = "127.0.0.1"
 DEFAULT_BRIDGE_PORT = 8765
 DEFAULT_FRONTEND_PORT = 4173
 LIVE_RELOAD_ENV_VAR = "FLATSHOT_LIVE_RELOAD"
+PORTABLE_DEV_ENV_VAR = "FLATSHOT_PORTABLE_DEV"
+DEVELOPMENT_FLAG = ROOT / "development.flag"
 LIVE_RELOAD_ENDPOINT = "/__flatshot_live_reload"
 LIVE_RELOAD_INTERVAL_MS = 700
 UI_PREFERENCES_SETTINGS_KEY = "desktop_ui_preferences"
@@ -57,6 +59,8 @@ def configure_portable_environment() -> None:
 
 
 def auto_sync_from_source(source_root: Path | None = None) -> None:
+    if not development_mode_enabled():
+        return
     source_root = source_root or find_source_root()
     if source_root is None:
         return
@@ -83,6 +87,8 @@ def auto_sync_from_source(source_root: Path | None = None) -> None:
 
 
 def find_source_root() -> Path | None:
+    if not development_mode_enabled():
+        return None
     candidates: list[Path] = []
     env_source = os.environ.get("FLATSHOT_SOURCE_ROOT")
     if env_source:
@@ -161,8 +167,17 @@ def source_frontend_dir(source_root: Path) -> Path:
 
 
 def live_reload_enabled() -> bool:
+    if not development_mode_enabled():
+        return False
     configured = os.environ.get(LIVE_RELOAD_ENV_VAR, "").strip().lower()
     return configured not in {"0", "false", "no", "off"}
+
+
+def development_mode_enabled() -> bool:
+    configured = os.environ.get(PORTABLE_DEV_ENV_VAR, "").strip().lower()
+    if configured:
+        return configured not in {"0", "false", "no", "off"}
+    return DEVELOPMENT_FLAG.exists()
 
 
 def resolve_frontend_runtime(source_root: Path | None) -> tuple[Path, bool]:

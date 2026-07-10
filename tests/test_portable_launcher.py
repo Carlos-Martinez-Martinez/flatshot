@@ -23,12 +23,24 @@ def load_launcher():
 
 def test_resolve_frontend_runtime_uses_source_frontend_with_live_reload(monkeypatch):
     launcher = load_launcher()
+    monkeypatch.setenv(launcher.PORTABLE_DEV_ENV_VAR, "1")
     monkeypatch.delenv(launcher.LIVE_RELOAD_ENV_VAR, raising=False)
 
     frontend_dir, live_reload = launcher.resolve_frontend_runtime(PROJECT_ROOT)
 
     assert frontend_dir == PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
     assert live_reload is True
+
+
+def test_resolve_frontend_runtime_requires_explicit_development_mode(monkeypatch):
+    launcher = load_launcher()
+    monkeypatch.setenv(launcher.PORTABLE_DEV_ENV_VAR, "0")
+    monkeypatch.delenv(launcher.LIVE_RELOAD_ENV_VAR, raising=False)
+
+    frontend_dir, live_reload = launcher.resolve_frontend_runtime(PROJECT_ROOT)
+
+    assert frontend_dir == launcher.FRONTEND_DIR
+    assert live_reload is False
 
 
 def test_resolve_frontend_runtime_can_disable_live_reload(monkeypatch):

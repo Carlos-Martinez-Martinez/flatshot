@@ -118,3 +118,12 @@ def test_save_writes_settings_file(tmp_path):
     saved = json.loads(settings_file.read_text(encoding="utf-8"))
     assert saved["format"] == "PNG"
     assert saved["bg_color"] == [10, 20, 30]
+
+
+def test_settings_services_share_a_file_lock_for_same_settings_file(tmp_path):
+    path = tmp_path / "settings.json"
+
+    first = SettingsService(path)
+    second = SettingsService(path)
+
+    assert first.write_lock is second.write_lock

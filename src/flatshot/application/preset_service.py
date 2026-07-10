@@ -19,6 +19,16 @@ from flatshot.core.models import (
 )
 
 
+_PRESET_LOCKS: dict[Path, threading.RLock] = {}
+_PRESET_LOCKS_GUARD = threading.Lock()
+
+
+def _shared_preset_lock(config_dir: Path) -> threading.RLock:
+    key = config_dir.resolve()
+    with _PRESET_LOCKS_GUARD:
+        return _PRESET_LOCKS.setdefault(key, threading.RLock())
+
+
 class PresetService:
     PRESETS_FILE = "presets.json"
     CATEGORIZED_PRESETS_FILE = "presets_v2.json"
@@ -27,7 +37,11 @@ class PresetService:
     def __init__(self, config_dir: str | Path) -> None:
         self.config_dir = Path(config_dir)
         self.config_dir.mkdir(parents=True, exist_ok=True)
-        self._write_lock = threading.Lock()
+        self._write_lock = _shared_preset_lock(self.config_dir)
+
+    @property
+    def write_lock(self) -> threading.RLock:
+        return self._write_lock
 
     @property
     def presets_path(self) -> Path:

@@ -6,14 +6,24 @@ import json
 import logging
 import os
 import tempfile
+import threading
 from pathlib import Path
 from typing import Any, Mapping
+from uuid import uuid4
 
 from flatshot.core.models import SHADOW_ENGINE_COMPAT, SHADOW_ENGINE_DEFAULT
 from flatshot.core.scaling import DEFAULT_SCALE_CURVE
 
 
 LOGGER = logging.getLogger(__name__)
+_SETTINGS_LOCKS: dict[Path, threading.RLock] = {}
+_SETTINGS_LOCKS_GUARD = threading.Lock()
+
+
+def _shared_settings_lock(settings_file: Path) -> threading.RLock:
+    key = settings_file.resolve()
+    with _SETTINGS_LOCKS_GUARD:
+        return _SETTINGS_LOCKS.setdefault(key, threading.RLock())
 
 DEFAULT_APP_SETTINGS: dict[str, Any] = {
     "output_folder_name": "_SALIDA_PRO",
@@ -64,6 +74,11 @@ DEFAULT_APP_SETTINGS: dict[str, Any] = {
 class SettingsService:
     def __init__(self, settings_file: str | Path) -> None:
         self.settings_file = Path(settings_file)
+        self._write_lock = _shared_settings_lock(self.settings_file)
+
+    @property
+    def write_lock(self) -> threading.RLock:
+        return self._write_lock
 
     def load(self) -> dict[str, Any]:
         loaded = self._load_existing_mapping()
@@ -110,15 +125,16 @@ class SettingsService:
             LOGGER.debug("Settings load error", exc_info=exc)
 
     def save(self, settings: Mapping[str, Any]) -> None:
-        self.settings_file.parent.mkdir(parents=True, exist_ok=True)
-        tmp_path = self.settings_file.with_suffix(".tmp")
-        try:
-            with open(tmp_path, "w", encoding="utf-8") as handle:
-                json.dump(dict(settings), handle, indent=4)
-            os.replace(tmp_path, self.settings_file)
-        finally:
-            if tmp_path.exists():
-                tmp_path.unlink(missing_ok=True)
+        with self._write_lock:
+            self.settings_file.parent.mkdir(parents=True, exist_ok=True)
+            tmp_path = self.settings_file.with_name(f".{self.settings_file.name}.{uuid4().hex}.tmp")
+            try:
+                with open(tmp_path, "w", encoding="utf-8") as handle:
+                    json.dump(dict(settings), handle, indent=4)
+                os.replace(tmp_path, self.settings_file)
+            finally:
+                if tmp_path.exists():
+                    tmp_path.unlink(missing_ok=True)
 
     @classmethod
     def normalize(cls, loaded: Mapping[str, Any]) -> dict[str, Any]:

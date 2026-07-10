@@ -38,9 +38,10 @@ def save_ui_preferences(service, payload: Mapping[str, Any]) -> dict[str, Any]:
         raise InvalidRequestError("Expected a JSON object.")
 
     settings_service = service._writable_settings_service()
-    settings = settings_service.load()
-    settings[UI_PREFERENCES_SETTINGS_KEY] = json_compatible(payload)
-    settings_service.save(settings)
+    with settings_service.write_lock:
+        settings = settings_service.load()
+        settings[UI_PREFERENCES_SETTINGS_KEY] = json_compatible(payload)
+        settings_service.save(settings)
 
     response = load_ui_preferences(service)
     response["ok"] = True

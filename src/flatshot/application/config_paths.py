@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import os
+import json
 import shutil
 import sys
 from pathlib import Path
 from typing import Mapping
+from uuid import uuid4
 
 
 CONFIG_DIR_ENV_VAR = "FLATSHOT_CONFIG_DIR"
@@ -66,7 +68,7 @@ class ConfigPathResolver:
             home=self._home,
             platform=self._platform,
         )
-        if target == legacy or target.exists() or not legacy.exists():
+        if target == legacy or not legacy.exists():
             return
 
         has_legacy_data = any((legacy / name).exists() for name in LEGACY_CONFIG_FILES + LEGACY_CONFIG_DIRS)
@@ -77,7 +79,13 @@ class ConfigPathResolver:
         for filename in LEGACY_CONFIG_FILES:
             source = legacy / filename
             destination = target / filename
-            if source.is_file() and not destination.exists():
+            if not source.is_file():
+                continue
+            if filename == "presets.json" and (target / "presets_v2.json").is_file():
+                _merge_legacy_presets_into_categorized(source, target / "presets_v2.json")
+            elif destination.exists() and filename == "presets.json":
+                _merge_legacy_flat_presets(source, destination)
+            elif not destination.exists():
                 shutil.copy2(source, destination)
         for dirname in LEGACY_CONFIG_DIRS:
             source = legacy / dirname
@@ -114,3 +122,52 @@ class ConfigPathResolver:
         current_platform = platform or sys.platform
         name = "FlatShot" if current_platform.startswith("win") or current_platform == "darwin" else "flatshot"
         return base / name
+
+
+def _merge_legacy_flat_presets(source: Path, destination: Path) -> None:
+    try:
+        legacy = json.loads(source.read_text(encoding="utf-8"))
+        current = json.loads(destination.read_text(encoding="utf-8"))
+        if not isinstance(legacy, dict) or not isinstance(current, dict):
+            return
+        merged = dict(current)
+        for name, settings in legacy.items():
+            merged.setdefault(name, settings)
+        if merged == current:
+            return
+        _atomic_json_write(destination, merged)
+    except (OSError, ValueError, TypeError):
+        return
+
+
+def _merge_legacy_presets_into_categorized(source: Path, destination: Path) -> None:
+    try:
+        legacy = json.loads(source.read_text(encoding="utf-8"))
+        categorized = json.loads(destination.read_text(encoding="utf-8"))
+        if not isinstance(legacy, dict) or not isinstance(categorized, dict):
+            return
+        categories = categorized.setdefault("categories", {})
+        uncategorized = categorized.setdefault("uncategorized", {})
+        existing = set(uncategorized)
+        for category in categories.values():
+            if isinstance(category, dict):
+                existing.update((category.get("presets") or {}).keys())
+        changed = False
+        for name, settings in legacy.items():
+            if name not in existing:
+                uncategorized[name] = settings
+                changed = True
+        if changed:
+            _atomic_json_write(destination, categorized)
+    except (OSError, ValueError, TypeError):
+        return
+
+
+def _atomic_json_write(path: Path, payload: dict) -> None:
+    temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+    try:
+        temporary.write_text(json.dumps(payload, indent=4, ensure_ascii=False), encoding="utf-8")
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+

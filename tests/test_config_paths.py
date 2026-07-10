@@ -2,6 +2,7 @@ from pathlib import Path
 
 import flatshot.application.config_paths as config_paths_module
 from flatshot.application.config_paths import CONFIG_DIR_ENV_VAR, ConfigPathResolver
+from flatshot.application.preset_service import PresetService
 
 
 def test_config_path_resolver_does_not_import_pyqt():
@@ -74,3 +75,28 @@ def test_config_path_resolver_migrates_legacy_default_files(tmp_path):
     assert (config_dir / "settings.json").read_text(encoding="utf-8") == '{"format": "PNG"}'
     assert (config_dir / "presets.json").read_text(encoding="utf-8") == '{"Legacy": {"opacity": 20}}'
     assert (legacy_root / "settings.json").exists()
+
+
+def test_config_path_resolver_merges_legacy_presets_when_target_already_exists(tmp_path):
+    legacy_root = tmp_path / "LocalAppData"
+    legacy_root.mkdir()
+    (legacy_root / "presets.json").write_text(
+        '{"Legacy": {"opacity": 20}}',
+        encoding="utf-8",
+    )
+    target = legacy_root / "FlatShot"
+    target.mkdir()
+    (target / "presets_v2.json").write_text(
+        '{"categories": {}, "uncategorized": {"New": {"opacity": 30}}}',
+        encoding="utf-8",
+    )
+    resolver = ConfigPathResolver(
+        environ={"LOCALAPPDATA": str(legacy_root)},
+        home=tmp_path / "home",
+        platform="win32",
+    )
+
+    resolver.config_dir()
+
+    presets = PresetService(target).load_flat_presets()
+    assert set(presets) == {"Legacy", "New"}

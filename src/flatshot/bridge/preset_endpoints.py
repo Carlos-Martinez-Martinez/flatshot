@@ -58,9 +58,10 @@ def save_preset(service, payload: Mapping[str, Any]) -> dict[str, Any]:
         raise InvalidRequestError("Field 'settings' contains invalid preset values.") from exc
 
     preset_service = service._writable_preset_service()
-    flat_presets = preset_service.load_flat_presets()
-    updated = PresetService.save_current_preset(flat_presets, name, settings)
-    preset_service.save_flat_presets_preserving_categories(updated)
+    with preset_service.write_lock:
+        flat_presets = preset_service.load_flat_presets()
+        updated = PresetService.save_current_preset(flat_presets, name, settings)
+        preset_service.save_flat_presets_preserving_categories(updated)
 
     response = list_presets(service)
     response["ok"] = True
@@ -74,16 +75,17 @@ def delete_preset(service, payload: Mapping[str, Any]) -> dict[str, Any]:
 
     name = required_string(payload.get("name"), "name")
     preset_service = service._writable_preset_service()
-    flat_presets = preset_service.load_flat_presets()
-    if len(flat_presets) <= 1:
-        raise InvalidRequestError("At least one preset must remain.")
+    with preset_service.write_lock:
+        flat_presets = preset_service.load_flat_presets()
+        if len(flat_presets) <= 1:
+            raise InvalidRequestError("At least one preset must remain.")
 
-    try:
-        updated = PresetService.delete_preset(flat_presets, name)
-    except ValueError as exc:
-        raise InvalidRequestError(str(exc)) from exc
+        try:
+            updated = PresetService.delete_preset(flat_presets, name)
+        except ValueError as exc:
+            raise InvalidRequestError(str(exc)) from exc
 
-    preset_service.save_flat_presets_preserving_categories(updated)
+        preset_service.save_flat_presets_preserving_categories(updated)
     response = list_presets(service)
     response["ok"] = True
     response["activePreset"] = response["items"][0]["name"] if response.get("items") else None

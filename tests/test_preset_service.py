@@ -183,3 +183,10 @@ def test_preset_name_operations_reject_invalid_changes():
         PresetService.rename_preset({"Uno": {}, "Dos": {}}, "Uno", "Dos")
     with pytest.raises(ValueError):
         PresetService.delete_preset({"Uno": {}}, "Dos")
+
+
+def test_preset_services_share_a_file_lock_for_same_config(tmp_path):
+    first = PresetService(tmp_path)
+    second = PresetService(tmp_path)
+
+    assert first.write_lock is second.write_lock

@@ -52,6 +52,13 @@ class FolderScanJob:
                 self.status = "cancelling"
                 self.cancellation_token.cancel()
 
+    def join(self, timeout: float | None = None) -> bool:
+        thread = self._thread
+        if thread is None:
+            return True
+        thread.join(timeout=timeout)
+        return not thread.is_alive()
+
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
             return {

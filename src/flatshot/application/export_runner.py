@@ -283,11 +283,10 @@ class ExportRunner:
                         total=total,
                     )
 
-                while in_flight and not self.cancellation_token.cancelled:
-                    if self.pause_token.wait_if_paused(timeout=None, cancellation_token=self.cancellation_token):
-                        break
-                    if self.cancellation_token.cancelled:
-                        break
+                while in_flight:
+                    if not self.cancellation_token.cancelled:
+                        if self.pause_token.wait_if_paused(timeout=None, cancellation_token=self.cancellation_token):
+                            continue
 
                     done, _ = wait(set(in_flight), timeout=0.2, return_when=FIRST_COMPLETED)
                     if not done:

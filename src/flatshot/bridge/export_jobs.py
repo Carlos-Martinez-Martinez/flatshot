@@ -91,6 +91,13 @@ class BridgeExportJob:
                 self.pause_token.resume()
                 self._record_message_locked("Cancelando exportación.")
 
+    def join(self, timeout: float | None = None) -> bool:
+        thread = self._thread
+        if thread is None:
+            return True
+        thread.join(timeout=timeout)
+        return not thread.is_alive()
+
     def snapshot(self) -> dict:
         with self._lock:
             return {

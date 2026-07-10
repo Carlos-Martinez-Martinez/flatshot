@@ -186,6 +186,12 @@ class LocalServer:
         return f"http://{self.host}:{self.port}"
 
     def stop(self) -> None:
+        service = getattr(self.server, "service", None)
+        if service is not None:
+            try:
+                service.shutdown()
+            except Exception:
+                pass
         self.server.shutdown()
         self.server.server_close()
         self.thread.join(timeout=5)

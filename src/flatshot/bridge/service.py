@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import threading
 from pathlib import Path
+from time import perf_counter
 from typing import Any, Callable, Mapping
 from uuid import uuid4
 
@@ -44,6 +45,7 @@ class FlatShotBridgeService:
         folder_opener: Callable[[Path], None] | None = None,
         path_revealer: Callable[[Path], None] | None = None,
         max_concurrent_exports: int = 1,
+        max_concurrent_scans: int = 1,
         max_retained_jobs: int = 20,
         path_policy: TrustedPathPolicy | None = None,
         thumbnail_cache: ThumbnailCache | None = None,
@@ -58,7 +60,8 @@ class FlatShotBridgeService:
         self.folder_picker = folder_picker or pick_folder_with_tk
         self.folder_opener = folder_opener or open_folder_with_system
         self.path_revealer = path_revealer or reveal_path_with_system
-        self.max_concurrent_exports = max_concurrent_exports
+        self.max_concurrent_exports = max(1, int(max_concurrent_exports))
+        self.max_concurrent_scans = max(1, int(max_concurrent_scans))
         self.max_retained_jobs = max(1, int(max_retained_jobs))
         self.path_policy = path_policy or TrustedPathPolicy()
         self.thumbnail_cache = thumbnail_cache
@@ -121,6 +124,16 @@ class FlatShotBridgeService:
         )
         with self._scan_jobs_lock:
             self._prune_finished_scan_jobs_locked(reserve_slots=1)
+            active_count = sum(
+                1 for active_job in self._scan_jobs.values()
+                if active_job.status in {"queued", "running", "cancelling"}
+            )
+            if active_count >= self.max_concurrent_scans:
+                raise BridgeError(
+                    "scan_busy",
+                    "Ya hay un escaneo en curso. Espera a que termine o cancélalo.",
+                    status=409,
+                )
             self._scan_jobs[job.job_id] = job
         job.start()
         return scan_job_endpoints.scan_job_snapshot(job, image_id_for_path=self.image_registry.register)
@@ -210,6 +223,30 @@ class FlatShotBridgeService:
         job = self._job(job_id)
         job.cancel()
         return job.snapshot()
+
+    def shutdown(self, timeout: float = 5.0) -> bool:
+        """Cancel active background work and wait for worker threads to exit."""
+        with self._jobs_lock:
+            export_jobs = [
+                job for job in self._jobs.values()
+                if job.status in {"queued", "running", "paused", "cancelling"}
+            ]
+        with self._scan_jobs_lock:
+            scan_jobs = [
+                job for job in self._scan_jobs.values()
+                if job.status in {"queued", "running", "cancelling"}
+            ]
+        for job in export_jobs:
+            job.cancel()
+        for job in scan_jobs:
+            job.cancel()
+        deadline = perf_counter() + max(0.0, float(timeout))
+        all_stopped = True
+        for job in [*export_jobs, *scan_jobs]:
+            remaining = max(0.0, deadline - perf_counter())
+            if not job.join(remaining):
+                all_stopped = False
+        return all_stopped
 
     def _export_requests(self, payload: Mapping[str, Any]):
         return export_requests.build_export_requests(self, payload)

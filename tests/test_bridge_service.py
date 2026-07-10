@@ -2,6 +2,7 @@ from pathlib import Path
 import base64
 import json
 import shutil
+import threading
 from io import BytesIO
 from time import sleep
 
@@ -1518,6 +1519,102 @@ def test_bridge_service_prunes_old_finished_export_jobs(tmp_path):
     assert len(service._jobs) <= 2
     assert started_jobs[0] not in service._jobs
     assert started_jobs[-1] in service._jobs
+
+
+def test_bridge_start_export_reserves_concurrent_slot(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    image = _png(source / "item.png")
+    started = threading.Event()
+    release = threading.Event()
+
+    class BlockingRunner:
+        def run(self, request):
+            started.set()
+            release.wait(timeout=2)
+            return ExportJobResult(False, 0, 1, 1, 0.0, [])
+
+    def runner_factory(**_kwargs):
+        return BlockingRunner()
+
+    service = _allow_roots(
+        FlatShotBridgeService(
+            config_resolver=ConfigPathResolver(tmp_path / "config"),
+            export_runner_factory=runner_factory,
+            max_concurrent_exports=1,
+        ),
+        source,
+    )
+    payload = {
+        "imagePaths": [str(image)],
+        "settings": {"opacity": 0, "blur": 0, "noise": 0},
+        "export": {"format": "PNG", "size": "8x8", "destinationValue": "_OUT"},
+    }
+
+    first = service.start_export(payload)
+    assert started.wait(timeout=1)
+    with pytest.raises(BridgeError, match="exportación en curso"):
+        service.start_export(payload)
+
+    release.set()
+    assert _wait_for_export(service, first["jobId"])["status"] == "partial"
+
+
+def test_bridge_start_scan_enforces_active_scan_limit(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    started = threading.Event()
+    release = threading.Event()
+
+    class BlockingScanner:
+        def scan_folders(self, folders, image_overrides=None, cancellation_token=None, **_kwargs):
+            started.set()
+            while not release.is_set() and not cancellation_token.cancelled:
+                sleep(0.01)
+            return BatchScanResult(total_folders=1)
+
+    service = _allow_roots(
+        FlatShotBridgeService(
+            config_resolver=ConfigPathResolver(tmp_path / "config"),
+            folder_scanner=BlockingScanner(),
+            max_concurrent_scans=1,
+        ),
+        source,
+    )
+
+    first = service.start_scan_job({"folders": [str(source)]})
+    assert started.wait(timeout=1)
+    with pytest.raises(BridgeError, match="escaneo en curso"):
+        service.start_scan_job({"folders": [str(source)]})
+
+    release.set()
+    assert _wait_for_scan_job(service, first["jobId"])["status"] == "completed"
+
+
+def test_bridge_shutdown_cancels_and_joins_active_scan_jobs(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    started = threading.Event()
+
+    class BlockingScanner:
+        def scan_folders(self, folders, image_overrides=None, cancellation_token=None, **_kwargs):
+            started.set()
+            while not cancellation_token.cancelled:
+                sleep(0.01)
+            return BatchScanResult(total_folders=1)
+
+    service = _allow_roots(
+        FlatShotBridgeService(
+            config_resolver=ConfigPathResolver(tmp_path / "config"),
+            folder_scanner=BlockingScanner(),
+        ),
+        source,
+    )
+    first = service.start_scan_job({"folders": [str(source)]})
+    assert started.wait(timeout=1)
+
+    assert service.shutdown(timeout=1)
+    assert service.scan_job_status(first["jobId"])["status"] == "cancelled"
 
 
 def test_bridge_export_job_keeps_internal_event_lists_bounded(tmp_path):

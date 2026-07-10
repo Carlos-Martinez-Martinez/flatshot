@@ -229,6 +229,86 @@ def test_export_runner_cancellation_wakes_a_paused_pending_export(tmp_path):
     assert result_holder[0].processed == 0
 
 
+def test_export_runner_accounts_for_in_flight_outputs_after_cancellation(tmp_path):
+    files = []
+    for index in range(2):
+        path = tmp_path / f"source-{index}.png"
+        Image.new("RGBA", (8, 8), (120, 80, 40, 255)).save(path)
+        files.append(path)
+
+    started = threading.Event()
+    release = threading.Event()
+    started_count = 0
+    started_lock = threading.Lock()
+    cancellation = CancellationToken()
+
+    class ThreadExecutor:
+        def __init__(self, max_workers=1):
+            self.threads = []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            self.shutdown()
+
+        def submit(self, fn, arg):
+            from concurrent.futures import Future
+
+            future = Future()
+
+            def run():
+                try:
+                    future.set_result(fn(arg))
+                except Exception as exc:
+                    future.set_exception(exc)
+
+            thread = threading.Thread(target=run)
+            thread.start()
+            self.threads.append(thread)
+            return future
+
+        def shutdown(self, wait=True, cancel_futures=False):
+            if wait:
+                for thread in self.threads:
+                    thread.join(timeout=2)
+
+    def processor(args):
+        nonlocal started_count
+        _img_path, save_path, *_rest = args
+        with started_lock:
+            started_count += 1
+            started.set()
+        release.wait(timeout=2)
+        Path(save_path).write_bytes(b"rendered")
+        return True, Path(save_path).name, None
+
+    result_holder = []
+
+    def run_export():
+        result_holder.append(
+            ExportRunner(
+                executor_factory=ThreadExecutor,
+                image_processor=processor,
+                cancellation_token=cancellation,
+                max_workers=2,
+            ).run(_request_with_files(tmp_path, files))
+        )
+
+    thread = threading.Thread(target=run_export)
+    thread.start()
+    assert started.wait(timeout=1)
+    cancellation.cancel()
+    release.set()
+    thread.join(timeout=3)
+
+    assert not thread.is_alive()
+    result = result_holder[0]
+    assert result.success is False
+    assert result.processed == started_count == 2
+    assert result.total == 2
+
+
 def test_export_runner_exports_to_custom_destination(tmp_path):
     _source(tmp_path)
     custom_output = tmp_path / "custom-output"
@@ -498,7 +578,7 @@ def test_export_runner_cancel_during_cached_tasks(tmp_path):
     result = runner.run(_request(tmp_path))
 
     assert not result.success
-    assert result.processed == 0
+    assert result.processed == 1
     finished_events = [e for e in sink.events if isinstance(e, ExportFinishedEvent)]
     assert len(finished_events) == 1
     assert not finished_events[0].success

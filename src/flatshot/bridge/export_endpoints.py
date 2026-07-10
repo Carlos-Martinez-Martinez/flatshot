@@ -59,18 +59,6 @@ def start_export(service, payload: Mapping[str, Any]) -> dict[str, Any]:
     )
     job_id = uuid4().hex
 
-    with service._jobs_lock:
-        service._prune_finished_jobs_locked(reserve_slots=1)
-        active_count = sum(
-            1 for job in service._jobs.values() if job.status in {"queued", "running", "paused", "cancelling"}
-        )
-        if active_count >= service.max_concurrent_exports:
-            raise BridgeError(
-                "export_busy",
-                "Ya hay una exportación en curso. Espera a que termine o cancélala.",
-                status=409,
-            )
-
     job = BridgeExportJob(
         job_id=job_id,
         requests=requests,
@@ -81,6 +69,17 @@ def start_export(service, payload: Mapping[str, Any]) -> dict[str, Any]:
         manifest_writer=service.export_job_repository.write_manifest,
     )
     with service._jobs_lock:
+        service._prune_finished_jobs_locked(reserve_slots=1)
+        active_count = sum(
+            1 for active_job in service._jobs.values()
+            if active_job.status in {"queued", "running", "paused", "cancelling"}
+        )
+        if active_count >= service.max_concurrent_exports:
+            raise BridgeError(
+                "export_busy",
+                "Ya hay una exportación en curso. Espera a que termine o cancélala.",
+                status=409,
+            )
         service._jobs[job_id] = job
     job.start()
     return job.snapshot()

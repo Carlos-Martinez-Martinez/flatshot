@@ -48,6 +48,22 @@ def test_build_portable_sync_stamp_separates_runtime_and_dependencies(tmp_path):
     assert stamp["python_version"].startswith(str(build_portable.sys.version_info.major))
 
 
+def test_release_portable_does_not_embed_development_source_pointer(tmp_path):
+    target = tmp_path / "FlatShotPortable"
+
+    build_portable.build_portable(
+        PROJECT_ROOT,
+        target,
+        install_dependencies=False,
+        development=False,
+    )
+
+    assert not (target / "source_path.txt").exists()
+    stamp = json.loads((target / ".autosync.json").read_text(encoding="utf-8"))
+    assert stamp["source_root"] is None
+    assert stamp["portable_mode"] == "release"
+
+
 def test_source_manifest_tracks_backend_and_frontend_files():
     files = {path.relative_to(PROJECT_ROOT).as_posix() for path in build_portable.iter_source_files(PROJECT_ROOT)}
 

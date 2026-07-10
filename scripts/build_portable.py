@@ -39,28 +39,50 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--target", type=Path, default=DEFAULT_TARGET)
     parser.add_argument("--skip-venv", action="store_true", help="No crea ni actualiza el venv portable.")
+    parser.add_argument(
+        "--release",
+        action="store_true",
+        help="Construye un portable autocontenido sin puntero al repositorio de desarrollo.",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     target = args.target.expanduser().resolve()
-    build_portable(PROJECT_ROOT, target, install_dependencies=not args.skip_venv)
+    build_portable(
+        PROJECT_ROOT,
+        target,
+        install_dependencies=not args.skip_venv,
+        development=not args.release,
+    )
     print(f"Portable listo: {target}")
     print(f"Launcher: {target / 'Abrir FlatShot.vbs'}")
     return 0
 
 
-def build_portable(source_root: Path, target: Path, *, install_dependencies: bool = True) -> None:
+def build_portable(
+    source_root: Path,
+    target: Path,
+    *,
+    install_dependencies: bool = True,
+    development: bool = True,
+) -> None:
     validate_source_root(source_root)
     target.mkdir(parents=True, exist_ok=True)
     (target / "data").mkdir(exist_ok=True)
     (target / "portable.flag").write_text("portable\n", encoding="utf-8")
-    (target / "source_path.txt").write_text(str(source_root), encoding="utf-8")
+    source_pointer = target / "source_path.txt"
+    if development:
+        source_pointer.write_text(str(source_root), encoding="utf-8")
+        (target / "release.flag").unlink(missing_ok=True)
+    else:
+        source_pointer.unlink(missing_ok=True)
+        (target / "release.flag").write_text("release\n", encoding="utf-8")
 
     sync_portable_app(source_root, target)
     copy_launcher_files(target)
-    write_sync_stamp(source_root, target)
+    write_sync_stamp(source_root, target, development=development)
 
     if install_dependencies:
         ensure_portable_venv(source_root, target / "venv")
@@ -121,11 +143,12 @@ def run_command(command: list[str], cwd: Path, *, timeout: int) -> None:
         raise RuntimeError(f"Comando fallido ({' '.join(command)}):\n{output}")
 
 
-def write_sync_stamp(source_root: Path, target: Path) -> None:
+def write_sync_stamp(source_root: Path, target: Path, *, development: bool = True) -> None:
     (target / ".autosync.json").write_text(
         json.dumps(
             {
-                "source_root": str(source_root),
+                "source_root": str(source_root) if development else None,
+                "portable_mode": "development" if development else "release",
                 "manifest_hash": source_manifest_hash(source_root),
                 "runtime_hash": runtime_manifest_hash(source_root),
                 "dependency_hash": dependency_manifest_hash(source_root),

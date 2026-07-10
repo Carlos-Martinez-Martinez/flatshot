@@ -56,7 +56,10 @@ def export_cached_tasks(runner, cached_tasks, cache: RenderCache, completed_coun
                 runner.copy_file(cache_path, temporary_path)
                 commit_output_file(temporary_path, save_path)
             finally:
-                temporary_path.unlink(missing_ok=True)
+                try:
+                    temporary_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
 
             completed_count += 1
             runner._emit(ExportImageCompletedEvent(cached.display_name, True, cached.source_path, save_path))

@@ -10,6 +10,7 @@ function selectImage(imageId, options = {}) {
     state.selectedImageIds = [image.id];
     state.selectionAnchorImageId = image.id;
   }
+  state.localAdjustmentDraft = null;
   state.localOverride = hasImageAdjustmentOverride(image);
   state.fitZoom = 100;
   resetViewerPan();
@@ -79,6 +80,7 @@ function clearPreviewSelection() {
   state.selectedImageIds = [];
   state.selectionAnchorImageId = null;
   state.localOverride = false;
+  state.localAdjustmentDraft = null;
   Object.assign(state, previewStateHelpers.previewEmptyState());
   state.fitZoom = 100;
   resetViewerPan();

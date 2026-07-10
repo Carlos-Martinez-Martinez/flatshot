@@ -109,6 +109,7 @@ const state = {
   presetDirty: Boolean(initialStartupAdjustment),
   presetSource: initialStartupAdjustment ? "Preferencias" : "Global",
   localOverride: false,
+  localAdjustmentDraft: null,
   exportStatus: "blocked",
   exportJobId: null,
   exportDestinations: [],

@@ -33,12 +33,32 @@ function hasImageAdjustmentOverride(image) {
   return hasCurrentImageOverride(image) || image?.status === "adjusted";
 }
 
+function beginLocalAdjustmentDraft(image = selectedImage()) {
+  const key = imageOverrideKey(image);
+  if (!key) {
+    return null;
+  }
+  if (state.localAdjustmentDraft?.imageKey === key) {
+    return state.localAdjustmentDraft;
+  }
+  state.localAdjustmentDraft = {
+    imageKey: key,
+    override: normalizeLocalOverride(currentImageOverride(image)),
+  };
+  return state.localAdjustmentDraft;
+}
+
+function clearLocalAdjustmentDraft() {
+  state.localAdjustmentDraft = null;
+}
+
 function imageAdjustmentOverrideCount(images = activeImages()) {
   return images.filter(hasImageAdjustmentOverride).length;
 }
 
 function resetAllImageOverrides() {
   const before = adjustmentSnapshot();
+  clearLocalAdjustmentDraft();
   state.imageOverrides = {};
   state.realImages = state.realImages.map((image) =>
     image.status === "adjusted" ? { ...image, status: "ready" } : image
@@ -55,6 +75,7 @@ function setCurrentImageOverrideValue(key, value) {
   if (!image || !overrideKey || !localOverrideKeys.includes(key)) {
     return;
   }
+  beginLocalAdjustmentDraft(image);
   const next = {
     ...currentImageOverride(image),
     [key]: clampLocalOverrideValue(key, value),
@@ -76,11 +97,30 @@ function resetCurrentImageOverride() {
     return;
   }
   const before = adjustmentSnapshot();
+  clearLocalAdjustmentDraft();
   delete state.imageOverrides[key];
   state.localOverride = false;
   state.statusText = "Ajuste de imagen restablecido";
   refreshPreviewAfterSettingChange();
   recordAdjustmentChange(before, "Restablecer imagen");
+}
+
+function cancelLocalAdjustment() {
+  const draft = state.localAdjustmentDraft;
+  if (draft?.imageKey) {
+    const restored = normalizeLocalOverride(draft.override);
+    if (Object.keys(restored).length) {
+      state.imageOverrides[draft.imageKey] = restored;
+    } else {
+      delete state.imageOverrides[draft.imageKey];
+    }
+  }
+  const image = selectedImage();
+  clearLocalAdjustmentDraft();
+  state.presetEditorOpen = false;
+  state.localOverride = hasImageAdjustmentOverride(image);
+  state.statusText = "Ajuste de imagen cancelado";
+  refreshPreviewAfterSettingChange();
 }
 
 function settingsWithLocalOverride(settings = state.settings, override = currentImageOverride()) {
@@ -104,6 +144,7 @@ function applyLocalAdjustmentOnly() {
   if (!image) {
     return;
   }
+  clearLocalAdjustmentDraft();
   state.presetEditorOpen = false;
   state.localOverride = hasImageAdjustmentOverride(image);
   state.statusText = state.localOverride ? "Ajuste aplicado sólo a esta imagen" : "La imagen usa el ajuste del lote";

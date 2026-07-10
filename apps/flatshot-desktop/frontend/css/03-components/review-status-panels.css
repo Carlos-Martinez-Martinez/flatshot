@@ -70,6 +70,18 @@
   font-size: var(--font-size-sm);
 }
 
+@media (max-width: 720px) {
+  .result-actions {
+    align-items: stretch;
+  }
+
+  .result-actions > button,
+  .result-actions > span {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+}
+
 .result-header__copy {
   min-width: 0;
   display: grid;

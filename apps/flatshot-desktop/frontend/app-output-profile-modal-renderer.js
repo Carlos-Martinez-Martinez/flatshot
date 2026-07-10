@@ -209,6 +209,7 @@ function renderAppSettings() {
   if (profileCount) {
     profileCount.textContent = `${enabledOutputProfiles().length} activos`;
   }
+  setOutputProfileFormValues(draft);
   const draftDirty = outputProfileHasUnsavedChanges();
   $("#output-profile-list").innerHTML = rows.map((profile) => {
     const selected = profile.id === draft?.id;
@@ -225,6 +226,5 @@ function renderAppSettings() {
       unsaved,
     });
   }).join("");
-  setOutputProfileFormValues(draft);
   renderOutputProfileModalState();
 }

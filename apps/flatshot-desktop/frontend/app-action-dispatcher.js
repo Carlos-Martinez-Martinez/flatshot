@@ -151,6 +151,7 @@ const actionDispatcher = actionHandlerHelpers.createActionDispatcher({
   "remove-guide-rule": (target) => removeGuideRule(target),
   "reset-settings": () => resetActivePresetSettings(),
   "cancel-adjustment-edit": () => cancelAdjustmentEdit(),
+  "cancel-local-adjustment": () => cancelLocalAdjustment(),
   "apply-global-adjustment": () => applyGlobalAdjustmentWithoutSaving(),
   "save-preset": () => { void saveCurrentPreset(); },
   "save-preset-as-new": () => saveCurrentPresetAsNew(),

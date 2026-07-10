@@ -47,6 +47,7 @@ class FlatShotBridgeService:
         max_concurrent_exports: int = 1,
         max_concurrent_scans: int = 1,
         max_retained_jobs: int = 20,
+        max_retained_manifests: int = 100,
         path_policy: TrustedPathPolicy | None = None,
         thumbnail_cache: ThumbnailCache | None = None,
         image_registry: BridgeImageRegistry | None = None,
@@ -67,7 +68,8 @@ class FlatShotBridgeService:
         self.thumbnail_cache = thumbnail_cache
         self.image_registry = image_registry or BridgeImageRegistry()
         self.export_job_repository = export_job_repository or ExportJobRepository(
-            self.config_resolver.config_dir(create=False) / "export-manifests"
+            self.config_resolver.config_dir(create=False) / "export-manifests",
+            max_retained_manifests=max_retained_manifests,
         )
         self._jobs: dict[str, BridgeExportJob] = {}
         self._export_idempotency: dict[str, str] = {}

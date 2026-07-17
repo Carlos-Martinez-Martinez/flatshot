@@ -4,6 +4,7 @@ function renderSettings() {
   if (settingsPanel) {
     settingsPanel.dataset.shadowEngine = state.settings.shadow_engine || "";
   }
+  FlatShotShadowControls.applyControlVisibility(document, state.settings.shadow_engine);
   const activePreset = $("#active-preset");
   if (activePreset) {
     activePreset.textContent = state.activePreset;

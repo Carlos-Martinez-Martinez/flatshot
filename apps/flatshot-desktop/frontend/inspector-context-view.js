@@ -78,7 +78,9 @@
           ? "close-preset-editor"
           : "close-inspector-subview",
       backLabel: options.outputEditMode ? "Cancelar" : "Volver",
-      showManageAction: mode === "advanced" && !isPresetManager,
+      // La gestión se abre desde la tarjeta de lote; el subpanel de edición
+      // mantiene una sola acción clara y no repite ese acceso.
+      showManageAction: false,
     };
   }
 

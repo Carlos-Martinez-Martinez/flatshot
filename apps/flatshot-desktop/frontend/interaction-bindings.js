@@ -13,6 +13,16 @@
     return { ...handlers };
   }
 
+  function bindValueControl(input, handler) {
+    if (!input || typeof handler !== "function") {
+      return;
+    }
+    if (input.type === "range") {
+      input.addEventListener("input", handler);
+    }
+    input.addEventListener("change", handler);
+  }
+
   function wireFlatShotInteractions(deps = {}) {
     const documentRef = deps.document || (typeof document !== "undefined" ? document : null);
     const windowRef = deps.window || (typeof window !== "undefined" ? window : null);
@@ -56,15 +66,12 @@
     optionalElement($, "#naming-input")?.addEventListener("input", handlers.namingInput);
 
     $$("[data-setting]").forEach((input) => {
-      input.addEventListener("input", handlers.settingInput);
-      input.addEventListener("change", handlers.settingInput);
+      bindValueControl(input, handlers.settingInput);
     });
     $$("[data-lighting-field]").forEach((input) => {
-      input.addEventListener("input", handlers.lightingFieldInput);
-      input.addEventListener("change", handlers.lightingFieldInput);
+      bindValueControl(input, handlers.lightingFieldInput);
     });
     $$("[data-lighting-number-field]").forEach((input) => {
-      input.addEventListener("input", handlers.lightingNumberFieldInput);
       input.addEventListener("change", handlers.lightingNumberFieldInput);
     });
     $$("[data-lighting-preset]").forEach((button) => {
@@ -122,6 +129,28 @@
       finishLightingDrag(event);
     });
     lightingStage.addEventListener("pointercancel", finishLightingDrag);
+    lightingStage.addEventListener("keydown", (event) => {
+      const deltas = {
+        ArrowLeft: [-1, 0],
+        ArrowRight: [1, 0],
+        ArrowUp: [0, -1],
+        ArrowDown: [0, 1],
+      };
+      const delta = deltas[event.key];
+      if (!delta) {
+        return;
+      }
+      event.preventDefault();
+      const step = event.shiftKey ? 0.1 : 0.05;
+      const changed = handlers.nudgeLightingScenePosition?.(
+        delta[0] * step,
+        delta[1] * step,
+        { deferRender: true },
+      );
+      if (changed) {
+        handlers.refreshPreviewAfterSettingChange?.();
+      }
+    });
   }
 
   function wireViewerCanvas(canvas, documentRef, handlers) {
@@ -137,6 +166,7 @@
   }
 
   return {
+    bindValueControl,
     createFlatShotInteractionHandlers,
     wireFlatShotInteractions,
   };

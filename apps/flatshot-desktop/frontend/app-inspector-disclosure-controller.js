@@ -13,7 +13,7 @@ function inspectorDisclosureBody(details) {
 }
 
 function inspectorDisclosurePreferenceKey(details) {
-  const knownKeys = ["preset-section", "appearance-section", "advanced-block", "local-adjustment"];
+  const knownKeys = ["preset-section", "appearance-section", "composition-section", "advanced-block", "local-adjustment"];
   return knownKeys.find((key) => details?.classList?.contains(key)) || "";
 }
 

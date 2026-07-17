@@ -106,6 +106,8 @@
 
 .lighting-stage-fields { display: grid; gap: var(--space-2); min-width: 0; }
 
+.lighting-stage-fields > small { color: var(--color-text-muted); font-size: var(--font-size-xs); line-height: var(--line-height-compact); }
+
 .lighting-stage-fields .control-row { grid-template-columns: minmax(62px, 0.64fr) minmax(0, 1fr) 72px; }
 
 .lighting-slider-stack, .advanced-technical-panel { display: grid; gap: var(--space-2); min-width: 0; }
@@ -123,9 +125,7 @@
 
 .settings-panel details.inspector-disclosure[data-inspector-section="advanced"]:not([open]) { min-height: 54px; overflow: hidden; }
 
-.settings-panel[data-shadow-engine="studio_2_5d"] [data-engine-row="direction"] { display: none; }
-
-.settings-panel .preset-section, .settings-panel .appearance-section, .settings-panel .advanced-block, .settings-panel .local-adjustment {
+.settings-panel .preset-section, .settings-panel .appearance-section, .settings-panel .composition-section, .settings-panel .advanced-block, .settings-panel .local-adjustment {
   margin: 0;
 }
 
@@ -134,7 +134,7 @@
   padding-top: var(--space-3);
 }
 
-.preset-section, .appearance-section, .advanced-block, .local-adjustment {
+.preset-section, .appearance-section, .composition-section, .advanced-block, .local-adjustment {
   border-radius: var(--radius-sm);
 }
 
@@ -246,7 +246,7 @@
   display: none;
 }
 
-.preset-section > summary .summary-copy, .appearance-section > summary .summary-copy, .advanced-block > summary .summary-copy, .local-adjustment > summary .summary-copy {
+.preset-section > summary .summary-copy, .appearance-section > summary .summary-copy, .composition-section > summary .summary-copy, .advanced-block > summary .summary-copy, .local-adjustment > summary .summary-copy {
   gap: var(--space-0-5);
 }
 

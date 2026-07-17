@@ -47,15 +47,15 @@ def test_adjustment_editor_actions_use_explicit_scope_labels():
     assert 'data-action="save-preset-as-new"' in html
     assert "Guardar como nuevo" in html
     assert 'data-action="apply-local-adjustment"' in html
-    assert "Aplicar a esta imagen" in html
+    assert "Guardar excepción" in html
     assert 'data-action="save-local-adjustment-as-new"' in html
-    assert "Guardar nuevo" in html
-    assert "Restablecer lote" in html
+    assert "Guardar excepción como ajuste" in html
+    assert "Usar ajuste del lote" in html
 
 
 def test_main_controls_offer_subtle_default_reset():
     html = INDEX_PATH.read_text(encoding="utf-8")
-    main_controls_index = html.index("<strong>Controles principales</strong>")
+    main_controls_index = html.index("<strong>Sombra</strong>")
     section_start = html.rindex(
         '<details class="settings-section inspector-disclosure appearance-section"',
         0,
@@ -86,10 +86,10 @@ def test_studio_lighting_panel_is_available_in_advanced_settings():
     assert 'class="lighting-editor-grid"' in html
     assert 'class="lighting-slider-stack"' in html
     assert 'class="advanced-technical-panel"' in html
-    assert "Altura luz" in html
-    assert "Tamaño luz" in html
-    assert "Potencia" in html
-    assert "Escala imagen" in html
+    assert "Altura de la luz" in html
+    assert "Tamaño de fuente" in html
+    assert "Potencia de luz" in html
+    assert "Tamaño del producto" in html
     assert html.index('id="lighting-stage"') < html.index('data-lighting-field="main.type"')
     assert html.index('class="lighting-slider-stack"') < html.index('data-lighting-field="main.height"')
     assert html.index('data-setting="shadow_engine"') < html.index('data-setting="spread"')
@@ -138,10 +138,7 @@ def test_studio_lighting_panel_css_keeps_active_preset_filled_and_unclipped():
         '.settings-panel details.inspector-disclosure[data-inspector-section="advanced"]:not([open]) '
         "{ min-height: 54px; overflow: hidden; }"
     ) in css
-    assert (
-        '.settings-panel[data-shadow-engine="studio_2_5d"] '
-        '[data-engine-row="direction"] { display: none; }'
-    ) in css
+    assert "[data-control-key]" in (FRONTEND_DIR / "shadow-control-schema.js").read_text(encoding="utf-8")
 
 
 def test_studio_lighting_stage_dark_theme_keeps_lines_visible():
@@ -174,7 +171,7 @@ def test_studio_lighting_preset_selection_state_is_explicit():
     assert "settingsPanel.dataset.shadowEngine = state.settings.shadow_engine" in js
     assert 'panel.classList.toggle("is-advanced-subview", mode === "advanced");' in js
     assert "visibleAdvancedSettingKeys(state.settings)" in js
-    assert 'advancedSettingKeys.filter((key) => key !== "angle")' in js
+    assert "visibleKeysForEngine(settings.shadow_engine)" in js
     assert 'data-lighting-number-field' in js
 
 
@@ -212,8 +209,8 @@ assert.equal(helpers.presetSourceLabel({{ bridgePresetWarning: "", presetDirty: 
 assert.equal(helpers.presetSourceLabel({{ bridgePresetWarning: "", presetDirty: true }}), "Global · Modificado");
 assert.equal(helpers.presetSourceLabel({{ bridgePresetWarning: "Aviso", presetDirty: false }}), "Global · aviso");
 assert.equal(helpers.presetSourceLabel({{ bridgePresetWarning: "Aviso", presetDirty: true }}), "Global · Modificado · aviso");
-assert.equal(helpers.localAdjustmentText(true), "Personalizado");
-assert.equal(helpers.localAdjustmentText(false), "Igual que el lote");
+assert.equal(helpers.localAdjustmentText(true), "Con excepción");
+assert.equal(helpers.localAdjustmentText(false), "Usa el ajuste del lote");
 assert.equal(helpers.localSettingOutputText(3), "+3");
 assert.equal(helpers.localSettingOutputText(0), "0");
 assert.equal(helpers.localSettingOutputText(-2), "-2");
@@ -248,9 +245,9 @@ assert.deepEqual(helpers.deletePresetButtonState(2), {{
   disabled: false,
   title: "Eliminar el ajuste activo",
 }});
-assert.equal(helpers.advancedSummaryTitle(0), "Avanzado");
-assert.equal(helpers.advancedSummaryTitle(1), "Avanzado · 1 cambio");
-assert.equal(helpers.advancedSummaryTitle(3), "Avanzado · 3 cambios");
+assert.equal(helpers.advancedSummaryTitle(0), "Calibración del motor");
+assert.equal(helpers.advancedSummaryTitle(1), "Calibración del motor · 1 cambio");
+assert.equal(helpers.advancedSummaryTitle(3), "Calibración del motor · 3 cambios");
 assert.equal(helpers.advancedDirtyCount({{
   presetDirty: false,
   keys: ["spread"],

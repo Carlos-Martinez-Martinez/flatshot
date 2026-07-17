@@ -465,31 +465,54 @@
           <details class="settings-section inspector-disclosure appearance-section" data-inspector-section="advanced">
             <summary>
               <span class="summary-copy">
-                <strong>Controles principales</strong>
-                <small>Ajuste global</small>
+                <strong>Sombra</strong>
+                <small>Ajustes básicos</small>
               </span>
             </summary>
             <button type="button" class="appearance-section__reset ghost-action" id="reset-settings-inline" data-action="reset-settings" aria-label="Restaurar valores por defecto" title="Restaurar valores por defecto">Por defecto</button>
             <div class="inspector-disclosure__body control-stack">
-              <label class="control-row">
-                <span>Opacidad</span>
+              <label class="control-row" data-control-key="opacity">
+                <span data-control-label-key="opacity">Intensidad</span>
                 <input id="opacity-input" type="range" min="0" max="100" value="20" data-setting="opacity" />
-                <input id="opacity-number" class="number-input setting-number" type="number" min="0" max="100" step="1" value="20" data-setting-number="opacity" aria-label="Opacidad" />
+                <input id="opacity-number" class="number-input setting-number" type="number" min="0" max="100" step="1" value="20" data-setting-number="opacity" aria-label="Intensidad" />
               </label>
-              <label class="control-row">
-                <span>Desenfoque</span>
+              <label class="control-row" data-control-key="blur">
+                <span data-control-label-key="blur">Suavidad</span>
                 <input id="blur-input" type="range" min="0" max="80" value="30" data-setting="blur" />
-                <input id="blur-number" class="number-input setting-number" type="number" min="0" max="80" step="1" value="30" data-setting-number="blur" aria-label="Desenfoque" />
+                <input id="blur-number" class="number-input setting-number" type="number" min="0" max="80" step="1" value="30" data-setting-number="blur" aria-label="Suavidad" />
               </label>
-              <label class="control-row">
-                <span>Distancia</span>
+              <label class="control-row" data-control-key="distance">
+                <span data-control-label-key="distance">Separación</span>
                 <input id="distance-input" type="range" min="0" max="80" value="25" data-setting="distance" />
-                <input id="distance-number" class="number-input setting-number" type="number" min="0" max="80" step="1" value="25" data-setting-number="distance" aria-label="Distancia" />
+                <input id="distance-number" class="number-input setting-number" type="number" min="0" max="80" step="1" value="25" data-setting-number="distance" aria-label="Separación" />
               </label>
-              <label class="control-row">
-                <span>Padding</span>
+            </div>
+          </details>
+
+          <details class="settings-section inspector-disclosure composition-section" data-inspector-section="advanced">
+            <summary>
+              <span class="summary-copy">
+                <strong>Producto y lienzo</strong>
+                <small>Tamaño, margen y encaje</small>
+              </span>
+            </summary>
+            <div class="inspector-disclosure__body control-stack">
+              <label class="control-row" data-control-key="scale_adjustment">
+                <span data-control-label-key="scale_adjustment">Tamaño del producto</span>
+                <input type="range" min="-30" max="30" value="0" data-setting="scale_adjustment" />
+                <input class="number-input setting-number" type="number" min="-30" max="30" step="1" value="0" data-setting-number="scale_adjustment" aria-label="Tamaño del producto" />
+              </label>
+              <label class="control-row" data-control-key="padding">
+                <span data-control-label-key="padding">Margen del producto</span>
                 <input id="padding-input" type="range" min="0" max="30" value="10" data-setting="padding" />
-                <input id="padding-number" class="number-input setting-number" type="number" min="0" max="30" step="1" value="10" data-setting-number="padding" aria-label="Padding" />
+                <input id="padding-number" class="number-input setting-number" type="number" min="0" max="30" step="1" value="10" data-setting-number="padding" aria-label="Margen del producto" />
+              </label>
+              <label class="control-row control-row--toggle" data-control-key="adaptive_zoom">
+                <span data-control-label-key="adaptive_zoom">Ajuste automático del producto</span>
+                <span class="toggle-field">
+                  <input type="checkbox" data-setting="adaptive_zoom" checked />
+                  <em>Activo</em>
+                </span>
               </label>
             </div>
           </details>
@@ -497,13 +520,13 @@
           <details class="settings-section inspector-disclosure advanced-block" id="advanced-settings" data-inspector-section="advanced">
             <summary>
               <span class="summary-copy">
-                <strong>Avanzado</strong>
-                <small>Parámetros técnicos</small>
+                <strong>Calibración del motor</strong>
+                <small>Controles que dependen del modo</small>
               </span>
             </summary>
             <div class="inspector-disclosure__body control-stack advanced-controls">
-                <label class="control-row control-row--select">
-                  <span>Motor</span>
+                <label class="control-row control-row--select" data-control-key="shadow_engine">
+                  <span data-control-label-key="shadow_engine">Modo de sombra</span>
                   <select data-setting="shadow_engine">
                     <option value="realistic_v2">Realista V2</option>
                     <option value="studio_2_5d">Estudio 2.5D</option>
@@ -518,7 +541,7 @@
                     <button type="button" data-lighting-preset="mild_drama">Drama leve</button>
                   </div>
                   <div class="lighting-editor-grid">
-                    <button type="button" class="lighting-stage" id="lighting-stage" data-lighting-stage aria-label="Posición de la luz">
+                    <button type="button" class="lighting-stage" id="lighting-stage" data-lighting-stage aria-label="Posición de la luz" aria-describedby="lighting-stage-help">
                       <span class="lighting-stage__cross lighting-stage__cross--x"></span>
                       <span class="lighting-stage__cross lighting-stage__cross--y"></span>
                       <span class="lighting-stage__product"></span>
@@ -526,80 +549,69 @@
                     </button>
                     <div class="lighting-stage-fields">
                       <label class="control-row control-row--select">
-                        <span>Tipo</span>
+                        <span>Tipo de luz</span>
                         <select data-lighting-field="main.type">
-                          <option value="softbox">Softbox</option>
-                          <option value="spot">Spot</option>
-                          <option value="strip">Strip</option>
+                          <option value="softbox">Caja suave</option>
+                          <option value="spot">Foco</option>
+                          <option value="strip">Tira</option>
                         </select>
                       </label>
+                      <small id="lighting-stage-help">Usa las flechas para mover la luz; Mayús ajusta más deprisa.</small>
                     </div>
                   </div>
                   <div class="lighting-slider-stack">
                     <label class="control-row">
-                      <span>Altura luz</span>
+                      <span>Altura de la luz</span>
                       <input type="range" min="0" max="100" value="65" data-lighting-field="main.height" />
-                      <input id="lighting-height-output" class="number-input lighting-number" type="number" min="0" max="100" step="1" value="65" data-lighting-number-field="main.height" aria-label="Altura luz" />
+                      <input id="lighting-height-output" class="number-input lighting-number" type="number" min="0" max="100" step="1" value="65" data-lighting-number-field="main.height" aria-label="Altura de la luz" />
                     </label>
                     <label class="control-row">
-                      <span>Tamaño luz</span>
+                      <span>Tamaño de fuente</span>
                       <input type="range" min="0" max="100" value="55" data-lighting-field="main.size" />
-                      <input id="lighting-size-output" class="number-input lighting-number" type="number" min="0" max="100" step="1" value="55" data-lighting-number-field="main.size" aria-label="Tamaño luz" />
+                      <input id="lighting-size-output" class="number-input lighting-number" type="number" min="0" max="100" step="1" value="55" data-lighting-number-field="main.size" aria-label="Tamaño de fuente" />
                     </label>
                     <label class="control-row">
-                      <span>Potencia</span>
+                      <span>Potencia de luz</span>
                       <input type="range" min="0" max="150" value="85" data-lighting-field="main.intensity" />
-                      <input id="lighting-intensity-output" class="number-input lighting-number" type="number" min="0" max="150" step="1" value="85" data-lighting-number-field="main.intensity" aria-label="Potencia" />
+                      <input id="lighting-intensity-output" class="number-input lighting-number" type="number" min="0" max="150" step="1" value="85" data-lighting-number-field="main.intensity" aria-label="Potencia de luz" />
                     </label>
                     <label class="control-row">
-                      <span>Ambiente</span>
+                      <span>Luz ambiente</span>
                       <input type="range" min="0" max="100" value="25" data-lighting-field="ambient_intensity" />
-                      <input id="lighting-ambient-output" class="number-input lighting-number" type="number" min="0" max="100" step="1" value="25" data-lighting-number-field="ambient_intensity" aria-label="Ambiente" />
+                      <input id="lighting-ambient-output" class="number-input lighting-number" type="number" min="0" max="100" step="1" value="25" data-lighting-number-field="ambient_intensity" aria-label="Luz ambiente" />
                     </label>
                   </div>
                 </div>
                 <div class="advanced-technical-panel">
-                  <label class="control-row">
-                    <span>Spread</span>
+                  <label class="control-row" data-control-key="spread">
+                    <span data-control-label-key="spread">Difusión extra</span>
                     <input type="range" min="0" max="20" value="0" data-setting="spread" />
-                    <input class="number-input setting-number" type="number" min="0" max="20" step="1" value="0" data-setting-number="spread" aria-label="Spread" />
+                    <input class="number-input setting-number" type="number" min="0" max="20" step="1" value="0" data-setting-number="spread" aria-label="Difusión extra" />
                   </label>
-                  <label class="control-row">
-                    <span>Ruido</span>
+                  <label class="control-row" data-control-key="noise">
+                    <span data-control-label-key="noise">Grano de sombra</span>
                     <input type="range" min="0" max="20" value="2" data-setting="noise" />
-                    <input class="number-input setting-number" type="number" min="0" max="20" step="1" value="2" data-setting-number="noise" aria-label="Ruido" />
+                    <input class="number-input setting-number" type="number" min="0" max="20" step="1" value="2" data-setting-number="noise" aria-label="Grano de sombra" />
                   </label>
-                  <label class="control-row">
-                    <span>Contacto</span>
+                  <label class="control-row" data-control-key="contact_blur">
+                    <span data-control-label-key="contact_blur">Suavidad de contacto</span>
                     <input type="range" min="0" max="40" value="10" data-setting="contact_blur" />
-                    <input class="number-input setting-number" type="number" min="0" max="40" step="1" value="10" data-setting-number="contact_blur" aria-label="Contacto" />
+                    <input class="number-input setting-number" type="number" min="0" max="40" step="1" value="10" data-setting-number="contact_blur" aria-label="Suavidad de contacto" />
                   </label>
-                  <label class="control-row">
-                    <span>Escala imagen</span>
-                    <input type="range" min="-30" max="30" value="0" data-setting="scale_adjustment" />
-                    <input class="number-input setting-number" type="number" min="-30" max="30" step="1" value="0" data-setting-number="scale_adjustment" aria-label="Escala imagen" />
-                  </label>
-                  <label class="control-row">
-                    <span>Fusión</span>
+                  <label class="control-row" data-control-key="fusion">
+                    <span data-control-label-key="fusion">Protección interior</span>
                     <input type="range" min="0" max="20" value="1" data-setting="fusion" />
-                    <input class="number-input setting-number" type="number" min="0" max="20" step="1" value="1" data-setting-number="fusion" aria-label="Fusión" />
+                    <input class="number-input setting-number" type="number" min="0" max="20" step="1" value="1" data-setting-number="fusion" aria-label="Protección interior" />
                   </label>
-                  <label class="control-row" data-engine-row="direction">
-                    <span>Ángulo</span>
+                  <label class="control-row" data-engine-row="direction" data-control-key="angle">
+                    <span data-control-label-key="angle">Dirección de la sombra</span>
                     <input type="range" min="0" max="360" value="180" data-setting="angle" />
-                    <input class="number-input setting-number" type="number" min="0" max="360" step="1" value="180" data-setting-number="angle" aria-label="Ángulo" />
+                    <input class="number-input setting-number" type="number" min="0" max="360" step="1" value="180" data-setting-number="angle" aria-label="Dirección de la sombra" />
                   </label>
-                  <label class="control-row">
-                    <span>Contracción</span>
+                  <label class="control-row" data-control-key="contraction">
+                    <span data-control-label-key="contraction">Reducir halo del borde</span>
                     <input type="range" min="0" max="80" value="0" data-setting="contraction" />
-                    <input class="number-input setting-number" type="number" min="0" max="80" step="1" value="0" data-setting-number="contraction" aria-label="Contracción" />
-                  </label>
-                  <label class="control-row control-row--toggle">
-                    <span>Zoom auto</span>
-                    <span class="toggle-field">
-                      <input type="checkbox" data-setting="adaptive_zoom" checked />
-                      <em>Activo</em>
-                    </span>
+                    <input class="number-input setting-number" type="number" min="0" max="80" step="1" value="0" data-setting-number="contraction" aria-label="Reducir halo del borde" />
                   </label>
                 </div>
               </div>
@@ -608,31 +620,31 @@
           <details class="settings-section inspector-disclosure local-adjustment" id="local-adjustment" data-inspector-section="advanced">
             <summary>
               <span class="summary-copy">
-                <strong>Ajuste por imagen</strong>
-                <small id="local-adjustment-text">Igual que el lote</small>
+                <strong>Excepción de esta imagen</strong>
+                <small id="local-adjustment-text">Usa el ajuste del lote</small>
               </span>
             </summary>
             <div class="inspector-disclosure__body local-adjustment__body">
               <label class="local-control-row">
-                <span>Tamaño</span>
+                <span>Tamaño respecto al lote</span>
                 <input type="range" min="-30" max="30" value="0" data-local-setting="size_delta" />
-                <input class="number-input local-setting-number" type="number" min="-30" max="30" step="1" value="0" data-local-setting-number="size_delta" aria-label="Tamaño por imagen" />
+                <input class="number-input local-setting-number" type="number" min="-30" max="30" step="1" value="0" data-local-setting-number="size_delta" aria-label="Tamaño respecto al lote" />
               </label>
               <label class="local-control-row">
-                <span>Sombra</span>
+                <span>Intensidad respecto al lote</span>
                 <input type="range" min="-40" max="40" value="0" data-local-setting="shadow_delta" />
-                <input class="number-input local-setting-number" type="number" min="-40" max="40" step="1" value="0" data-local-setting-number="shadow_delta" aria-label="Sombra por imagen" />
+                <input class="number-input local-setting-number" type="number" min="-40" max="40" step="1" value="0" data-local-setting-number="shadow_delta" aria-label="Intensidad respecto al lote" />
               </label>
               <label class="local-control-row">
-                  <span>Desenfoque</span>
+                  <span>Suavidad respecto al lote</span>
                 <input type="range" min="-40" max="40" value="0" data-local-setting="blur_delta" />
-                <input class="number-input local-setting-number" type="number" min="-40" max="40" step="1" value="0" data-local-setting-number="blur_delta" aria-label="Desenfoque por imagen" />
+                <input class="number-input local-setting-number" type="number" min="-40" max="40" step="1" value="0" data-local-setting-number="blur_delta" aria-label="Suavidad respecto al lote" />
               </label>
               <div class="local-adjustment__actions">
                 <button type="button" data-action="cancel-local-adjustment">Cancelar</button>
-                <button type="button" class="primary" data-action="apply-local-adjustment">Aplicar a esta imagen</button>
-                <button type="button" data-action="save-local-adjustment-as-new">Guardar nuevo</button>
-                <button type="button" data-action="reset-local-adjustment">Restablecer lote</button>
+                <button type="button" class="primary" data-action="apply-local-adjustment">Guardar excepción</button>
+                <button type="button" data-action="save-local-adjustment-as-new">Guardar excepción como ajuste</button>
+                <button type="button" data-action="reset-local-adjustment">Usar ajuste del lote</button>
               </div>
             </div>
           </details>
@@ -1180,6 +1192,7 @@
       [
         "app-globals.js",
         "mock-data.js",
+        "shadow-control-schema.js",
         "app-state-selectors.js",
         "app-preflight-state.js",
         "app-export-readiness-state.js",
@@ -1232,6 +1245,7 @@
         "app-render-shell-gallery.js",
         "app-action-dispatcher.js",
         "app-document-events.js",
+        "app-lighting-position-workflow.js",
         "app-form-events.js",
         "app-viewer-events.js",
         "app.js",

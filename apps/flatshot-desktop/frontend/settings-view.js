@@ -39,7 +39,7 @@
   }
 
   function localAdjustmentText(localActive) {
-    return localActive ? "Personalizado" : "Igual que el lote";
+    return localActive ? "Con excepción" : "Usa el ajuste del lote";
   }
 
   function localSettingOutputText(value) {
@@ -74,7 +74,9 @@
 
   function advancedSummaryTitle(dirtyCount) {
     const count = Number(dirtyCount) || 0;
-    return count ? `Avanzado · ${count} cambio${count === 1 ? "" : "s"}` : "Avanzado";
+    return count
+      ? `Calibración del motor · ${count} cambio${count === 1 ? "" : "s"}`
+      : "Calibración del motor";
   }
 
   function advancedDirtyCount(options = {}) {

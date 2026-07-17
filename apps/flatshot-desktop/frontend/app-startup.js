@@ -66,6 +66,7 @@ try {
       lightingNumberFieldInput: handleLightingNumberFieldInput,
       lightingPresetClick: handleLightingPresetClick,
       namingInput: handleNamingInput,
+      nudgeLightingScenePosition,
       outputProfileSelectChange: handleOutputProfileSelectChange,
       positionBackgroundPresetEditor,
       refreshPreviewAfterSettingChange,

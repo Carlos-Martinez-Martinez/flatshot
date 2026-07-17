@@ -14,6 +14,7 @@ APP_RENDER_LIMIT = 400
 EXPECTED_APP_SCRIPT_ORDER = [
     "app-globals.js",
     "mock-data.js",
+    "shadow-control-schema.js",
     "app-state-selectors.js",
     "app-preflight-state.js",
     "app-export-readiness-state.js",
@@ -66,6 +67,7 @@ EXPECTED_APP_SCRIPT_ORDER = [
     "app-render-shell-gallery.js",
     "app-action-dispatcher.js",
     "app-document-events.js",
+    "app-lighting-position-workflow.js",
     "app-form-events.js",
     "app-viewer-events.js",
     "app.js",

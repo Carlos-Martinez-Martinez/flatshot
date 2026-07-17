@@ -80,6 +80,7 @@ def test_app_domain_scripts_are_loaded_in_order():
     expected_order = [
         "app-globals.js",
         "mock-data.js",
+        "shadow-control-schema.js",
         "app-state-selectors.js",
         "app-preflight-state.js",
         "app-export-readiness-state.js",
@@ -132,6 +133,7 @@ def test_app_domain_scripts_are_loaded_in_order():
         "app-render-shell-gallery.js",
         "app-action-dispatcher.js",
         "app-document-events.js",
+        "app-lighting-position-workflow.js",
         "app-form-events.js",
         "app-viewer-events.js",
         "app.js",

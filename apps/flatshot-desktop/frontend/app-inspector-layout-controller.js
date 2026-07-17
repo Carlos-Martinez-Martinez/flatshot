@@ -9,10 +9,7 @@ function advancedDirtyCount() {
 }
 
 function visibleAdvancedSettingKeys(settings = state.settings) {
-  if (settings.shadow_engine === "studio_2_5d") {
-    return advancedSettingKeys.filter((key) => key !== "angle");
-  }
-  return advancedSettingKeys;
+  return FlatShotShadowControls.visibleKeysForEngine(settings.shadow_engine);
 }
 
 function advancedSettingsDirty() {

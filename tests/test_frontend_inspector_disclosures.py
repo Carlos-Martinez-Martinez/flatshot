@@ -62,3 +62,9 @@ assert.equal(state.advancedDisclosureKey, "advanced-block");
     )
 
     assert result.returncode == 0, result.stderr or result.stdout
+
+
+def test_composition_disclosure_is_a_remembered_advanced_section():
+    source = (FRONTEND_DIR / "app-inspector-disclosure-controller.js").read_text(encoding="utf-8")
+
+    assert '"composition-section"' in source

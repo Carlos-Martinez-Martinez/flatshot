@@ -6,20 +6,20 @@
   root.FlatShotShadowControls = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   const commonLabels = {
-    opacity: "Intensidad",
+    opacity: "Densidad de sombra",
     blur: "Suavidad",
-    distance: "Separación",
-    padding: "Margen del producto",
+    distance: "Distancia",
+    padding: "Margen",
     noise: "Grano de sombra",
     contact_blur: "Suavidad de contacto",
-    scale_adjustment: "Tamaño del producto",
+    scale_adjustment: "Escala del producto",
     angle: "Dirección de la sombra",
     contraction: "Reducir halo del borde",
     adaptive_zoom: "Ajuste automático del producto",
-    shadow_engine: "Modo de sombra",
+    shadow_engine: "Motor de sombra",
     fusion: "Protección interior",
     lighting_scene: "Escena de luz",
-    spread: "Difusión extra",
+    spread: "Difusión",
   };
 
   const advancedKeys = [
@@ -50,19 +50,19 @@
 
   const profiles = {
     realistic_v2: {
-      label: "Realista V2",
+      label: "Realista",
       supported: new Set([...universalKeys, "spread", "angle"]),
-      labels: { spread: "Difusión extra" },
+      labels: { spread: "Difusión" },
     },
     studio_2_5d: {
-      label: "Estudio 2.5D",
+      label: "Estudio con luz",
       supported: new Set([...universalKeys, "spread", "lighting_scene"]),
       labels: { spread: "Expansión" },
     },
     legacy: {
-      label: "Clásico",
+      label: "Clásico · compatibilidad",
       supported: new Set([...universalKeys, "fusion", "angle"]),
-      labels: { spread: "Expansión no disponible" },
+      labels: {},
     },
   };
 
@@ -101,6 +101,9 @@
     documentRef.querySelectorAll("[data-control-label-key]").forEach((label) => {
       const key = label.dataset.controlLabelKey;
       const text = profile.labelFor(key);
+      if (!label.id) {
+        label.id = `${key}-label`;
+      }
       label.textContent = text;
       label.title = text;
     });

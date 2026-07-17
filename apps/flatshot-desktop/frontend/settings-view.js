@@ -59,8 +59,8 @@
   function resetPresetButtonState(presetDirty) {
     return {
       disabled: !presetDirty,
-      label: "Restaurar valores por defecto",
-      title: presetDirty ? "Restaurar valores por defecto" : "Sin cambios que restaurar",
+      label: "Restaurar recomendado",
+      title: presetDirty ? "Restaurar recomendado" : "Sin cambios que restaurar",
     };
   }
 

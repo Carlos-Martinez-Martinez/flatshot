@@ -116,11 +116,11 @@ assert.deepEqual(helpers.previewErrorState("timeout"), {{
 }});
 
 assert.equal(helpers.bridgePreviewMeta({{ previewStatus: "loading" }}), "Generando vista");
-assert.equal(helpers.bridgePreviewMeta({{ previewStatus: "loading", engineLabel: "Estudio 2.5D" }}), "Generando vista · Estudio 2.5D");
+assert.equal(helpers.bridgePreviewMeta({{ previewStatus: "loading", engineLabel: "Estudio con luz" }}), "Generando vista · Estudio con luz");
 assert.equal(helpers.bridgePreviewMeta({{ previewStatus: "error", previewError: "" }}), "Vista no disponible");
-assert.equal(helpers.bridgePreviewMeta({{ previewStatus: "ready", previewData: {{ warning: "fallback" }}, activePreset: "Luz", engineLabel: "Estudio 2.5D" }}), "Vista con aviso · Estudio 2.5D");
+assert.equal(helpers.bridgePreviewMeta({{ previewStatus: "ready", previewData: {{ warning: "fallback" }}, activePreset: "Luz", engineLabel: "Estudio con luz" }}), "Vista con aviso · Estudio con luz");
 assert.equal(helpers.bridgePreviewMeta({{ previewStatus: "ready", previewData: {{}}, activePreset: "Luz" }}), "Luz");
-assert.equal(helpers.bridgePreviewMeta({{ previewStatus: "ready", previewData: {{}}, activePreset: "Luz", engineLabel: "Estudio 2.5D" }}), "Estudio 2.5D · Luz");
+assert.equal(helpers.bridgePreviewMeta({{ previewStatus: "ready", previewData: {{}}, activePreset: "Luz", engineLabel: "Estudio con luz" }}), "Estudio con luz · Luz");
 assert.equal(helpers.bridgePreviewMeta({{ previewStatus: "empty" }}), "Vista pendiente");
 
 assert.equal(helpers.previewSettingsLabel({{ bridgeMode: "bridge", activePresetSource: "bridge", presetDirty: false }}), "Ajuste");

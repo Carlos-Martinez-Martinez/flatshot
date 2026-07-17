@@ -194,9 +194,9 @@ global.defaultLightingScene = {
 };
 
 global.shadowEngineLabels = {
-  realistic_v2: "Realista V2",
-  studio_2_5d: "Estudio 2.5D",
-  legacy: "Clásico",
+  realistic_v2: "Realista",
+  studio_2_5d: "Estudio con luz",
+  legacy: "Clásico · compatibilidad",
 };
 
 global.lightingScenePresets = {

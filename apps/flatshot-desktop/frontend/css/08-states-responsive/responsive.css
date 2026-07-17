@@ -364,4 +364,10 @@
     grid-row: 1;
   }
 }
+
+@media (max-width: 1360px) and (min-width: 1121px) {
+  .app-shell[data-inspector-editing="true"] .workspace {
+    grid-template-columns: clamp(340px, 29vw, 390px) minmax(0, 1fr) minmax(380px, 440px);
+  }
+}
 }

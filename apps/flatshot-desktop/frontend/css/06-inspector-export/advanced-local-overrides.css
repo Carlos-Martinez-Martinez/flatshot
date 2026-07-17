@@ -205,16 +205,16 @@
 }
 
 .settings-panel.is-editing-preset .control-row, .settings-panel.is-editing-preset .local-control-row {
-  grid-template-columns: 96px minmax(82px, 1fr) 72px;
+  grid-template-columns: minmax(112px, 1fr) minmax(0, 1.2fr) 72px;
   gap: var(--space-2);
 }
 
 .settings-panel.is-editing-preset .studio-lighting-panel .control-row {
-  grid-template-columns: 96px minmax(82px, 1fr) 72px;
+  grid-template-columns: minmax(112px, 1fr) minmax(0, 1.2fr) 72px;
 }
 
 .settings-panel.is-editing-preset .lighting-stage-fields .control-row {
-  grid-template-columns: 96px minmax(82px, 1fr) 72px;
+  grid-template-columns: minmax(112px, 1fr) minmax(0, 1.2fr) 72px;
 }
 
 .settings-panel.is-editing-preset .studio-lighting-panel .control-row--select {
@@ -238,8 +238,31 @@
 }
 
 .settings-panel.is-editing-preset .control-row > span, .settings-panel.is-editing-preset .local-control-row > span {
-  overflow: visible;
+  min-width: 0;
+  overflow: hidden;
   font-size: var(--font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+  .settings-panel.is-editing-preset .control-row, .settings-panel.is-editing-preset .local-control-row {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .settings-panel.is-editing-preset .control-row > span, .settings-panel.is-editing-preset .local-control-row > span {
+    white-space: normal;
+  }
+
+  .settings-panel.is-editing-preset .control-row input[type="range"], .settings-panel.is-editing-preset .local-control-row input[type="range"] {
+    grid-column: 1;
+  }
+
+  .settings-panel.is-editing-preset .number-input, .settings-panel.is-editing-preset .setting-number, .settings-panel.is-editing-preset .local-setting-number {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 .advanced-block:not([open]) .inspector-disclosure__body {

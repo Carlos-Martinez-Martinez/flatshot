@@ -27,23 +27,23 @@ def test_settings_markup_uses_plain_language_and_one_preset_management_entry():
     html = INDEX_PATH.read_text(encoding="utf-8")
 
     for label in (
-        "Intensidad",
+        "Densidad de sombra",
         "Suavidad",
-        "Separación",
-        "Margen del producto",
+        "Distancia",
+        "Margen",
         "Calibración del motor",
-        "Difusión extra",
+        "Difusión",
         "Grano de sombra",
         "Suavidad de contacto",
-        "Tamaño del producto",
+        "Escala del producto",
         "Dirección de la sombra",
         "Reducir halo del borde",
         "Ajuste automático del producto",
-        "Tamaño respecto al lote",
-        "Intensidad respecto al lote",
+        "Escala respecto al lote",
+        "Densidad respecto al lote",
         "Suavidad respecto al lote",
-        "Guardar excepción",
-        "Usar ajuste del lote",
+        "Aplicar a esta imagen",
+        "Restablecer al lote",
     ):
         assert label in html
 
@@ -121,8 +121,8 @@ const assert = require("node:assert/strict");
 const controls = require({json.dumps(str(SCHEMA_PATH))});
 
 const realistic = controls.engineProfile("realistic_v2");
-assert.equal(realistic.label, "Realista V2");
-assert.equal(realistic.labelFor("spread"), "Difusión extra");
+assert.equal(realistic.label, "Realista");
+assert.equal(realistic.labelFor("spread"), "Difusión");
 assert.equal(realistic.supports("angle"), true);
 assert.equal(realistic.supports("fusion"), false);
 assert.equal(realistic.supports("lighting_scene"), false);

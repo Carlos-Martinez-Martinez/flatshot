@@ -14,9 +14,9 @@ ADVANCED_LOCAL_CSS_PATH = FRONTEND_DIR / "css" / "06-inspector-export" / "advanc
 def test_slider_number_fields_reserve_signed_three_digit_width():
     css = ADVANCED_LOCAL_CSS_PATH.read_text(encoding="utf-8")
 
-    assert "grid-template-columns: 96px minmax(82px, 1fr) 72px;" in css
-    assert ".settings-panel.is-editing-preset .studio-lighting-panel .control-row {\n  grid-template-columns: 96px minmax(82px, 1fr) 72px;" in css
-    assert ".settings-panel.is-editing-preset .lighting-stage-fields .control-row {\n  grid-template-columns: 96px minmax(82px, 1fr) 72px;" in css
+    assert "grid-template-columns: minmax(112px, 1fr) minmax(0, 1.2fr) 72px;" in css
+    assert ".settings-panel.is-editing-preset .studio-lighting-panel .control-row {\n  grid-template-columns: minmax(112px, 1fr) minmax(0, 1.2fr) 72px;" in css
+    assert ".settings-panel.is-editing-preset .lighting-stage-fields .control-row {\n  grid-template-columns: minmax(112px, 1fr) minmax(0, 1.2fr) 72px;" in css
     assert (
         ".settings-panel.is-editing-preset .number-input, .settings-panel.is-editing-preset "
         ".setting-number, .settings-panel.is-editing-preset .local-setting-number"

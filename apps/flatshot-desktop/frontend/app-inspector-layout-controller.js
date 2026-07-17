@@ -26,12 +26,15 @@ function inspectorMode() {
 function renderInspector() {
   const panel = $(".settings-panel");
   const mode = inspectorMode();
+  const editingInspector = state.presetEditorOpen || mode === "advanced";
+  const appShell = $(".app-shell");
+  appShell?.setAttribute("data-inspector-editing", String(editingInspector));
   const validTabs = ["review", "output", "warnings", "advanced"];
   if (!validTabs.includes(state.inspectorTab)) {
     state.inspectorTab = "review";
   }
   panel.classList.toggle("is-editing-output", state.outputEditMode);
-  panel.classList.toggle("is-editing-preset", state.presetEditorOpen || mode === "advanced");
+  panel.classList.toggle("is-editing-preset", editingInspector);
   panel.classList.toggle("is-inspector-subview", mode !== "summary");
   panel.classList.toggle("is-advanced-subview", mode === "advanced");
   const start = $("#inspector-start");

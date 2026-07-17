@@ -41,16 +41,16 @@ def test_adjustment_editor_actions_use_explicit_scope_labels():
     assert 'data-action="reset-settings"' in html
     assert "Restaurar recomendado" in html
     assert 'data-action="apply-global-adjustment"' in html
-    assert "Aplicar al lote sin guardar" in html
+    assert "Aplicar al lote" in html
     assert 'data-action="save-preset"' in html
     assert "Guardar ajuste" in html
     assert 'data-action="save-preset-as-new"' in html
     assert "Guardar como nuevo" in html
     assert 'data-action="apply-local-adjustment"' in html
-    assert "Guardar excepción" in html
+    assert "Aplicar a esta imagen" in html
     assert 'data-action="save-local-adjustment-as-new"' in html
-    assert "Guardar excepción como ajuste" in html
-    assert "Usar ajuste del lote" in html
+    assert "Guardar como ajuste" in html
+    assert "Restablecer al lote" in html
 
 
 def test_main_controls_offer_subtle_default_reset():
@@ -67,15 +67,15 @@ def test_main_controls_offer_subtle_default_reset():
     assert 'id="reset-settings-inline"' in section
     assert 'class="appearance-section__reset ghost-action"' in section
     assert 'data-action="reset-settings"' in section
-    assert 'aria-label="Restaurar valores por defecto"' in section
-    assert 'title="Restaurar valores por defecto"' in section
-    assert ">Por defecto</button>" in section
+    assert 'aria-label="Restaurar recomendado"' in section
+    assert 'title="Restaurar recomendado"' in section
+    assert ">Restaurar</button>" in section
 
 
 def test_studio_lighting_panel_is_available_in_advanced_settings():
     html = INDEX_PATH.read_text(encoding="utf-8")
 
-    assert '<option value="studio_2_5d">Estudio 2.5D</option>' in html
+    assert '<option value="studio_2_5d">Estudio con luz</option>' in html
     assert 'id="studio-lighting-panel"' in html
     assert 'data-lighting-stage' in html
     assert 'data-lighting-preset="overhead_soft"' in html
@@ -89,7 +89,7 @@ def test_studio_lighting_panel_is_available_in_advanced_settings():
     assert "Altura de la luz" in html
     assert "Tamaño de fuente" in html
     assert "Potencia de luz" in html
-    assert "Tamaño del producto" in html
+    assert "Escala del producto" in html
     assert html.index('id="lighting-stage"') < html.index('data-lighting-field="main.type"')
     assert html.index('class="lighting-slider-stack"') < html.index('data-lighting-field="main.height"')
     assert html.index('data-setting="shadow_engine"') < html.index('data-setting="spread"')
@@ -229,12 +229,12 @@ assert.deepEqual(helpers.savePresetButtonState(false), {{
 }});
 assert.deepEqual(helpers.resetPresetButtonState(true), {{
   disabled: false,
-  label: "Restaurar valores por defecto",
-  title: "Restaurar valores por defecto",
+  label: "Restaurar recomendado",
+  title: "Restaurar recomendado",
 }});
 assert.deepEqual(helpers.resetPresetButtonState(false), {{
   disabled: true,
-  label: "Restaurar valores por defecto",
+  label: "Restaurar recomendado",
   title: "Sin cambios que restaurar",
 }});
 assert.deepEqual(helpers.deletePresetButtonState(1), {{

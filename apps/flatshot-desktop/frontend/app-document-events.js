@@ -251,6 +251,7 @@ function handleDocumentInput(event) {
   if (event.target?.matches?.("input[type='range']")) {
     syncRangeFill(event.target);
   }
+  if (typeof setNumericControlPending === "function") setNumericControlPending(event.target);
   if (event.target.id === "onboarding-scan-path") {
     state.bridgeScanPath = event.target.value;
     const sidebarInput = $("#bridge-scan-path");
@@ -312,12 +313,9 @@ function handleDocumentChange(event) {
     }
     return;
   }
-  if (event.target?.dataset?.settingNumber) {
-    updateSettingFromNumberInput(event.target, { commit: true });
-    return;
-  }
-  if (event.target?.dataset?.localSettingNumber) {
-    updateLocalOverrideFromNumberInput(event.target, { commit: true });
+  if (isNumericControlInput(event.target)) {
+    commitNumericControlInput(event.target);
+    clearNumericControlPending(event.target);
     return;
   }
   if (event.target.matches?.("[data-output-profile-enabled-id]")) {
@@ -357,16 +355,10 @@ function handleDocumentFocusOut(event) {
       otherInput.value = state.bridgeScanPath;
     }
   }
-  if (target?.dataset?.settingNumber) {
-    updateSettingFromNumberInput(target, { commit: true });
+  if (isNumericControlInput(target)) {
+    commitNumericControlInput(target);
+    clearNumericControlPending(target);
     return;
-  }
-  if (target?.dataset?.localSettingNumber) {
-    updateLocalOverrideFromNumberInput(target, { commit: true });
-    return;
-  }
-  if (target?.dataset?.lightingNumberField && typeof handleLightingNumberFieldInput === "function") {
-    handleLightingNumberFieldInput({ type: "change", target });
   }
 }
 

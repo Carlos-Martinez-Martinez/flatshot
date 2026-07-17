@@ -39,7 +39,7 @@
   }
 
   function localAdjustmentText(localActive) {
-    return localActive ? "Con excepción" : "Usa el ajuste del lote";
+    return localActive ? "Modificada respecto al lote" : "Usa el ajuste del lote";
   }
 
   function localSettingOutputText(value) {

@@ -51,16 +51,19 @@
   const profiles = {
     realistic_v2: {
       label: "Realista",
+      description: "Sombra natural con contacto suave",
       supported: new Set([...universalKeys, "spread", "angle"]),
       labels: { spread: "Difusión" },
     },
     studio_2_5d: {
       label: "Estudio con luz",
+      description: "Control manual de luz y escena",
       supported: new Set([...universalKeys, "spread", "lighting_scene"]),
       labels: { spread: "Expansión" },
     },
     legacy: {
       label: "Clásico · compatibilidad",
+      description: "Motor anterior para compatibilidad",
       supported: new Set([...universalKeys, "fusion", "angle"]),
       labels: {},
     },
@@ -76,6 +79,7 @@
     return {
       id: engineId,
       label: profile.label,
+      description: profile.description,
       supports: (key) => profile.supported.has(key),
       labelFor: (key) => profile.labels[key] || commonLabels[key] || key,
     };
@@ -106,6 +110,10 @@
       }
       label.textContent = text;
       label.title = text;
+    });
+    documentRef.querySelectorAll("[data-engine-description]").forEach((description) => {
+      description.textContent = profile.description;
+      description.title = profile.description;
     });
     documentRef.querySelectorAll("[data-control-group]").forEach((group) => {
       const keys = String(group.dataset.controlGroup || "")

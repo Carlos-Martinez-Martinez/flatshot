@@ -458,7 +458,7 @@
                     <summary>Más acciones</summary>
                     <div class="button-row">
                       <button type="button" data-action="cancel-adjustment-edit">Descartar cambios</button>
-                      <button type="button" data-action="reset-settings">Restaurar recomendado</button>
+                      <button type="button" id="reset-preset" data-action="reset-settings">Restaurar recomendado</button>
                       <button type="button" data-action="save-preset-as-new">Guardar como nuevo</button>
                     </div>
                   </details>
@@ -467,6 +467,8 @@
             </div>
           </details>
 
+          <small class="control-pending-status" id="numeric-pending-status" role="status" aria-live="polite" hidden></small>
+
           <details class="settings-section inspector-disclosure appearance-section" data-inspector-section="advanced">
             <summary>
               <span class="summary-copy">
@@ -474,7 +476,6 @@
                 <small>Ajustes básicos</small>
               </span>
             </summary>
-            <button type="button" class="appearance-section__reset ghost-action" id="reset-settings-inline" data-action="reset-settings" aria-label="Restaurar recomendado" title="Restaurar recomendado">Restaurar</button>
             <div class="inspector-disclosure__body control-stack">
               <label class="control-row" data-control-key="opacity">
                 <span id="opacity-label" data-control-label-key="opacity">Densidad de sombra</span>
@@ -532,13 +533,23 @@
             <div class="inspector-disclosure__body control-stack advanced-controls">
                 <label class="control-row control-row--select" data-control-key="shadow_engine">
                   <span id="shadow_engine-label" data-control-label-key="shadow_engine">Motor de sombra</span>
-                  <select data-setting="shadow_engine">
+                  <select data-setting="shadow_engine" aria-describedby="shadow-engine-description engine-state-help">
                     <option value="realistic_v2">Realista</option>
                     <option value="studio_2_5d">Estudio con luz</option>
                     <option value="legacy">Clásico · compatibilidad</option>
                   </select>
                 </label>
-                <div class="studio-lighting-panel" id="studio-lighting-panel" hidden>
+                <small class="advanced-help" id="shadow-engine-description" data-engine-description>Sombra natural con contacto suave</small>
+                <small class="advanced-help" id="engine-state-help">Los controles de otros motores se conservan al cambiar de modo.</small>
+                <details class="advanced-subgroup" data-advanced-group="lighting" data-control-group="lighting_scene" open>
+                  <summary>
+                    <span class="summary-copy">
+                      <strong>Luz</strong>
+                      <small>Escena y fuente</small>
+                    </span>
+                  </summary>
+                  <div class="advanced-subgroup__body">
+                  <div class="studio-lighting-panel" id="studio-lighting-panel" hidden>
                   <div class="lighting-scene-toolbar" aria-label="Escenas de luz">
                     <button type="button" data-lighting-preset="overhead_soft">Cenital suave</button>
                     <button type="button" data-lighting-preset="side_soft">Lateral suave</button>
@@ -586,8 +597,18 @@
                       <input id="lighting-ambient-output" class="number-input lighting-number" type="number" min="0" max="100" step="1" value="25" data-lighting-number-field="ambient_intensity" aria-label="Luz ambiente" />
                     </label>
                   </div>
-                </div>
-                <div class="advanced-technical-panel">
+                  </div>
+                  </div>
+                </details>
+                <details class="advanced-subgroup" data-advanced-group="quality" data-control-group="spread,noise,contact_blur,fusion,angle,contraction" open>
+                  <summary>
+                    <span class="summary-copy">
+                      <strong>Calidad de sombra</strong>
+                      <small>Contacto, difusión y halo</small>
+                    </span>
+                  </summary>
+                  <div class="advanced-subgroup__body">
+                  <div class="advanced-technical-panel">
                   <label class="control-row" data-control-key="spread">
                     <span id="spread-label" data-control-label-key="spread">Difusión</span>
                     <input type="range" min="0" max="20" value="0" data-setting="spread" />
@@ -618,7 +639,9 @@
                     <input type="range" min="0" max="80" value="0" data-setting="contraction" />
                     <input class="number-input setting-number" type="number" min="0" max="80" step="1" value="0" data-setting-number="contraction" aria-labelledby="contraction-label" />
                   </label>
-                </div>
+                  </div>
+                  </div>
+                </details>
               </div>
           </details>
 

@@ -19,11 +19,17 @@ function handleDocumentKeydown(event) {
   if (typeof isNumericControlInput === "function" && isNumericControlInput(target)) {
     if (event.key === "Enter") {
       commitNumericControlInput(target);
+      if (typeof clearNumericControlPending === "function") {
+        clearNumericControlPending(target);
+      }
       event.preventDefault();
       return;
     }
     if (event.key === "Escape") {
       cancelNumericControlInput(target);
+      if (typeof clearNumericControlPending === "function") {
+        clearNumericControlPending(target);
+      }
       event.preventDefault();
       return;
     }

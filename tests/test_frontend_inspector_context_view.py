@@ -84,7 +84,7 @@ assert.deepEqual(helpers.inspectorSubviewHeaderState({{
   detail: "Global · Modificado",
   backAction: "close-inspector-subview",
   backLabel: "Volver",
-  showManageAction: false,
+  showManageAction: true,
 }});
 assert.deepEqual(helpers.inspectorSubviewHeaderState({{
   mode: "advanced",

@@ -12,6 +12,8 @@ INDEX_PATH = FRONTEND_DIR / "index.html"
 SCHEMA_PATH = FRONTEND_DIR / "shadow-control-schema.js"
 ADVANCED_CSS_PATH = FRONTEND_DIR / "css" / "06-inspector-export" / "advanced-local-overrides.css"
 RESPONSIVE_CSS_PATH = FRONTEND_DIR / "css" / "08-states-responsive" / "responsive.css"
+DOCUMENT_EVENTS_PATH = FRONTEND_DIR / "app-document-events.js"
+SETTINGS_CONTROLLER_PATH = FRONTEND_DIR / "app-settings-panel-controller.js"
 
 
 def test_editor_uses_plain_labels_and_keeps_secondary_actions_collapsed():
@@ -36,6 +38,35 @@ def test_editor_uses_plain_labels_and_keeps_secondary_actions_collapsed():
     assert "Aplicar al lote sin guardar" not in html
     assert "Guardar excepción" not in html
     assert 'class="secondary-actions"' in html
+
+
+def test_advanced_engine_controls_are_split_by_intent_and_explain_modes():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+
+    assert 'data-advanced-group="lighting"' in html
+    assert 'data-advanced-group="quality"' in html
+    assert 'id="shadow-engine-description"' in html
+    assert 'id="engine-state-help"' in html
+    assert 'aria-describedby="shadow-engine-description engine-state-help"' in html
+
+
+def test_numeric_inputs_expose_a_pending_commit_state():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+    source = DOCUMENT_EVENTS_PATH.read_text(encoding="utf-8")
+    controller = SETTINGS_CONTROLLER_PATH.read_text(encoding="utf-8")
+
+    assert 'id="numeric-pending-status"' in html
+    assert "dataset.pending" in controller
+    assert "setNumericControlPending" in source
+    assert "clearNumericControlPending" in source
+
+
+def test_preset_management_has_one_entry_point():
+    review_source = (FRONTEND_DIR / "inspector-review-view.js").read_text(encoding="utf-8")
+    context_source = (FRONTEND_DIR / "inspector-context-view.js").read_text(encoding="utf-8")
+
+    assert review_source.count('data-action="open-preset-editor"') == 0
+    assert "showManageAction: mode === \"advanced\" && !isPresetManager" in context_source
 
 
 def test_dynamic_control_names_share_the_visible_label_for_accessibility():
@@ -72,6 +103,9 @@ assert.equal(controls.engineProfile("studio_2_5d").label, "Estudio con luz");
 assert.equal(controls.engineProfile("legacy").label, "Clásico · compatibilidad");
 assert.equal(controls.engineProfile("studio_2_5d").labelFor("shadow_engine"), "Motor de sombra");
 assert.equal(controls.engineProfile("studio_2_5d").labelFor("spread"), "Expansión");
+assert.equal(controls.engineProfile("realistic_v2").description, "Sombra natural con contacto suave");
+assert.equal(controls.engineProfile("studio_2_5d").description, "Control manual de luz y escena");
+assert.equal(controls.engineProfile("legacy").description, "Motor anterior para compatibilidad");
 """
     result = subprocess.run(
         ["node", "-e", script],

@@ -48,6 +48,12 @@ global.updateSettingFromNumberInput = (target, options = {{}}) => {{
 global.updateLocalOverrideFromNumberInput = (target, options = {{}}) => {{
   localCommits.push({{ value: target.value, commit: Boolean(options.commit) }});
 }};
+global.isNumericControlInput = (target) => Boolean(target?.dataset?.settingNumber || target?.dataset?.localSettingNumber);
+global.commitNumericControlInput = (target) => {{
+  if (target.dataset.settingNumber) updateSettingFromNumberInput(target, {{ commit: true }});
+  if (target.dataset.localSettingNumber) updateLocalOverrideFromNumberInput(target, {{ commit: true }});
+}};
+global.clearNumericControlPending = () => {{}};
 global.updateBackgroundPresetEditorFromFields = () => {{}};
 global.updateOutputProfileDraftFromForm = () => {{}};
 global.renderOutputProfileModalState = () => {{}};
@@ -262,7 +268,11 @@ const frontend = {json.dumps(str(FRONTEND_DIR))};
 let settingCommits = [];
 let localCommits = [];
 let lightingCommits = [];
-global.isNumericControlInput = (target) => Boolean(target?.dataset?.settingNumber || target?.dataset?.localSettingNumber);
+global.isNumericControlInput = (target) => Boolean(
+  target?.dataset?.settingNumber
+  || target?.dataset?.localSettingNumber
+  || target?.dataset?.lightingNumberField
+);
 global.updateSettingFromNumberInput = (target, options = {{}}) => {{
   settingCommits.push({{ value: target.value, commit: Boolean(options.commit) }});
 }};
@@ -272,6 +282,12 @@ global.updateLocalOverrideFromNumberInput = (target, options = {{}}) => {{
 global.handleLightingNumberFieldInput = (event) => {{
   lightingCommits.push({{ type: event.type, value: event.target.value }});
 }};
+global.commitNumericControlInput = (target) => {{
+  if (target.dataset.settingNumber) updateSettingFromNumberInput(target, {{ commit: true }});
+  if (target.dataset.localSettingNumber) updateLocalOverrideFromNumberInput(target, {{ commit: true }});
+  if (target.dataset.lightingNumberField) handleLightingNumberFieldInput({{ type: "change", target }});
+}};
+global.clearNumericControlPending = () => {{}};
 global.$ = () => null;
 global.state = {{ bridgeScanPath: "" }};
 global.syncRangeFill = () => {{}};

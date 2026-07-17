@@ -49,8 +49,8 @@ def test_settings_markup_uses_plain_language_and_one_preset_management_entry():
 
     review_source = (FRONTEND_DIR / "inspector-review-view.js").read_text(encoding="utf-8")
     context_source = (FRONTEND_DIR / "inspector-context-view.js").read_text(encoding="utf-8")
-    assert review_source.count('data-action="open-preset-editor"') == 1
-    assert 'showManageAction: false' in context_source
+    assert review_source.count('data-action="open-preset-editor"') == 0
+    assert 'showManageAction: mode === "advanced" && !isPresetManager' in context_source
     assert "Padding" not in html
     assert ">Spread<" not in html
 

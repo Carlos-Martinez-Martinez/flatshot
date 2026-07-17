@@ -53,7 +53,7 @@ def test_adjustment_editor_actions_use_explicit_scope_labels():
     assert "Restablecer al lote" in html
 
 
-def test_main_controls_offer_subtle_default_reset():
+def test_main_controls_keep_reset_in_preset_actions_only():
     html = INDEX_PATH.read_text(encoding="utf-8")
     main_controls_index = html.index("<strong>Sombra</strong>")
     section_start = html.rindex(
@@ -64,12 +64,9 @@ def test_main_controls_offer_subtle_default_reset():
     section_end = html.index('<details class="settings-section inspector-disclosure advanced-block"', main_controls_index)
     section = html[section_start:section_end]
 
-    assert 'id="reset-settings-inline"' in section
-    assert 'class="appearance-section__reset ghost-action"' in section
-    assert 'data-action="reset-settings"' in section
-    assert 'aria-label="Restaurar recomendado"' in section
-    assert 'title="Restaurar recomendado"' in section
-    assert ">Restaurar</button>" in section
+    assert 'id="reset-settings-inline"' not in section
+    assert 'data-action="reset-settings"' not in section
+    assert 'data-action="reset-settings"' in html
 
 
 def test_studio_lighting_panel_is_available_in_advanced_settings():
@@ -209,7 +206,7 @@ assert.equal(helpers.presetSourceLabel({{ bridgePresetWarning: "", presetDirty: 
 assert.equal(helpers.presetSourceLabel({{ bridgePresetWarning: "", presetDirty: true }}), "Global · Modificado");
 assert.equal(helpers.presetSourceLabel({{ bridgePresetWarning: "Aviso", presetDirty: false }}), "Global · aviso");
 assert.equal(helpers.presetSourceLabel({{ bridgePresetWarning: "Aviso", presetDirty: true }}), "Global · Modificado · aviso");
-assert.equal(helpers.localAdjustmentText(true), "Con excepción");
+assert.equal(helpers.localAdjustmentText(true), "Modificada respecto al lote");
 assert.equal(helpers.localAdjustmentText(false), "Usa el ajuste del lote");
 assert.equal(helpers.localSettingOutputText(3), "+3");
 assert.equal(helpers.localSettingOutputText(0), "0");

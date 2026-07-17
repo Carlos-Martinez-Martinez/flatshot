@@ -1,3 +1,42 @@
+function isPendingNumericControl(target) {
+  return Boolean(
+    target?.dataset?.settingNumber
+    || target?.dataset?.localSettingNumber
+    || target?.dataset?.lightingNumberField
+  );
+}
+
+function numericControlLabel(target) {
+  const label = target?.closest?.("label");
+  return label?.querySelector?.("[data-control-label-key], span")?.textContent?.trim()
+    || target?.getAttribute?.("aria-label")
+    || "Valor";
+}
+
+function setNumericControlPending(target, pending = true) {
+  if (!isPendingNumericControl(target)) {
+    return;
+  }
+  target.dataset.pending = String(Boolean(pending));
+  if (typeof document === "undefined") {
+    return;
+  }
+  const status = document.querySelector("#numeric-pending-status");
+  if (!status) {
+    return;
+  }
+  const pendingInputs = Array.from(document.querySelectorAll("[data-pending=\"true\"]"));
+  const active = pendingInputs[0];
+  status.hidden = !active;
+  status.textContent = active
+    ? `Pendiente: ${numericControlLabel(active)}. Pulsa Enter para aplicar.`
+    : "";
+}
+
+function clearNumericControlPending(target) {
+  setNumericControlPending(target, false);
+}
+
 function renderSettings() {
   renderReviewPanel();
   const settingsPanel = $(".settings-panel");
@@ -66,7 +105,7 @@ function renderSettings() {
   savePresetButton.title = savePresetState.title;
   savePresetButton.textContent = savePresetState.text;
   savePresetButton.classList.toggle("primary", savePresetState.primary);
-  const resetSettingsButton = $("#reset-settings-inline");
+  const resetSettingsButton = $("#reset-preset");
   if (resetSettingsButton) {
     const resetPresetState = settingsViewHelpers.resetPresetButtonState(state.presetDirty);
     resetSettingsButton.disabled = resetPresetState.disabled;

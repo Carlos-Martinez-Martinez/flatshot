@@ -5,6 +5,57 @@
 
 .settings-panel .advanced-controls { gap: var(--space-3); }
 
+.advanced-help {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-relaxed);
+}
+
+.advanced-subgroup {
+  min-width: 0;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-panel);
+}
+
+.advanced-subgroup > summary {
+  min-height: var(--control-height);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-3);
+  color: var(--color-text-strong);
+  cursor: pointer;
+}
+
+.advanced-subgroup > summary .summary-copy {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-0-5);
+}
+
+.advanced-subgroup__body {
+  display: grid;
+  gap: var(--space-3);
+  border-top: var(--border-width) solid var(--color-border);
+  padding: var(--space-3);
+}
+
+.control-pending-status {
+  min-height: var(--control-height);
+  display: block;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-soft);
+  color: var(--color-text-muted);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-xs);
+}
+
+.settings-panel [data-pending="true"] {
+  border-color: var(--color-accent-border);
+  background: var(--color-accent-soft);
+}
+
 .settings-panel .advanced-controls > .control-row, .settings-panel .advanced-technical-panel .control-row { grid-template-columns: minmax(76px, 0.72fr) minmax(0, 1fr) 64px; }
 
 .control-row--toggle, .control-row--select { grid-template-columns: minmax(86px, 0.9fr) minmax(0, 1.4fr) 44px; }

@@ -267,7 +267,7 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-FlatShot-Token")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-FlatShot-Token, Idempotency-Key")
 
     def _require_auth(self, path: str, *, query: dict[str, list[str]] | None = None) -> None:
         token = self.server.auth_token

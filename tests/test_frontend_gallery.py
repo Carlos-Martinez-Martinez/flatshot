@@ -12,6 +12,7 @@ HELPER_PATH = FRONTEND_DIR / "gallery.js"
 INDEX_PATH = FRONTEND_DIR / "index.html"
 APP_GALLERY_CONTROLLER_PATH = FRONTEND_DIR / "app-gallery-controller.js"
 APP_GALLERY_SELECTION_PATH = FRONTEND_DIR / "app-gallery-selection-workflow.js"
+APP_RENDER_SHELL_GALLERY_PATH = FRONTEND_DIR / "app-render-shell-gallery.js"
 APP_DOCUMENT_EVENTS_PATH = FRONTEND_DIR / "app-document-events.js"
 APP_THUMBNAIL_CONTROLLER_PATH = FRONTEND_DIR / "app-thumbnail-controller.js"
 APP_JS_PATH = FRONTEND_DIR / "app.js"
@@ -80,6 +81,25 @@ def test_gallery_multiselect_and_virtual_window_are_wired():
     assert "function queueThumbnailPreload(images = null)" in thumbnails
     assert "preloadBatchThumbnails(images)" in thumbnails
     assert "gallery-virtual-spacer" in css
+
+
+def test_gallery_auto_scroll_runs_only_when_selection_changes():
+    selection = APP_GALLERY_SELECTION_PATH.read_text(encoding="utf-8")
+    rendering = APP_RENDER_SHELL_GALLERY_PATH.read_text(encoding="utf-8")
+
+    assert "keepActiveThumbnailVisible();" in selection
+    assert "keepActiveThumbnailVisible();" not in rendering
+
+
+def test_virtual_gallery_render_restores_scroll_position_after_replacing_items():
+    controller = APP_GALLERY_CONTROLLER_PATH.read_text(encoding="utf-8")
+
+    capture = "const preservedScrollTop = imageList.scrollTop;"
+    replace = "imageList.innerHTML = ["
+    restore = "imageList.scrollTop = preservedScrollTop;"
+    assert capture in controller
+    assert restore in controller
+    assert controller.index(capture) < controller.index(replace) < controller.index(restore)
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")

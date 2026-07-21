@@ -198,6 +198,28 @@ def test_bridge_http_allows_configured_localhost_frontend_origin_on_custom_port(
     assert headers["Access-Control-Allow-Origin"] == origin
 
 
+def test_bridge_http_export_preflight_allows_idempotency_key(tmp_path):
+    origin = "http://127.0.0.1:4174"
+    with running_bridge(tmp_path / "config", allowed_origins={origin}) as port:
+        status, headers = request_with_headers(
+            port,
+            "OPTIONS",
+            "/exports/run",
+            {
+                "Origin": origin,
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type,idempotency-key",
+            },
+        )
+
+    assert status == 204
+    allowed_headers = {
+        header.strip().lower()
+        for header in headers["Access-Control-Allow-Headers"].split(",")
+    }
+    assert "idempotency-key" in allowed_headers
+
+
 def test_bridge_http_rejects_unconfigured_localhost_frontend_origin(tmp_path):
     with running_bridge(tmp_path / "config") as port:
         status, headers = request_with_headers(

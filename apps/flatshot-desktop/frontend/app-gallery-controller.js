@@ -168,6 +168,7 @@ function renderBatch() {
 
   const visible = filteredImages();
   const imageList = $("#image-list");
+  const preservedScrollTop = imageList.scrollTop;
   const virtualWindow = galleryVirtualWindow(visible);
   const renderedImages = visible.slice(virtualWindow.start, virtualWindow.end);
   setGalleryTitle(exportable);
@@ -179,6 +180,7 @@ function renderBatch() {
     ...renderedImages.map(imageItemHtml),
     galleryVirtualSpacerHtml(virtualWindow.paddingBottom),
   ].join("");
+  imageList.scrollTop = preservedScrollTop;
   queueThumbnailPreload(renderedImages);
   $("#batch-empty-note").innerHTML = visible.length ? "" : filteredEmptyHtml(images.length, valid, warnings, errors);
   if (filmstripCount) {
@@ -187,7 +189,6 @@ function renderBatch() {
       : `${visible.length} de ${images.length}`;
   }
 }
-
 function galleryVisibleCountText(visibleCount, totalCount) {
   const visibleText = visibleCount === totalCount ? "" : `${visibleCount}/${totalCount}`;
   const selectedCount = state.selectedImageIds.length;

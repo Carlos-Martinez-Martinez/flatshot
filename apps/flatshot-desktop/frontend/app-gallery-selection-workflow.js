@@ -16,10 +16,12 @@ function selectImage(imageId, options = {}) {
   resetViewerPan();
   if (image.source === "bridge") {
     void requestBridgePreview(image);
+    keepActiveThumbnailVisible();
     return;
   }
   Object.assign(state, previewStateHelpers.previewLoadingState({ clearData: false }));
   render();
+  keepActiveThumbnailVisible();
   setTimer(() => {
     Object.assign(state, previewStateHelpers.previewImageStatusState(image.status));
     render();

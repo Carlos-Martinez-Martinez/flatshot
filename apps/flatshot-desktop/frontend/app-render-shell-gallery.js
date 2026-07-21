@@ -18,7 +18,6 @@ function render() {
   renderAccessibilityHints();
   syncRangeFillStyles();
   syncOpenInspectorDisclosureHeights();
-  keepActiveThumbnailVisible();
   if (sessionSnapshotPersistenceEnabled) {
     writeSessionSnapshot();
   }
@@ -33,5 +32,4 @@ function renderAdjustmentResponse() {
   renderTop();
   syncRangeFillStyles();
   syncOpenInspectorDisclosureHeights();
-  keepActiveThumbnailVisible();
 }

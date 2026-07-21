@@ -46,9 +46,14 @@ The previous Qt desktop surface has been retired:
 - Keep frontend state values aligned with `docs/FRONTEND_STATE_CONTRACT.md`; new states need tests and documentation.
 - Keep low-use model decisions aligned with `docs/LOW_USE_MODELS_AUDIT.md`; do not remove legacy-looking models without a compatibility review.
 - Keep CSS consolidation aligned with `docs/CSS_CASCADE_INVENTORY.md`; the active frontend CSS is modular under `apps/flatshot-desktop/frontend/css/` and must keep its audited load order, single `@layer flatshot` boundary, token ownership, zero same-context duplicate selectors or selector groups, zero legacy shell state classes, no runtime design-system class injection, file-size limit and `!important` limits.
+- Keep the browser frontend zero-build, but do not reintroduce large app-domain scripts. `app.js` must stay a bootstrap file, app-domain and app-render scripts must stay below 400 lines, helper aliases live in `app-globals.js`, mock data stays data-only, and DOM event wiring stays in `interaction-bindings.js`.
+- Keep `FlatShotBridgeService` as a facade. Presets, UI preferences, previews/thumbnails, payload parsing, export endpoints, export naming and export planning live in focused modules; `export_runner.py` and `bridge/service.py` must each stay below 340 lines.
+- Run `python scripts/audit_frontend.py --check` with frontend architecture changes. It checks script order, missing/empty linked scripts, app-domain file-size limits, mock-data helper aliases and event-wiring ownership.
+- Ruff includes flake8-bugbear (`B`) to catch lightweight correctness issues without forcing broad historical style churn.
 
 ## Tests
 
 - `tests/test_architecture_boundaries.py` checks that removed legacy packages do not return.
 - `tests/test_headless_imports.py` checks core/application/bridge/CLI imports without loading Qt modules.
 - Export behavior is covered through `application.export_runner` and bridge tests, not UI adapters.
+- `tests/test_frontend_app_cleanup.py` checks frontend JS ownership and calls the frontend audit in check mode.

@@ -13,6 +13,14 @@ INDEX_PATH = FRONTEND_DIR / "index.html"
 APP_PATH = FRONTEND_DIR / "app.js"
 
 
+def app_domain_source():
+    return "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in [APP_PATH, *sorted(FRONTEND_DIR.glob("app-*.js"))]
+        if path.name != "app-state.js"
+    )
+
+
 def test_output_profile_view_helper_loads_before_app_script():
     html = INDEX_PATH.read_text(encoding="utf-8")
 
@@ -24,7 +32,7 @@ def test_output_profile_view_helper_loads_before_app_script():
 
 def test_output_profile_delete_uses_in_app_confirmation():
     html = INDEX_PATH.read_text(encoding="utf-8")
-    app_js = APP_PATH.read_text(encoding="utf-8")
+    app_js = app_domain_source()
 
     delete_start = app_js.index("function deleteManagedOutputProfile()")
     delete_end = app_js.index("function resetOutputProfileDraft()", delete_start)
@@ -40,7 +48,7 @@ def test_output_profile_delete_uses_in_app_confirmation():
 
 def test_background_preset_editor_stays_with_background_controls():
     html = INDEX_PATH.read_text(encoding="utf-8")
-    app_js = APP_PATH.read_text(encoding="utf-8")
+    app_js = app_domain_source()
 
     image_section_index = html.index('class="format-form-section format-section-image"')
     editor_index = html.index('id="background-preset-editor"')
@@ -65,8 +73,38 @@ def test_background_preset_editor_stays_with_background_controls():
     assert "Muestra del fondo RGB" in app_js
 
 
+def test_background_preset_editor_uses_visual_rgb_selector():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+    app_js = app_domain_source()
+    background_css = (FRONTEND_DIR / "css" / "06-inspector-export" / "background-presets.css").read_text(encoding="utf-8")
+    forms_css = (FRONTEND_DIR / "css" / "03-components" / "forms.css").read_text(encoding="utf-8")
+
+    editor_block = html[html.index('id="background-preset-editor"'):html.index('id="background-preset-editor-message"')]
+
+    assert 'id="background-preset-rgb-input" type="hidden"' in editor_block
+    assert 'class="rgb-visual-control rgb-visual-control--swatch-only background-preset-rgb-control"' in editor_block
+    assert 'data-rgb-visual-control="background-preset"' in editor_block
+    assert 'data-rgb-visual-target="background-preset-rgb-input"' in editor_block
+    assert 'data-rgb-visual-format="rgb-text"' in editor_block
+    assert 'type="button" class="rgb-visual-control__swatch background-preset-swatch"' in editor_block
+    assert 'data-rgb-visual-picker-trigger' in editor_block
+    assert 'type="color" class="rgb-visual-control__picker"' in editor_block
+    assert 'data-rgb-visual-picker' in editor_block
+    assert 'data-rgb-visual-channel=' not in editor_block
+    assert 'data-rgb-visual-swatch' in editor_block
+    assert "syncRgbVisualControlFromValue" in app_js
+    assert "syncRgbVisualControlToTarget" in app_js
+    assert "openRgbVisualPicker" in app_js
+    assert "data-rgb-visual-picker" in app_js
+    assert ".rgb-visual-control" in forms_css
+    assert ".rgb-visual-control--swatch-only" in forms_css
+    assert "Math.min(390" in app_js
+    assert "width: min(390px, calc(100vw - var(--modal-viewport-gutter)))" in background_css
+    assert "grid-template-columns: minmax(0, 1fr) var(--control-size-lg)" in background_css
+
+
 def test_transparent_background_switches_output_type_before_validation():
-    app_js = APP_PATH.read_text(encoding="utf-8")
+    app_js = app_domain_source()
 
     update_start = app_js.index("function updateOutputProfileDraftFromForm()")
     update_end = app_js.index("function setOutputProfileDraftEnabled", update_start)
@@ -78,7 +116,7 @@ def test_transparent_background_switches_output_type_before_validation():
 
 
 def test_destination_mode_clears_custom_path_before_validation():
-    app_js = APP_PATH.read_text(encoding="utf-8")
+    app_js = app_domain_source()
 
     update_start = app_js.index("function updateOutputProfileDraftFromForm()")
     update_end = app_js.index("function setOutputProfileDraftEnabled", update_start)
@@ -88,12 +126,12 @@ def test_destination_mode_clears_custom_path_before_validation():
     assert update_block.index("syncOutputProfileDestinationMode();") < update_block.index("outputProfileDraftFromForm();")
     assert "function looksLikeAbsoluteOutputPath" in update_block
     assert 'destinationInput.value = "Salida";' in update_block
-    assert "readPersistentValue(STORAGE_KEYS.lastOutputFolder)" in update_block
+    assert "storageHelpers.readValue(window.localStorage, STORAGE_KEYS.lastOutputFolder)" in update_block
 
 
 def test_custom_destination_can_pick_folder_from_bridge():
     html = INDEX_PATH.read_text(encoding="utf-8")
-    app_js = APP_PATH.read_text(encoding="utf-8")
+    app_js = app_domain_source()
 
     assert 'id="profile-destination-value-label"' in html
     assert 'data-action="pick-output-profile-destination"' in html
@@ -101,6 +139,142 @@ def test_custom_destination_can_pick_folder_from_bridge():
     assert 'bridgeRequest("/folders/pick"' in app_js
     assert 'modeInput.value = "custom";' in app_js
     assert 'destinationLabel.textContent = raw.destinationMode === "custom" ? "Carpeta" : "Subcarpeta";' in app_js
+
+
+def test_jpg_size_limit_field_stays_below_background_control():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+    app_js = app_domain_source()
+
+    image_section_index = html.index('class="format-form-section format-section-image"')
+    background_index = html.index('id="profile-background-input"', image_section_index)
+    actions_index = html.index('class="background-preset-actions"', image_section_index)
+    limit_index = html.index('id="profile-max-file-size-input"', image_section_index)
+    destination_index = html.index('class="format-form-section format-section-destination"')
+
+    assert background_index < actions_index < limit_index < destination_index
+    assert '<span>Peso máx.</span>' in html
+    assert 'data-profile-field-message="maxFileSizeKb"' in html
+    assert "function syncJpgSizeLimitVisibility()" in app_js
+    assert 'const isJpg = outputProfileHelpers.normalizeExportFormat(formatInput.value) === "JPG";' in app_js
+    assert 'sizeLimitField.classList.toggle("is-reserved-hidden", !isJpg);' in app_js
+    assert 'sizeLimitInput.disabled = !isJpg;' in app_js
+
+
+def test_background_preset_editor_closes_on_outside_click():
+    app_js = app_domain_source()
+
+    click_start = app_js.index("function handleDocumentClick(event)")
+    click_end = app_js.index("function handleDocumentToggle", click_start)
+    click_block = app_js[click_start:click_end]
+
+    close_start = app_js.index("function closeBackgroundPresetEditorOnOutsideClick(event)")
+    close_end = app_js.index("function handleDocumentClick", close_start)
+    close_block = app_js[close_start:close_end]
+
+    assert "const closedBackgroundPresetEditor = closeBackgroundPresetEditorOnOutsideClick(event);" in click_block
+    assert click_block.index("closeBackgroundPresetEditorOnOutsideClick(event)") < click_block.index("const actionTarget")
+    assert "if (closedBackgroundPresetEditor)" in click_block
+    assert 'target.closest?.("#background-preset-editor")' in close_block
+    assert 'target.closest?.(".background-preset-actions")' in close_block
+    assert "state.backgroundPresetEditor = null;" in close_block
+
+
+def test_system_background_presets_are_not_editable_or_deletable():
+    app_js = app_domain_source()
+
+    render_start = app_js.index("function renderBackgroundPresetControls")
+    render_end = app_js.index("function updateBackgroundPresetEditorFromFields", render_start)
+    render_block = app_js[render_start:render_end]
+
+    begin_start = app_js.index("function beginBackgroundPresetEdit")
+    begin_end = app_js.index("function saveBackgroundPreset", begin_start)
+    begin_block = app_js[begin_start:begin_end]
+
+    delete_start = app_js.index("function deleteBackgroundPreset")
+    delete_block = app_js[delete_start:]
+
+    assert "const selectedIsSystemPreset = backgroundPresetHelpers.isSystemBackgroundPreset" in render_block
+    assert "editButton.disabled = !selectedPreset || selectedIsSystemPreset;" in render_block
+    assert "deleteButton.disabled = !selectedPreset || selectedIsSystemPreset;" in render_block
+    assert "Los fondos del sistema no se editan" in render_block
+    assert "Los fondos del sistema no se eliminan" in render_block
+    assert "backgroundPresetHelpers.isSystemBackgroundPreset(preset" in begin_block
+    assert "state.backgroundPresetEditor = null;" in begin_block
+    assert "backgroundPresetHelpers.isSystemBackgroundPreset(preset" in delete_block
+    assert "return;" in delete_block
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
+def test_deleting_selected_background_preset_resets_current_editor_draft():
+    script = f"""
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const vm = require("node:vm");
+const path = require("node:path");
+const frontend = {json.dumps(str(FRONTEND_DIR))};
+
+global.outputProfileHelpers = require(path.join(frontend, "output-profiles.js"));
+global.backgroundPresetHelpers = require(path.join(frontend, "background-presets.js"));
+global.defaultBackgroundPresets = [
+  {{ id: "rgb230", name: "Gris claro", kind: "rgb", rgb: [230, 230, 230] }},
+  {{ id: "white", name: "Blanco", kind: "rgb", rgb: [255, 255, 255] }},
+  {{ id: "transparent", name: "Transparente", kind: "transparent", rgb: [230, 230, 230] }},
+];
+const customValue = "rgb:142,82,82";
+global.state = {{
+  backgroundPresets: backgroundPresetHelpers.normalizeBackgroundPresetList([
+    {{ id: "fondo-rojo", name: "Fondo rojo", kind: "rgb", rgb: [142, 82, 82] }},
+  ], {{ defaultPresets: defaultBackgroundPresets }}),
+  backgroundPresetEditor: null,
+  outputProfileDraft: {{ id: "web", background: customValue }},
+  outputProfileEditorId: "web",
+  outputProfiles: [{{ id: "web", background: customValue }}],
+  statusText: "",
+}};
+const backgroundSelect = {{ value: customValue, innerHTML: "" }};
+let persisted = false;
+let rendered = false;
+
+global.window = {{ confirm: () => true }};
+global.$ = (selector) => selector === "#profile-background-input" ? backgroundSelect : null;
+global.outputProfileFormRawData = () => ({{ background: backgroundSelect.value }});
+global.ensureOutputProfileDraft = () => state.outputProfileDraft;
+global.backgroundHelperOptions = (extra = {{}}) => ({{ outputProfileHelpers, ...extra }});
+global.backgroundPresetOptions = (extra = {{}}) => ({{ outputProfileHelpers, defaultPresets: defaultBackgroundPresets, ...extra }});
+global.backgroundPresetByValue = (value) => backgroundPresetHelpers.backgroundPresetByValue(value, state.backgroundPresets, {{ outputProfileHelpers }});
+global.backgroundSelectOptionsHtml = (value) => backgroundPresetHelpers.backgroundSelectOptionsHtml(value, {{
+  presets: state.backgroundPresets,
+  outputProfileHelpers,
+  escapeHtml: (text) => String(text),
+  backgroundLabel: (background) => `Etiqueta ${{background}}`,
+}});
+global.renderOutputProfileModalState = () => {{}};
+global.persistBackgroundPresets = () => {{ persisted = true; }};
+global.persistOutputProfiles = () => {{}};
+global.render = () => {{ rendered = true; }};
+
+vm.runInThisContext(fs.readFileSync(path.join(frontend, "app-background-preset-controller.js"), "utf8"));
+
+deleteBackgroundPreset();
+
+assert.equal(state.backgroundPresets.some((preset) => preset.id === "fondo-rojo"), false);
+assert.equal(state.outputProfileDraft.background, "rgb230");
+assert.equal(backgroundSelect.value, "rgb230");
+assert.equal(backgroundSelect.innerHTML.includes("Actual ·"), false);
+assert.equal(state.outputProfiles[0].background, customValue);
+assert.equal(state.statusText, "Fondo eliminado: Fondo rojo. Salida en edición: gris claro");
+assert.equal(persisted, true);
+assert.equal(rendered, true);
+"""
+    result = subprocess.run(
+        ["node", "-e", script],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
@@ -128,7 +302,7 @@ const heading = helpers.outputProfileEditorHeadingHtml({{
   isPersisted: true,
   summary: "JPG · 1800x2400",
 }});
-assert.equal(heading.includes("Formato seleccionado"), true);
+assert.equal(heading.includes("Salida seleccionada"), true);
 assert.equal(heading.includes("Web &lt;gris&gt;"), true);
 assert.equal(heading.includes("Usar en este lote"), true);
 assert.equal(heading.includes("data-output-profile-draft-enabled"), true);
@@ -138,12 +312,12 @@ assert.equal(heading.includes("Editado"), false);
 assert.equal(heading.includes("Activo en este lote"), false);
 assert.equal(heading.includes('status-badge ready'), false);
 assert.equal(helpers.outputProfileEditorHeadingHtml({{
-  profile: {{ name: "Nuevo formato" }},
+  profile: {{ name: "Nueva salida" }},
   validation: {{ errors: [] }},
   enabled: false,
   isPersisted: false,
   new: true,
-}}).includes("Formato nuevo"), false);
+}}).includes("Salida nueva"), false);
 
 const invalidHeading = helpers.outputProfileEditorHeadingHtml({{
   profile,
@@ -172,7 +346,7 @@ const validationHtml = helpers.outputProfileValidationHtml({{
   errors: ["Formato invalido"],
   warnings: ["Falta {{original}}"],
 }});
-assert.equal(validationHtml.includes("Revisa el formato"), true);
+assert.equal(validationHtml.includes("Revisa la salida"), true);
 assert.equal(validationHtml.includes('class="error"'), true);
 assert.equal(validationHtml.includes('class="warning"'), true);
 
@@ -246,14 +420,14 @@ assert.equal(helpers.outputNameForImage({{
   format: "JPG",
   image: {{ name: "camisa.png", folderId: "missing" }},
   folders: [{{ id: "folder-a", name: "Lote A" }}],
-}}), "Lote A_camisa_PRO.jpg");
+}}), "Lote A_camisa.jpg");
 assert.equal(helpers.outputNameForImage({{
   naming: "{{folder}}_{{original}}{{suffix}}",
   suffix: "",
   format: "JPG",
   image: {{}},
   folders: [],
-}}), "lote_imagen_001_PRO.jpg");
+}}), "lote_imagen_001.jpg");
 assert.equal(helpers.outputNameForImage({{
   naming: "{{original}}.webp",
   suffix: "_PRO",
@@ -285,7 +459,7 @@ assert.equal(helpers.destinationCompactLabel({{
 assert.equal(helpers.destinationCompactLabel({{
   destinationMode: "custom",
   destinationValue: "C:/Export",
-}}), "C:/Export");
+}}), "Export");
 assert.equal(helpers.destinationCompactLabel({{
   destinationMode: "source",
   destinationValue: "",
@@ -303,7 +477,7 @@ assert.equal(helpers.profileDestinationLabel({{
 assert.equal(helpers.profileDestinationLabel({{
   destinationMode: "custom",
   destinationValue: "C:/Export",
-}}), "C:/Export");
+}}), "Export");
 assert.equal(helpers.profileDestinationLabel({{
   destinationMode: "source",
   destinationValue: "",
@@ -343,6 +517,14 @@ assert.equal(helpers.namingExample({{
 }}), "Sin ejemplo");
 assert.equal(helpers.namingExample({{
   naming: "{{folder}}_{{index:02d}}_{{original}}{{suffix}}",
+  suffix: "",
+  format: "JPG",
+  original: "camisa",
+  folder: "Lote",
+  index: 3,
+}}), "Lote_03_camisa.jpg");
+assert.equal(helpers.namingExample({{
+  naming: "{{folder}}_{{index:02d}}_{{original}}{{suffix}}",
   suffix: "_PRO",
   format: "PNG",
   original: "camisa",
@@ -366,7 +548,7 @@ assert.equal(helpers.destinationFallbackLabel({{
   destinationMode: "custom",
   destinationValue: "C:/Export",
   destinations: [],
-}}), "C:/Export");
+}}), "Export");
 assert.equal(helpers.destinationFallbackLabel({{
   destinationMode: "source",
   destinationValue: "",
@@ -394,7 +576,7 @@ assert.deepEqual(helpers.outputProfileFooterState({{
   closeLabel: "Cerrar",
   closeHidden: true,
   deleteDisabled: true,
-  deleteTitle: "Debe quedar al menos un formato",
+  deleteTitle: "Debe quedar al menos una salida",
   resetDisabled: true,
   resetHidden: true,
   resetLabel: "Descartar",
@@ -416,7 +598,7 @@ assert.deepEqual(helpers.outputProfileFooterState({{
   closeLabel: "Cerrar",
   closeHidden: true,
   deleteDisabled: false,
-  deleteTitle: "Eliminar formato seleccionado",
+  deleteTitle: "Eliminar salida seleccionada",
   resetDisabled: true,
   resetHidden: true,
   resetLabel: "Descartar",
@@ -438,7 +620,7 @@ assert.deepEqual(helpers.outputProfileFooterState({{
   closeLabel: "Cancelar",
   closeHidden: false,
   deleteDisabled: false,
-  deleteTitle: "Descartar formato nuevo",
+  deleteTitle: "Descartar salida nueva",
   resetDisabled: true,
   resetHidden: true,
   resetLabel: "Descartar",
@@ -446,14 +628,14 @@ assert.deepEqual(helpers.outputProfileFooterState({{
   saveHidden: false,
   saveLabel: "Guardar cambios",
   noteClass: "settings-footer-note warning",
-  noteText: "Formato nuevo sin guardar",
+  noteText: "Salida nueva sin guardar",
 }});
 
 assert.deepEqual(helpers.outputProfileFooterState({{
   draft: {{ enabled: true }},
   dirty: true,
   isPersisted: true,
-  noticeText: "Guarda o descarta los cambios antes de cambiar de formato.",
+  noticeText: "Guarda o descarta los cambios antes de cambiar de salida.",
   profileCount: 2,
   validation: {{ errors: [] }},
 }}), {{
@@ -461,7 +643,7 @@ assert.deepEqual(helpers.outputProfileFooterState({{
   closeLabel: "Cerrar",
   closeHidden: true,
   deleteDisabled: false,
-  deleteTitle: "Eliminar formato seleccionado",
+  deleteTitle: "Eliminar salida seleccionada",
   resetDisabled: false,
   resetHidden: false,
   resetLabel: "Descartar",
@@ -469,7 +651,7 @@ assert.deepEqual(helpers.outputProfileFooterState({{
   saveHidden: false,
   saveLabel: "Guardar cambios",
   noteClass: "settings-footer-note warning",
-  noteText: "Guarda o descarta los cambios antes de cambiar de formato.",
+  noteText: "Guarda o descarta los cambios antes de cambiar de salida.",
 }});
 
 assert.deepEqual(helpers.outputProfileFooterState({{
@@ -483,7 +665,7 @@ assert.deepEqual(helpers.outputProfileFooterState({{
   closeLabel: "Cerrar",
   closeHidden: true,
   deleteDisabled: false,
-  deleteTitle: "Eliminar formato seleccionado",
+  deleteTitle: "Eliminar salida seleccionada",
   resetDisabled: false,
   resetHidden: false,
   resetLabel: "Descartar",

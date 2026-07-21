@@ -194,6 +194,89 @@ class TestAplicarEfectos:
         assert result.size == target_size
         assert isinstance(result, Image.Image)
 
+    def test_export_resize_keeps_detail_for_large_subjects(self):
+        """Full export should not pre-downsample detailed source pixels before final resize."""
+        subject_w, subject_h = 3000, 1000
+        canvas = Image.new("RGBA", (3300, 1300), (0, 0, 0, 0))
+        x = np.arange(subject_w, dtype=np.uint16)
+        y = np.arange(subject_h, dtype=np.uint16)[:, None]
+        pattern = (((x // 3 + y // 3) % 2) * 255).astype(np.uint8)
+        rgb = np.dstack(
+            [
+                pattern,
+                np.roll(pattern, 1, axis=1),
+                np.roll(pattern, 2, axis=0),
+            ]
+        )
+        alpha = np.full((subject_h, subject_w), 255, dtype=np.uint8)
+        canvas.alpha_composite(Image.fromarray(np.dstack([rgb, alpha]), "RGBA"), (150, 150))
+        settings = ShadowSettings(
+            adaptive_zoom=False,
+            padding=0,
+            transparent_bg=True,
+            opacity=0,
+            blur=0,
+            contact_blur=0,
+            noise=0,
+        )
+
+        result = ShadowEngine.aplicar_efectos(canvas, settings, (2400, 800))
+        subject = result.crop(result.getbbox()).convert("RGB")
+        arr = np.asarray(subject, dtype=np.int16)
+        horizontal_detail = float(np.mean(np.abs(arr[:, 1:, :] - arr[:, :-1, :])))
+
+        assert horizontal_detail > 75.0
+
+    def test_export_downscale_uses_lanczos_for_subject_detail(self):
+        size = 101
+        x = np.arange(size, dtype=np.uint16)
+        y = np.arange(size, dtype=np.uint16)[:, None]
+        pattern = ((x * 3 + y * 5 + ((x // 2 + y // 3) % 2) * 90) % 256).astype(np.uint8)
+        rgb = np.dstack(
+            [
+                pattern,
+                np.roll(pattern, 3, axis=1),
+                np.roll(pattern, 5, axis=0),
+            ]
+        )
+        source = Image.fromarray(
+            np.dstack([rgb, np.full((size, size), 255, dtype=np.uint8)]),
+            "RGBA",
+        )
+        settings = ShadowSettings(
+            adaptive_zoom=False,
+            padding=0,
+            transparent_bg=True,
+            opacity=0,
+            blur=0,
+            contact_blur=0,
+            noise=0,
+        )
+
+        result = ShadowEngine.aplicar_efectos(source, settings, (67, 67))
+        subject = result.crop(result.getbbox()).convert("RGB")
+        bicubic = source.resize(result.size, Image.Resampling.BICUBIC).convert("RGB")
+        lanczos = source.resize(result.size, Image.Resampling.LANCZOS).convert("RGB")
+
+        subject_arr = np.asarray(subject, dtype=np.int16)
+
+        def best_delta(reference: Image.Image) -> float:
+            max_left = reference.width - subject.width
+            max_top = reference.height - subject.height
+            deltas = []
+            for left in range(max_left + 1):
+                for top in range(max_top + 1):
+                    crop = reference.crop((left, top, left + subject.width, top + subject.height))
+                    deltas.append(
+                        float(np.mean(np.abs(subject_arr - np.asarray(crop, dtype=np.int16))))
+                    )
+            return min(deltas)
+
+        bicubic_delta = best_delta(bicubic)
+        lanczos_delta = best_delta(lanczos)
+
+        assert lanczos_delta < bicubic_delta
+
     def test_legacy_golden_synthetic_output(self):
         """Legacy renderer keeps the established visual output within tolerance."""
         img = Image.new("RGBA", (80, 120), (0, 0, 0, 0))
@@ -215,6 +298,70 @@ class TestAplicarEfectos:
 
         assert result.mode == "RGB"
         assert abs(int(arr.sum()) - 22290180) <= 5000
+
+    @pytest.mark.parametrize(
+        ("engine_name", "expected_sum"),
+        [
+            ("realistic_v2", 22149618),
+            ("studio_2_5d", 22080705),
+        ],
+    )
+    def test_modern_shadow_engines_golden_synthetic_output(self, engine_name, expected_sum):
+        """Modern renderers keep small synthetic output stable within tolerance."""
+        img = Image.new("RGBA", (80, 120), (0, 0, 0, 0))
+        img.paste(Image.new("RGBA", (40, 70), (128, 128, 128, 255)), (20, 25))
+        settings = ShadowSettings(
+            shadow_engine=engine_name,
+            adaptive_zoom=False,
+            angle=180,
+            distance=18,
+            blur=12,
+            opacity=35,
+            noise=0,
+            contact_blur=6,
+            padding=10,
+        )
+
+        result = ShadowEngine.aplicar_efectos(img, settings, (180, 240))
+        arr = np.asarray(result, dtype=np.int64)
+
+        assert result.mode == "RGB"
+        assert abs(int(arr.sum()) - expected_sum) <= 5000
+
+    def test_adaptive_scale_golden_synthetic_output(self):
+        """Adaptive scaling keeps a small transparent output stable within tolerance."""
+        img = Image.new("RGBA", (90, 140), (0, 0, 0, 0))
+        img.paste(Image.new("RGBA", (34, 96), (90, 120, 180, 255)), (28, 24))
+        settings = ShadowSettings(
+            shadow_engine="realistic_v2",
+            adaptive_zoom=True,
+            transparent_bg=True,
+            angle=180,
+            distance=12,
+            blur=8,
+            opacity=30,
+            noise=0,
+            contact_blur=4,
+            padding=12,
+        )
+
+        result = ShadowEngine.aplicar_efectos(
+            img,
+            settings,
+            (180, 260),
+            scale_factor=1.0,
+            curve_data=CurveData(
+                xp=[0.0, 0.35, 0.60, 0.85, 1.10, 1.40, 3.0],
+                fp=[0.80, 0.80, 0.90, 1.00, 0.95, 0.90, 0.90],
+            ),
+        )
+        arr = np.asarray(result, dtype=np.int64)
+        alpha_sum = int(np.asarray(result.getchannel("A"), dtype=np.int64).sum())
+
+        assert result.mode == "RGBA"
+        assert result.getbbox() == (49, 22, 132, 238)
+        assert abs(int(arr.sum()) - 9594010) <= 5000
+        assert abs(alpha_sum - 3768226) <= 5000
 
     def test_realistic_v2_is_deterministic_with_noise(self, sample_image):
         settings = ShadowSettings(
@@ -254,7 +401,7 @@ class TestAplicarEfectos:
                     blur=18,
                     contact_blur=6,
                     opacity=45,
-                    noise=25,
+                    noise=20,
                 )
             )
         ).shadow
@@ -580,7 +727,7 @@ class TestAplicarEfectos:
     def test_studio_2_5d_light_types_produce_distinct_shadows(self):
         base = {
             "shadow_engine": "studio_2_5d",
-            "distance": 90,
+            "distance": 80,
             "blur": 24,
             "contact_blur": 9,
             "opacity": 45,

@@ -5,13 +5,9 @@
   }
   root.FlatShotExportConfirmView = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  const escapeHtml = globalThis.FlatShotFormatters?.escapeHtml || function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  };
+  const formatterHelpers = globalThis.FlatShotFormatters
+    || (typeof require === "function" ? require("./formatters.js") : null);
+  const escapeHtml = (value) => formatterHelpers.escapeHtml(value);
 
   function exportConfirmRiskHtml(risk) {
     const icon = risk.blocking ? "!" : "⚠";
@@ -26,6 +22,33 @@
   `;
   }
 
+  function summaryListItemHtml(item) {
+    if (item && typeof item === "object") {
+      return `
+        <li>
+          <span>${escapeHtml(item.label || "")}</span>
+          <strong title="${escapeHtml(item.value || "")}">${escapeHtml(item.value || "")}</strong>
+        </li>
+      `;
+    }
+    return `<li><strong title="${escapeHtml(item)}">${escapeHtml(item)}</strong></li>`;
+  }
+
+  function summaryRowHtml(row) {
+    const normalized = Array.isArray(row)
+      ? { label: row[0], value: row[1], items: [] }
+      : row || {};
+    const items = Array.isArray(normalized.items) ? normalized.items : [];
+    const value = normalized.value === undefined || normalized.value === null ? "" : String(normalized.value);
+    return `
+      <div class="export-confirm-summary__item${items.length ? " has-list" : ""}">
+        <span>${escapeHtml(normalized.label || "")}</span>
+        ${value ? `<strong title="${escapeHtml(value)}">${escapeHtml(value)}</strong>` : ""}
+        ${items.length ? `<ul class="export-confirm-summary__list">${items.map(summaryListItemHtml).join("")}</ul>` : ""}
+      </div>
+    `;
+  }
+
   function exportConfirmHtml(options = {}) {
     const risks = Array.isArray(options.risks) ? options.risks : [];
     const summaryRows = Array.isArray(options.summaryRows) ? options.summaryRows : [];
@@ -38,7 +61,7 @@
         <span aria-hidden="true">✓</span>
         <div>
           <strong>Sin avisos</strong>
-          <small>El lote se exportará con el formato activo.</small>
+          <small>El lote se exportará con la salida activa.</small>
         </div>
       </div>
     `;
@@ -53,12 +76,7 @@
 
     return `
     <div class="export-confirm-summary">
-      ${summaryRows.map(([label, value]) => `
-        <div>
-          <span>${escapeHtml(label)}</span>
-          <strong title="${escapeHtml(value)}">${escapeHtml(value)}</strong>
-        </div>
-      `).join("")}
+      ${summaryRows.map(summaryRowHtml).join("")}
     </div>
     <section class="export-confirm-section">
       <h3>${escapeHtml(riskTitle)}</h3>
@@ -86,5 +104,6 @@
     exportConfirmHtml,
     exportConfirmModalState,
     exportConfirmRiskHtml,
+    summaryRowHtml,
   };
 });

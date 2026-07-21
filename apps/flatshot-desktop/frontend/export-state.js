@@ -14,8 +14,10 @@
       exportDestinations: [],
       exportMessages: [],
       exportCompletedItems: [],
+      exportFailedItems: [],
       exportIssues: [],
       exportResult: null,
+      outputBrowserOpen: false,
       errors: [],
       paused: false,
       statusText: "Preparando exportación",
@@ -32,15 +34,45 @@
   }
 
   function bridgeRunFailureState(message) {
+    const issue = runFailureIssue(message);
     return {
       exportStatus: "failed",
       progress: 0,
       processed: 0,
-      exportIssues: [{ level: "error", title: "Exportación fallida", detail: message }],
+      exportIssues: [issue],
       exportResult: null,
-      errors: [{ level: "error", title: "Exportación fallida", detail: message }],
-      statusText: "Exportación fallida",
+      errors: [issue],
+      statusText: isOutputConfigurationIssue(issue) ? "Revisa salida" : "Exportación fallida",
     };
+  }
+
+  function runFailureIssue(message) {
+    return isOutputConfigurationMessage(message)
+      ? { level: "error", title: "Salida a corregir", detail: String(message || "Revisa la salida configurada.") }
+      : { level: "error", title: "Exportación fallida", detail: message };
+  }
+
+  function isOutputConfigurationMessage(message) {
+    const text = String(message || "").toLowerCase();
+    if (!text) {
+      return false;
+    }
+    return /salida|destino|sufijo|subcarpeta|patr[oó]n de nombre|nombre de archivo/.test(text)
+      && /repetid|existente|ya existe|mismo archivo|generar[ií]a|colisi[oó]n|sobrescri|overwrite|already exists/.test(text);
+  }
+
+  function isOutputConfigurationIssue(issue) {
+    if (!issue) {
+      return false;
+    }
+    if (issue.title === "Salida a corregir") {
+      return true;
+    }
+    return isOutputConfigurationMessage(`${issue.title || ""} ${issue.detail || ""}`);
+  }
+
+  function clearOutputConfigurationIssues(issues = []) {
+    return (Array.isArray(issues) ? issues : []).filter((issue) => !isOutputConfigurationIssue(issue));
   }
 
   function bridgeProgressUnavailableState(message) {
@@ -78,6 +110,7 @@
       exportDestinations: Array.isArray(payload.destinations) ? payload.destinations : previous.exportDestinations,
       exportMessages: Array.isArray(payload.messages) ? payload.messages : previous.exportMessages,
       exportCompletedItems: Array.isArray(payload.completedItems) ? payload.completedItems : previous.exportCompletedItems,
+      exportFailedItems: Array.isArray(payload.failedItems) ? payload.failedItems : previous.exportFailedItems || [],
       exportIssues: Array.isArray(payload.issues) ? payload.issues.map(normalizeBridgeIssue) : previous.exportIssues,
       exportResult: payload.result || previous.exportResult,
       progress: Number(progress.percent) || 0,
@@ -135,7 +168,9 @@
     bridgeRunFailureState,
     bridgeStatusErrors,
     bridgeStatusPatch,
+    clearOutputConfigurationIssues,
     exportStartState,
+    isOutputConfigurationIssue,
     normalizeBridgeIssue,
     stoppedExportState,
   };

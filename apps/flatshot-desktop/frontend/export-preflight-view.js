@@ -5,13 +5,9 @@
   }
   root.FlatShotExportPreflightView = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  const escapeHtml = globalThis.FlatShotFormatters?.escapeHtml || function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  };
+  const formatterHelpers = globalThis.FlatShotFormatters
+    || (typeof require === "function" ? require("./formatters.js") : null);
+  const escapeHtml = (value) => formatterHelpers.escapeHtml(value);
 
   function issueItemHtml(row = {}) {
     const action = row.imageId
@@ -118,7 +114,7 @@
     const warningCount = Number(options.warningCount) || 0;
     const onlyIgnored = rows.length > 0 && warningCount === 0 && Number(counts.errors) === 0;
     const footerAction = counts.errors
-      ? '<button type="button" class="primary" data-action="edit-output">Revisar salida</button>'
+      ? '<button type="button" class="primary" data-action="edit-output">Corregir salida</button>'
       : "";
 
     if (!rows.length) {
@@ -135,7 +131,7 @@
         ? `${rows.length} ignorado${rows.length === 1 ? "" : "s"}`
         : `${warningCount || rows.length} aviso${(warningCount || rows.length) === 1 ? "" : "s"}`;
     const detailText = counts.errors
-      ? "Resuelve los bloqueos antes de exportar."
+      ? "Corrige la salida para continuar."
       : onlyIgnored
         ? "No afectan a la exportación."
         : "Puedes revisar sin bloquear la exportación.";
@@ -179,19 +175,26 @@
     if (status === "partial") {
       return "Exportado con avisos";
     }
+    const issueLabel = firstActionableIssueLabel(issues);
     if (status === "failed") {
-      return "Revisar antes de exportar";
+      return issueLabel ? `Revisar: ${issueLabel}` : "Revisar antes de exportar";
     }
     if (issues.some((issue) => issue.level === "error")) {
-      return "Revisar antes de exportar";
+      return issueLabel ? `Revisar: ${issueLabel}` : "Revisar antes de exportar";
     }
     if (options.batch === "empty" || (options.hasActiveBatch && !ready)) {
-      return "Pendiente";
+      return issueLabel ? `Pendiente: ${issueLabel}` : "Pendiente";
     }
     if (ready && issues.length) {
       return `${issues.length} aviso${issues.length === 1 ? "" : "s"} antes de exportar`;
     }
     return ready ? "Listo para exportar" : "Configura salida";
+  }
+
+  function firstActionableIssueLabel(issues = []) {
+    const issue = issues.find((item) => item.level === "error") || issues[0];
+    const label = issue?.title || issue?.detail || "";
+    return label.length > 40 ? `${label.slice(0, 37)}...` : label;
   }
 
   function exportPreflightSummary(options = {}) {

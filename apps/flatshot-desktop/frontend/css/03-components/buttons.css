@@ -15,20 +15,20 @@
 }
 
 .btn-linklike {
-  min-height: 32px;
+  min-height: var(--control-height);
   border: 0;
   background: transparent;
-  color: var(--color-accent-hover);
+  color: var(--semantic-selection);
   font-weight: var(--font-weight-semibold);
   box-shadow: none;
 }
 
 .primary {
   min-width: 150px;
-  font-weight: 750;
+  font-weight: var(--font-weight-bold);
   border-color: var(--accent);
   background: var(--accent);
-  color: #fff;
+  color: var(--color-text-inverse);
   box-shadow: var(--shadow-xs);
 }
 
@@ -40,40 +40,35 @@ button, summary {
   user-select: none;
 }
 
-button:not(.image-item):not(.preset-chip):not(.output-profile-edit) {
+button:where([data-action], [data-filter], [data-gallery-view], [data-preview-mode], [data-preview-bg], [data-lighting-preset], [data-review-scenario], [data-inspector-tab], [data-output-profile-close], [data-output-profile-reset], [data-output-profile-save]) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  line-height: 1;
+  line-height: var(--line-height-none);
 }
 
 .button-icon {
   flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
+  width: var(--button-icon-size);
+  height: var(--button-icon-size);
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
 .button-icon svg {
-  width: 16px;
-  height: 16px;
+  width: var(--button-icon-size);
+  height: var(--button-icon-size);
   display: block;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2;
+  stroke-width: var(--icon-stroke-width);
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
-.button-icon--fill svg {
-  fill: currentColor;
-  stroke: none;
-}
-
-button, .status-dot, .asset-state, .preflight-chip, .change-chip, .state-chip, .empty-output-chip {
+.status-dot, .asset-state, .preflight-chip, .change-chip, .state-chip {
   user-select: none;
 }
 
@@ -85,9 +80,10 @@ button.primary {
 }
 
 .segmented button {
-  border-radius: var(--radius-6);
-  font-size: 12px;
-  min-height: var(--control-height-sm);
+  width: 100%;
+  border-radius: var(--radius-xs);
+  font-size: var(--font-size-xs);
+  min-height: var(--control-height);
   border-color: transparent;
   background: transparent;
   padding: 0 var(--space-3);
@@ -95,17 +91,17 @@ button.primary {
 }
 
 .danger-subtle {
-  border-color: rgba(180, 35, 24, 0.18);
+  border-color: var(--danger-deep-alpha-18);
   color: var(--color-error);
 }
 
 .ghost-action {
   border-color: transparent;
   background: transparent;
-  color: var(--color-primary);
+  color: var(--semantic-selection);
 }
 
-button:not(.primary):not(.active):not(.danger):not(.danger-subtle):not(.btn-linklike):not(.ghost-action):not(.icon-button):not(.image-item):not(.preset-chip):not(.output-profile-edit) {
+button:where([data-action], [data-filter], [data-gallery-view], [data-preview-mode], [data-preview-bg], [data-lighting-preset], [data-review-scenario], [data-inspector-tab], [data-output-profile-close], [data-output-profile-reset], [data-output-profile-save]):where(:not(.primary):not(.active):not(.danger):not(.danger-subtle):not(.btn-linklike):not(.ghost-action):not(.icon-button)) {
   border-color: var(--border-default);
   background: var(--surface-panel);
   color: var(--text-secondary);
@@ -114,7 +110,7 @@ button:not(.primary):not(.active):not(.danger):not(.danger-subtle):not(.btn-link
 .btn-linklike, .ghost-action {
   border-color: transparent;
   background: transparent;
-  color: var(--semantic-primary);
+  color: var(--semantic-selection);
 }
 
 .danger, .danger-subtle {
@@ -125,15 +121,9 @@ button:not(.primary):not(.active):not(.danger):not(.danger-subtle):not(.btn-link
 
 .icon-button {
   min-width: var(--control-height);
-  padding-inline: var(--space-2);
-}
-
-.top-more-menu__content button {
-  width: 100%;
-  justify-content: flex-start;
   border-color: transparent;
   background: transparent;
-  color: var(--color-text);
+  padding-inline: var(--space-2);
 }
 
 .empty-state.onboarding .primary {

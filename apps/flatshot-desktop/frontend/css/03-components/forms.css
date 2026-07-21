@@ -21,20 +21,20 @@ input[type="range"]::-webkit-slider-thumb {
 .search-field {
   flex: 0 0 auto;
   display: grid;
-  gap: 6px;
-  margin-top: 12px;
+  gap: var(--space-1-5);
+  margin-top: var(--space-3);
 }
 
 .search-field span {
-  font-weight: 700;
-  font-size: 12px;
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-xs);
 }
 
 input, select {
   min-width: 0;
   width: 100%;
-  min-height: 34px;
-  border: 1px solid var(--color-border);
+  min-height: var(--control-size-md);
+  border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-bg-panel);
   padding: 0 var(--space-3);
@@ -54,12 +54,19 @@ input, select {
 
 .form-grid label, .text-field {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--space-1-5);
 }
+
+.rgb-visual-control { position: relative; min-width: 0; width: 100%; height: var(--control-size-md); display: inline-flex; align-items: center; overflow: hidden; border: var(--border-width) solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-bg-panel); }
+.rgb-visual-control:focus-within { border-color: var(--semantic-focus); box-shadow: var(--shadow-focus); }
+.rgb-visual-control .rgb-visual-control__swatch { width: var(--control-height); min-width: var(--control-height); height: 100%; display: block; border: 0; border-right: var(--border-width) solid var(--color-border); border-radius: 0; background: var(--rgb-visual-color, var(--rgb-neutral-fallback)); padding: 0; cursor: pointer; box-shadow: inset 0 0 0 var(--border-width) var(--surface-alpha-55); }
+.rgb-visual-control--swatch-only { width: var(--control-size-lg); min-width: var(--control-size-lg); }
+.rgb-visual-control--swatch-only .rgb-visual-control__swatch { width: 100%; min-width: 100%; border-right: 0; }
+.rgb-visual-control__picker { position: absolute; inset: 0 auto auto 0; width: var(--visually-hidden-size); height: var(--visually-hidden-size); opacity: 0; pointer-events: none; }
 
 @supports (-webkit-appearance: none) {
   .settings-panel input[type="range"] {
-    height: 22px;
+    height: var(--control-size-2xs);
     background: transparent;
     cursor: pointer;
     -webkit-appearance: none;
@@ -68,8 +75,8 @@ input, select {
 
 @supports (-webkit-appearance: none) {
   .settings-panel input[type="range"]::-webkit-slider-runnable-track {
-    height: 6px;
-    border: 1px solid color-mix(in srgb, var(--color-accent-border) 45%, var(--color-border));
+    height: var(--control-track-height);
+    border: var(--border-width) solid color-mix(in srgb, var(--color-accent-border) 45%, var(--color-border));
     border-radius: var(--radius-pill);
     background: linear-gradient(
       to right,
@@ -81,13 +88,13 @@ input, select {
 
 @supports (-webkit-appearance: none) {
   .settings-panel input[type="range"]::-webkit-slider-thumb {
-    width: 14px;
-    height: 14px;
+    width: var(--range-thumb-size);
+    height: var(--range-thumb-size);
     margin-top: -5px;
-    border: 2px solid var(--color-bg-panel);
+    border: var(--border-width-strong) solid var(--color-bg-panel);
     border-radius: var(--radius-pill);
     background: var(--color-accent);
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
+    box-shadow: 0 1px 3px var(--ink-alpha-20);
     -webkit-appearance: none;
   }
 }
@@ -103,7 +110,7 @@ input, select {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 30px;
+  min-height: var(--control-size-compact);
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
   font-style: normal;
@@ -111,8 +118,8 @@ input, select {
 }
 
 .toggle-field input[type="checkbox"] {
-  width: 22px;
-  height: 22px;
+  width: var(--control-size-2xs);
+  height: var(--control-size-2xs);
   accent-color: var(--color-accent);
   cursor: pointer;
 }
@@ -131,7 +138,7 @@ input, select {
 }
 
 #zoom-label {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   flex: 0 0 auto;
   color: var(--color-text-muted);
   min-width: 40px;
@@ -140,7 +147,7 @@ input, select {
 .number-input {
   width: 100%;
   min-width: 0;
-  min-height: 32px;
+  min-height: var(--control-size-slim);
   padding: 0 var(--space-2);
   text-align: center;
   font-variant-numeric: tabular-nums;

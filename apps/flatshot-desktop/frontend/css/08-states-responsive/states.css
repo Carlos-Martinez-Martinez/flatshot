@@ -10,6 +10,19 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   box-shadow: var(--focus-ring);
 }
 
+@media (forced-colors: active) {
+  button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible {
+    outline: var(--focus-outline-width) solid Highlight;
+    outline-color: Highlight;
+    outline-offset: var(--focus-outline-offset);
+    box-shadow: none;
+  }
+
+  button, input, select, summary, .image-item, .preflight-item {
+    border-color: CanvasText;
+  }
+}
+
 input:hover:not(:disabled), select:hover:not(:disabled) {
   border-color: var(--border-strong);
 }
@@ -24,7 +37,7 @@ input:hover:not(:disabled), select:hover:not(:disabled) {
 
 .btn-linklike:hover:not(:disabled) {
   background: var(--color-accent-soft);
-  color: var(--color-accent-hover);
+  color: var(--semantic-selection);
 }
 
 .result-header.ready {
@@ -84,9 +97,9 @@ input:hover:not(:disabled), select:hover:not(:disabled) {
 }
 
 .empty-state.onboarding, .empty-state.warning {
-  border: 1px solid rgba(255, 255, 255, 0.78);
-  border-radius: var(--radius-16);
-  background: rgba(255, 255, 255, 0.78);
+  border: var(--border-width) solid var(--surface-alpha-78);
+  border-radius: var(--radius-lg);
+  background: var(--surface-alpha-78);
   padding: 26px 28px;
   box-shadow: var(--shadow-sm);
 }
@@ -97,7 +110,7 @@ input:hover:not(:disabled), select:hover:not(:disabled) {
 
 .preflight-item.warning {
   border-color: var(--warning-line);
-  background: #fffaf0;
+  background: var(--warning-soft);
 }
 
 .preflight-item.warning > span {
@@ -110,7 +123,7 @@ input:hover:not(:disabled), select:hover:not(:disabled) {
 
 .preflight-item.error {
   border-color: var(--danger-line);
-  background: #fff7f6;
+  background: var(--danger-soft);
 }
 
 .preflight-item.error > span {
@@ -127,12 +140,12 @@ html.dev-mode [data-action="toggle-inspector"] {
 
 .warning-summary strong {
   color: var(--text-strong);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 
 .warning-summary span {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .warning-summary.clear span {
@@ -160,20 +173,13 @@ button.primary:hover:not(:disabled) {
   background: var(--color-bg-panel);
 }
 
-.segmented button.active {
-  border-color: var(--color-accent-border);
-  background: var(--color-accent-soft);
-  color: var(--color-accent-hover);
-  box-shadow: none;
-}
-
 .warning-summary {
   border-color: var(--warning-line);
   background: var(--color-warning-soft);
   padding: var(--space-3);
   display: grid;
   gap: var(--space-2);
-  border: 1px solid var(--color-warning-border);
+  border: var(--border-width) solid var(--color-warning-border);
   border-radius: var(--radius-md);
   color: var(--color-warning);
 }
@@ -199,7 +205,7 @@ button.primary:hover:not(:disabled) {
 
 .warning-summary button {
   justify-self: start;
-  min-height: 28px;
+  min-height: var(--control-height);
   border: 0;
   background: transparent;
   padding: 0;
@@ -219,7 +225,7 @@ button.primary:hover:not(:disabled) {
 }
 
 .danger-subtle:hover:not(:disabled) {
-  border-color: rgba(180, 35, 24, 0.32);
+  border-color: var(--danger-deep-alpha-32);
   background: var(--color-error-soft);
 }
 
@@ -250,7 +256,7 @@ button.primary:hover:not(:disabled) {
 }
 
 .status-badge.ready {
-  border-color: rgba(15, 143, 114, 0.28);
+  border-color: var(--color-accent-border);
   color: var(--color-success);
 }
 
@@ -264,35 +270,51 @@ button.primary:hover:not(:disabled) {
   color: var(--color-error);
 }
 
-.status-badge.active {
-  border-color: var(--color-accent-border);
-  color: var(--color-accent);
-}
-
 .warning-actions {
   margin-top: var(--space-1);
 }
 
-.top-detail-action[hidden], #top-secondary-action[hidden] {
+.app-shell[data-ui-state="error"] .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+
+.app-shell[data-ui-state="error"] .workspace > :not(.app-error-boundary) {
   display: none !important;
 }
 
-.top-more-menu[hidden] {
-  display: none !important;
+.app-error-boundary { display: grid; place-items: center; min-width: 0; min-height: 0; background: var(--color-bg-soft); padding: var(--space-5); }
+
+.app-error-boundary__card {
+  width: min(560px, 100%); display: grid; gap: var(--space-3);
+  border: var(--border-width) solid var(--color-error-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-panel);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-md);
 }
 
-.top-more-menu__content button:hover:not(:disabled) {
-  border-color: var(--color-border);
-  background: var(--color-bg-soft);
+.app-error-boundary__card strong { color: var(--color-text); font-size: var(--font-size-lg); }
+
+.app-error-boundary__card p, .app-error-boundary__card summary {
+  color: var(--color-text-muted);
+}
+
+.app-error-boundary__card pre {
+  max-height: 180px; overflow: auto; border-radius: var(--radius-sm);
+  background: var(--color-bg-soft); padding: var(--space-3); color: var(--color-text);
+  white-space: pre-wrap; user-select: text;
 }
 
 .ghost-action:hover:not(:disabled) {
   border-color: var(--color-accent-border);
   background: var(--color-primary-soft);
-  color: var(--color-primary-hover);
+  color: var(--semantic-selection);
 }
 
 #app-settings-modal:not(.is-hidden) {
+  display: grid;
+  place-items: center;
+}
+
+#preferences-modal:not(.is-hidden) {
   display: grid;
   place-items: center;
 }
@@ -314,7 +336,22 @@ button.primary:hover:not(:disabled) {
   color: var(--color-text-inverse);
 }
 
-.app-shell[data-ui-state="no_folder"] .gallery-column, .app-shell[data-ui-state="scanning"] .gallery-column, .app-shell[data-ui-state="batch_empty"] .gallery-column, .app-shell[data-ui-state="scan_empty"] .gallery-column, .app-shell[data-ui-state="no_folder"] .settings-panel, .app-shell[data-ui-state="scanning"] .settings-panel {
+.app-shell:is([data-ui-state="scanning"], [data-ui-state="no_folder"], [data-ui-state="batch_empty"], [data-ui-state="scan_empty"]) :is(#batch-visible-count, .gallery-search, .gallery-filter, .gallery-view-switch) {
   display: none;
+}
+
+.app-shell:is([data-ui-state="no_folder"], [data-ui-state="scanning"], [data-ui-state="batch_empty"], [data-ui-state="scan_empty"]) .gallery-column,
+.app-shell:is([data-ui-state="no_folder"], [data-ui-state="scanning"]) .settings-panel {
+  display: none;
+}
+
+.app-shell[data-ui-state="no_folder"] :is(.search-field, .folder-list, .batch-filter, .image-list, .empty-note) {
+  display: none;
+}
+
+:root[data-motion="reduced"] :is(.thumb-skeleton, .onboarding-background__slide, .app-settings-backdrop, .app-settings-backdrop > section, .image-item) {
+  animation: none;
+  transition: none;
+  transform: none;
 }
 }

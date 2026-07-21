@@ -11,6 +11,16 @@ FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
 HELPER_PATH = FRONTEND_DIR / "preview-view.js"
 INDEX_PATH = FRONTEND_DIR / "index.html"
 APP_PATH = FRONTEND_DIR / "app.js"
+VIEWER_TOOLBAR_CSS_PATH = FRONTEND_DIR / "css" / "05-viewer" / "viewer-toolbar.css"
+CANVAS_CSS_PATH = FRONTEND_DIR / "css" / "05-viewer" / "canvas.css"
+
+
+def app_domain_source():
+    return "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in [APP_PATH, *sorted(FRONTEND_DIR.glob("app-*.js"))]
+        if path.name != "app-state.js"
+    )
 
 
 def test_preview_view_helper_loads_before_app_script():
@@ -24,26 +34,84 @@ def test_preview_view_helper_loads_before_app_script():
 
 def test_preview_toolbar_keeps_compact_context_labels():
     html = INDEX_PATH.read_text(encoding="utf-8")
-    app_js = APP_PATH.read_text(encoding="utf-8")
+    app_js = app_domain_source()
 
-    for label in ("Fondo", "Imagen", "Encajar", "Zoom"):
+    for label in ("Fondo", "Guías", "Imagen", "Encajar", "Zoom"):
         assert f'class="viewer-control-label">{label}</span>' in html
     assert 'data-preview-bg="soft-black"' in html
     assert 'data-preview-bg="custom"' in html
-    assert 'data-preview-bg-channel="r"' in html
-    assert 'data-preview-bg-channel="g"' in html
-    assert 'data-preview-bg-channel="b"' in html
+    custom_control = html[html.index('data-rgb-visual-control="preview-background"'):html.index('id="preview-output-context"')]
+    assert 'data-rgb-visual-format="rgb-background"' in custom_control
+    assert 'id="preview-bg-custom-value" type="hidden"' in custom_control
+    assert 'id="preview-bg-color-input" type="color"' in html
+    assert 'data-preview-bg-picker' in html
+    assert 'data-rgb-visual-picker-trigger' in html
+    assert 'data-rgb-visual-picker' in html
+    assert 'data-preview-bg-channel=' not in custom_control
+    assert 'data-rgb-visual-channel=' not in custom_control
+    assert "openRgbVisualPicker" in app_js
+    assert "applyPreviewBackgroundPickerChange" in app_js
+    assert "renderPreview();" in app_js
     assert "customFields.classList.toggle(\"active\"" in app_js
     assert ">Gris</button>" not in html
     assert ">Blanco</button>" not in html
     assert ">Transparente</button>" not in html
-    assert "function normalizePreviewBackgroundValue" in app_js
+    assert html.index("background-presets.js") < html.index("app.js")
+    assert "backgroundPresetHelpers.normalizePreviewBackgroundValue" in app_js
     assert "function previewCustomBackgroundValue" in app_js
     assert 'bgTarget.dataset.previewBg === "custom" ? previewCustomBackgroundValue()' in app_js
     assert 'data-action="zoom-fit"' not in html
     assert 'data-action="zoom-fit" title="Encajar' not in html
     assert 'data-action="zoom-100"' not in html
     assert ">1:1</button>" not in html
+
+
+def test_preview_rgb230_swatch_uses_real_light_background_color():
+    css = VIEWER_TOOLBAR_CSS_PATH.read_text(encoding="utf-8")
+
+    assert '.viewer-background-switch [data-preview-bg="rgb230"]::before' in css
+    rgb230_rule = css.split('.viewer-background-switch [data-preview-bg="rgb230"]::before {', 1)[1].split("}", 1)[0]
+    assert "background: var(--rgb-neutral-fallback);" in rgb230_rule
+
+
+def test_preview_rgb230_canvas_uses_real_light_background_color():
+    css = CANVAS_CSS_PATH.read_text(encoding="utf-8")
+
+    assert ".canvas-area.bg-rgb230" in css
+    rgb230_rule = css.split(".canvas-area.bg-rgb230 {", 1)[1].split("}", 1)[0]
+    assert "background: var(--rgb-neutral-fallback);" in rgb230_rule
+    assert "background: var(--color-bg-stage);" not in rgb230_rule
+
+
+def test_initial_canvas_uses_app_background_instead_of_preview_background():
+    css = CANVAS_CSS_PATH.read_text(encoding="utf-8")
+
+    assert '.app-shell[data-ui-state="no_folder"] .canvas-area' in css
+    initial_rule = css.split('.app-shell[data-ui-state="no_folder"] .canvas-area {', 1)[1].split("}", 1)[0]
+    assert "background: var(--color-bg);" in initial_rule
+    assert "--rgb-neutral-fallback" not in initial_rule
+
+
+def test_preview_render_preserves_onboarding_background_layer():
+    source = (FRONTEND_DIR / "app-preview-controller.js").read_text(encoding="utf-8")
+
+    assert "function setPreviewCanvasHtml(" in source
+    assert 'canvas.querySelector("#onboarding-background")' in source
+    assert "canvas.prepend(onboardingLayer);" in source
+
+
+def test_compare_mode_has_draggable_divider_wiring():
+    app_js = app_domain_source()
+    canvas_css = (FRONTEND_DIR / "css" / "05-viewer" / "canvas.css").read_text(encoding="utf-8")
+
+    assert "compareSplit: 50" in app_js
+    assert "compareDividerDrag" in app_js
+    assert "previewViewHelpers.compareDividerHtml" in app_js
+    assert "handleCompareDividerPointerDown(event)" in app_js
+    assert "updateCompareDividerFromPointer(event)" in app_js
+    assert "data-compare-divider" in app_js
+    assert "--compare-split" in canvas_css
+    assert ".compare-divider" in canvas_css
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
@@ -121,6 +189,15 @@ assert.equal(helpers.viewerOutputCompactLabel({{
   backgroundLabel: "transparente",
 }}), "PNG · 1200×1600 · transparente");
 assert.equal(helpers.viewerOutputCompactLabel({{}}), "JPG · 1800×2400 · gris claro");
+
+const outputContext = helpers.viewerOutputContextHtml({{
+  name: 'Web <gris>',
+  summary: 'JPG · 1800×2400 · "RGB230"',
+}});
+assert.equal(outputContext.includes("<span>Previsualizando</span>"), true);
+assert.equal(outputContext.includes("<strong>Web &lt;gris&gt;</strong>"), true);
+assert.equal(outputContext.includes("JPG · 1800×2400 · &quot;RGB230&quot;"), true);
+assert.equal(helpers.viewerOutputContextHtml({{ name: "", summary: "" }}), "");
 """
     result = subprocess.run(
         ["node", "-e", script],

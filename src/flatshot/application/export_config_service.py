@@ -4,7 +4,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from flatshot.core.models import ExportConfig, ExportVariant, normalize_export_variants
+from flatshot.core.models import (
+    MAX_EXPORT_PIXELS,
+    MAX_EXPORT_SIDE,
+    ExportConfig,
+    ExportVariant,
+    normalize_export_variants,
+)
 
 
 class ExportConfigService:
@@ -50,6 +56,10 @@ class ExportConfigService:
             errors.append("El formato de exportación debe ser JPG o PNG.")
         if int(config.output_width) <= 0 or int(config.output_height) <= 0:
             errors.append("El tamaño de exportación debe ser positivo.")
+        if int(config.output_width) > MAX_EXPORT_SIDE or int(config.output_height) > MAX_EXPORT_SIDE:
+            errors.append(f"El lado de exportación no puede superar {MAX_EXPORT_SIDE}px.")
+        if int(config.output_width) * int(config.output_height) > MAX_EXPORT_PIXELS:
+            errors.append(f"El área de exportación no puede superar {MAX_EXPORT_PIXELS:,} píxeles.")
         if config.output_destination not in {"subfolder", "custom"}:
             errors.append("El destino de exportación debe ser subfolder o custom.")
         if config.output_destination == "custom" and not config.custom_output_path:
@@ -74,6 +84,10 @@ class ExportConfigService:
                 errors.append(f"{variant.label}: el formato debe ser JPG o PNG.")
             if output_width <= 0 or output_height <= 0:
                 errors.append(f"{variant.label}: el tamaño de exportación debe ser positivo.")
+            if output_width > MAX_EXPORT_SIDE or output_height > MAX_EXPORT_SIDE:
+                errors.append(f"{variant.label}: ningún lado puede superar {MAX_EXPORT_SIDE}px.")
+            if output_width * output_height > MAX_EXPORT_PIXELS:
+                errors.append(f"{variant.label}: el área supera {MAX_EXPORT_PIXELS:,} píxeles.")
             if destination_mode not in {"subfolder", "custom"}:
                 errors.append(f"{variant.label}: el destino debe ser subfolder o custom.")
             if (

@@ -1,11 +1,12 @@
 import ast
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = PROJECT_ROOT / "src" / "flatshot"
+APP_ROOT = SRC_ROOT / "application"
+BRIDGE_ROOT = SRC_ROOT / "bridge"
 PROTECTED_PACKAGE_DIRS = (
-    SRC_ROOT / "application",
+    APP_ROOT,
     SRC_ROOT / "core",
 )
 
@@ -87,3 +88,51 @@ def test_retired_qt_packages_are_removed():
 
 def test_local_api_package_is_not_active_yet():
     assert not (SRC_ROOT / "api").exists()
+
+
+def test_test_helpers_own_inline_executor():
+    duplicate_definitions: list[str] = []
+
+    for path in PROJECT_ROOT.joinpath("tests").glob("test_*.py"):
+        if path.name == "test_architecture_boundaries.py":
+            continue
+        source = path.read_text(encoding="utf-8")
+        if "class InlineExecutor" in source:
+            duplicate_definitions.append(_relative(path))
+
+    assert duplicate_definitions == []
+
+
+def test_large_backend_modules_are_split_by_responsibility():
+    focused_limits = {
+        APP_ROOT / "export_runner.py": 340,
+        BRIDGE_ROOT / "service.py": 340,
+    }
+
+    oversized = {
+        _relative(path): {
+            "lines": len(path.read_text(encoding="utf-8").splitlines()),
+            "limit": limit,
+        }
+        for path, limit in focused_limits.items()
+        if len(path.read_text(encoding="utf-8").splitlines()) > limit
+    }
+
+    assert oversized == {}
+
+
+def test_backend_refactor_modules_exist_for_large_responsibilities():
+    expected_modules = [
+        APP_ROOT / "export_naming.py",
+        APP_ROOT / "export_planning.py",
+        APP_ROOT / "export_workers.py",
+        BRIDGE_ROOT / "export_endpoints.py",
+        BRIDGE_ROOT / "payload_helpers.py",
+        BRIDGE_ROOT / "preset_endpoints.py",
+        BRIDGE_ROOT / "preferences.py",
+        BRIDGE_ROOT / "preview_endpoints.py",
+    ]
+
+    missing = [_relative(path) for path in expected_modules if not path.exists()]
+
+    assert missing == []

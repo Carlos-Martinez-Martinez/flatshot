@@ -24,6 +24,8 @@ def test_build_portable_without_venv_copies_runtime_files(tmp_path):
     assert (target / "source_path.txt").read_text(encoding="utf-8") == str(PROJECT_ROOT)
     assert (target / ".autosync.json").exists()
     assert (target / "FlatShot.pyw").exists()
+    assert (target / "manifest.py").exists()
+    assert (target / "runtime_sync.py").exists()
     assert (target / "Abrir FlatShot.vbs").exists()
     assert (target / "Diagnostico FlatShot.bat").exists()
     assert (target / "app" / "flatshot" / "bridge" / "service.py").exists()
@@ -43,6 +45,25 @@ def test_build_portable_sync_stamp_separates_runtime_and_dependencies(tmp_path):
     assert stamp["dependency_hash"] == build_portable.dependency_manifest_hash(PROJECT_ROOT)
     assert stamp["portable_dependencies"] == list(build_portable.PORTABLE_DEPENDENCIES)
     assert stamp["dependency_status"] == "current"
+    assert stamp["python_version"].startswith(str(build_portable.sys.version_info.major))
+
+
+def test_release_portable_does_not_embed_development_source_pointer(tmp_path):
+    target = tmp_path / "FlatShotPortable"
+
+    build_portable.build_portable(
+        PROJECT_ROOT,
+        target,
+        install_dependencies=False,
+        development=False,
+    )
+
+    assert not (target / "source_path.txt").exists()
+    assert not (target / "development.flag").exists()
+    assert (target / "release.flag").read_text(encoding="utf-8") == "release\n"
+    stamp = json.loads((target / ".autosync.json").read_text(encoding="utf-8"))
+    assert stamp["source_root"] is None
+    assert stamp["portable_mode"] == "release"
 
 
 def test_source_manifest_tracks_backend_and_frontend_files():
@@ -67,4 +88,13 @@ def test_runtime_manifest_excludes_dependency_files():
 
 
 def test_portable_window_dependency_is_recorded():
-    assert any(dependency.startswith("pywebview") for dependency in build_portable.PORTABLE_DEPENDENCIES)
+    assert any(dependency.startswith("pywebview==") for dependency in build_portable.PORTABLE_DEPENDENCIES)
+
+
+def test_portable_runtime_lock_is_present_and_constrained():
+    lock = (PROJECT_ROOT / "requirements.lock").read_text(encoding="utf-8")
+
+    assert "Pillow==" in lock
+    assert "numpy==" in lock
+    assert "pydantic==" in lock
+    assert not any(line.startswith(("Pillow>=", "numpy>=", "pydantic>=")) for line in lock.splitlines())

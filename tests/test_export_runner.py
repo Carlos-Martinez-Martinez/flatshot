@@ -1,5 +1,6 @@
 import threading
-from concurrent.futures import Future
+import shutil
+from pathlib import Path
 
 import pytest
 from PIL import Image
@@ -14,41 +15,24 @@ from flatshot.application.events import (
 from flatshot.application.execution_control import CancellationToken, PauseToken
 from flatshot.application.export_runner import (
     ExportRunner,
+    MAX_EXPORT_WORKERS,
     OutputPathValidationError,
+    build_export_plan,
+    resolve_export_max_workers,
     validate_export_requests_outputs,
 )
+from flatshot.application.export_workers import process_single_image
 from flatshot.core.models import CurveData, ExportConfig, ShadowSettings
+from flatshot.utils.render_cache import RenderCache
+from tests.helpers import CollectingSink, InlineExecutor
 
 
-class InlineExecutor:
+class RecordingExecutor(InlineExecutor):
+    created_workers: list[int] = []
+
     def __init__(self, max_workers=1):
-        self.max_workers = max_workers
-        self.shutdown_called = False
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        self.shutdown()
-
-    def submit(self, fn, arg):
-        future = Future()
-        try:
-            future.set_result(fn(arg))
-        except Exception as exc:
-            future.set_exception(exc)
-        return future
-
-    def shutdown(self, wait=True, cancel_futures=False):
-        self.shutdown_called = True
-
-
-class CollectingSink:
-    def __init__(self):
-        self.events = []
-
-    def emit(self, event):
-        self.events.append(event)
+        super().__init__(max_workers=max_workers)
+        self.created_workers.append(max_workers)
 
 
 def _curve():
@@ -80,12 +64,44 @@ def _request_with_files(folder, files, config=None, settings=None):
     )
 
 
+def _use_isolated_cache(monkeypatch, cache_dir):
+    def init(self):
+        self.cache_dir = cache_dir
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr(RenderCache, "__init__", init)
+
+
 def test_export_runner_does_not_import_pyqt():
     source = export_runner_module.Path(export_runner_module.__file__).read_text(encoding="utf-8")
 
     assert "PyQt6" not in source
     assert "QThread" not in source
     assert "pyqtSignal" not in source
+
+
+def test_build_export_plan_splits_cached_and_render_tasks(monkeypatch, tmp_path):
+    cache_dir = tmp_path / "cache"
+    _use_isolated_cache(monkeypatch, cache_dir)
+    source = _source(tmp_path)
+    settings = ShadowSettings(opacity=0, blur=0, noise=0)
+    config = ExportConfig(format="PNG", output_width=8, output_height=8)
+    request = _request(tmp_path, config=config, settings=settings)
+    cache = RenderCache()
+    image_items = [(source, str(source), source)]
+    first_plan = build_export_plan(request, image_items, cache)
+    assert first_plan.render_tasks[0].display_name == "source.png · Web RGB230"
+    cache_path = first_plan.render_tasks[0].cache_path
+    Image.new("RGBA", (8, 8), (1, 2, 3, 255)).save(cache_path)
+
+    plan = build_export_plan(request, image_items, cache)
+
+    assert plan.source_total == 1
+    assert plan.total == 1
+    assert plan.render_tasks == []
+    assert len(plan.cached_tasks) == 1
+    assert plan.cached_tasks[0].save_path.name == "source_PRO.png"
+    assert plan.planned_outputs[0]["save_path"].name == "source_PRO.png"
 
 
 def test_export_runner_empty_folder_returns_success(tmp_path):
@@ -114,7 +130,189 @@ def test_export_runner_exports_one_png_to_subfolder(tmp_path):
     assert output.exists()
     assert output.parent in result.destinations
     assert any(isinstance(event, ExportProgressEvent) and event.percent == 100 for event in sink.events)
-    assert any(isinstance(event, ExportImageCompletedEvent) and event.success for event in sink.events)
+    assert any(
+        isinstance(event, ExportImageCompletedEvent)
+        and event.success
+        and event.output_path == output
+        for event in sink.events
+    )
+
+
+def test_export_runner_writes_render_cache_after_normal_render(monkeypatch, tmp_path):
+    cache_dir = tmp_path / "cache"
+    _use_isolated_cache(monkeypatch, cache_dir)
+    _source(tmp_path)
+    settings = ShadowSettings(opacity=0, blur=0, noise=0)
+    config = ExportConfig(format="PNG", output_width=8, output_height=8)
+    runner = ExportRunner(executor_factory=InlineExecutor)
+
+    result = runner.run(_request(tmp_path, config=config, settings=settings))
+
+    assert result.success
+    cache_files = list(cache_dir.glob("*.png"))
+    assert len(cache_files) == 1
+    assert cache_files[0].stat().st_size > 0
+
+
+def test_export_runner_prunes_render_cache_after_export(monkeypatch, tmp_path):
+    cache_dir = tmp_path / "cache"
+    _use_isolated_cache(monkeypatch, cache_dir)
+    _source(tmp_path)
+    prune_calls = []
+    original_prune = RenderCache.prune
+
+    def prune(self, *args, **kwargs):
+        prune_calls.append(self.cache_dir)
+        return original_prune(self, *args, **kwargs)
+
+    monkeypatch.setattr(RenderCache, "prune", prune)
+    runner = ExportRunner(executor_factory=InlineExecutor)
+
+    result = runner.run(_request(tmp_path))
+
+    assert result.success
+    assert prune_calls == [cache_dir]
+
+
+def test_export_runner_honors_configured_max_workers(tmp_path):
+    for index in range(4):
+        Image.new("RGBA", (8, 8), (120, 80, 40, 255)).save(tmp_path / f"source-{index}.png")
+    RecordingExecutor.created_workers = []
+    runner = ExportRunner(executor_factory=RecordingExecutor, max_workers=2)
+
+    result = runner.run(_request(tmp_path))
+
+    assert result.success
+    assert RecordingExecutor.created_workers == [2]
+
+
+def test_export_runner_caps_configured_worker_count():
+    assert resolve_export_max_workers(MAX_EXPORT_WORKERS + 10) == MAX_EXPORT_WORKERS
+
+
+def test_export_runner_reports_executor_construction_failure_as_fatal(tmp_path):
+    _source(tmp_path)
+
+    class RaisingExecutor:
+        def __init__(self, **_kwargs):
+            raise RuntimeError("executor unavailable")
+
+    runner = ExportRunner(executor_factory=RaisingExecutor)
+
+    result = runner.run(_request(tmp_path))
+
+    assert result.success is False
+    assert result.fatal_error
+    assert result.processed == 0
+
+
+def test_export_runner_cancellation_wakes_a_paused_pending_export(tmp_path):
+    _source(tmp_path)
+    pause_token = PauseToken()
+    cancellation_token = CancellationToken()
+    pause_token.pause()
+    result_holder = []
+
+    def run_export():
+        result_holder.append(
+            ExportRunner(
+                executor_factory=InlineExecutor,
+                pause_token=pause_token,
+                cancellation_token=cancellation_token,
+            ).run(_request(tmp_path))
+        )
+
+    thread = threading.Thread(target=run_export)
+    thread.start()
+
+    assert thread.is_alive()
+    cancellation_token.cancel()
+    thread.join(timeout=1)
+
+    assert not thread.is_alive()
+    assert result_holder
+    assert result_holder[0].success is False
+    assert result_holder[0].processed == 0
+
+
+def test_export_runner_accounts_for_in_flight_outputs_after_cancellation(tmp_path):
+    files = []
+    for index in range(2):
+        path = tmp_path / f"source-{index}.png"
+        Image.new("RGBA", (8, 8), (120, 80, 40, 255)).save(path)
+        files.append(path)
+
+    started = threading.Event()
+    release = threading.Event()
+    started_count = 0
+    started_lock = threading.Lock()
+    cancellation = CancellationToken()
+
+    class ThreadExecutor:
+        def __init__(self, max_workers=1):
+            self.threads = []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            self.shutdown()
+
+        def submit(self, fn, arg):
+            from concurrent.futures import Future
+
+            future = Future()
+
+            def run():
+                try:
+                    future.set_result(fn(arg))
+                except Exception as exc:
+                    future.set_exception(exc)
+
+            thread = threading.Thread(target=run)
+            thread.start()
+            self.threads.append(thread)
+            return future
+
+        def shutdown(self, wait=True, cancel_futures=False):
+            if wait:
+                for thread in self.threads:
+                    thread.join(timeout=2)
+
+    def processor(args):
+        nonlocal started_count
+        _img_path, save_path, *_rest = args
+        with started_lock:
+            started_count += 1
+            started.set()
+        release.wait(timeout=2)
+        Path(save_path).write_bytes(b"rendered")
+        return True, Path(save_path).name, None
+
+    result_holder = []
+
+    def run_export():
+        result_holder.append(
+            ExportRunner(
+                executor_factory=ThreadExecutor,
+                image_processor=processor,
+                cancellation_token=cancellation,
+                max_workers=2,
+            ).run(_request_with_files(tmp_path, files))
+        )
+
+    thread = threading.Thread(target=run_export)
+    thread.start()
+    assert started.wait(timeout=1)
+    cancellation.cancel()
+    release.set()
+    thread.join(timeout=3)
+
+    assert not thread.is_alive()
+    result = result_holder[0]
+    assert result.success is False
+    assert result.processed == started_count == 2
+    assert result.total == 2
 
 
 def test_export_runner_exports_to_custom_destination(tmp_path):
@@ -175,6 +373,32 @@ def test_export_validation_rejects_existing_output_without_overwriting(tmp_path)
     assert existing.read_bytes() == b"existing-output"
 
 
+def test_export_worker_does_not_overwrite_destination_created_during_render(tmp_path):
+    source = _source(tmp_path)
+    output = tmp_path / "_SALIDA_PRO" / "source_PRO.png"
+    output.parent.mkdir()
+    output.write_bytes(b"existing-output")
+
+    success, message, warning = process_single_image(
+        (
+            source,
+            output,
+            ShadowSettings(opacity=0, blur=0, noise=0).model_dump(),
+            (8, 8),
+            "png",
+            _curve().model_dump(),
+            {},
+            "source.png · Web RGB230",
+        )
+    )
+
+    assert not success
+    assert "already exists" in message
+    assert warning is None
+    assert output.read_bytes() == b"existing-output"
+    assert list(output.parent.glob(".*.png")) == []
+
+
 def test_export_runner_honors_cancellation_before_rendering(tmp_path):
     _source(tmp_path)
     token = CancellationToken()
@@ -195,6 +419,88 @@ def test_export_runner_honors_cancellation_before_rendering(tmp_path):
     assert result.processed == 0
     assert result.total == 1
     assert not (tmp_path / "_SALIDA_PRO" / "source_PRO.png").exists()
+
+
+def test_export_runner_snapshots_explicit_files_progressively(tmp_path):
+    files = []
+    for index in range(3):
+        source = tmp_path / f"source-{index}.png"
+        Image.new("RGBA", (8, 8), (120, 80, 40, 255)).save(source)
+        files.append(source)
+
+    snapshot_counts_during_render = []
+    copied_sources = []
+
+    def copy_file(src, dest):
+        src = Path(src)
+        dest = Path(dest)
+        if dest.parent.parent.name.startswith("flatshot_snap_"):
+            copied_sources.append(src.name)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        return shutil.copy2(src, dest)
+
+    def processor(args):
+        img_path, save_path, *_rest = args
+        img_path = Path(img_path)
+        snapshot_counts_during_render.append(len(list(img_path.parent.glob("*.png"))))
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(save_path).write_bytes(b"rendered")
+        return True, img_path.name, None
+
+    runner = ExportRunner(
+        executor_factory=InlineExecutor,
+        image_processor=processor,
+        copy_file=copy_file,
+        max_workers=1,
+    )
+
+    result = runner.run(_request_with_files(tmp_path, files))
+
+    assert result.success
+    assert copied_sources == [path.name for path in files]
+    assert snapshot_counts_during_render == [1, 1, 1]
+
+
+def test_export_runner_reports_unstable_snapshot_sources(tmp_path):
+    stable = tmp_path / "stable.png"
+    unstable = tmp_path / "unstable.png"
+    Image.new("RGBA", (8, 8), (120, 80, 40, 255)).save(stable)
+    Image.new("RGBA", (8, 8), (20, 40, 60, 255)).save(unstable)
+    sink = CollectingSink()
+
+    def copy_file(src, dest):
+        src = Path(src)
+        if src == unstable:
+            raise OSError("simulated network read failure")
+        Path(dest).parent.mkdir(parents=True, exist_ok=True)
+        return shutil.copy2(src, dest)
+
+    def processor(args):
+        _img_path, save_path, *_rest = args
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(save_path).write_bytes(b"rendered")
+        return True, Path(save_path).name, None
+
+    runner = ExportRunner(
+        event_sink=sink,
+        executor_factory=InlineExecutor,
+        image_processor=processor,
+        copy_file=copy_file,
+        max_workers=1,
+    )
+
+    result = runner.run(_request_with_files(tmp_path, [stable, unstable]))
+
+    assert not result.success
+    assert result.processed == 2
+    assert result.total == 2
+    assert result.errors == 1
+    failed_items = [
+        event for event in sink.events
+        if isinstance(event, ExportImageCompletedEvent) and not event.success
+    ]
+    assert len(failed_items) == 1
+    assert failed_items[0].image_name == "unstable.png"
 
 
 def test_pause_token_blocks_until_resume():
@@ -278,7 +584,7 @@ def test_export_runner_cancel_during_cached_tasks(tmp_path):
     result = runner.run(_request(tmp_path))
 
     assert not result.success
-    assert result.processed == 0
+    assert result.processed == 1
     finished_events = [e for e in sink.events if isinstance(e, ExportFinishedEvent)]
     assert len(finished_events) == 1
     assert not finished_events[0].success

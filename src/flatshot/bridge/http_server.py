@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -22,6 +23,8 @@ DEFAULT_ALLOWED_ORIGINS = {
     "http://localhost:4173",
 }
 CLIENT_DISCONNECT_ERRORS = (BrokenPipeError, ConnectionAbortedError, ConnectionResetError)
+MAX_JSON_BODY_BYTES = 1_000_000
+_logger = logging.getLogger(__name__)
 
 
 class FlatShotBridgeHTTPServer(ThreadingHTTPServer):
@@ -35,10 +38,12 @@ class FlatShotBridgeHTTPServer(ThreadingHTTPServer):
         *,
         service: FlatShotBridgeService | None = None,
         allowed_origins: set[str] | None = None,
+        auth_token: str | None = None,
     ) -> None:
         super().__init__(server_address, handler_class)
         self.service = service or FlatShotBridgeService()
         self.allowed_origins = allowed_origins or set(DEFAULT_ALLOWED_ORIGINS)
+        self.auth_token = str(auth_token or "").strip()
 
 
 class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
@@ -51,6 +56,7 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
         try:
             parsed = urlparse(self.path)
             path = parsed.path
+            self._require_auth(path, query=parse_qs(parsed.query))
             if path == "/health":
                 self._send_json(self.server.service.health())
             elif path == "/app-info":
@@ -61,19 +67,38 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(self.server.service.list_presets())
             elif path == "/ui/preferences":
                 self._send_json(self.server.service.load_ui_preferences())
+            elif path == "/assets/onboarding/open":
+                raise MethodNotAllowedError("Use POST for /assets/onboarding/open.")
+            elif path == "/folders/open":
+                raise MethodNotAllowedError("Use POST for /folders/open.")
+            elif path == "/files/reveal":
+                raise MethodNotAllowedError("Use POST for /files/reveal.")
             elif path == "/images/thumbnail":
                 query = parse_qs(parsed.query)
+                image_id = _single_query_value(query, "imageId", required=False)
                 mime_type, body = self.server.service.render_thumbnail(
                     {
-                        "imagePath": _single_query_value(query, "path"),
+                        "imageId": image_id,
+                        "imagePath": _single_query_value(query, "path", required=image_id is None),
                         "size": _single_query_value(query, "size", required=False),
                     }
                 )
                 self._send_binary(body, content_type=mime_type)
             elif _is_export_job_status_path(path):
                 self._send_json(self.server.service.export_status(_export_job_id(path)))
+            elif _is_scan_job_status_path(path):
+                query = parse_qs(parsed.query)
+                self._send_json(
+                    self.server.service.scan_job_status(
+                        _scan_job_id(path),
+                        image_offset=_integer_query_value(query, "imageOffset", default=0, required=False),
+                        image_limit=_integer_query_value(query, "imageLimit", required=False),
+                    )
+                )
             elif path == "/folders/scan":
                 raise MethodNotAllowedError("Use POST for /folders/scan.")
+            elif path == "/folders/scan/jobs":
+                raise MethodNotAllowedError("Use POST for /folders/scan/jobs.")
             elif path == "/folders/pick":
                 raise MethodNotAllowedError("Use POST for /folders/pick.")
             elif path == "/preview/render":
@@ -92,10 +117,19 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         try:
             path = urlparse(self.path).path
+            self._require_auth(path)
             if path == "/folders/scan":
                 self._send_json(self.server.service.scan_folders(self._read_json_body()))
+            elif path == "/folders/scan/jobs":
+                self._send_json(self.server.service.start_scan_job(self._read_json_body()), status=202)
+            elif _is_scan_job_action_path(path, "cancel"):
+                self._send_json(self.server.service.cancel_scan_job(_scan_job_id(path)))
             elif path == "/folders/pick":
                 self._send_json(self.server.service.pick_folder(self._read_json_body()))
+            elif path == "/folders/open":
+                self._send_json(self.server.service.open_folder(self._read_json_body()))
+            elif path == "/files/reveal":
+                self._send_json(self.server.service.reveal_path(self._read_json_body()))
             elif path == "/preview/render-image":
                 mime_type, body, width, height, warning = self.server.service.render_preview_binary(self._read_json_body())
                 self._send_binary(body, content_type=mime_type, width=width, height=height, warning=warning)
@@ -107,10 +141,18 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(self.server.service.delete_preset(self._read_json_body()))
             elif path == "/ui/preferences":
                 self._send_json(self.server.service.save_ui_preferences(self._read_json_body()))
+            elif path == "/assets/onboarding/open":
+                self._send_json(self.server.service.open_onboarding_assets_folder())
             elif path == "/exports/prepare":
                 self._send_json(self.server.service.prepare_export(self._read_json_body()))
             elif path == "/exports/run":
-                self._send_json(self.server.service.start_export(self._read_json_body()), status=202)
+                self._send_json(
+                    self.server.service.start_export(
+                        self._read_json_body(),
+                        idempotency_key=self.headers.get("Idempotency-Key"),
+                    ),
+                    status=202,
+                )
             elif _is_export_job_action_path(path, "pause"):
                 self._send_json(self.server.service.pause_export(_export_job_id(path)))
             elif _is_export_job_action_path(path, "resume"):
@@ -120,7 +162,7 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
             else:
                 if path in {"/health", "/app-info", "/capabilities", "/presets", "/ui/preferences"}:
                     raise MethodNotAllowedError("Use GET for this endpoint.")
-                if _is_export_job_status_path(path):
+                if _is_export_job_status_path(path) or _is_scan_job_status_path(path):
                     raise MethodNotAllowedError("Use GET for this endpoint.")
                 raise NotFoundError()
         except CLIENT_DISCONNECT_ERRORS:
@@ -150,6 +192,11 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
             length = int(raw_length)
         except ValueError as exc:
             raise BridgeError("invalid_request", "Invalid Content-Length.", status=400) from exc
+        if length < 0:
+            raise BridgeError("invalid_request", "Invalid Content-Length.", status=400)
+        if length > MAX_JSON_BODY_BYTES:
+            self.rfile.read(min(length, MAX_JSON_BODY_BYTES + 1))
+            raise BridgeError("payload_too_large", "Request body is too large.", status=413)
 
         raw_body = self.rfile.read(length) if length else b"{}"
         try:
@@ -164,6 +211,13 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
         if isinstance(exc, CLIENT_DISCONNECT_ERRORS):
             return
         status = exc.status if isinstance(exc, BridgeError) else 500
+        if not isinstance(exc, BridgeError):
+            _logger.error(
+                "Unhandled bridge error for %s %s",
+                getattr(self, "command", "?"),
+                getattr(self, "path", "?"),
+                exc_info=(type(exc), exc, exc.__traceback__),
+            )
         self._send_json(error_response(exc), status=status)
 
     def _send_json(self, payload: dict[str, Any], *, status: int = 200) -> None:
@@ -209,11 +263,21 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
 
     def _send_cors_headers(self) -> None:
         origin = self.headers.get("Origin")
-        if origin and (origin in self.server.allowed_origins or _is_local_http_origin(origin)):
+        if origin and origin in self.server.allowed_origins:
             self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-FlatShot-Token")
+
+    def _require_auth(self, path: str, *, query: dict[str, list[str]] | None = None) -> None:
+        token = self.server.auth_token
+        if not token or path in {"/health", "/app-info", "/capabilities"}:
+            return
+        supplied = self.headers.get("X-FlatShot-Token", "")
+        if not supplied and query is not None:
+            supplied = _single_query_value(query, "token", required=False) or ""
+        if supplied != token:
+            raise BridgeError("unauthorized", "Token local de FlatShot no válido.", status=401)
 
 
 def create_server(
@@ -222,12 +286,14 @@ def create_server(
     *,
     service: FlatShotBridgeService | None = None,
     allowed_origins: set[str] | None = None,
+    auth_token: str | None = None,
 ) -> FlatShotBridgeHTTPServer:
     return FlatShotBridgeHTTPServer(
         (host, port),
         FlatShotBridgeRequestHandler,
         service=service,
         allowed_origins=allowed_origins,
+        auth_token=auth_token,
     )
 
 
@@ -243,9 +309,23 @@ def _single_query_value(query: dict[str, list[str]], name: str, *, required: boo
     return value
 
 
-def _is_local_http_origin(origin: str) -> bool:
-    parsed = urlparse(origin)
-    return parsed.scheme == "http" and parsed.hostname in {"127.0.0.1", "localhost"}
+def _integer_query_value(
+    query: dict[str, list[str]],
+    name: str,
+    *,
+    default: int | None = None,
+    required: bool = True,
+) -> int | None:
+    value = _single_query_value(query, name, required=required)
+    if value in (None, ""):
+        return default
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise BridgeError("invalid_request", f"Query '{name}' must be an integer.", status=400) from exc
+    if parsed < 0:
+        raise BridgeError("invalid_request", f"Query '{name}' must be zero or greater.", status=400)
+    return parsed
 
 
 def _is_export_job_status_path(path: str) -> bool:
@@ -253,25 +333,48 @@ def _is_export_job_status_path(path: str) -> bool:
     return len(parts) == 3 and parts[:2] == ["exports", "jobs"]
 
 
+def _is_scan_job_status_path(path: str) -> bool:
+    parts = _path_parts(path)
+    return len(parts) == 4 and parts[:3] == ["folders", "scan", "jobs"]
+
+
 def _is_export_job_action_path(path: str, action: str) -> bool:
     parts = _path_parts(path)
     return len(parts) == 4 and parts[:2] == ["exports", "jobs"] and parts[3] == action
+
+
+def _is_scan_job_action_path(path: str, action: str) -> bool:
+    parts = _path_parts(path)
+    return len(parts) == 5 and parts[:3] == ["folders", "scan", "jobs"] and parts[4] == action
 
 
 def _export_job_id(path: str) -> str:
     return _path_parts(path)[2]
 
 
+def _scan_job_id(path: str) -> str:
+    return _path_parts(path)[3]
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="flatshot-bridge", description="FlatShot local development bridge")
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
+    parser.add_argument(
+        "--allowed-origin",
+        action="append",
+        default=[],
+        help="Frontend origin allowed to call the local bridge. Can be passed multiple times.",
+    )
+    parser.add_argument("--auth-token", default="", help="Optional local token required for sensitive endpoints.")
     args = parser.parse_args(argv)
 
     if args.host not in {"127.0.0.1", "localhost"}:
         parser.error("APP.3 bridge must bind to 127.0.0.1 or localhost.")
 
-    server = create_server(args.host, args.port)
+    allowed_origins = set(DEFAULT_ALLOWED_ORIGINS)
+    allowed_origins.update(origin.strip() for origin in args.allowed_origin if origin and origin.strip())
+    server = create_server(args.host, args.port, allowed_origins=allowed_origins, auth_token=args.auth_token)
     print(f"FlatShot bridge listening on http://{args.host}:{server.server_port}", flush=True)
     try:
         server.serve_forever()

@@ -14,11 +14,14 @@ INDEX_PATH = FRONTEND_DIR / "index.html"
 
 def test_inspector_context_view_helper_loads_before_app_script():
     html = INDEX_PATH.read_text(encoding="utf-8")
+    layout = (FRONTEND_DIR / "app-inspector-layout-controller.js").read_text(encoding="utf-8")
 
     helper_index = html.index("inspector-context-view.js")
     app_index = html.index("app.js")
 
     assert helper_index < app_index
+    assert "inspectorSummaryCardKeys" in layout
+    assert "complexityMode: state.interfacePreferences.complexityMode" in layout
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
@@ -34,6 +37,30 @@ assert.equal(helpers.inspectorMode({{ outputEditMode: false, inspectorTab: "adva
 assert.equal(helpers.inspectorMode({{ outputEditMode: false, inspectorTab: "warnings" }}), "warnings");
 assert.equal(helpers.inspectorMode({{ outputEditMode: false, inspectorTab: "review" }}), "summary");
 assert.equal(helpers.inspectorMode({{ outputEditMode: false, inspectorTab: "unknown" }}), "summary");
+assert.deepEqual(helpers.inspectorSummaryCardKeys({{ complexityMode: "simple", hasIssues: false }}), [
+  "lot",
+  "aspect",
+  "output",
+]);
+assert.deepEqual(helpers.inspectorSummaryCardKeys({{ complexityMode: "simple", hasIssues: true }}), [
+  "lot",
+  "aspect",
+  "output",
+  "issues",
+]);
+assert.deepEqual(helpers.inspectorSummaryCardKeys({{ complexityMode: "advanced", hasIssues: true }}), [
+  "lot",
+  "aspect",
+  "output",
+  "selectedImage",
+  "issues",
+]);
+assert.deepEqual(helpers.inspectorSummaryCardKeys({{ complexityMode: "unknown", hasIssues: true }}), [
+  "lot",
+  "aspect",
+  "output",
+  "issues",
+]);
 
 assert.deepEqual(helpers.inspectorSubviewHeaderState({{
   mode: "output",
@@ -41,7 +68,7 @@ assert.deepEqual(helpers.inspectorSubviewHeaderState({{
   outputLabel: "JPG · 1800×2400",
 }}), {{
   title: "Exportación",
-  subtitle: "Editar formato de salida",
+  subtitle: "Editar salida",
   detail: "",
   backAction: "cancel-output-edit",
   backLabel: "Cancelar",

@@ -4,14 +4,14 @@ import os
 from pathlib import Path
 import tempfile
 import shutil
-from typing import Iterable
+from typing import Any, Iterable, Mapping
 
 from PIL import Image, UnidentifiedImageError
 
 class RenderCache:
     """Manages cached full-resolution renders to speed up export."""
 
-    CACHE_VERSION = 3
+    CACHE_VERSION = 6
     CACHE_DIR_ENV_VAR = "FLATSHOT_RENDER_CACHE_DIR"
     
     def __init__(self):
@@ -27,17 +27,33 @@ class RenderCache:
     def _file_fingerprint(self, image_path: str) -> dict:
         path = Path(image_path)
         try:
-            stat = path.stat()
+            for _ in range(3):
+                before = path.stat()
+                digest = hashlib.sha256()
+                with path.open("rb") as source:
+                    for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                        digest.update(chunk)
+                after = path.stat()
+                if before.st_size == after.st_size and before.st_mtime_ns == after.st_mtime_ns:
+                    return {
+                        "path": str(path.resolve()),
+                        "size": after.st_size,
+                        "mtime_ns": after.st_mtime_ns,
+                        "sha256": digest.hexdigest(),
+                    }
             return {
                 "path": str(path.resolve()),
-                "size": stat.st_size,
-                "mtime_ns": stat.st_mtime_ns,
+                "size": after.st_size,
+                "mtime_ns": after.st_mtime_ns,
+                "sha256": digest.hexdigest(),
+                "unstable": True,
             }
         except OSError:
             return {
                 "path": str(path.resolve()),
                 "size": None,
                 "mtime_ns": None,
+                "sha256": None,
             }
 
     @staticmethod
@@ -57,6 +73,8 @@ class RenderCache:
         target_size: tuple,
         local_override: dict | None = None,
         export_format: str | None = None,
+        *,
+        export_options: Mapping[str, Any] | None = None,
     ) -> str:
         """Generate a unique key for a specific render configuration."""
         # Use a stable representation of the inputs
@@ -70,6 +88,13 @@ class RenderCache:
             "local_override": local_override or {},
             "format": self.normalize_format(export_format),
         }
+        normalized_export_options = {
+            str(key): value
+            for key, value in dict(export_options or {}).items()
+            if value is not None
+        }
+        if normalized_export_options:
+            data["export_options"] = normalized_export_options
         
         # Normalize floating point values to strings with fixed precision if necessary
         # but pydantic/json should be stable enough here for our purposes.

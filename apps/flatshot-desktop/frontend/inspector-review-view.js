@@ -5,13 +5,9 @@
   }
   root.FlatShotInspectorReviewView = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  const escapeHtml = globalThis.FlatShotFormatters?.escapeHtml || function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  };
+  const formatterHelpers = globalThis.FlatShotFormatters
+    || (typeof require === "function" ? require("./formatters.js") : null);
+  const escapeHtml = (value) => formatterHelpers.escapeHtml(value);
 
   function lotInspectorSummaryHtml(options = {}) {
     const counts = options.counts || {};
@@ -105,7 +101,7 @@
       <button type="button" data-action="previous-image"${canNavigate ? "" : " disabled"}>Anterior</button>
       <button type="button" data-action="next-image"${canNavigate ? "" : " disabled"}>Siguiente</button>
       ${issues.length ? '<button type="button" data-action="review-errors">Revisar avisos</button>' : ""}
-      <button type="button" data-action="open-app-settings">Cambiar formato</button>
+      <button type="button" data-action="open-app-settings">Salidas</button>
       ${hasLocal ? '<button type="button" data-action="reset-local-adjustment">Restablecer al lote</button>' : '<button type="button" data-action="open-advanced">Editar ajuste</button>'}
     </div>
   `;
@@ -139,7 +135,7 @@
           <small class="selected-image-card__state">${escapeHtml(hasLocal ? "Ajuste personalizado" : "Ajuste del lote")}</small>
         </header>
         <div class="selected-image-card__actions">
-          <button type="button" data-action="open-image-adjustment">${escapeHtml(hasLocal ? "Editar ajuste" : "Personalizar")}</button>
+          <button type="button" data-action="open-image-adjustment">${escapeHtml(hasLocal ? "Editar ajuste" : "Personalizar imagen")}</button>
           ${hasLocal ? '<button type="button" data-action="reset-local-adjustment">Restablecer</button>' : ""}
         </div>
     </section>
@@ -203,8 +199,10 @@
           </select>
         </label>
         <div class="processing-card__actions">
-          <button type="button" data-action="open-advanced">Editar</button>
-          <button type="button" data-action="open-preset-editor">Ajustes</button>
+          <button type="button" data-action="open-advanced" aria-label="Editar ajuste del lote" title="Editar ajuste del lote">
+            <span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></span>
+            <span class="visually-hidden">Editar ajuste</span>
+          </button>
         </div>
       </div>
       ${customizedLabel ? `

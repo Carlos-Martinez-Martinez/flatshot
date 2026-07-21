@@ -5,17 +5,23 @@
   }
   root.FlatShotPreviewView = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  const escapeHtml = globalThis.FlatShotFormatters?.escapeHtml || function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  };
+  const formatterHelpers = globalThis.FlatShotFormatters
+    || (typeof require === "function" ? require("./formatters.js") : null);
+  const escapeHtml = (value) => formatterHelpers.escapeHtml(value);
 
   function previewLoadingHtml(detail = "") {
     return `
       <div class="preview-state">
+        <span class="loader" aria-hidden="true"></span>
+        <strong>Generando vista</strong>
+        <span>${escapeHtml(detail)}</span>
+      </div>
+    `;
+  }
+
+  function previewLoadingOverlayHtml(detail = "") {
+    return `
+      <div class="preview-loading-overlay" role="status" aria-live="polite">
         <span class="loader" aria-hidden="true"></span>
         <strong>Generando vista</strong>
         <span>${escapeHtml(detail)}</span>
@@ -79,17 +85,41 @@
   `;
   }
 
+  function compareDividerHtml(value = 50) {
+    const percent = Math.max(5, Math.min(95, Number(value) || 50));
+    return `
+      <button type="button" class="compare-divider" data-compare-divider aria-label="Mover divisor de comparación" aria-valuemin="5" aria-valuemax="95" aria-valuenow="${percent}" title="Mover comparación"></button>
+    `;
+  }
+
   function viewerOutputCompactLabel(options = {}) {
     return `${options.format || "JPG"} · ${options.sizeLabel || "1800×2400"} · ${options.backgroundLabel || "gris claro"}`;
   }
 
+  function viewerOutputContextHtml(options = {}) {
+    const name = options.name || "";
+    if (!name) {
+      return "";
+    }
+    const summary = options.summary || "";
+    const summaryHtml = summary ? `<small title="${escapeHtml(summary)}">${escapeHtml(summary)}</small>` : "";
+    return `
+      <span>Previsualizando</span>
+      <strong>${escapeHtml(name)}</strong>
+      ${summaryHtml}
+    `;
+  }
+
   return {
+    compareDividerHtml,
     escapeHtml,
     mockPreviewHtml,
+    previewLoadingOverlayHtml,
     previewLoadingHtml,
     realPreviewImageHtml,
     realPreviewPlaceholderHtml,
     scanningStateHtml,
+    viewerOutputContextHtml,
     viewerOutputCompactLabel,
   };
 });

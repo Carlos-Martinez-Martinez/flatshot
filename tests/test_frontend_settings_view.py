@@ -17,6 +17,14 @@ BUTTONS_CSS_PATH = FRONTEND_DIR / "css" / "03-components" / "buttons.css"
 STATES_CSS_PATH = FRONTEND_DIR / "css" / "08-states-responsive" / "states.css"
 
 
+def app_domain_source():
+    return "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in [APP_PATH, *sorted(FRONTEND_DIR.glob("app-*.js"))]
+        if path.name != "app-state.js"
+    )
+
+
 def test_settings_view_helper_loads_before_app_script():
     html = INDEX_PATH.read_text(encoding="utf-8")
 
@@ -30,8 +38,10 @@ def test_adjustment_editor_actions_use_explicit_scope_labels():
     html = INDEX_PATH.read_text(encoding="utf-8")
 
     assert 'data-action="cancel-adjustment-edit"' in html
+    assert 'data-action="reset-settings"' in html
+    assert "Restaurar recomendado" in html
     assert 'data-action="apply-global-adjustment"' in html
-    assert "Aplicar al lote sin guardar" in html
+    assert "Aplicar al lote" in html
     assert 'data-action="save-preset"' in html
     assert "Guardar ajuste" in html
     assert 'data-action="save-preset-as-new"' in html
@@ -39,14 +49,30 @@ def test_adjustment_editor_actions_use_explicit_scope_labels():
     assert 'data-action="apply-local-adjustment"' in html
     assert "Aplicar a esta imagen" in html
     assert 'data-action="save-local-adjustment-as-new"' in html
-    assert "Guardar nuevo" in html
-    assert "Restablecer lote" in html
+    assert "Guardar como ajuste" in html
+    assert "Restablecer al lote" in html
+
+
+def test_main_controls_keep_reset_in_preset_actions_only():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+    main_controls_index = html.index("<strong>Sombra</strong>")
+    section_start = html.rindex(
+        '<details class="settings-section inspector-disclosure appearance-section"',
+        0,
+        main_controls_index,
+    )
+    section_end = html.index('<details class="settings-section inspector-disclosure advanced-block"', main_controls_index)
+    section = html[section_start:section_end]
+
+    assert 'id="reset-settings-inline"' not in section
+    assert 'data-action="reset-settings"' not in section
+    assert 'data-action="reset-settings"' in html
 
 
 def test_studio_lighting_panel_is_available_in_advanced_settings():
     html = INDEX_PATH.read_text(encoding="utf-8")
 
-    assert '<option value="studio_2_5d">Estudio 2.5D</option>' in html
+    assert '<option value="studio_2_5d">Estudio con luz</option>' in html
     assert 'id="studio-lighting-panel"' in html
     assert 'data-lighting-stage' in html
     assert 'data-lighting-preset="overhead_soft"' in html
@@ -57,10 +83,10 @@ def test_studio_lighting_panel_is_available_in_advanced_settings():
     assert 'class="lighting-editor-grid"' in html
     assert 'class="lighting-slider-stack"' in html
     assert 'class="advanced-technical-panel"' in html
-    assert "Altura luz" in html
-    assert "Tamaño luz" in html
-    assert "Potencia" in html
-    assert "Escala imagen" in html
+    assert "Altura de la luz" in html
+    assert "Tamaño de fuente" in html
+    assert "Potencia de luz" in html
+    assert "Escala del producto" in html
     assert html.index('id="lighting-stage"') < html.index('data-lighting-field="main.type"')
     assert html.index('class="lighting-slider-stack"') < html.index('data-lighting-field="main.height"')
     assert html.index('data-setting="shadow_engine"') < html.index('data-setting="spread"')
@@ -76,8 +102,9 @@ def test_studio_lighting_panel_css_keeps_active_preset_filled_and_unclipped():
     assert ".lighting-scene-toolbar button.active {" in css
     active_rule = css.split(".lighting-scene-toolbar button.active {", 1)[1].split("}", 1)[0]
     assert "background: var(--color-accent)" in active_rule
-    assert "color: #fff" in active_rule
-    assert "button:not(.primary):not(.active)" in buttons_css
+    assert "color: var(--color-text-inverse)" in active_rule
+    assert "button:where([data-action]" in buttons_css
+    assert "button:not(.primary):not(.active)" not in buttons_css
     assert "button:hover:not(:disabled):not(.active)" in states_css
     assert ".settings-panel details.advanced-block[open] { overflow: visible; }" in css
     assert (
@@ -108,10 +135,18 @@ def test_studio_lighting_panel_css_keeps_active_preset_filled_and_unclipped():
         '.settings-panel details.inspector-disclosure[data-inspector-section="advanced"]:not([open]) '
         "{ min-height: 54px; overflow: hidden; }"
     ) in css
-    assert (
-        '.settings-panel[data-shadow-engine="studio_2_5d"] '
-        '[data-engine-row="direction"] { display: none; }'
-    ) in css
+    assert "[data-control-key]" in (FRONTEND_DIR / "shadow-control-schema.js").read_text(encoding="utf-8")
+
+
+def test_studio_lighting_stage_dark_theme_keeps_lines_visible():
+    css = ADVANCED_CSS_PATH.read_text(encoding="utf-8")
+
+    assert ':root[data-theme="dark"] .lighting-stage {' in css
+    stage_rule = css.split(':root[data-theme="dark"] .lighting-stage {', 1)[1].split("}", 1)[0]
+    assert "var(--color-border-strong)" in stage_rule
+    assert "var(--color-bg-muted)" in stage_rule
+    assert ':root[data-theme="dark"] .lighting-stage__cross {' in css
+    assert ':root[data-theme="dark"] .lighting-stage__product {' in css
 
 
 def test_inspector_navigation_does_not_grid_advanced_disclosures():
@@ -121,7 +156,7 @@ def test_inspector_navigation_does_not_grid_advanced_disclosures():
 
 
 def test_studio_lighting_preset_selection_state_is_explicit():
-    js = APP_PATH.read_text(encoding="utf-8")
+    js = app_domain_source()
 
     assert 'lightingPresetId: ""' in js
     assert "const rememberedPresetId =" in js
@@ -133,7 +168,7 @@ def test_studio_lighting_preset_selection_state_is_explicit():
     assert "settingsPanel.dataset.shadowEngine = state.settings.shadow_engine" in js
     assert 'panel.classList.toggle("is-advanced-subview", mode === "advanced");' in js
     assert "visibleAdvancedSettingKeys(state.settings)" in js
-    assert 'advancedSettingKeys.filter((key) => key !== "angle")' in js
+    assert "visibleKeysForEngine(settings.shadow_engine)" in js
     assert 'data-lighting-number-field' in js
 
 
@@ -171,8 +206,8 @@ assert.equal(helpers.presetSourceLabel({{ bridgePresetWarning: "", presetDirty: 
 assert.equal(helpers.presetSourceLabel({{ bridgePresetWarning: "", presetDirty: true }}), "Global · Modificado");
 assert.equal(helpers.presetSourceLabel({{ bridgePresetWarning: "Aviso", presetDirty: false }}), "Global · aviso");
 assert.equal(helpers.presetSourceLabel({{ bridgePresetWarning: "Aviso", presetDirty: true }}), "Global · Modificado · aviso");
-assert.equal(helpers.localAdjustmentText(true), "Personalizado");
-assert.equal(helpers.localAdjustmentText(false), "Igual que el lote");
+assert.equal(helpers.localAdjustmentText(true), "Modificada respecto al lote");
+assert.equal(helpers.localAdjustmentText(false), "Usa el ajuste del lote");
 assert.equal(helpers.localSettingOutputText(3), "+3");
 assert.equal(helpers.localSettingOutputText(0), "0");
 assert.equal(helpers.localSettingOutputText(-2), "-2");
@@ -189,6 +224,16 @@ assert.deepEqual(helpers.savePresetButtonState(false), {{
   text: "Guardar ajuste",
   title: "Sin cambios pendientes",
 }});
+assert.deepEqual(helpers.resetPresetButtonState(true), {{
+  disabled: false,
+  label: "Restaurar recomendado",
+  title: "Restaurar recomendado",
+}});
+assert.deepEqual(helpers.resetPresetButtonState(false), {{
+  disabled: true,
+  label: "Restaurar recomendado",
+  title: "Sin cambios que restaurar",
+}});
 assert.deepEqual(helpers.deletePresetButtonState(1), {{
   disabled: true,
   title: "Debe quedar al menos un ajuste",
@@ -197,9 +242,9 @@ assert.deepEqual(helpers.deletePresetButtonState(2), {{
   disabled: false,
   title: "Eliminar el ajuste activo",
 }});
-assert.equal(helpers.advancedSummaryTitle(0), "Avanzado");
-assert.equal(helpers.advancedSummaryTitle(1), "Avanzado · 1 cambio");
-assert.equal(helpers.advancedSummaryTitle(3), "Avanzado · 3 cambios");
+assert.equal(helpers.advancedSummaryTitle(0), "Calibración del motor");
+assert.equal(helpers.advancedSummaryTitle(1), "Calibración del motor · 1 cambio");
+assert.equal(helpers.advancedSummaryTitle(3), "Calibración del motor · 3 cambios");
 assert.equal(helpers.advancedDirtyCount({{
   presetDirty: false,
   keys: ["spread"],

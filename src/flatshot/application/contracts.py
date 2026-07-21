@@ -10,6 +10,13 @@ from flatshot.core.models import CurveData, ExportConfig, ShadowSettings
 
 
 @dataclass(frozen=True)
+class RenderConfiguration:
+    settings: ShadowSettings
+    curve_data: CurveData | None = None
+    preset_name: str | None = None
+
+
+@dataclass(frozen=True)
 class ImageFileInfo:
     path: Path
     name: str
@@ -63,6 +70,18 @@ class ExportJobRequest:
     preset_name: str | None = None
     input_files: list[Path] | None = None
     image_overrides: dict | None = None
+    render_config: RenderConfiguration | None = None
+
+    def __post_init__(self) -> None:
+        render_config = self.render_config or RenderConfiguration(
+            settings=self.settings,
+            curve_data=self.curve_data,
+            preset_name=self.preset_name,
+        )
+        object.__setattr__(self, "render_config", render_config)
+        object.__setattr__(self, "settings", render_config.settings)
+        object.__setattr__(self, "curve_data", render_config.curve_data)
+        object.__setattr__(self, "preset_name", render_config.preset_name)
 
 
 @dataclass(frozen=True)
@@ -73,6 +92,7 @@ class ExportJobResult:
     errors: int
     duration: float
     destinations: list[Path] = field(default_factory=list)
+    fatal_error: str | None = None
 
 
 @dataclass(frozen=True)
@@ -84,6 +104,13 @@ class PreviewRequest:
     is_preview: bool = True
     image_path: Path | None = None
     image: Image.Image | None = None
+    render_config: RenderConfiguration | None = None
+
+    def __post_init__(self) -> None:
+        if self.render_config is None:
+            return
+        object.__setattr__(self, "settings", self.render_config.settings)
+        object.__setattr__(self, "curve_data", self.render_config.curve_data)
 
 
 @dataclass(frozen=True)

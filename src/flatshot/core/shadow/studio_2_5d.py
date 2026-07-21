@@ -176,7 +176,7 @@ def _strip_smear(mask: Image.Image, vector: ShadowVector, radius: float) -> Imag
     offsets = (-1.0, -0.5, 0.0, 0.5, 1.0)
     weights = (0.16, 0.28, 0.42, 0.28, 0.16)
     alpha = np.zeros((mask.height, mask.width), dtype=np.float32)
-    for offset, weight in zip(offsets, weights):
+    for offset, weight in zip(offsets, weights, strict=True):
         dx = int(round(perp.x * radius * offset))
         dy = int(round(perp.y * radius * offset))
         shifted = paste_offset(mask, dx, dy)

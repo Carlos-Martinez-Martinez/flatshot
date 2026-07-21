@@ -5,52 +5,136 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>FlatShot Desktop</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./css/00-settings/tokens.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/01-base/base.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/02-layout/shell-workspace.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/02-layout/topbar.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/02-layout/footer.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/03-components/primitives.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/03-components/workflow-panels.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/03-components/review-status-panels.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/03-components/buttons.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/03-components/forms.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/03-components/navigation-controls.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/03-components/status-badges.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/03-components/cards.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/03-components/empty-states.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/03-components/progress-loaders.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/03-components/dev-debug.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/04-batch-gallery/batch-rail.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/04-batch-gallery/source-import.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/04-batch-gallery/batch-summary.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/04-batch-gallery/gallery-shell.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/04-batch-gallery/image-grid.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/04-batch-gallery/thumbnails.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/04-batch-gallery/review-devtools.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/05-viewer/viewer-shell.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/05-viewer/viewer-toolbar.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/05-viewer/canvas.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/05-viewer/viewer-states.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/06-inspector-export/inspector-shell.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/06-inspector-export/inspector-navigation.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/06-inspector-export/inspector-workflow.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/06-inspector-export/inspector-cards.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/06-inspector-export/adjustments-presets.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/06-inspector-export/adjustment-controls.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/06-inspector-export/advanced-local-overrides.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/06-inspector-export/export-panel.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/06-inspector-export/output-profiles.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/06-inspector-export/review-warnings.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/07-modals/app-settings.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/07-modals/batch-detail.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/07-modals/export-confirm.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/08-states-responsive/states.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/08-states-responsive/responsive.css?v=20260616-inspector-fit-height" />
-    <link rel="stylesheet" href="./css/99-legacy-compat.css?v=20260616-inspector-fit-height" />
+    <script>
+      (() => {
+        try {
+          const root = document.documentElement;
+          root.dataset.boot = "pending";
+          const bootPreferences = (() => {
+            try {
+              const node = document.getElementById("flatshot-boot-preferences");
+              if (!node?.textContent) {
+                return {};
+              }
+              const parsed = JSON.parse(node.textContent);
+              if (!parsed || typeof parsed !== "object") {
+                return {};
+              }
+              return parsed.preferences && typeof parsed.preferences === "object" ? parsed.preferences : parsed;
+            } catch (error) {
+              return {};
+            }
+          })();
+          let storedThemePreference = null;
+          let storedBrandTone = null;
+          let storedInterfacePreferences = {};
+          try {
+            storedThemePreference = localStorage.getItem("flatshot.theme");
+          } catch (error) {}
+          try {
+            storedBrandTone = localStorage.getItem("flatshot.brandTone");
+          } catch (error) {}
+          try {
+            storedInterfacePreferences = JSON.parse(localStorage.getItem("flatshot.interfacePreferences") || "{}");
+          } catch (error) {
+            storedInterfacePreferences = {};
+          }
+          const hasBootTheme = Object.prototype.hasOwnProperty.call(bootPreferences, "themePreference");
+          const hasBootBrandTone = Object.prototype.hasOwnProperty.call(bootPreferences, "brandTone");
+          const hasBootInterfacePreferences = (
+            bootPreferences.interfacePreferences
+            && typeof bootPreferences.interfacePreferences === "object"
+            && !Array.isArray(bootPreferences.interfacePreferences)
+          );
+          const themePreferenceValue = hasBootTheme ? bootPreferences.themePreference : storedThemePreference;
+          const brandToneValue = hasBootBrandTone ? bootPreferences.brandTone : storedBrandTone;
+          const preferences = hasBootInterfacePreferences ? bootPreferences.interfacePreferences : storedInterfacePreferences;
+          const themePreference = ["light", "dark", "system"].includes(themePreferenceValue) ? themePreferenceValue : "light";
+          const systemDark = themePreference === "system" && window.matchMedia?.("(prefers-color-scheme: dark)")?.matches;
+          const brandTone = ["green", "blue", "indigo", "violet", "coral", "amber"].includes(brandToneValue) ? brandToneValue : "green";
+          root.dataset.theme = themePreference === "dark" || systemDark ? "dark" : "light";
+          root.dataset.themePreference = themePreference;
+          root.dataset.brandTone = brandTone;
+          root.dataset.uiDensity = preferences.density === "comfortable" ? "comfortable" : "compact";
+          root.dataset.motion = preferences.reduceMotion === true ? "reduced" : "auto";
+          root.dataset.onboardingBackground = preferences.onboardingBackground === false ? "disabled" : "enabled";
+          root.dataset.thumbnailSize = ["small", "medium", "large"].includes(preferences.thumbnailSize) ? preferences.thumbnailSize : "medium";
+          root.dataset.fileNameDisplay = ["always", "hover", "none"].includes(preferences.fileNameDisplay) ? preferences.fileNameDisplay : "always";
+          if (hasBootTheme) {
+            try {
+              localStorage.setItem("flatshot.theme", themePreference);
+            } catch (error) {}
+          }
+          if (hasBootBrandTone) {
+            try {
+              localStorage.setItem("flatshot.brandTone", brandTone);
+            } catch (error) {}
+          }
+          if (hasBootInterfacePreferences) {
+            try {
+              localStorage.setItem("flatshot.interfacePreferences", JSON.stringify(preferences));
+            } catch (error) {}
+          }
+        } catch (error) {
+          document.documentElement.dataset.boot = "pending";
+          document.documentElement.dataset.theme = "light";
+          document.documentElement.dataset.themePreference = "light";
+          document.documentElement.dataset.brandTone = "green";
+          document.documentElement.dataset.uiDensity = "compact";
+          document.documentElement.dataset.motion = "auto";
+          document.documentElement.dataset.onboardingBackground = "enabled";
+          document.documentElement.dataset.thumbnailSize = "medium";
+          document.documentElement.dataset.fileNameDisplay = "always";
+        }
+      })();
+    </script>
+    <link rel="stylesheet" href="./css/00-settings/tokens.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/01-base/base.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/02-layout/shell-workspace.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/02-layout/topbar.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/02-layout/footer.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/03-components/primitives.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/03-components/workflow-panels.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/03-components/review-status-panels.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/03-components/buttons.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/03-components/forms.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/03-components/navigation-controls.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/03-components/status-badges.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/03-components/cards.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/03-components/empty-states.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/03-components/progress-loaders.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/03-components/dev-debug.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/04-batch-gallery/batch-rail.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/04-batch-gallery/source-import.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/04-batch-gallery/batch-summary.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/04-batch-gallery/gallery-shell.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/04-batch-gallery/image-grid.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/04-batch-gallery/thumbnails.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/04-batch-gallery/review-devtools.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/05-viewer/viewer-shell.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/05-viewer/viewer-toolbar.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/05-viewer/canvas.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/05-viewer/viewer-states.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/06-inspector-export/inspector-shell.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/06-inspector-export/inspector-navigation.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/06-inspector-export/inspector-workflow.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/06-inspector-export/inspector-cards.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/06-inspector-export/adjustments-presets.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/06-inspector-export/adjustment-controls.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/06-inspector-export/advanced-local-overrides.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/06-inspector-export/export-panel.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/06-inspector-export/output-profiles.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/06-inspector-export/background-presets.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/06-inspector-export/review-warnings.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/07-modals/app-settings.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/07-modals/batch-detail.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/07-modals/export-confirm.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/08-states-responsive/states.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/08-states-responsive/responsive.css?v=20260704-search-focus" />
+    <link rel="stylesheet" href="./css/99-legacy-compat.css?v=20260704-search-focus" />
   </head>
   <body>
-    <main class="app-shell" aria-label="FlatShot nueva app">
+    <main class="app-shell no-selected-image" data-ui-state="no_folder" data-batch-context="false" data-status-footer="false" data-output-editing="false" aria-label="FlatShot nueva app">
       <header class="top-bar">
         <div class="top-bar-main">
           <div class="brand-block">
@@ -59,6 +143,51 @@
               <strong>FlatShot</strong>
               <span id="active-batch-label" hidden>Sin lote</span>
             </div>
+            <details class="top-preferences-menu" id="top-preferences-menu">
+              <summary aria-label="Preferencias" title="Preferencias">
+                <span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 0-.4 1.1V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-.6-1 1.65 1.65 0 0 0-1.1-.4H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-.6 1.65 1.65 0 0 0 .4-1.1V3a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 .6 1 1.65 1.65 0 0 0 1.1.4H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51.6Z"></path></svg></span>
+              </summary>
+              <div class="top-preferences-menu__content" role="menu" aria-label="Preferencias de interfaz">
+                <section class="top-preferences-section" aria-label="Tema">
+                  <span>Tema</span>
+                  <button type="button" class="top-theme-action" data-action="toggle-theme" aria-label="Activar tema oscuro" title="Tema oscuro">
+                    <span class="button-icon theme-icon theme-icon--dark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 13a8 8 0 1 1-10-10 7 7 0 0 0 10 10Z"></path></svg></span>
+                    <span class="button-icon theme-icon theme-icon--light" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path></svg></span>
+                    <span class="top-theme-label">Tema oscuro</span>
+                  </button>
+                </section>
+                <section class="top-preferences-section" aria-label="Tono de marca">
+                  <span>Tono de marca</span>
+                  <div class="brand-tone-list" aria-label="Tonos disponibles">
+                    <button type="button" class="brand-tone-option" data-action="set-brand-tone" data-brand-tone-value="green" aria-pressed="false">
+                      <span class="brand-tone-swatch" style="--brand-tone-swatch: #0e8469"></span>
+                      Verde
+                    </button>
+                    <button type="button" class="brand-tone-option" data-action="set-brand-tone" data-brand-tone-value="blue" aria-pressed="false">
+                      <span class="brand-tone-swatch" style="--brand-tone-swatch: #2563eb"></span>
+                      Azul
+                    </button>
+                    <button type="button" class="brand-tone-option" data-action="set-brand-tone" data-brand-tone-value="indigo" aria-pressed="false">
+                      <span class="brand-tone-swatch" style="--brand-tone-swatch: #4f46e5"></span>
+                      Índigo
+                    </button>
+                    <button type="button" class="brand-tone-option" data-action="set-brand-tone" data-brand-tone-value="violet" aria-pressed="false">
+                      <span class="brand-tone-swatch" style="--brand-tone-swatch: #7c3aed"></span>
+                      Violeta
+                    </button>
+                    <button type="button" class="brand-tone-option" data-action="set-brand-tone" data-brand-tone-value="coral" aria-pressed="false">
+                      <span class="brand-tone-swatch" style="--brand-tone-swatch: #c2410c"></span>
+                      Coral
+                    </button>
+                    <button type="button" class="brand-tone-option" data-action="set-brand-tone" data-brand-tone-value="amber" aria-pressed="false">
+                      <span class="brand-tone-swatch" style="--brand-tone-swatch: #b45309"></span>
+                      Ámbar
+                    </button>
+                  </div>
+                </section>
+                <button type="button" class="top-preferences-full-action" data-action="open-preferences">Preferencias...</button>
+              </div>
+            </details>
           </div>
 
           <div class="top-summary" aria-live="polite" hidden>
@@ -66,6 +195,7 @@
             <span id="top-status-text">Sin lote</span>
             <span class="bridge-chip idle" id="bridge-status">Bridge pendiente</span>
           </div>
+          <span class="top-active-preset" id="top-active-preset" hidden></span>
 
           <div class="top-actions">
             <span class="preflight-chip" id="top-preflight-status" hidden>Exportación bloqueada</span>
@@ -73,26 +203,19 @@
               <button type="button" class="top-folder-action" data-action="pick-bridge-folder" data-icon="folder-open"><span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 6.5A2.5 2.5 0 0 1 5.5 4H10l2 2.5h6.5A2.5 2.5 0 0 1 21 9v8.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"></path><path d="M3 10h18"></path></svg></span>Carpeta</button>
             </div>
             <div class="top-action-cluster top-action-cluster--config" aria-label="Exportación">
-              <button type="button" class="top-format-action" data-action="open-app-settings" data-icon="sliders"><span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h8M16 7h4M4 17h4M12 17h8"></path><path d="M12 5v4M8 15v4"></path></svg></span>Formatos</button>
+              <button type="button" class="top-format-action" data-action="open-app-settings" data-icon="sliders"><span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h8M16 7h4M4 17h4M12 17h8"></path><path d="M12 5v4M8 15v4"></path></svg></span>Salidas</button>
+              <button type="button" class="top-inspector-action" data-action="toggle-responsive-inspector" data-icon="sliders" hidden>Ajustes</button>
             </div>
             <div class="top-action-cluster top-action-cluster--run" aria-label="Procesamiento">
               <button type="button" class="top-secondary-action" id="top-secondary-action" data-action="secondary-primary" hidden></button>
               <button type="button" class="primary top-export" id="top-primary-action" data-action="primary">Seleccionar carpeta</button>
             </div>
-            <button type="button" data-action="toggle-inspector">Diagnóstico</button>
-            <details class="debug-panel" id="debug-panel">
+            <button type="button" class="dev-only" data-action="toggle-inspector">Diagnóstico</button>
+            <details class="debug-panel dev-only" id="debug-panel">
               <summary>Debug</summary>
               <div class="debug-content">
-                <label class="mode-switcher">
-                  <span>Modo</span>
-                  <select id="app-mode" aria-label="Modo de datos">
-                    <option value="mock">Mock</option>
-                    <option value="bridge">Bridge local</option>
-                  </select>
-                </label>
                 <button type="button" data-action="check-bridge">Comprobar bridge</button>
                 <button type="button" data-action="clear-batch">Limpiar lote</button>
-                <button type="button" data-action="load-mock-batch">Lote mock</button>
                 <label class="text-field compact-field">
                   <span>URL bridge</span>
                   <input id="bridge-url" type="url" value="http://127.0.0.1:8765" />
@@ -151,65 +274,27 @@
               </div>
               <div class="batch-source__toolbar">
                 <button type="button" id="bridge-pick-folder" data-action="pick-bridge-folder">Elegir carpeta</button>
-                <button type="button" class="batch-source__refresh" id="bridge-scan-folder" data-action="scan-bridge-folder" aria-label="Actualizar lote" title="Actualizar lote">↻</button>
               </div>
               <span class="state-chip" id="scan-source-badge">Sin lote</span>
             </div>
-            <details class="manual-path-panel">
-              <summary>Ruta manual</summary>
+            <div class="source-path-panel" aria-label="Carpeta de entrada">
               <label class="text-field">
-                <span>Carpeta</span>
-                <input id="bridge-scan-path" type="text" placeholder="C:/ruta/lote" />
+                <span>Carpeta de entrada</span>
+                <input id="bridge-scan-path" type="text" placeholder="C:/ruta/lote" autocomplete="off" spellcheck="false" />
               </label>
-            </details>
+              <button type="button" class="source-path-panel__scan" id="bridge-scan-folder" data-action="scan-bridge-folder" aria-label="Escanear carpeta" title="Escanear carpeta">Escanear</button>
+            </div>
             <div class="bridge-message" id="bridge-message">Sin lote.</div>
             <ul class="import-requirements" aria-label="Requisitos de importación">
               <li>Carpeta local</li>
               <li>Imágenes PNG</li>
-              <li>Formatos configurables después</li>
+              <li>Salidas configurables después</li>
             </ul>
           </section>
 
           <section class="batch-summary batch-rail__summary" id="batch-summary" aria-live="polite"></section>
-          <div class="folder-list batch-format" id="folder-list" aria-label="Formato del lote" hidden></div>
+          <div class="folder-list batch-format" id="folder-list" aria-label="Salida del lote" hidden></div>
 
-          <details class="review-panel">
-            <summary>Revisión</summary>
-            <label class="demo-switcher review-switcher">
-              <span>Escenario</span>
-              <select id="demo-scenario" aria-label="Escenario de demo">
-                <option value="initial">Sin lote</option>
-                <option value="batch-ready">Lote listo</option>
-                <option value="empty-folder">Carpeta vacía</option>
-                <option value="preview-loading">Vista cargando</option>
-                <option value="preview-warning">Vista con aviso</option>
-                <option value="preview-error">Error de vista</option>
-                <option value="export-blocked">Carpeta de salida sin configurar</option>
-                <option value="export-ready">Exportación lista</option>
-                <option value="export-running">Exportación en curso</option>
-                <option value="export-completed">Exportación completada</option>
-                <option value="export-partial">Completada con errores</option>
-                <option value="export-failed">Exportación fallida</option>
-              </select>
-            </label>
-            <div class="review-grid" aria-label="Estados de revisión">
-              <button type="button" data-review-scenario="initial">Sin lote</button>
-              <button type="button" data-review-scenario="batch-ready">Lote listo</button>
-              <button type="button" data-review-scenario="empty-folder">Carpeta vacía</button>
-              <button type="button" data-review-scenario="preview-loading">Vista cargando</button>
-              <button type="button" data-review-scenario="preview-error">Error de vista</button>
-              <button type="button" data-review-scenario="export-ready">Exportación lista</button>
-              <button type="button" data-review-scenario="export-running">En curso</button>
-              <button type="button" data-review-scenario="export-completed">Completada</button>
-              <button type="button" data-review-scenario="export-partial">Con errores</button>
-            </div>
-            <div class="review-actions">
-              <button type="button" data-action="check-bridge">Bridge health</button>
-              <button type="button" data-action="scan-bridge-folder">Escaneo real</button>
-              <button type="button" data-action="force-preview-error">Error de vista</button>
-            </div>
-            <p>Estados simulados salvo health y escaneo por ruta.</p>
-          </details>
         </aside>
 
         <aside class="gallery-column" aria-label="Galería de imágenes">
@@ -280,12 +365,26 @@
                 <button type="button" data-preview-bg="white" title="Fondo blanco" aria-label="Fondo blanco"></button>
                 <button type="button" data-preview-bg="soft-black" title="Fondo negro suave" aria-label="Fondo negro suave"></button>
                 <button type="button" data-preview-bg="transparent" title="Fondo transparente" aria-label="Fondo transparente"></button>
-                <div class="viewer-bg-custom-fields" aria-label="Fondo personalizado">
-                  <button type="button" id="preview-bg-custom-swatch" data-preview-bg="custom" title="Fondo personalizado" aria-label="Fondo personalizado"></button>
-                  <input type="number" min="0" max="255" step="1" value="230" data-preview-bg-channel="r" aria-label="Rojo del fondo personalizado" />
-                  <input type="number" min="0" max="255" step="1" value="230" data-preview-bg-channel="g" aria-label="Verde del fondo personalizado" />
-                  <input type="number" min="0" max="255" step="1" value="230" data-preview-bg-channel="b" aria-label="Azul del fondo personalizado" />
+                <div class="viewer-bg-custom-fields rgb-visual-control rgb-visual-control--swatch-only" data-rgb-visual-control="preview-background" data-rgb-visual-target="preview-bg-custom-value" data-rgb-visual-format="rgb-background" aria-label="Fondo personalizado">
+                  <button type="button" class="rgb-visual-control__swatch" id="preview-bg-custom-swatch" data-preview-bg="custom" data-rgb-visual-picker-trigger data-rgb-visual-swatch title="Fondo personalizado" aria-label="Fondo personalizado"></button>
+                  <input id="preview-bg-custom-value" type="hidden" value="rgb:230,230,230" />
+                  <input id="preview-bg-color-input" type="color" class="rgb-visual-control__picker" value="#e6e6e6" data-rgb-visual-picker data-preview-bg-picker tabindex="-1" aria-label="Elegir fondo personalizado" />
                 </div>
+              </div>
+              <div class="viewer-control-group viewer-guides" aria-label="Guías del lienzo">
+                <span class="viewer-control-label">Guías</span>
+                <button type="button" id="guides-toggle" data-action="toggle-guides" aria-pressed="true" title="Mostrar u ocultar guías">On</button>
+                <details class="viewer-guides-menu" id="viewer-guides-menu">
+                  <summary class="viewer-guides-menu-trigger" aria-label="Sistemas de guías" title="Sistemas de guías">
+                    <span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h8M16 7h4M4 17h4M12 17h8"></path><path d="M12 5v4M8 15v4"></path></svg></span>
+                    <span class="visually-hidden">Sistemas de guías</span>
+                    <span id="guides-active-count" class="viewer-guides-count">0</span>
+                  </summary>
+                  <div class="viewer-guides-popover" role="menu" aria-label="Sistemas de guías">
+                    <div data-guide-system-list></div>
+                    <button type="button" data-action="open-guide-manager">Gestionar guías</button>
+                  </div>
+                </details>
               </div>
               <div class="zoom-controls" aria-label="Zoom">
                 <div class="viewer-control-group viewer-nav" aria-label="Navegación">
@@ -311,6 +410,7 @@
 
           <div class="canvas-area" id="canvas-area">
             <div class="preview-output-context" id="preview-output-context" aria-live="polite"></div>
+            <div class="guide-overlay" id="guide-overlay" aria-hidden="true" hidden></div>
             <div class="preview-canvas" id="preview-canvas" tabindex="0" aria-live="polite" aria-label="Visor de revisión. Arrastra para mover la imagen cuando haya zoom; usa la rueda o los botones de zoom para acercar y alejar."></div>
           </div>
 
@@ -336,7 +436,7 @@
           <details class="settings-section inspector-disclosure preset-section" data-inspector-section="advanced">
             <summary>
               <span class="summary-copy">
-                <strong>Gestionar ajustes</strong>
+                <strong>Ajuste del lote</strong>
                 <small id="preset-source">Luz cenital · Global</small>
               </span>
               <span class="change-chip" id="preset-dirty">Sin cambios</span>
@@ -351,43 +451,74 @@
                 <div class="preset-group-heading">
                   <span>Gestionar ajuste</span>
                 </div>
-                <div class="button-row preset-actions">
-                  <button type="button" data-action="cancel-adjustment-edit">Cancelar</button>
-                  <button type="button" class="primary" data-action="apply-global-adjustment">Aplicar al lote sin guardar</button>
+                <div class="preset-actions">
+                  <button type="button" class="primary" data-action="apply-global-adjustment">Aplicar al lote</button>
                   <button type="button" id="save-preset" data-action="save-preset">Guardar ajuste</button>
-                  <button type="button" data-action="save-preset-as-new">Guardar como nuevo</button>
+                  <details class="secondary-actions">
+                    <summary>Más acciones</summary>
+                    <div class="button-row">
+                      <button type="button" data-action="cancel-adjustment-edit">Descartar cambios</button>
+                      <button type="button" id="reset-preset" data-action="reset-settings">Restaurar recomendado</button>
+                      <button type="button" data-action="save-preset-as-new">Guardar como nuevo</button>
+                    </div>
+                  </details>
                 </div>
               </div>
             </div>
           </details>
 
+          <small class="control-pending-status" id="numeric-pending-status" role="status" aria-live="polite" hidden></small>
+
           <details class="settings-section inspector-disclosure appearance-section" data-inspector-section="advanced">
             <summary>
               <span class="summary-copy">
-                <strong>Controles principales</strong>
-                <small>Ajuste global</small>
+                <strong>Sombra</strong>
+                <small>Ajustes básicos</small>
               </span>
             </summary>
             <div class="inspector-disclosure__body control-stack">
-              <label class="control-row">
-                <span>Opacidad</span>
+              <label class="control-row" data-control-key="opacity">
+                <span id="opacity-label" data-control-label-key="opacity">Densidad de sombra</span>
                 <input id="opacity-input" type="range" min="0" max="100" value="20" data-setting="opacity" />
-                <input id="opacity-number" class="number-input setting-number" type="number" min="0" max="100" step="1" value="20" data-setting-number="opacity" aria-label="Opacidad" />
+                <input id="opacity-number" class="number-input setting-number" type="number" min="0" max="100" step="1" value="20" data-setting-number="opacity" aria-labelledby="opacity-label" />
               </label>
-              <label class="control-row">
-                <span>Desenfoque</span>
+              <label class="control-row" data-control-key="blur">
+                <span id="blur-label" data-control-label-key="blur">Suavidad</span>
                 <input id="blur-input" type="range" min="0" max="80" value="30" data-setting="blur" />
-                <input id="blur-number" class="number-input setting-number" type="number" min="0" max="80" step="1" value="30" data-setting-number="blur" aria-label="Desenfoque" />
+                <input id="blur-number" class="number-input setting-number" type="number" min="0" max="80" step="1" value="30" data-setting-number="blur" aria-labelledby="blur-label" />
               </label>
-              <label class="control-row">
-                <span>Distancia</span>
+              <label class="control-row" data-control-key="distance">
+                <span id="distance-label" data-control-label-key="distance">Distancia</span>
                 <input id="distance-input" type="range" min="0" max="80" value="25" data-setting="distance" />
-                <input id="distance-number" class="number-input setting-number" type="number" min="0" max="80" step="1" value="25" data-setting-number="distance" aria-label="Distancia" />
+                <input id="distance-number" class="number-input setting-number" type="number" min="0" max="80" step="1" value="25" data-setting-number="distance" aria-labelledby="distance-label" />
               </label>
-              <label class="control-row">
-                <span>Padding</span>
+            </div>
+          </details>
+
+          <details class="settings-section inspector-disclosure composition-section" data-inspector-section="advanced">
+            <summary>
+              <span class="summary-copy">
+                <strong>Producto y lienzo</strong>
+                <small>Tamaño, margen y encaje</small>
+              </span>
+            </summary>
+            <div class="inspector-disclosure__body control-stack">
+              <label class="control-row" data-control-key="scale_adjustment">
+                <span id="scale_adjustment-label" data-control-label-key="scale_adjustment">Escala del producto</span>
+                <input type="range" min="-30" max="30" value="0" data-setting="scale_adjustment" />
+                <input class="number-input setting-number" type="number" min="-30" max="30" step="1" value="0" data-setting-number="scale_adjustment" aria-labelledby="scale_adjustment-label" />
+              </label>
+              <label class="control-row" data-control-key="padding">
+                <span id="padding-label" data-control-label-key="padding">Margen</span>
                 <input id="padding-input" type="range" min="0" max="30" value="10" data-setting="padding" />
-                <input id="padding-number" class="number-input setting-number" type="number" min="0" max="30" step="1" value="10" data-setting-number="padding" aria-label="Padding" />
+                <input id="padding-number" class="number-input setting-number" type="number" min="0" max="30" step="1" value="10" data-setting-number="padding" aria-labelledby="padding-label" />
+              </label>
+              <label class="control-row control-row--toggle" data-control-key="adaptive_zoom">
+                <span data-control-label-key="adaptive_zoom">Ajuste automático del producto</span>
+                <span class="toggle-field">
+                  <input type="checkbox" data-setting="adaptive_zoom" checked />
+                  <em>Activo</em>
+                </span>
               </label>
             </div>
           </details>
@@ -395,20 +526,30 @@
           <details class="settings-section inspector-disclosure advanced-block" id="advanced-settings" data-inspector-section="advanced">
             <summary>
               <span class="summary-copy">
-                <strong>Avanzado</strong>
-                <small>Parámetros técnicos</small>
+                <strong>Calibración del motor</strong>
+                <small>Controles que dependen del modo</small>
               </span>
             </summary>
             <div class="inspector-disclosure__body control-stack advanced-controls">
-                <label class="control-row control-row--select">
-                  <span>Motor</span>
-                  <select data-setting="shadow_engine">
-                    <option value="realistic_v2">Realista V2</option>
-                    <option value="studio_2_5d">Estudio 2.5D</option>
-                    <option value="legacy">Clásico</option>
+                <label class="control-row control-row--select" data-control-key="shadow_engine">
+                  <span id="shadow_engine-label" data-control-label-key="shadow_engine">Motor de sombra</span>
+                  <select data-setting="shadow_engine" aria-describedby="shadow-engine-description engine-state-help">
+                    <option value="realistic_v2">Realista</option>
+                    <option value="studio_2_5d">Estudio con luz</option>
+                    <option value="legacy">Clásico · compatibilidad</option>
                   </select>
                 </label>
-                <div class="studio-lighting-panel" id="studio-lighting-panel" hidden>
+                <small class="advanced-help" id="shadow-engine-description" data-engine-description>Sombra natural con contacto suave</small>
+                <small class="advanced-help" id="engine-state-help">Los controles de otros motores se conservan al cambiar de modo.</small>
+                <details class="advanced-subgroup" data-advanced-group="lighting" data-control-group="lighting_scene" open>
+                  <summary>
+                    <span class="summary-copy">
+                      <strong>Luz</strong>
+                      <small>Escena y fuente</small>
+                    </span>
+                  </summary>
+                  <div class="advanced-subgroup__body">
+                  <div class="studio-lighting-panel" id="studio-lighting-panel" hidden>
                   <div class="lighting-scene-toolbar" aria-label="Escenas de luz">
                     <button type="button" data-lighting-preset="overhead_soft">Cenital suave</button>
                     <button type="button" data-lighting-preset="side_soft">Lateral suave</button>
@@ -416,7 +557,7 @@
                     <button type="button" data-lighting-preset="mild_drama">Drama leve</button>
                   </div>
                   <div class="lighting-editor-grid">
-                    <button type="button" class="lighting-stage" id="lighting-stage" data-lighting-stage aria-label="Posición de la luz">
+                    <button type="button" class="lighting-stage" id="lighting-stage" data-lighting-stage aria-label="Posición de la luz" aria-describedby="lighting-stage-help">
                       <span class="lighting-stage__cross lighting-stage__cross--x"></span>
                       <span class="lighting-stage__cross lighting-stage__cross--y"></span>
                       <span class="lighting-stage__product"></span>
@@ -424,113 +565,119 @@
                     </button>
                     <div class="lighting-stage-fields">
                       <label class="control-row control-row--select">
-                        <span>Tipo</span>
+                        <span>Tipo de luz</span>
                         <select data-lighting-field="main.type">
-                          <option value="softbox">Softbox</option>
-                          <option value="spot">Spot</option>
-                          <option value="strip">Strip</option>
+                          <option value="softbox">Caja suave</option>
+                          <option value="spot">Foco</option>
+                          <option value="strip">Tira</option>
                         </select>
                       </label>
+                      <small id="lighting-stage-help">Usa las flechas para mover la luz; Mayús ajusta más deprisa.</small>
                     </div>
                   </div>
                   <div class="lighting-slider-stack">
                     <label class="control-row">
-                      <span>Altura luz</span>
+                      <span>Altura de la luz</span>
                       <input type="range" min="0" max="100" value="65" data-lighting-field="main.height" />
-                      <input id="lighting-height-output" class="number-input lighting-number" type="number" min="0" max="100" step="1" value="65" data-lighting-number-field="main.height" aria-label="Altura luz" />
+                      <input id="lighting-height-output" class="number-input lighting-number" type="number" min="0" max="100" step="1" value="65" data-lighting-number-field="main.height" aria-label="Altura de la luz" />
                     </label>
                     <label class="control-row">
-                      <span>Tamaño luz</span>
+                      <span>Tamaño de fuente</span>
                       <input type="range" min="0" max="100" value="55" data-lighting-field="main.size" />
-                      <input id="lighting-size-output" class="number-input lighting-number" type="number" min="0" max="100" step="1" value="55" data-lighting-number-field="main.size" aria-label="Tamaño luz" />
+                      <input id="lighting-size-output" class="number-input lighting-number" type="number" min="0" max="100" step="1" value="55" data-lighting-number-field="main.size" aria-label="Tamaño de fuente" />
                     </label>
                     <label class="control-row">
-                      <span>Potencia</span>
+                      <span>Potencia de luz</span>
                       <input type="range" min="0" max="150" value="85" data-lighting-field="main.intensity" />
-                      <input id="lighting-intensity-output" class="number-input lighting-number" type="number" min="0" max="150" step="1" value="85" data-lighting-number-field="main.intensity" aria-label="Potencia" />
+                      <input id="lighting-intensity-output" class="number-input lighting-number" type="number" min="0" max="150" step="1" value="85" data-lighting-number-field="main.intensity" aria-label="Potencia de luz" />
                     </label>
                     <label class="control-row">
-                      <span>Ambiente</span>
+                      <span>Luz ambiente</span>
                       <input type="range" min="0" max="100" value="25" data-lighting-field="ambient_intensity" />
-                      <input id="lighting-ambient-output" class="number-input lighting-number" type="number" min="0" max="100" step="1" value="25" data-lighting-number-field="ambient_intensity" aria-label="Ambiente" />
+                      <input id="lighting-ambient-output" class="number-input lighting-number" type="number" min="0" max="100" step="1" value="25" data-lighting-number-field="ambient_intensity" aria-label="Luz ambiente" />
                     </label>
                   </div>
-                </div>
-                <div class="advanced-technical-panel">
-                  <label class="control-row">
-                    <span>Spread</span>
-                    <input type="range" min="0" max="20" value="0" data-setting="spread" />
-                    <input class="number-input setting-number" type="number" min="0" max="20" step="1" value="0" data-setting-number="spread" aria-label="Spread" />
-                  </label>
-                  <label class="control-row">
-                    <span>Ruido</span>
-                    <input type="range" min="0" max="20" value="2" data-setting="noise" />
-                    <input class="number-input setting-number" type="number" min="0" max="20" step="1" value="2" data-setting-number="noise" aria-label="Ruido" />
-                  </label>
-                  <label class="control-row">
-                    <span>Contacto</span>
-                    <input type="range" min="0" max="40" value="10" data-setting="contact_blur" />
-                    <input class="number-input setting-number" type="number" min="0" max="40" step="1" value="10" data-setting-number="contact_blur" aria-label="Contacto" />
-                  </label>
-                  <label class="control-row">
-                    <span>Escala imagen</span>
-                    <input type="range" min="-30" max="30" value="0" data-setting="scale_adjustment" />
-                    <input class="number-input setting-number" type="number" min="-30" max="30" step="1" value="0" data-setting-number="scale_adjustment" aria-label="Escala imagen" />
-                  </label>
-                  <label class="control-row">
-                    <span>Fusión</span>
-                    <input type="range" min="0" max="20" value="1" data-setting="fusion" />
-                    <input class="number-input setting-number" type="number" min="0" max="20" step="1" value="1" data-setting-number="fusion" aria-label="Fusión" />
-                  </label>
-                  <label class="control-row" data-engine-row="direction">
-                    <span>Ángulo</span>
-                    <input type="range" min="0" max="360" value="180" data-setting="angle" />
-                    <input class="number-input setting-number" type="number" min="0" max="360" step="1" value="180" data-setting-number="angle" aria-label="Ángulo" />
-                  </label>
-                  <label class="control-row">
-                    <span>Contracción</span>
-                    <input type="range" min="0" max="80" value="0" data-setting="contraction" />
-                    <input class="number-input setting-number" type="number" min="0" max="80" step="1" value="0" data-setting-number="contraction" aria-label="Contracción" />
-                  </label>
-                  <label class="control-row control-row--toggle">
-                    <span>Zoom auto</span>
-                    <span class="toggle-field">
-                      <input type="checkbox" data-setting="adaptive_zoom" checked />
-                      <em>Activo</em>
+                  </div>
+                  </div>
+                </details>
+                <details class="advanced-subgroup" data-advanced-group="quality" data-control-group="spread,noise,contact_blur,fusion,angle,contraction" open>
+                  <summary>
+                    <span class="summary-copy">
+                      <strong>Calidad de sombra</strong>
+                      <small>Contacto, difusión y halo</small>
                     </span>
+                  </summary>
+                  <div class="advanced-subgroup__body">
+                  <div class="advanced-technical-panel">
+                  <label class="control-row" data-control-key="spread">
+                    <span id="spread-label" data-control-label-key="spread">Difusión</span>
+                    <input type="range" min="0" max="20" value="0" data-setting="spread" />
+                    <input class="number-input setting-number" type="number" min="0" max="20" step="1" value="0" data-setting-number="spread" aria-labelledby="spread-label" />
                   </label>
-                </div>
+                  <label class="control-row" data-control-key="noise">
+                    <span id="noise-label" data-control-label-key="noise">Grano de sombra</span>
+                    <input type="range" min="0" max="20" value="2" data-setting="noise" />
+                    <input class="number-input setting-number" type="number" min="0" max="20" step="1" value="2" data-setting-number="noise" aria-labelledby="noise-label" />
+                  </label>
+                  <label class="control-row" data-control-key="contact_blur">
+                    <span id="contact_blur-label" data-control-label-key="contact_blur">Suavidad de contacto</span>
+                    <input type="range" min="0" max="40" value="10" data-setting="contact_blur" />
+                    <input class="number-input setting-number" type="number" min="0" max="40" step="1" value="10" data-setting-number="contact_blur" aria-labelledby="contact_blur-label" />
+                  </label>
+                  <label class="control-row" data-control-key="fusion">
+                    <span id="fusion-label" data-control-label-key="fusion">Protección interior</span>
+                    <input type="range" min="0" max="20" value="1" data-setting="fusion" />
+                    <input class="number-input setting-number" type="number" min="0" max="20" step="1" value="1" data-setting-number="fusion" aria-labelledby="fusion-label" />
+                  </label>
+                  <label class="control-row" data-engine-row="direction" data-control-key="angle">
+                    <span id="angle-label" data-control-label-key="angle">Dirección de la sombra</span>
+                    <input type="range" min="0" max="360" value="180" data-setting="angle" />
+                    <input class="number-input setting-number" type="number" min="0" max="360" step="1" value="180" data-setting-number="angle" aria-labelledby="angle-label" />
+                  </label>
+                  <label class="control-row" data-control-key="contraction">
+                    <span id="contraction-label" data-control-label-key="contraction">Reducir halo del borde</span>
+                    <input type="range" min="0" max="80" value="0" data-setting="contraction" />
+                    <input class="number-input setting-number" type="number" min="0" max="80" step="1" value="0" data-setting-number="contraction" aria-labelledby="contraction-label" />
+                  </label>
+                  </div>
+                  </div>
+                </details>
               </div>
           </details>
 
           <details class="settings-section inspector-disclosure local-adjustment" id="local-adjustment" data-inspector-section="advanced">
             <summary>
               <span class="summary-copy">
-                <strong>Ajuste por imagen</strong>
-                <small id="local-adjustment-text">Igual que el lote</small>
+                <strong>Excepción de esta imagen</strong>
+                <small id="local-adjustment-text">Usa el ajuste del lote</small>
               </span>
             </summary>
             <div class="inspector-disclosure__body local-adjustment__body">
               <label class="local-control-row">
-                <span>Tamaño</span>
+                <span id="local-size-label">Escala respecto al lote</span>
                 <input type="range" min="-30" max="30" value="0" data-local-setting="size_delta" />
-                <input class="number-input local-setting-number" type="number" min="-30" max="30" step="1" value="0" data-local-setting-number="size_delta" aria-label="Tamaño por imagen" />
+                <input class="number-input local-setting-number" type="number" min="-30" max="30" step="1" value="0" data-local-setting-number="size_delta" aria-labelledby="local-size-label" />
               </label>
               <label class="local-control-row">
-                <span>Sombra</span>
+                <span id="local-shadow-label">Densidad respecto al lote</span>
                 <input type="range" min="-40" max="40" value="0" data-local-setting="shadow_delta" />
-                <input class="number-input local-setting-number" type="number" min="-40" max="40" step="1" value="0" data-local-setting-number="shadow_delta" aria-label="Sombra por imagen" />
+                <input class="number-input local-setting-number" type="number" min="-40" max="40" step="1" value="0" data-local-setting-number="shadow_delta" aria-labelledby="local-shadow-label" />
               </label>
               <label class="local-control-row">
-                  <span>Desenfoque</span>
+                  <span id="local-blur-label">Suavidad respecto al lote</span>
                 <input type="range" min="-40" max="40" value="0" data-local-setting="blur_delta" />
-                <input class="number-input local-setting-number" type="number" min="-40" max="40" step="1" value="0" data-local-setting-number="blur_delta" aria-label="Desenfoque por imagen" />
+                <input class="number-input local-setting-number" type="number" min="-40" max="40" step="1" value="0" data-local-setting-number="blur_delta" aria-labelledby="local-blur-label" />
               </label>
               <div class="local-adjustment__actions">
-                <button type="button" data-action="close-preset-editor">Cancelar</button>
                 <button type="button" class="primary" data-action="apply-local-adjustment">Aplicar a esta imagen</button>
-                <button type="button" data-action="save-local-adjustment-as-new">Guardar nuevo</button>
-                <button type="button" data-action="reset-local-adjustment">Restablecer lote</button>
+                <button type="button" data-action="reset-local-adjustment">Restablecer al lote</button>
+                <details class="secondary-actions">
+                  <summary>Más acciones</summary>
+                  <div class="button-row">
+                    <button type="button" data-action="cancel-local-adjustment">Descartar cambios</button>
+                    <button type="button" data-action="save-local-adjustment-as-new">Guardar como ajuste</button>
+                  </div>
+                </details>
               </div>
             </div>
           </details>
@@ -546,7 +693,7 @@
 
             <div class="output-profile-row">
               <label>
-                <span>Formatos</span>
+                <span>Salidas</span>
                 <select id="output-profile-select"></select>
               </label>
               <button type="button" class="btn-linklike" data-action="open-app-settings">Cambiar</button>
@@ -643,19 +790,218 @@
         </section>
       </div>
 
+      <div class="app-settings-backdrop is-hidden" id="preferences-modal" role="dialog" aria-modal="true" aria-labelledby="preferences-title">
+        <section class="app-settings-dialog preferences-dialog">
+          <header class="app-settings-header">
+            <div>
+              <span class="eyebrow">Aplicación</span>
+              <h2 id="preferences-title">Preferencias</h2>
+              <small>Interfaz, inicio y datos locales.</small>
+            </div>
+            <button type="button" class="icon-button" data-action="close-preferences" aria-label="Cerrar preferencias">×</button>
+          </header>
+
+          <div class="app-settings-content preferences-content">
+            <section class="preferences-section" aria-labelledby="preferences-appearance-title">
+              <div class="preferences-section-heading">
+                <h3 id="preferences-appearance-title">Apariencia</h3>
+                <small>Estos cambios no afectan al procesado ni a la exportación.</small>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Tema</strong>
+                  <small>El modo sistema sigue el ajuste del escritorio.</small>
+                </div>
+                <label class="preference-select">
+                  <span class="visually-hidden">Tema</span>
+                  <select data-preference-select="theme">
+                    <option value="light">Claro</option>
+                    <option value="dark">Oscuro</option>
+                    <option value="system">Sistema</option>
+                  </select>
+                </label>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Tono de marca</strong>
+                  <small>Color de acento para controles y estados activos.</small>
+                </div>
+                <label class="preference-select preference-select--brand">
+                  <span class="preference-brand-preview" aria-hidden="true"></span>
+                  <select data-preference-select="brandTone" aria-label="Tono de marca">
+                    <option value="green">Verde</option>
+                    <option value="blue">Azul</option>
+                    <option value="indigo">Índigo</option>
+                    <option value="violet">Violeta</option>
+                    <option value="coral">Coral</option>
+                    <option value="amber">Ámbar</option>
+                  </select>
+                </label>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Densidad</strong>
+                  <small>Controla altura de controles y respiración general.</small>
+                </div>
+                <label class="preference-select">
+                  <span class="visually-hidden">Densidad</span>
+                  <select data-preference-select="density">
+                    <option value="compact">Compacta</option>
+                    <option value="comfortable">Cómoda</option>
+                  </select>
+                </label>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Modo de trabajo</strong>
+                  <small>Panel principal simple o completo.</small>
+                </div>
+                <label class="preference-select">
+                  <span class="visually-hidden">Modo de trabajo</span>
+                  <select data-preference-select="complexityMode">
+                    <option value="simple">Simple</option>
+                    <option value="advanced">Avanzado</option>
+                  </select>
+                </label>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Animaciones</strong>
+                  <small>Reduce transiciones y efectos de carga visual.</small>
+                </div>
+                <button type="button" class="preference-toggle" data-action="toggle-reduced-motion" aria-pressed="false">
+                  <span aria-hidden="true"></span>
+                  <em>Automáticas</em>
+                </button>
+              </div>
+            </section>
+
+            <section class="preferences-section" aria-labelledby="preferences-start-title">
+              <div class="preferences-section-heading">
+                <h3 id="preferences-start-title">Inicio</h3>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Carpetas recientes</strong>
+                  <small>Muestra u oculta accesos recientes en la pantalla inicial.</small>
+                </div>
+                <button type="button" class="preference-toggle" data-action="toggle-show-recent-folders" aria-pressed="true">
+                  <span aria-hidden="true"></span>
+                  <em>Visibles</em>
+                </button>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Fondos de bienvenida</strong>
+                  <small>Muestra imágenes decorativas al iniciar sin lote.</small>
+                </div>
+                <button type="button" class="preference-toggle" data-action="toggle-onboarding-background" aria-pressed="true">
+                  <span aria-hidden="true"></span>
+                  <em>Activas</em>
+                </button>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Carpeta de fondos</strong>
+                  <small>Añade tus imágenes a la carpeta local de onboarding.</small>
+                </div>
+                <button type="button" data-action="open-onboarding-assets-folder">Abrir carpeta</button>
+              </div>
+            </section>
+
+            <section class="preferences-section" aria-labelledby="preferences-processing-title">
+              <div class="preferences-section-heading">
+                <h3 id="preferences-processing-title">Procesado</h3>
+                <small>Controla sólo el ajuste inicial; no modifica presets guardados.</small>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Ajuste al iniciar</strong>
+                  <small data-preference-startup-adjustment-summary>Usar el ajuste guardado por defecto.</small>
+                </div>
+                <div class="preference-action-group">
+                  <button type="button" data-action="set-startup-adjustment">Usar actual</button>
+                  <button type="button" data-action="clear-startup-adjustment">Borrar</button>
+                </div>
+              </div>
+            </section>
+
+            <section class="preferences-section" aria-labelledby="preferences-view-title">
+              <div class="preferences-section-heading">
+                <h3 id="preferences-view-title">Vista</h3>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Tamaño de miniaturas</strong>
+                  <small>Ajusta la densidad visual de la galería.</small>
+                </div>
+                <label class="preference-select">
+                  <span class="visually-hidden">Tamaño de miniaturas</span>
+                  <select data-preference-select="thumbnailSize">
+                    <option value="small">Pequeño</option>
+                    <option value="medium">Medio</option>
+                    <option value="large">Grande</option>
+                  </select>
+                </label>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Nombres de archivo</strong>
+                  <small>Controla la visibilidad de nombres en miniaturas.</small>
+                </div>
+                <label class="preference-select">
+                  <span class="visually-hidden">Nombres de archivo</span>
+                  <select data-preference-select="fileNameDisplay">
+                    <option value="always">Siempre</option>
+                    <option value="hover">Al pasar</option>
+                    <option value="none">Ocultos</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+
+            <section class="preferences-section" aria-labelledby="preferences-local-title">
+              <div class="preferences-section-heading">
+                <h3 id="preferences-local-title">Datos locales</h3>
+                <small>Sólo afecta a preferencias de este equipo; no modifica imágenes ni presets.</small>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Carpetas recientes</strong>
+                  <small>Elimina sólo el acceso rápido de la pantalla inicial.</small>
+                </div>
+                <button type="button" data-action="clear-recent-folders">Borrar carpetas recientes</button>
+              </div>
+              <div class="preferences-row">
+                <div class="preferences-row__info">
+                  <strong>Interfaz</strong>
+                  <small>Vuelve a tema claro, tono verde y valores compactos.</small>
+                </div>
+                <button type="button" data-action="reset-interface-preferences">Restablecer interfaz</button>
+              </div>
+            </section>
+          </div>
+
+          <footer class="app-settings-footer">
+            <span class="settings-footer-note">Preferencias locales de interfaz.</span>
+            <button type="button" class="primary" data-action="close-preferences">Cerrar</button>
+          </footer>
+        </section>
+      </div>
+
       <div class="app-settings-backdrop is-hidden" id="app-settings-modal" role="dialog" aria-modal="true" aria-labelledby="app-settings-title">
         <section class="app-settings-dialog">
           <header class="app-settings-header">
             <div>
               <span class="eyebrow">Exportación</span>
-              <h2 id="app-settings-title">Formatos de salida</h2>
+              <h2 id="app-settings-title">Salidas</h2>
               <small id="app-settings-subtitle">Configura las salidas del lote.</small>
             </div>
-            <button type="button" class="icon-button" data-action="close-app-settings" aria-label="Cerrar ajustes">×</button>
+            <button type="button" class="icon-button" data-action="close-app-settings" aria-label="Cerrar Salidas">×</button>
           </header>
 
           <div class="app-settings-content">
-            <aside class="output-format-list" aria-label="Formatos de salida">
+            <aside class="output-format-list" aria-label="Salidas">
               <div class="settings-toolbar">
                 <div>
                   <small id="output-profile-count">0 activos de 0</small>
@@ -676,7 +1022,7 @@
                 <section class="format-form-section format-section-file">
                   <h3>Archivo</h3>
                   <label class="text-field format-field-wide">
-                    <span>Nombre del formato</span>
+                    <span>Nombre de salida</span>
                     <input id="profile-name-input" type="text" autocomplete="off" />
                     <small class="field-message" data-profile-field-message="name"></small>
                   </label>
@@ -707,23 +1053,35 @@
                     <label class="format-size-field">
                       <span>Tamaño</span>
                       <div class="format-size-inputs">
-                        <input id="profile-width-input" type="number" min="1" step="1" aria-label="Anchura en píxeles" />
+                        <input id="profile-width-input" type="number" min="1" max="12000" step="1" aria-label="Anchura en píxeles" />
                         <em aria-hidden="true">×</em>
-                        <input id="profile-height-input" type="number" min="1" step="1" aria-label="Altura en píxeles" />
+                        <input id="profile-height-input" type="number" min="1" max="12000" step="1" aria-label="Altura en píxeles" />
                         <em>px</em>
                       </div>
                       <small class="field-message" data-profile-field-message="width"></small>
                       <small class="field-message" data-profile-field-message="height"></small>
                     </label>
-                    <label>
-                      <span>Fondo</span>
-                      <select id="profile-background-input"></select>
-                      <small class="field-message" data-profile-field-message="background"></small>
-                    </label>
-                    <div class="background-preset-actions" aria-label="Presets de fondo">
-                      <button type="button" data-action="edit-background-preset">Editar</button>
-                      <button type="button" data-action="new-background-preset">Nuevo</button>
-                      <button type="button" data-action="delete-background-preset">Eliminar</button>
+                    <div class="format-background-fields">
+                      <div class="format-background-row">
+                        <label>
+                          <span>Fondo</span>
+                          <select id="profile-background-input"></select>
+                          <small class="field-message" data-profile-field-message="background"></small>
+                        </label>
+                        <div class="background-preset-actions" aria-label="Fondos guardados">
+                          <button type="button" data-action="edit-background-preset" aria-label="Editar fondo" title="Editar fondo"><span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></span><span class="visually-hidden">Editar fondo</span></button>
+                          <button type="button" data-action="new-background-preset" aria-label="Nuevo fondo" title="Nuevo fondo"><span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg></span><span class="visually-hidden">Nuevo fondo</span></button>
+                          <button type="button" data-action="delete-background-preset" aria-label="Eliminar fondo" title="Eliminar fondo"><span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v5"></path><path d="M14 11v5"></path></svg></span><span class="visually-hidden">Eliminar fondo</span></button>
+                        </div>
+                      </div>
+                      <label class="text-field format-size-limit-field" id="profile-max-file-size-field">
+                        <span>Peso máx.</span>
+                        <div class="format-size-limit-input">
+                          <input id="profile-max-file-size-input" type="number" min="1" step="1" inputmode="numeric" placeholder="Sin límite" aria-label="Peso máximo JPG en KB" />
+                          <em>KB</em>
+                        </div>
+                        <small class="field-message" data-profile-field-message="maxFileSizeKb"></small>
+                      </label>
                     </div>
                   </div>
                 </section>
@@ -756,11 +1114,11 @@
           <footer class="app-settings-footer">
             <div class="output-delete-confirm" id="output-delete-confirm" hidden aria-live="polite">
               <div class="output-delete-confirm-copy">
-                <strong id="output-delete-confirm-title">Eliminar formato</strong>
+                <strong id="output-delete-confirm-title">Eliminar salida</strong>
                 <small id="output-delete-confirm-detail"></small>
               </div>
               <button type="button" data-action="cancel-output-delete">Cancelar</button>
-              <button type="button" class="danger" data-action="confirm-output-delete">Eliminar formato</button>
+              <button type="button" class="danger" data-action="confirm-output-delete">Eliminar salida</button>
             </div>
             <span id="output-profile-unsaved" class="settings-footer-note"></span>
             <button type="button" data-output-profile-close data-action="cancel-output-profile-draft" hidden>Cancelar</button>
@@ -782,12 +1140,12 @@
               </label>
               <label class="text-field background-preset-rgb-field">
                 <span>RGB</span>
-                <input id="background-preset-rgb-input" type="text" inputmode="numeric" placeholder="Ej. 245, 245, 245" />
+                <input id="background-preset-rgb-input" type="hidden" value="230, 230, 230" />
+                <span class="rgb-visual-control rgb-visual-control--swatch-only background-preset-rgb-control" data-rgb-visual-control="background-preset" data-rgb-visual-target="background-preset-rgb-input" data-rgb-visual-format="rgb-text" style="--rgb-visual-color: rgb(230, 230, 230)">
+                  <button type="button" class="rgb-visual-control__swatch background-preset-swatch" id="background-preset-swatch" data-rgb-visual-picker-trigger data-rgb-visual-swatch aria-label="Elegir color del fondo"></button>
+                  <input type="color" class="rgb-visual-control__picker" value="#e6e6e6" data-rgb-visual-picker tabindex="-1" aria-label="Selector de color del fondo" />
+                </span>
               </label>
-              <div class="background-preset-swatch-field">
-                <span>Muestra</span>
-                <div class="background-preset-swatch" id="background-preset-swatch" role="img" aria-label="Muestra del fondo"></div>
-              </div>
             </div>
             <div class="background-preset-editor-actions">
               <button type="button" data-action="save-background-preset">Guardar fondo</button>
@@ -818,30 +1176,115 @@
       </footer>
     </main>
 
-    <script src="./formatters.js?v=20260616-inspector-fit-height"></script>
-    <script src="./output-profiles.js?v=20260616-inspector-fit-height"></script>
-    <script src="./output-profile-view.js?v=20260616-inspector-fit-height"></script>
-    <script src="./export-payload.js?v=20260616-inspector-fit-height"></script>
-    <script src="./export-state.js?v=20260616-inspector-fit-height"></script>
-    <script src="./export-summary-view.js?v=20260616-inspector-fit-height"></script>
-    <script src="./export-result-view.js?v=20260616-inspector-fit-height"></script>
-    <script src="./export-preflight-view.js?v=20260616-inspector-fit-height"></script>
-    <script src="./top-status-view.js?v=20260616-inspector-fit-height"></script>
-    <script src="./preflight.js?v=20260616-inspector-fit-height"></script>
-    <script src="./batch-view.js?v=20260616-inspector-fit-height"></script>
-    <script src="./scan-state.js?v=20260616-inspector-fit-height"></script>
-    <script src="./export-confirm-view.js?v=20260616-inspector-fit-height"></script>
-    <script src="./empty-state-view.js?v=20260616-inspector-fit-height"></script>
-    <script src="./batch-detail-view.js?v=20260616-inspector-fit-height"></script>
-    <script src="./gallery.js?v=20260616-inspector-fit-height"></script>
-    <script src="./preview-view.js?v=20260616-inspector-fit-height"></script>
-    <script src="./preview-state.js?v=20260616-inspector-fit-height"></script>
-    <script src="./settings-view.js?v=20260616-inspector-fit-height"></script>
-    <script src="./inspector-output-view.js?v=20260616-inspector-fit-height"></script>
-    <script src="./inspector-review-view.js?v=20260616-inspector-fit-height"></script>
-    <script src="./inspector-context-view.js?v=20260616-inspector-fit-height"></script>
-    <script src="./bridge-url.js?v=20260616-inspector-fit-height"></script>
-    <script src="./mock-data.js?v=20260616-inspector-fit-height"></script>
-    <script src="./app.js?v=20260616-inspector-fit-height"></script>
+    <script src="./error-boundary.js?v=20260704-search-focus"></script>
+    <script src="./formatters.js?v=20260704-search-focus"></script>
+    <script src="./output-profiles.js?v=20260704-search-focus"></script>
+    <script src="./background-presets.js?v=20260704-search-focus"></script>
+    <script src="./canvas-guides.js?v=20260704-search-focus"></script>
+    <script src="./canvas-guides-view.js?v=20260704-search-focus"></script>
+    <script src="./output-profile-view.js?v=20260704-search-focus"></script>
+    <script src="./export-payload.js?v=20260704-search-focus"></script>
+    <script src="./export-state.js?v=20260704-search-focus"></script>
+    <script src="./export-summary-view.js?v=20260704-search-focus"></script>
+    <script src="./export-result-view.js?v=20260704-search-focus"></script>
+    <script src="./export-history.js?v=20260704-search-focus"></script>
+    <script src="./export-preflight-view.js?v=20260704-search-focus"></script>
+    <script src="./top-status-view.js?v=20260704-search-focus"></script>
+    <script src="./preflight.js?v=20260704-search-focus"></script>
+    <script src="./batch-view.js?v=20260704-search-focus"></script>
+    <script src="./scan-state.js?v=20260704-search-focus"></script>
+    <script src="./scan-result-pages.js?v=20260704-search-focus"></script>
+    <script src="./export-confirm-view.js?v=20260704-search-focus"></script>
+    <script src="./empty-state-view.js?v=20260704-search-focus"></script>
+    <script src="./qa-lab-view.js?v=20260704-search-focus"></script>
+    <script src="./batch-detail-view.js?v=20260704-search-focus"></script>
+    <script src="./gallery.js?v=20260704-search-focus"></script>
+    <script src="./preview-view.js?v=20260704-search-focus"></script>
+    <script src="./preview-state.js?v=20260704-search-focus"></script>
+    <script src="./settings-view.js?v=20260704-search-focus"></script>
+    <script src="./inspector-output-view.js?v=20260704-search-focus"></script>
+    <script src="./inspector-review-view.js?v=20260704-search-focus"></script>
+    <script src="./inspector-context-view.js?v=20260704-search-focus"></script>
+    <script src="./storage.js?v=20260704-search-focus"></script>
+    <script src="./number-utils.js?v=20260704-search-focus"></script>
+    <script src="./bridge-url.js?v=20260704-search-focus"></script>
+    <script src="./bridge-client.js?v=20260704-search-focus"></script>
+    <script src="./action-handlers.js?v=20260704-search-focus"></script>
+    <script src="./interaction-bindings.js?v=20260704-search-focus"></script>
+    <script src="./theme.js?v=20260704-search-focus"></script>
+    <script src="./interface-preferences.js?v=20260704-search-focus"></script>
+    <script src="./session-snapshot.js?v=20260704-search-focus"></script>
+    <script src="./recent-folders.js?v=20260704-search-focus"></script>
+    <script src="./folder-drop.js?v=20260704-search-focus"></script>
+    <script src="./adjustment-history.js?v=20260704-search-focus"></script>
+    <script src="./state-stores.mjs?v=20260704-search-focus" type="module"></script>
+    <script src="./state-stores.js?v=20260704-search-focus"></script>
+    <script src="./app-state.js?v=20260704-search-focus"></script>
+    <script src="./onboarding-background.js?v=20260704-search-focus"></script>
+    <script type="application/json" id="flatshot-app-loader-manifest">
+      [
+        "app-globals.js",
+        "mock-data.js",
+        "shadow-control-schema.js",
+        "app-state-selectors.js",
+        "app-preflight-state.js",
+        "app-export-readiness-state.js",
+        "app-visible-state.js",
+        "app-session-snapshot-controller.js",
+        "app-timer-controller.js",
+        "app-output-profile-storage.js",
+        "app-background-state.js",
+        "app-output-profile-state.js",
+        "app-export-preferences.js",
+        "app-bridge-ui-preferences.js",
+        "app-output-profile-apply.js",
+        "app-settings-preset-workflow.js",
+        "app-viewer-state.js",
+        "app-local-adjustment-workflow.js",
+        "app-gallery-selection-workflow.js",
+        "app-batch-workflow.js",
+        "app-bridge-api.js",
+        "app-bridge-preview-controller.js",
+        "app-export-controller.js",
+        "app-bridge-connection-controller.js",
+        "app-bridge-scan-controller.js",
+        "app-folder-drop-controller.js",
+        "app-review-actions.js",
+        "app-inspector-disclosure-controller.js",
+        "app-shell.js",
+        "app-topbar-bridge.js",
+        "app-gallery-controller.js",
+        "app-thumbnail-controller.js",
+        "app-modal-visibility.js",
+        "app-modal-render-controller.js",
+        "app-canvas-guides-controller.js",
+        "app-preview-controller.js",
+        "app-range-fill-controller.js",
+        "app-review-panel-controller.js",
+        "app-inspector-cards.js",
+        "app-contextual-inspector-controller.js",
+        "app-settings-panel-controller.js",
+        "app-inspector-layout-controller.js",
+        "app-background-preset-controller.js",
+        "app-output-profile-summary.js",
+        "app-output-profile-draft.js",
+        "app-output-profile-manager.js",
+        "app-output-profile-modal-renderer.js",
+        "app-modal-controller.js",
+        "app-preferences-controller.js",
+        "app-export-view.js",
+        "app-preset-controller.js",
+        "app-footer-status-controller.js",
+        "app-render-shell-gallery.js",
+        "app-action-dispatcher.js",
+        "app-document-events.js",
+        "app-lighting-position-workflow.js",
+        "app-form-events.js",
+        "app-viewer-events.js",
+        "app.js",
+        "app-startup.js"
+      ]
+    </script>
+    <script src="./app-loader.js?v=20260704-search-focus"></script>
   </body>
 </html>

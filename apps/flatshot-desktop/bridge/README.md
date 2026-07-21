@@ -11,6 +11,7 @@ Estado actual:
 - preview real por endpoint JSON;
 - presets reales de solo lectura con settings serializables;
 - exportacion real con jobs locales en memoria;
+- manifests de exportacion persistidos como JSON local;
 - progreso real consultable por polling;
 - sin Tauri.
 
@@ -123,9 +124,15 @@ Request:
 
 ```json
 {
-  "folders": ["C:/ruta/a/carpeta"]
+  "folders": ["C:/ruta/a/carpeta"],
+  "scanMode": "verified",
+  "recursive": false
 }
 ```
+
+`scanMode` puede ser `verified` (por defecto, verifica PNG con Pillow) o `fast`
+(filtra por extension sin abrir cada imagen). `recursive: true` incluye
+subcarpetas; por defecto se omiten y aparecen como `subfolder_not_scanned`.
 
 Response:
 
@@ -138,6 +145,7 @@ Response:
       "isDir": true,
       "images": [
         {
+          "imageId": "img_0123456789abcdef0123",
           "path": "C:/ruta/a/carpeta/imagen.png",
           "name": "imagen.png",
           "stem": "imagen",
@@ -181,6 +189,68 @@ Prueba rapida con PowerShell:
 $body = @{ folders = @("C:/ruta/a/carpeta") } | ConvertTo-Json
 Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8765/folders/scan -ContentType "application/json" -Body $body
 ```
+
+### `POST /folders/scan/jobs`
+
+Real. Inicia un escaneo asincrono con el mismo payload de `/folders/scan`.
+
+Response inicial:
+
+```json
+{
+  "ok": true,
+  "jobId": "abc123",
+  "status": "running",
+  "progress": {
+    "processed": 0,
+    "total": 1,
+    "percent": 0
+  },
+  "result": null,
+  "error": null
+}
+```
+
+### `GET /folders/scan/jobs/{jobId}`
+
+Real. Devuelve progreso y, al completar, el mismo resultado de lote que
+`/folders/scan`.
+
+Para lotes grandes, el resultado completado admite paginacion de imagenes:
+
+```text
+/folders/scan/jobs/{jobId}?imageOffset=0&imageLimit=500
+```
+
+Cuando se usan esos parametros, cada carpeta conserva sus contadores totales
+(`validImages`, `filesFound`, `omittedCount`) pero `images` contiene solo la
+ventana solicitada. La respuesta incluye:
+
+```json
+{
+  "page": {
+    "imageOffset": 0,
+    "imageLimit": 500,
+    "imageCount": 500,
+    "totalImages": 1200,
+    "hasMore": true
+  }
+}
+```
+
+Estados posibles:
+
+- `queued`;
+- `running`;
+- `cancelling`;
+- `completed`;
+- `cancelled`;
+- `failed`.
+
+### `POST /folders/scan/jobs/{jobId}/cancel`
+
+Real. Solicita cancelacion del escaneo. La cancelacion es cooperativa: si el
+scanner ya estaba terminando, el estado final puede ser `completed`.
 
 ### `POST /folders/pick`
 
@@ -229,7 +299,7 @@ Request:
 
 ```json
 {
-  "imagePath": "C:/ruta/a/carpeta/imagen.png",
+  "imageId": "img_0123456789abcdef0123",
   "targetWidth": 675,
   "targetHeight": 900,
   "settings": {
@@ -276,11 +346,35 @@ Response:
 Notas:
 
 - sólo soporta PNG en esta fase;
+- acepta `imageId` devuelto por scan y mantiene `imagePath` como fallback legacy;
 - no modifica archivos;
 - no escribe configuracion;
 - limita cada lado de preview a 1200 px;
 - los presets y ajustes principales/avanzados se envian como settings reales de `ShadowSettings`;
 - `presetName` se conserva como contexto para UI/contrato, pero el render usa el objeto `settings`.
+
+### `GET /images/thumbnail`
+
+Real. Devuelve una miniatura PNG centrada para una imagen permitida por la
+politica de rutas.
+
+Query:
+
+```text
+/images/thumbnail?path=C%3A%2Fruta%2Fa%2Fcarpeta%2Fimagen.png&size=96
+```
+
+Tambien acepta el identificador opaco devuelto por scan:
+
+```text
+/images/thumbnail?imageId=img_0123456789abcdef0123&size=96
+```
+
+Notas:
+
+- solo acepta rutas bajo carpetas registradas por scan/pick;
+- usa cache persistente en `config/thumbnail-cache`;
+- la clave de cache incluye ruta, tamano, `mtime` y bytes del archivo fuente.
 
 ### `POST /exports/prepare`
 
@@ -290,7 +384,7 @@ Request:
 
 ```json
 {
-  "imagePaths": ["C:/ruta/a/carpeta/imagen.png"],
+  "imageIds": ["img_0123456789abcdef0123"],
   "presetName": "Luz cenital",
   "settings": {
     "opacity": 20,
@@ -331,6 +425,9 @@ Response:
 }
 ```
 
+Si el preflight detecta que el directorio temporal no tiene margen suficiente
+para snapshots/cache, devuelve `507` con `error.code = "export_insufficient_space"`.
+
 ### `POST /exports/run`
 
 Real. Lanza una exportacion en segundo plano usando `flatshot.application.export_runner.ExportRunner`.
@@ -356,11 +453,15 @@ Devuelve `202` con el estado inicial del job:
 Notas:
 
 - solo acepta PNG en esta fase;
+- acepta `imageIds` devueltos por scan y mantiene `imagePaths` como fallback legacy;
 - no borra ni mueve fuentes;
 - valida todas las salidas del job antes de escribir y bloquea colisiones internas o archivos ya existentes;
+- aplica el mismo preflight de espacio libre que `/exports/prepare`;
+- crea snapshots de fuentes explícitas de forma progresiva, acotados a las tareas en curso, en vez de copiar todo el lote antes de renderizar;
 - respeta `ExportRunner`, naming, sufijos, formatos, calidad y dimensiones existentes;
 - escribe en `_SALIDA_PRO` por defecto o en el destino personalizado indicado;
-- los jobs viven en memoria del proceso bridge de desarrollo.
+- los jobs activos viven en memoria del proceso bridge de desarrollo;
+- el manifest final se persiste mediante `ExportJobRepository` en `config/export-manifests`.
 
 Si la validacion detecta salidas repetidas o ya existentes, devuelve `409` con `error.code = "export_output_collision"` y no crea job ni escribe archivos.
 
@@ -397,6 +498,7 @@ Respuesta resumida:
       "success": true
     }
   ],
+  "failedItems": [],
   "issues": [],
   "destinations": ["C:/ruta/a/carpeta/_SALIDA_PRO"],
   "result": {
@@ -410,7 +512,11 @@ Respuesta resumida:
 }
 ```
 
-`issues` contiene errores/avisos estructurados derivados de eventos del runner. No incluye tracebacks brutos.
+`issues` contiene errores/avisos estructurados derivados de eventos del runner.
+`failedItems` mantiene la lista completa de items fallidos para reintentos,
+aunque `completedItems` se recorte en snapshots largos. No incluye tracebacks
+brutos. Si una fuente no puede estabilizarse para snapshot, se cuenta como item
+fallido en vez de desaparecer silenciosamente del lote.
 
 ### `POST /exports/jobs/{jobId}/pause`
 
@@ -447,8 +553,8 @@ No se devuelve traceback bruto en JSON.
 - No escribe configuracion.
 - No guarda ni edita presets.
 - El selector de carpeta solo devuelve una ruta seleccionada por el usuario.
-- Expone preview de lectura para rutas solicitadas por la UI.
-- Expone exportacion solo para rutas de imagen solicitadas por la UI.
+- Expone preview y miniaturas solo para imagenes registradas por scan/pick.
+- Expone exportacion solo para imagenes registradas por scan/pick.
 - La exportacion usa `ExportRunner`; no reimplementa motor ni naming en el bridge.
 - El servidor rechaza binds distintos de `127.0.0.1` o `localhost` desde el CLI.
 - CORS esta limitado a origenes locales de desarrollo del prototipo.

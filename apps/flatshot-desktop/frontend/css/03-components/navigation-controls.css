@@ -4,9 +4,14 @@
 .segmented {
   display: inline-grid;
   gap: var(--space-1);
-  border: 1px solid var(--border-default);
+  border: var(--border-width) solid var(--border-default);
   border-radius: var(--radius-md);
   background: var(--surface-muted);
   padding: var(--space-1);
+}
+
+.segmented.compact {
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
 }
 }

@@ -5,13 +5,10 @@
   }
   root.FlatShotExportResultView = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  const escapeHtml = globalThis.FlatShotFormatters?.escapeHtml || function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  };
+  const formatterHelpers = globalThis.FlatShotFormatters
+    || (typeof require === "function" ? require("./formatters.js") : null);
+  const escapeHtml = (value) => formatterHelpers.escapeHtml(value);
+  const uniqueStrings = (values = []) => Array.from(new Set(values.filter((value) => String(value || "").trim())));
 
   function exportResultClass(status) {
     if (status === "failed") {
@@ -79,14 +76,30 @@
     const issues = Array.isArray(options.issues) ? options.issues : [];
     const destinations = Array.isArray(options.destinations) ? options.destinations : [];
     const actions = [];
-    if ((status === "completed" || status === "partial") && options.canOpenOutput) {
+    const hasOutputBlocker = Boolean(options.hasOutputBlocker);
+    if ((status === "completed" || status === "partial") && options.canBrowseOutputs) {
+      const openLabel = options.outputBrowserOpen ? "Ocultar salidas" : "Ver salidas";
+      actions.push(`<button type="button" data-action="browse-outputs">${openLabel}</button>`);
+      actions.push('<button type="button" data-action="copy-output-path">Copiar ruta</button>');
+    } else if ((status === "completed" || status === "partial") && options.canOpenOutput) {
       actions.push('<button type="button" data-action="open-output">Abrir carpeta</button>');
+      actions.push('<button type="button" data-action="copy-output-path">Copiar ruta</button>');
     }
-    if (issues.length || status === "failed" || status === "partial") {
+    if (status === "failed" && hasOutputBlocker) {
+      if (options.canRetry) {
+        actions.push('<button type="button" class="primary" data-action="start-export">Exportar de nuevo</button>');
+      }
+      if (options.canEditOutput) {
+        actions.push('<button type="button" data-action="edit-output">Corregir salida</button>');
+      }
+    } else if (issues.length || status === "failed" || status === "partial") {
       actions.push('<button type="button" data-action="review-errors">Revisar avisos</button>');
     }
-    if (status === "failed" && options.canRetry) {
-      actions.push('<button type="button" class="primary" data-action="start-export">Reintentar</button>');
+    if ((status === "failed" || status === "partial") && options.canRetryFailed) {
+      actions.push('<button type="button" class="primary" data-action="retry-failed-export">Reintentar fallidas</button>');
+    }
+    if (status === "failed" && !hasOutputBlocker && options.canRetry) {
+      actions.push('<button type="button" data-action="start-export">Reintentar todo</button>');
     }
     if (!actions.length || destinations.length > 3) {
       return destinations.length > 3
@@ -94,6 +107,93 @@
         : "";
     }
     return `<div class="result-actions">${actions.join("")}</div>`;
+  }
+
+  function outputFolderForPath(path) {
+    const text = String(path || "").trim();
+    const slashIndex = Math.max(text.lastIndexOf("/"), text.lastIndexOf("\\"));
+    return slashIndex > 0 ? text.slice(0, slashIndex) : "";
+  }
+
+  function outputBrowserGroups(options = {}) {
+    const groups = new Map();
+    const items = Array.isArray(options.items) ? options.items : [];
+    items.forEach((item) => {
+      const outputPath = String(item?.outputPath || "").trim();
+      if (!outputPath || item.success === false) {
+        return;
+      }
+      const folder = outputFolderForPath(outputPath);
+      if (!folder) {
+        return;
+      }
+      if (!groups.has(folder)) {
+        groups.set(folder, { folder, items: [] });
+      }
+      groups.get(folder).items.push({ name: String(item.name || outputPath), outputPath });
+    });
+    uniqueStrings(Array.isArray(options.destinations) ? options.destinations : []).forEach((folder) => {
+      if (!groups.has(folder)) {
+        groups.set(folder, { folder, items: [] });
+      }
+    });
+    return Array.from(groups.values());
+  }
+
+  function countLabel(count, singular, plural) {
+    const value = Number(count) || 0;
+    return `${value} ${value === 1 ? singular : plural}`;
+  }
+
+  function exportOutputBrowserHtml(options = {}) {
+    const groups = Array.isArray(options.groups) ? options.groups : [];
+    if (!groups.length) {
+      return "";
+    }
+    const total = Number(options.total) || groups.reduce((sum, group) => sum + group.items.length, 0);
+    return `
+    <div class="result-output-browser" aria-label="Salidas exportadas">
+      <div class="result-output-browser__header">
+        <strong>Salidas</strong>
+        <span>${escapeHtml(`${countLabel(total, "archivo", "archivos")} en ${countLabel(groups.length, "carpeta", "carpetas")}`)}</span>
+      </div>
+      ${groups.map(outputBrowserGroupHtml).join("")}
+    </div>
+  `;
+  }
+
+  function outputBrowserGroupHtml(group) {
+    const items = Array.isArray(group.items) ? group.items : [];
+    const folder = String(group.folder || "");
+    return `
+      <section class="result-output-group">
+        <div class="result-output-group__head">
+          <div>
+            <span class="result-output-group__label">Carpeta</span>
+            <strong title="${escapeHtml(folder)}">${escapeHtml(folder)}</strong>
+          </div>
+          <button type="button" data-action="open-output-folder" data-output-folder="${escapeHtml(folder)}">Abrir carpeta</button>
+        </div>
+        ${items.length ? `
+          <div class="result-output-files">
+            ${items.map(outputBrowserFileHtml).join("")}
+          </div>
+        ` : '<small>Carpeta registrada en la exportación.</small>'}
+      </section>
+    `;
+  }
+
+  function outputBrowserFileHtml(item) {
+    const name = String(item.name || "Salida");
+    const outputPath = String(item.outputPath || "");
+    return `
+      <div class="result-output-file">
+        <div>
+          <span class="result-output-file__label">Archivo</span>
+          <strong title="${escapeHtml(outputPath)}">${escapeHtml(name)}</strong>
+        </div>
+      </div>
+    `;
   }
 
   function currentExportFileLabel(options = {}) {
@@ -128,8 +228,10 @@
     const errors = Number(options.errors) || 0;
     const destinationFallback = options.destinationFallback || "Pendiente";
     const actionsHtml = options.actionsHtml || "";
+    const outputBrowserHtml = options.outputBrowserHtml || "";
+    const browserOpen = Boolean(outputBrowserHtml);
 
-    const destinationHtml = destinations.length
+    const destinationHtml = browserOpen ? "" : destinations.length
       ? destinations.slice(0, 3).map((path) => `
       <div class="result-path" title="${escapeHtml(path)}">
         <span>Carpeta</span>
@@ -153,7 +255,7 @@
     </div>
   ` : "";
 
-    const itemsHtml = items.length ? `
+    const itemsHtml = !browserOpen && items.length ? `
     <div class="result-items" aria-label="Archivos procesados">
       ${items.map((item) => `
         <span class="result-item ${item.success ? "ready" : "error"}" title="${escapeHtml(item.name || "Archivo")}">
@@ -165,26 +267,33 @@
 
     return `
     <div class="result-header ${resultClass}">
-      <strong>${escapeHtml(title)}</strong>
-      <span>${escapeHtml(meta)}</span>
+      <div class="result-header__copy">
+        <span class="result-header__label">Resultado</span>
+        <strong>${escapeHtml(title)}</strong>
+      </div>
+      <span class="result-header__metric">${escapeHtml(meta)}</span>
     </div>
     ${destinationHtml}
     ${currentItemHtml}
     ${issuesHtml}
     ${itemsHtml}
     ${actionsHtml}
+    ${outputBrowserHtml}
   `;
   }
 
   return {
     escapeHtml,
     currentExportFileLabel,
+    exportOutputBrowserHtml,
     exportIssueActionText,
     exportResultActionsHtml,
     exportResultClass,
     exportResultHtml,
     exportResultMeta,
     exportResultTitle,
+    outputBrowserGroups,
     outputDestinationToOpen,
+    outputFolderForPath,
   };
 });

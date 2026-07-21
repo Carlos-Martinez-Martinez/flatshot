@@ -1,0 +1,123 @@
+"""Build export requests from bridge payloads."""
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Mapping
+
+from pydantic import ValidationError
+
+from flatshot.application.contracts import ExportJobRequest, RenderConfiguration
+from flatshot.application.export_job_builder import build_export_job_requests
+from flatshot.application.export_runner import OutputPathValidationError, validate_export_requests_outputs
+from flatshot.bridge.errors import BridgeError, InvalidRequestError
+from flatshot.bridge.image_registry import payload_export_image_paths
+from flatshot.bridge.path_policy import TrustedPathPolicy
+from flatshot.bridge.payload_helpers import (
+    backgroundColorTuple,
+    curve_data_payload,
+    export_size,
+    optional_string,
+    preview_settings,
+)
+from flatshot.core.models import SHADOW_ENGINE_DEFAULT, ExportConfig, normalize_shadow_settings
+from flatshot.core.overrides import normalize_image_override
+
+
+def build_export_requests(service, payload: Mapping[str, Any]) -> tuple[list[ExportJobRequest], ExportConfig]:
+    if not isinstance(payload, Mapping):
+        raise InvalidRequestError("Expected a JSON object.")
+
+    image_paths = payload_export_image_paths(service, payload)
+    for image_path in image_paths:
+        service._validate_image_path_access(image_path)
+    settings = normalize_shadow_settings(
+        preview_settings(payload.get("settings", {})),
+        missing_engine=SHADOW_ENGINE_DEFAULT,
+    )
+    raw_image_overrides = payload.get("imageOverrides", {})
+    if raw_image_overrides is None:
+        raw_image_overrides = {}
+    if not isinstance(raw_image_overrides, Mapping):
+        raise InvalidRequestError("Field 'imageOverrides' must be an object when provided.")
+    image_overrides = {
+        str(key): normalized
+        for key, value in raw_image_overrides.items()
+        if (normalized := normalize_image_override(value))
+    }
+    export_config = build_export_config(service.export_config_service, payload.get("export", {}))
+    errors = service.export_config_service.validate(export_config)
+    if errors:
+        raise InvalidRequestError(errors[0])
+    render_config = RenderConfiguration(
+        settings=settings,
+        curve_data=curve_data_payload(payload),
+        preset_name=optional_string(payload.get("presetName")),
+    )
+
+    return (
+        build_export_job_requests(
+            image_paths,
+            export_config=export_config,
+            render_config=render_config,
+            image_overrides=image_overrides,
+        ),
+        export_config,
+    )
+
+
+def validate_export_outputs(
+    requests: list[ExportJobRequest],
+    *,
+    path_policy: TrustedPathPolicy | None = None,
+) -> None:
+    try:
+        planned_outputs = validate_export_requests_outputs(requests)
+    except OutputPathValidationError as exc:
+        raise BridgeError("export_output_collision", str(exc), status=409) from exc
+
+    if path_policy is None:
+        return
+
+    for item in planned_outputs:
+        path_policy.validate_output_path(Path(item["save_path"]))
+
+
+def build_export_config(export_config_service, raw_export: Any) -> ExportConfig:
+    if raw_export is None:
+        raw_export = {}
+    if not isinstance(raw_export, Mapping):
+        raise InvalidRequestError("Field 'export' must be an object when provided.")
+
+    width, height = export_size(raw_export)
+    background = str(raw_export.get("background", "rgb230"))
+    destination_mode = str(raw_export.get("destinationMode", "source"))
+    destination_value = optional_string(raw_export.get("destinationValue"))
+    output_destination = "custom" if destination_mode == "custom" else "subfolder"
+    custom_output_path = optional_string(raw_export.get("customOutputPath")) or (
+        destination_value if output_destination == "custom" else None
+    )
+    output_folder_name = (
+        optional_string(raw_export.get("outputFolderName"))
+        or (destination_value if output_destination == "subfolder" else None)
+        or "_SALIDA_PRO"
+    )
+
+    settings = {
+        "format": raw_export.get("format", "JPG"),
+        "output_width": width,
+        "output_height": height,
+        "transparent_bg": background == "transparent",
+        "bg_color": backgroundColorTuple(background),
+        "output_folder_name": output_folder_name,
+        "suffix": raw_export.get("suffix", "_PRO"),
+        "naming_template": raw_export.get("namingTemplate", "{original}{suffix}"),
+        "output_destination": output_destination,
+        "custom_output_path": custom_output_path,
+        "variants": raw_export.get("variants", []),
+    }
+    try:
+        return export_config_service.build_from_settings(settings)
+    except ValidationError as exc:
+        first_error = exc.errors()[0] if exc.errors() else {}
+        message = str(first_error.get("msg") or exc)
+        raise InvalidRequestError(message) from exc

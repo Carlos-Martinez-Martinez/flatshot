@@ -5,24 +5,48 @@ Process product images from the command line.
 import argparse
 import sys
 from pathlib import Path
-from time import time
 
+from pydantic import ValidationError
+
+from flatshot.application.contracts import RenderConfiguration
 from flatshot.application.config_paths import ConfigPathResolver
+from flatshot.application.events import ExportImageCompletedEvent, ExportLogEvent, ExportProgressEvent
+from flatshot.application.export_job_builder import build_export_job_requests
+from flatshot.application.export_runner import ExportRunner
 from flatshot.application.log_service import ActivityLogService
 from flatshot.application.preset_service import PresetService
 from flatshot.application.settings_service import SettingsService
-from flatshot.application.export_runner import apply_naming_template
-from flatshot.core.engine import ShadowEngine
 from flatshot.core.models import (
-    ExportConfig,
     SHADOW_ENGINE_COMPAT,
     SHADOW_ENGINE_LEGACY,
     SHADOW_ENGINE_REALISTIC_V2,
     SHADOW_ENGINE_STUDIO_2_5D,
+    ExportConfig,
     ShadowSettings,
     normalize_shadow_settings,
 )
 from flatshot.core.scaling import DEFAULT_SCALE_CURVE, normalize_curve_data
+
+
+class CliExportSink:
+    def __init__(self, logger: ActivityLogService) -> None:
+        self.logger = logger
+
+    def emit(self, event) -> None:
+        if isinstance(event, ExportProgressEvent):
+            print(f"\r[{event.percent:3d}%] Processing: {event.processed}/{event.total}", end="", flush=True)
+            return
+
+        if isinstance(event, ExportImageCompletedEvent) and not event.success:
+            self.logger.log_error(event.image_name, str(event.source_path or ""))
+            return
+
+        if isinstance(event, ExportLogEvent):
+            if event.message.startswith("Aviso:"):
+                print(f"\nWarning: {event.message.removeprefix('Aviso:').strip()}")
+            elif event.message.startswith("Error:"):
+                self.logger.log_error(event.message)
+                print(f"\n{event.message}")
 
 
 def _path_resolver() -> ConfigPathResolver:
@@ -50,7 +74,7 @@ def list_presets():
     print("\nAvailable Presets:\n")
     
     # Show by category
-    for cat_key, category in presets.categories.items():
+    for category in presets.categories.values():
         if category.presets:
             print(f"  [{category.name}]")
             for name in category.presets.keys():
@@ -93,6 +117,9 @@ def process_folder(args):
     if not input_folder.exists():
         print(f"Error: Folder '{input_folder}' does not exist.")
         sys.exit(1)
+    if not input_folder.is_dir():
+        print(f"Error: Input '{input_folder}' is not a folder.")
+        sys.exit(1)
     
     app_settings = _load_app_settings()
 
@@ -125,17 +152,26 @@ def process_folder(args):
         width, height = 1800, 2400
     
     # Build export config
-    export_config = ExportConfig(
-        output_folder_name=args.output or "_SALIDA_CLI",
-        suffix=args.suffix or "_PRO",
-        format=args.format or "JPG",
-        output_width=width,
-        output_height=height,
-        naming_template=args.template or "{original}{suffix}"
-    )
-    
+    try:
+        export_config = ExportConfig(
+            output_folder_name=args.output or "_SALIDA_CLI",
+            suffix=args.suffix or "_PRO",
+            format=args.format or "JPG",
+            output_width=width,
+            output_height=height,
+            naming_template=args.template or "{original}{suffix}",
+        )
+    except ValidationError as exc:
+        first_error = exc.errors()[0] if exc.errors() else {}
+        print(f"Error: Invalid export configuration: {first_error.get('msg') or exc}")
+        sys.exit(1)
+
     # Find images
-    images = list(input_folder.glob("*.png"))
+    images = sorted(
+        path
+        for path in input_folder.iterdir()
+        if path.is_file() and path.suffix.lower() == ".png"
+    )
     total = len(images)
     
     if total == 0:
@@ -151,77 +187,35 @@ def process_folder(args):
         print("\n[DRY RUN] No images will be processed.")
         return
     
-    # Create output folder
-    output_folder = input_folder / export_config.output_folder_name
-    output_folder.mkdir(exist_ok=True)
-    
     # Load curve data
     curve_dict = app_settings.get('scale_curve', DEFAULT_SCALE_CURVE.copy())
     curve_data = normalize_curve_data(curve_dict)
-    
-    # Process images
-    from PIL import Image
-    
+
     logger = _log_service()
     logger.log_export_start(str(input_folder), total, args.preset)
-    
-    target_size = (width, height)
-    start_time = time()
-    processed = 0
-    errors = 0
-    
-    settings = settings.model_copy(update={
-        "transparent_bg": export_config.transparent_bg,
-        "bg_color": export_config.bg_color,
-    })
-    
-    for index, img_path in enumerate(sorted(images), start=1):
-        try:
-            # Show progress
-            progress = int((index / total) * 100)
-            print(f"\r[{progress:3d}%] Processing: {img_path.name[:40]:<40}", end="", flush=True)
-            
-            original = Image.open(img_path).convert('RGBA')
-            dpi = original.info.get('dpi', (300, 300))
-            
-            final_img, diagnostics = ShadowEngine._aplicar_efectos_with_diagnostics(
-                original, settings, target_size,
-                scale_factor=1.0, curve_data=curve_data
-            )
-            if diagnostics.fallback_used and diagnostics.warning:
-                print(f"\nWarning: {img_path.name}: {diagnostics.warning}")
-            
-            # Generate output name
-            base_name = apply_naming_template(
-                export_config.naming_template,
-                img_path.stem,
-                export_config.suffix,
-                input_folder.name,
-                index
-            )
-            
-            fmt = export_config.format.lower()
-            save_path = output_folder / f"{base_name}.{fmt}"
-            
-            if fmt in ['jpg', 'jpeg']:
-                final_img = final_img.convert("RGB")
-                final_img.save(save_path, quality=95, subsampling="4:2:0", dpi=dpi)
-            else:
-                final_img.save(save_path, optimize=True, dpi=dpi)
-            
-            processed += 1
-            
-        except Exception as e:
-            errors += 1
-            logger.log_error(str(e), img_path.name)
-            print(f"\nError processing {img_path.name}: {e}")
-    
-    duration = time() - start_time
-    logger.log_export_complete(str(input_folder), processed, total, duration)
-    
-    print(f"\n\n✓ Completed: {processed}/{total} images in {duration:.1f}s")
-    if errors > 0:
-        print(f"✗ Errors: {errors}")
+
+    render_config = RenderConfiguration(
+        settings=settings,
+        curve_data=curve_data,
+    )
+    requests = build_export_job_requests(
+        images,
+        export_config=export_config,
+        render_config=render_config,
+        image_overrides={},
+    )
+    request = requests[0]
+    result = ExportRunner(event_sink=CliExportSink(logger)).run(request)
+
+    logger.log_export_complete(str(input_folder), result.processed, result.total, result.duration)
+
+    if not result.success:
+        detail = result.fatal_error or f"{result.errors} errores durante la exportación."
+        print(f"\n\n✗ Exportación incompleta: {result.processed}/{result.total} imágenes")
+        print(f"Error: {detail}")
+        raise SystemExit(1)
+
+    print(f"\n\n✓ Completed: {result.processed}/{result.total} images in {result.duration:.1f}s")
 
 
 def main():
@@ -234,7 +228,7 @@ def main():
     subparsers = parser.add_subparsers(dest="command", help="Commands")
     
     # List presets command
-    list_parser = subparsers.add_parser("list-presets", help="List available presets")
+    subparsers.add_parser("list-presets", help="List available presets")
     
     # Process command
     process_parser = subparsers.add_parser("process", help="Process images in a folder")

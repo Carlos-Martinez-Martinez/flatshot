@@ -5,13 +5,9 @@
   }
   root.FlatShotBatchView = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  const escapeHtml = globalThis.FlatShotFormatters?.escapeHtml || function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  };
+  const formatterHelpers = globalThis.FlatShotFormatters
+    || (typeof require === "function" ? require("./formatters.js") : null);
+  const escapeHtml = (value) => formatterHelpers.escapeHtml(value);
 
   function warningCountLabel(count) {
     return `${count} aviso${count === 1 ? "" : "s"}`;
@@ -29,7 +25,7 @@
   }
 
   function outputCountLabel(count) {
-    return `${count} formato${count === 1 ? "" : "s"}`;
+    return `${count} salida${count === 1 ? "" : "s"}`;
   }
 
   function adjustedCountLabel(count) {
@@ -176,10 +172,10 @@
     const profileDestinations = Array.isArray(options.profileDestinations) ? options.profileDestinations : [];
     if (profileDestinations.length > 1) {
       const destinations = Array.from(new Set(profileDestinations));
-      return destinations.length === 1 ? destinations[0] : `${destinations.length} destinos`;
+      return destinations.length === 1 ? formatterHelpers.displayPath(destinations[0]) : `${destinations.length} destinos`;
     }
     if (options.destinationMode === "custom") {
-      return options.destinationValue || "Sin destino";
+      return options.destinationValue ? formatterHelpers.displayPath(options.destinationValue) : "Sin destino";
     }
     return options.destinationValue ? `Junto al origen · ${options.destinationValue}` : "Junto al origen";
   }
@@ -241,12 +237,20 @@
   function diagnosticsHtml(options = {}) {
     const diagnostics = options.diagnostics || {};
     const open = options.hasScanError ? " open" : "";
+    const omittedByReason = diagnostics.omittedByReason || {};
+    const subfoldersOmitted = Number(omittedByReason.subfolder_not_scanned) || 0;
     const reasonRows = Object.entries(diagnostics.omittedByReason || {}).map(([reason, count]) => `
     <div class="diagnostic-row">
       <span>${escapeHtml(omissionReasonLabel(reason))}</span>
       <strong>${escapeHtml(count)}</strong>
     </div>
   `).join("");
+    const subfolderWarning = subfoldersOmitted
+      ? `<div class="diagnostic-row" role="note">
+          <span>Hay subcarpetas omitidas</span>
+          <strong>${escapeHtml(subfoldersOmitted)}</strong>
+        </div>`
+      : "";
     const sampleRows = (diagnostics.omitted || []).slice(0, 5).map((item) => `
     <li title="${escapeHtml(item.path || item.name)}">
       <span>${escapeHtml(item.name)}</span>
@@ -255,8 +259,9 @@
   `).join("");
     return `
     <details class="batch-diagnostics"${open}>
-      <summary>${escapeHtml(diagnostics.totalOmitted ? "Ver diagnóstico" : "Diagnóstico")}</summary>
+      <summary>${escapeHtml(diagnostics.totalOmitted ? "Ver ignorados" : "Diagnóstico")}</summary>
       <div class="diagnostic-reasons">${reasonRows}</div>
+      ${subfolderWarning}
       ${sampleRows ? `<ul>${sampleRows}</ul>` : ""}
     </details>
   `;

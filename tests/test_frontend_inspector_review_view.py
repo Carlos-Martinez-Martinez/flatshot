@@ -10,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
 HELPER_PATH = FRONTEND_DIR / "inspector-review-view.js"
 INDEX_PATH = FRONTEND_DIR / "index.html"
+INSPECTOR_CARDS_CSS_PATH = FRONTEND_DIR / "css" / "06-inspector-export" / "inspector-cards.css"
 
 
 def test_inspector_review_view_helper_loads_before_app_script():
@@ -19,6 +20,21 @@ def test_inspector_review_view_helper_loads_before_app_script():
     app_index = html.index("app.js")
 
     assert helper_index < app_index
+
+
+def test_selected_image_actions_render_as_buttons_in_dark_surfaces():
+    css = INSPECTOR_CARDS_CSS_PATH.read_text(encoding="utf-8")
+    export_panel_css = (
+        FRONTEND_DIR / "css" / "06-inspector-export" / "export-panel.css"
+    ).read_text(encoding="utf-8")
+
+    assert ".selected-image-card__actions button {" in css
+    action_rule = css.split(".selected-image-card__actions button {", 1)[1].split("}", 1)[0]
+    assert "border-color: var(--color-border)" in action_rule
+    assert "background: var(--color-bg-panel)" in action_rule
+    assert "color: var(--color-text)" in action_rule
+    assert ".inspector-compact-row .selected-image-card__actions button:hover:not(:disabled)" in css
+    assert ".selected-image-card__actions button" not in export_panel_css
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
@@ -160,8 +176,14 @@ assert.equal(aspect.includes("Procesado"), true);
 assert.equal(aspect.includes("Ajuste del lote"), true);
 assert.equal(aspect.includes("2 imágenes"), false);
 assert.equal(aspect.includes('data-action="open-advanced"'), true);
-assert.equal(aspect.includes('data-action="open-preset-editor"'), true);
-assert.equal(aspect.includes(">Ajustes</button>"), true);
+assert.equal(aspect.includes('data-action="open-preset-editor"'), false);
+assert.equal(aspect.includes('aria-label="Editar ajuste del lote"'), true);
+assert.equal(aspect.includes('aria-label="Gestionar ajustes"'), false);
+assert.equal(aspect.includes('class="button-icon" aria-hidden="true"'), true);
+assert.equal(aspect.includes('class="visually-hidden">Editar ajuste</span>'), true);
+assert.equal(aspect.includes('class="visually-hidden">Ajustes</span>'), false);
+assert.equal(aspect.includes(">Editar ajuste</button>"), false);
+assert.equal(aspect.includes(">Ajustes</button>"), false);
 assert.equal(aspect.includes('data-action="apply-global-adjustment-to-overrides"'), true);
 assert.equal(aspect.includes("1 imagen mantiene su ajuste personalizado."), true);
 assert.equal(helpers.aspectInspectorCardHtml({{ hasReadyBatch: false }}), "");

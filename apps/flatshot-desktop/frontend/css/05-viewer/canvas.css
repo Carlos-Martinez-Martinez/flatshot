@@ -14,11 +14,11 @@
 }
 
 .canvas-area.bg-rgb230 {
-  background: var(--color-bg-stage);
+  background: var(--rgb-neutral-fallback);
 }
 
 .canvas-area.bg-white {
-  background: #fff;
+  background: var(--color-output-white);
 }
 
 .canvas-area.bg-custom {
@@ -27,13 +27,17 @@
 
 .canvas-area.bg-transparent {
   background:
-    linear-gradient(45deg, rgba(15, 23, 42, 0.045) 25%, transparent 25%),
-    linear-gradient(-45deg, rgba(15, 23, 42, 0.045) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, rgba(15, 23, 42, 0.045) 75%),
-    linear-gradient(-45deg, transparent 75%, rgba(15, 23, 42, 0.045) 75%),
-    #fff;
-  background-position: 0 0, 0 12px, 12px -12px, -12px 0;
-  background-size: 24px 24px;
+    linear-gradient(45deg, var(--ink-alpha-045) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--ink-alpha-045) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--ink-alpha-045) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--ink-alpha-045) 75%),
+    var(--color-output-white);
+  background-position: 0 0, 0 var(--checker-step-lg), var(--checker-step-lg) calc(0px - var(--checker-step-lg)), calc(0px - var(--checker-step-lg)) 0;
+  background-size: var(--checker-tile-lg) var(--checker-tile-lg);
+}
+
+.app-shell[data-ui-state="no_folder"] .canvas-area {
+  background: var(--color-bg);
 }
 
 .preview-canvas {
@@ -99,10 +103,49 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 50%;
+  left: var(--compare-split, 50%);
   z-index: 4;
-  width: 2px;
-  background: rgba(23, 32, 29, 0.32);
+  width: var(--border-width-strong);
+  background: var(--mock-shade-alpha-32);
+}
+
+.compare-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--compare-split, 50%);
+  z-index: 6;
+  width: var(--control-height);
+  min-width: var(--control-height);
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: ew-resize;
+  transform: translateX(-50%);
+}
+
+.compare-divider::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: var(--border-width-strong);
+  background: var(--accent);
+  transform: translateX(-50%);
+}
+
+.compare-divider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--control-size-2xs);
+  height: var(--control-size-2xs);
+  border: var(--border-width) solid var(--accent);
+  border-radius: var(--radius-pill);
+  background: var(--surface-alpha-90);
+  transform: translate(-50%, -50%);
 }
 
 .preview-canvas.compare::after {
@@ -112,8 +155,8 @@
   left: 14px;
   z-index: 5;
   border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.9);
-  padding: 4px 9px;
+  background: var(--surface-alpha-90);
+  padding: var(--space-1) 9px;
   color: var(--text-secondary);
   font-size: var(--text-sm);
   font-weight: var(--font-weight-bold);
@@ -137,16 +180,16 @@
   bottom: 4%;
   height: 20%;
   border-radius: 50%;
-  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0));
+  background: radial-gradient(ellipse at center, var(--black-alpha-22), var(--black-alpha-0));
   filter: blur(14px);
 }
 
 .mock-body {
   position: absolute;
   inset: 0 14% 15%;
-  border: 1px solid rgba(28, 35, 33, 0.14);
+  border: var(--border-width) solid var(--mock-border-alpha-14);
   border-radius: 26px 26px 12px 12px;
-  background: linear-gradient(180deg, #fbfbf8, #d4e5df);
+  background: linear-gradient(180deg, var(--color-mock-body-start), var(--color-mock-body-end));
 }
 
 .mock-body::before {
@@ -157,7 +200,7 @@
   width: 54%;
   height: 10%;
   border-radius: var(--radius-pill);
-  background: rgba(8, 125, 105, 0.18);
+  background: var(--primary-alpha-18);
   transform: translateX(-50%);
 }
 
@@ -166,6 +209,11 @@
 }
 
 .preview-canvas.original .mock-body {
-  background: linear-gradient(180deg, #f7f7f4, #e9eeec);
+  background: linear-gradient(180deg, var(--color-mock-body-original-start), var(--color-mock-body-original-end));
 }
+
+.guide-overlay { position: absolute; z-index: 2; overflow: hidden; pointer-events: none; }
+.guide-line { position: absolute; background: var(--guide-color); opacity: var(--guide-opacity); }
+.guide-line--x { top: 0; bottom: 0; left: calc(var(--guide-position) * 100%); width: var(--guide-thickness); transform: translateX(-50%); }
+.guide-line--y { right: 0; left: 0; top: calc(var(--guide-position) * 100%); height: var(--guide-thickness); transform: translateY(-50%); }
 }

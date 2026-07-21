@@ -10,6 +10,14 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
 HELPER_PATH = FRONTEND_DIR / "gallery.js"
 INDEX_PATH = FRONTEND_DIR / "index.html"
+APP_GALLERY_CONTROLLER_PATH = FRONTEND_DIR / "app-gallery-controller.js"
+APP_GALLERY_SELECTION_PATH = FRONTEND_DIR / "app-gallery-selection-workflow.js"
+APP_DOCUMENT_EVENTS_PATH = FRONTEND_DIR / "app-document-events.js"
+APP_THUMBNAIL_CONTROLLER_PATH = FRONTEND_DIR / "app-thumbnail-controller.js"
+APP_JS_PATH = FRONTEND_DIR / "app.js"
+APP_EXPORT_VIEW_PATH = FRONTEND_DIR / "app-export-view.js"
+GALLERY_CSS_PATH = FRONTEND_DIR / "css" / "04-batch-gallery" / "image-grid.css"
+THUMBNAILS_CSS_PATH = FRONTEND_DIR / "css" / "04-batch-gallery" / "thumbnails.css"
 
 
 def test_gallery_helper_loads_before_app_script():
@@ -23,6 +31,55 @@ def test_gallery_helper_loads_before_app_script():
     assert output_index < app_index
     assert preflight_index < app_index
     assert gallery_index < app_index
+
+
+def test_gallery_and_export_views_use_output_profile_destination_helper():
+    gallery_controller = APP_GALLERY_CONTROLLER_PATH.read_text(encoding="utf-8")
+    export_view = APP_EXPORT_VIEW_PATH.read_text(encoding="utf-8")
+
+    assert "profiles.map(outputProfileViewHelpers.profileDestinationPreviewLabel)" in gallery_controller
+    assert "profiles.map(outputProfileViewHelpers.profileDestinationPreviewLabel)" in export_view
+    assert "profiles.map(profileDestinationPreviewLabel)" not in gallery_controller
+    assert "profiles.map(profileDestinationPreviewLabel)" not in export_view
+
+
+def test_gallery_thumbnail_view_keeps_file_metadata_visible():
+    css = GALLERY_CSS_PATH.read_text(encoding="utf-8")
+
+    assert '.gallery-column[data-gallery-view="thumbs"] .image-copy small' in css
+    assert '.gallery-column[data-gallery-view="thumbs"] .image-copy small {\n  display: none;' not in css
+    assert '.gallery-column[data-gallery-view="thumbs"] .image-copy small, .gallery-filter[hidden]' not in css
+
+
+def test_gallery_rgb230_thumbnail_background_uses_resolved_output_color():
+    css = THUMBNAILS_CSS_PATH.read_text(encoding="utf-8")
+
+    assert '.gallery-column[data-output-bg="rgb230"] .thumb' in css
+    assert '.gallery-column[data-output-bg="rgb230"] .thumb, .gallery-column[data-output-bg="custom"] .thumb' in css
+
+
+def test_gallery_multiselect_and_virtual_window_are_wired():
+    app = APP_JS_PATH.read_text(encoding="utf-8")
+    selection = APP_GALLERY_SELECTION_PATH.read_text(encoding="utf-8")
+    controller = APP_GALLERY_CONTROLLER_PATH.read_text(encoding="utf-8")
+    events = APP_DOCUMENT_EVENTS_PATH.read_text(encoding="utf-8")
+    thumbnails = APP_THUMBNAIL_CONTROLLER_PATH.read_text(encoding="utf-8")
+    css = GALLERY_CSS_PATH.read_text(encoding="utf-8")
+
+    assert "selectedImageIds: []" in app
+    assert "selectionAnchorImageId: null" in app
+    assert "galleryScrollTop: 0" in app
+    assert "function selectGalleryImage(imageId, options = {})" in selection
+    assert "galleryHelpers.resolveGallerySelection" in selection
+    assert "selectGalleryImage(imageTarget.dataset.imageId" in events
+    assert "additive: event.ctrlKey || event.metaKey" in events
+    assert "range: event.shiftKey" in events
+    assert "galleryHelpers.virtualGalleryWindow" in controller
+    assert "galleryVirtualSpacerHtml" in controller
+    assert "queueThumbnailPreload(renderedImages)" in controller
+    assert "function queueThumbnailPreload(images = null)" in thumbnails
+    assert "preloadBatchThumbnails(images)" in thumbnails
+    assert "gallery-virtual-spacer" in css
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
@@ -41,6 +98,76 @@ const images = [
 const exportItemStatuses = new Map([
   ["e", {{ status: "error", label: "Error" }}],
 ]);
+
+assert.deepEqual(helpers.resolveGallerySelection({{
+  images,
+  selectedIds: ["a"],
+  primaryId: "a",
+  anchorId: "a",
+  targetId: "c",
+  additive: false,
+  range: false,
+}}), {{
+  selectedImageId: "c",
+  selectedIds: ["c"],
+  anchorId: "c",
+}});
+assert.deepEqual(helpers.resolveGallerySelection({{
+  images,
+  selectedIds: ["a"],
+  primaryId: "a",
+  anchorId: "a",
+  targetId: "c",
+  additive: true,
+  range: false,
+}}), {{
+  selectedImageId: "c",
+  selectedIds: ["a", "c"],
+  anchorId: "c",
+}});
+assert.deepEqual(helpers.resolveGallerySelection({{
+  images,
+  selectedIds: ["a"],
+  primaryId: "a",
+  anchorId: "a",
+  targetId: "d",
+  additive: false,
+  range: true,
+}}), {{
+  selectedImageId: "d",
+  selectedIds: ["a", "b", "c", "d"],
+  anchorId: "a",
+}});
+
+assert.deepEqual(helpers.virtualGalleryWindow({{
+  total: 20,
+  scrollTop: 180,
+  viewportHeight: 240,
+  rowHeight: 60,
+  columns: 2,
+  overscanRows: 1,
+}}), {{
+  virtualized: false,
+  start: 0,
+  end: 20,
+  paddingTop: 0,
+  paddingBottom: 0,
+}});
+assert.deepEqual(helpers.virtualGalleryWindow({{
+  total: 240,
+  scrollTop: 360,
+  viewportHeight: 300,
+  rowHeight: 60,
+  columns: 2,
+  overscanRows: 2,
+  threshold: 80,
+}}), {{
+  virtualized: true,
+  start: 8,
+  end: 24,
+  paddingTop: 240,
+  paddingBottom: 6480,
+}});
 
 assert.equal(helpers.imageFileStem("C:/lote/Zapato-Verde 01.png"), "Zapato-Verde 01");
 assert.equal(helpers.imageFileStem(""), "Imagen");
@@ -132,6 +259,15 @@ assert.equal(
   helpers.emptyBatchNoteHtml({{ ignored: 1, ignoredSummary: "1 archivo temporal" }}).includes("Esta carpeta no contiene PNG válidos. 1 archivo temporal."),
   true,
 );
+const subfolderEmpty = helpers.emptyBatchNoteHtml({{
+  ignored: 2,
+  ignoredSummary: "2 subcarpetas no escaneadas",
+  subfoldersOmitted: 2,
+}});
+assert.equal(subfolderEmpty.includes('data-action="include-subfolders"'), true);
+assert.equal(subfolderEmpty.includes("Incluir subcarpetas"), true);
+assert.equal(subfolderEmpty.includes('data-action="open-batch-detail"'), true);
+assert.equal(subfolderEmpty.includes("Ver ignorados"), true);
 assert.equal(
   helpers.emptyBatchNoteHtml({{ ignored: 0, scanStatus: "Sin compatibles" }}).includes("Sin compatibles"),
   true,
@@ -252,6 +388,22 @@ const itemWithOutput = helpers.imageItemHtml({{
 }});
 assert.equal(itemWithOutput.includes('aria-label="Camisa.png · Lista · PNG · transparente"'), true);
 assert.equal(itemWithOutput.includes('class="image-output-label">PNG · transparente</span>'), true);
+
+const multiSelectedItem = helpers.imageItemHtml({{
+  image: {{
+    id: "img-3",
+    name: "Bolso.png",
+    path: "C:/lote/Bolso.png",
+    detail: "PNG · 14 KB",
+    status: "ready",
+  }},
+  selected: true,
+  primarySelected: false,
+  statusLabels: {{}},
+}});
+assert.equal(multiSelectedItem.includes('class="image-item asset-row selected ready"'), true);
+assert.equal(multiSelectedItem.includes('aria-selected="true"'), true);
+assert.equal(multiSelectedItem.includes('aria-current="false"'), true);
 """
     result = subprocess.run(
         ["node", "-e", script],

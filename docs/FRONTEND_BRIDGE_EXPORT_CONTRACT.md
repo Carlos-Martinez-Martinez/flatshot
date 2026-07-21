@@ -7,13 +7,14 @@ Este documento fija el contrato actual que la UI estatica envia al bridge local 
 - `POST /exports/run`
 - `POST /exports/prepare`
 
-Ambos endpoints reciben la misma forma base de payload. La UI activa lo construye en `apps/flatshot-desktop/frontend/export-payload.js` y el bridge lo normaliza en `src/flatshot/bridge/service.py`.
+Ambos endpoints reciben la misma forma base de payload. La UI activa lo construye en `apps/flatshot-desktop/frontend/export-payload.js` y el bridge lo normaliza en `src/flatshot/bridge/export_requests.py`.
 
 ## Payload raiz
 
 ```json
 {
-  "imagePaths": ["C:/lote/a.png"],
+  "imageIds": ["img_0123456789abcdef0123"],
+  "imagePaths": [],
   "presetName": "Luz cenital",
   "settings": {},
   "imageOverrides": {},
@@ -21,7 +22,8 @@ Ambos endpoints reciben la misma forma base de payload. La UI activa lo construy
 }
 ```
 
-- `imagePaths`: rutas locales seleccionadas y exportables. La UI solo incluye imagenes `source: "bridge"` con `path`.
+- `imageIds`: identificadores opacos devueltos por el bridge tras el escaneo. La UI debe preferirlos para preview, miniaturas y exportacion.
+- `imagePaths`: fallback legacy para imagenes bridge sin `imageId`; no debe duplicar rutas de imagenes que ya tengan id.
 - `presetName`: nombre del preset activo.
 - `settings`: ajustes de preview/export derivados del preset activo y overrides globales.
 - `imageOverrides`: ajustes locales por imagen, indexados por ruta/id segun el estado actual.
@@ -93,6 +95,7 @@ Reglas actuales:
 ## Invariantes
 
 - No cambiar nombres de campos sin actualizar tests frontend y tests de bridge.
+- No enviar rutas absolutas desde frontend cuando exista `imageId`.
 - No cambiar defaults de formato, tamano, fondo, destino, naming o sufijo durante refactors UI.
 - No mover esta logica al renderizado ni a handlers DOM.
 - No tocar `ExportRunner` para cambios de UI; cualquier cambio en salida necesita pruebas de paridad/golden.

@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+from uuid import uuid4
 
 from flatshot.core.models import (
     CategorizedPresets,
@@ -17,6 +19,16 @@ from flatshot.core.models import (
 )
 
 
+_PRESET_LOCKS: dict[Path, threading.RLock] = {}
+_PRESET_LOCKS_GUARD = threading.Lock()
+
+
+def _shared_preset_lock(config_dir: Path) -> threading.RLock:
+    key = config_dir.resolve()
+    with _PRESET_LOCKS_GUARD:
+        return _PRESET_LOCKS.setdefault(key, threading.RLock())
+
+
 class PresetService:
     PRESETS_FILE = "presets.json"
     CATEGORIZED_PRESETS_FILE = "presets_v2.json"
@@ -25,7 +37,11 @@ class PresetService:
     def __init__(self, config_dir: str | Path) -> None:
         self.config_dir = Path(config_dir)
         self.config_dir.mkdir(parents=True, exist_ok=True)
-        self._write_lock = threading.Lock()
+        self._write_lock = _shared_preset_lock(self.config_dir)
+
+    @property
+    def write_lock(self) -> threading.RLock:
+        return self._write_lock
 
     @property
     def presets_path(self) -> Path:
@@ -43,8 +59,7 @@ class PresetService:
             )
             for name, settings in (presets or {}).items()
         }
-        with self.presets_path.open("w", encoding="utf-8") as handle:
-            json.dump(normalized, handle, indent=4)
+        _atomic_write_json(self.presets_path, normalized, indent=4)
 
     def load_presets(self) -> dict:
         if not self.presets_path.exists():
@@ -64,8 +79,7 @@ class PresetService:
             return {}
 
     def save_categorized_presets(self, presets: CategorizedPresets) -> None:
-        with self.categorized_presets_path.open("w", encoding="utf-8") as handle:
-            json.dump(presets.model_dump(), handle, indent=4, ensure_ascii=False)
+        _atomic_write_json(self.categorized_presets_path, presets.model_dump(), indent=4, ensure_ascii=False)
 
     def save_all_presets(self, presets: CategorizedPresets) -> None:
         presets = self.normalize_categorized_presets(
@@ -169,8 +183,7 @@ class PresetService:
                 },
                 "presets": presets.model_dump(),
             }
-            with Path(file_path).open("w", encoding="utf-8") as handle:
-                json.dump(export_payload, handle, indent=4, ensure_ascii=False)
+            _atomic_write_json(Path(file_path), export_payload, indent=4, ensure_ascii=False)
             return True
         except Exception as exc:
             logging.error(f"Error exporting presets: {exc}")
@@ -358,3 +371,15 @@ class PresetService:
             flat.update(category.presets)
         flat.update(categorized.uncategorized)
         return flat
+
+
+def _atomic_write_json(path: Path, payload: dict, **dump_kwargs) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+    try:
+        with tmp_path.open("w", encoding="utf-8") as handle:
+            json.dump(payload, handle, **dump_kwargs)
+        os.replace(tmp_path, path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)

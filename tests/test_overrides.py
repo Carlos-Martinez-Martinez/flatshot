@@ -41,6 +41,12 @@ def test_apply_image_override_does_not_mutate_global_settings():
     assert effective.scale_adjustment == 18
 
 
+def test_apply_image_override_clamps_to_shadow_settings_blur_range():
+    effective = apply_image_override(ShadowSettings(blur=70), {"blur_delta": 40})
+
+    assert effective.blur == 80
+
+
 def test_scale_adjustment_changes_rendered_subject_size():
     subject = Image.new("RGBA", (100, 100), (0, 0, 0, 0))
     subject.paste(Image.new("RGBA", (60, 60), (200, 40, 40, 255)), (20, 20))

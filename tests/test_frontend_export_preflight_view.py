@@ -159,12 +159,14 @@ assert.equal(warningHtml.includes('data-image-id="img-1"'), true);
 const blockerHtml = helpers.issueListHtml({{
   hasActiveBatch: true,
   batch: "ready",
-  rows: [{{ level: "error", title: "Destino", detail: "ocupado" }}],
+  rows: [{{ level: "error", title: "Salida a corregir", detail: "Cambia destino, sufijo o nombre" }}],
   counts: {{ errors: 1 }},
   warningCount: 1,
 }});
 assert.equal(blockerHtml.includes("1 bloqueo"), true);
+assert.equal(blockerHtml.includes("Corrige la salida para continuar."), true);
 assert.equal(blockerHtml.includes('data-action="edit-output"'), true);
+assert.equal(blockerHtml.includes(">Corregir salida</button>"), true);
 
 const ignoredHtml = helpers.issueListHtml({{
   hasActiveBatch: true,
@@ -191,6 +193,17 @@ assert.equal(helpers.exportPanelStatusLabel({{
   ready: true,
   issues: [{{ level: "warning" }}],
 }}), "1 aviso antes de exportar");
+assert.equal(helpers.exportPanelStatusLabel({{
+  status: "idle",
+  ready: false,
+  issues: [{{ level: "error", title: "Carpeta de salida" }}],
+}}), "Revisar: Carpeta de salida");
+assert.equal(helpers.exportPanelStatusLabel({{
+  status: "idle",
+  ready: false,
+  hasActiveBatch: true,
+  issues: [{{ level: "warning", title: "Aviso de alpha" }}],
+}}), "Pendiente: Aviso de alpha");
 assert.equal(helpers.exportPanelStatusLabel({{
   status: "idle",
   ready: true,

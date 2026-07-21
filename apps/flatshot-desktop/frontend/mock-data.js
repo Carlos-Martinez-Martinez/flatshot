@@ -74,48 +74,28 @@ global.mockPresets = [
   "Sin sombra",
 ];
 
-global.urlParams = new URLSearchParams(window.location.search);
-global.defaultBridgeUrl = "http://127.0.0.1:8765";
-global.bridgeUrlHelpers = window.FlatShotBridgeUrl;
-global.initialBridgeUrl = global.bridgeUrlHelpers.initialBridgeUrlFromSearch(window.location.search, global.defaultBridgeUrl);
-global.devMode = global.urlParams.get("dev") === "1";
-global.SOFT_BLACK_PREVIEW_BG = "soft-black";
-global.DEFAULT_PREVIEW_CUSTOM_RGB = [230, 230, 230];
-global.formatterHelpers = window.FlatShotFormatters;
-global.outputProfileHelpers = window.FlatShotOutputProfiles;
-global.outputProfileViewHelpers = window.FlatShotOutputProfileView;
-global.exportPayloadHelpers = window.FlatShotExportPayload;
-global.exportStateHelpers = window.FlatShotExportState;
-global.exportSummaryViewHelpers = window.FlatShotExportSummaryView;
-global.exportResultViewHelpers = window.FlatShotExportResultView;
-global.exportPreflightViewHelpers = window.FlatShotExportPreflightView;
-global.topStatusViewHelpers = window.FlatShotTopStatusView;
-global.preflightHelpers = window.FlatShotPreflight;
-global.batchViewHelpers = window.FlatShotBatchView;
-global.scanStateHelpers = window.FlatShotScanState;
-global.exportConfirmViewHelpers = window.FlatShotExportConfirmView;
-global.emptyStateViewHelpers = window.FlatShotEmptyStateView;
-global.batchDetailViewHelpers = window.FlatShotBatchDetailView;
-global.galleryHelpers = window.FlatShotGallery;
-global.previewViewHelpers = window.FlatShotPreviewView;
-global.previewStateHelpers = window.FlatShotPreviewState;
-global.settingsViewHelpers = window.FlatShotSettingsView;
-global.inspectorOutputViewHelpers = window.FlatShotInspectorOutputView;
-global.inspectorReviewViewHelpers = window.FlatShotInspectorReviewView;
-global.inspectorContextViewHelpers = window.FlatShotInspectorContextView;
 global.STORAGE_KEYS = {
   bridgeScanPath: "flatshot.bridgeScanPath",
   selectedImagePath: "flatshot.selectedImagePath",
   imageAdjustmentPreset: "flatshot.selectedImageAdjustmentPreset",
   outputProfiles: "flatshot.outputProfiles",
   backgroundPresets: "flatshot.backgroundPresets",
+  guideSystems: "flatshot.guideSystems",
+  activeGuideSystems: "flatshot.activeGuideSystemIds",
+  guideSystemOrder: "flatshot.guideSystemOrderIds",
+  hiddenGuideSystems: "flatshot.hiddenGuideSystemIds",
+  guidesVisible: "flatshot.guidesVisible",
   activeOutputProfile: "flatshot.activeOutputProfile",
   activeOutputFormats: "flatshot.activeOutputFormatIds",
   lastOutputFolder: "flatshot.lastOutputFolder",
+  recentFolders: "flatshot.recentFolders",
+  exportHistory: "flatshot.exportHistory",
   exportPreferences: "flatshot.exportPreferences",
+  theme: "flatshot.theme",
+  brandTone: "flatshot.brandTone",
+  interfacePreferences: "flatshot.interfacePreferences",
   sessionSnapshot: "flatshot.liveReloadSession.v1",
 };
-document.documentElement.classList.toggle("dev-mode", global.devMode);
 
 global.statusLabels = {
   ready: "Lista",
@@ -214,9 +194,9 @@ global.defaultLightingScene = {
 };
 
 global.shadowEngineLabels = {
-  realistic_v2: "Realista V2",
-  studio_2_5d: "Estudio 2.5D",
-  legacy: "Clásico",
+  realistic_v2: "Realista",
+  studio_2_5d: "Estudio con luz",
+  legacy: "Clásico · compatibilidad",
 };
 
 global.lightingScenePresets = {

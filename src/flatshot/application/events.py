@@ -27,6 +27,8 @@ class ExportProgressEvent:
 class ExportImageCompletedEvent:
     image_name: str
     success: bool
+    source_path: Path | None = None
+    output_path: Path | None = None
 
 
 @dataclass(frozen=True)

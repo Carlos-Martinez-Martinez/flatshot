@@ -1,37 +1,15 @@
 from argparse import Namespace
-from concurrent.futures import Future
 from pathlib import Path
 
 import pytest
 from PIL import Image
 
 from flatshot import cli
-from flatshot.application.contracts import ExportJobRequest
+from flatshot.application.contracts import ExportJobRequest, ExportJobResult, RenderConfiguration
 from flatshot.application.export_runner import ExportRunner
 from flatshot.core.models import ExportConfig, ShadowSettings
 from flatshot.core.scaling import DEFAULT_SCALE_CURVE, normalize_curve_data
-
-
-class InlineExecutor:
-    def __init__(self, max_workers=1):
-        self.max_workers = max_workers
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        self.shutdown()
-
-    def submit(self, fn, arg):
-        future = Future()
-        try:
-            future.set_result(fn(arg))
-        except Exception as exc:
-            future.set_exception(exc)
-        return future
-
-    def shutdown(self, wait=True, cancel_futures=False):
-        pass
+from tests.helpers import InlineExecutor
 
 
 class StubLogger:
@@ -143,6 +121,110 @@ def test_cli_and_export_runner_preserve_basic_jpg_output_metadata(monkeypatch, t
     assert cli_metadata["mode"] == runner_metadata["mode"] == "RGB"
     _assert_dpi_close(cli_metadata["dpi"])
     _assert_dpi_close(runner_metadata["dpi"])
+
+
+def test_cli_jpg_save_quality_matches_export_runner(monkeypatch, tmp_path, capsys):
+    source = tmp_path / "cli-source"
+    _write_png(source)
+    _patch_cli_user_state(monkeypatch)
+    monkeypatch.setattr(
+        cli,
+        "ExportRunner",
+        lambda event_sink=None: ExportRunner(event_sink=event_sink, executor_factory=InlineExecutor),
+    )
+    save_calls = []
+    original_save = Image.Image.save
+
+    def capture_save(image, fp, *args, **kwargs):
+        path = Path(fp)
+        if path.suffix.lower() == ".jpg" and "product_PRO" in path.name:
+            save_calls.append(dict(kwargs))
+        return original_save(image, fp, *args, **kwargs)
+
+    monkeypatch.setattr(Image.Image, "save", capture_save)
+
+    cli.process_folder(_cli_args(source))
+    capsys.readouterr()
+
+    assert save_calls
+    assert save_calls[-1]["quality"] == 100
+    assert save_calls[-1]["subsampling"] == 0
+
+
+def test_cli_process_uses_shared_export_runner(monkeypatch, tmp_path, capsys):
+    source = tmp_path / "cli-source"
+    _write_png(source)
+    _patch_cli_user_state(monkeypatch)
+    captured: dict = {}
+
+    class FakeRunner:
+        def __init__(self, event_sink=None):
+            captured["event_sink"] = event_sink
+
+        def run(self, request):
+            captured["request"] = request
+            return ExportJobResult(True, 1, 1, 0, 0.1, [source / "_PARITY_OUT"])
+
+    monkeypatch.setattr(cli, "ExportRunner", FakeRunner, raising=False)
+
+    cli.process_folder(_cli_args(source))
+    capsys.readouterr()
+
+    request = captured["request"]
+    assert request.input_folder == source
+    assert request.export_config.output_folder_name == "_PARITY_OUT"
+    assert request.export_config.output_width == 80
+    assert request.export_config.output_height == 100
+    assert request.export_config.format == "JPG"
+    assert request.render_config == RenderConfiguration(
+        settings=request.settings,
+        curve_data=normalize_curve_data(DEFAULT_SCALE_CURVE.copy()),
+    )
+
+
+def test_cli_process_builds_jobs_through_shared_export_job_builder(monkeypatch, tmp_path, capsys):
+    source = tmp_path / "cli-source"
+    image = _write_png(source)
+    _patch_cli_user_state(monkeypatch)
+    captured: dict = {}
+
+    def fake_builder(image_paths, *, export_config, render_config, image_overrides=None):
+        captured["image_paths"] = list(image_paths)
+        captured["export_config"] = export_config
+        captured["render_config"] = render_config
+        captured["image_overrides"] = image_overrides
+        return [
+            ExportJobRequest(
+                input_folder=source,
+                input_files=[image],
+                settings=render_config.settings,
+                export_config=export_config,
+                curve_data=render_config.curve_data,
+                preset_name=render_config.preset_name,
+                render_config=render_config,
+            )
+        ]
+
+    class FakeRunner:
+        def __init__(self, event_sink=None):
+            self.event_sink = event_sink
+
+        def run(self, request):
+            captured["request"] = request
+            return ExportJobResult(True, 1, 1, 0, 0.1, [source / "_PARITY_OUT"])
+
+    monkeypatch.setattr(cli, "build_export_job_requests", fake_builder, raising=False)
+    monkeypatch.setattr(cli, "ExportRunner", FakeRunner, raising=False)
+
+    cli.process_folder(_cli_args(source))
+    capsys.readouterr()
+
+    assert captured["image_paths"] == [image]
+    assert captured["export_config"].output_folder_name == "_PARITY_OUT"
+    assert captured["render_config"].settings == ShadowSettings()
+    assert captured["render_config"].curve_data == normalize_curve_data(DEFAULT_SCALE_CURVE.copy())
+    assert captured["image_overrides"] == {}
+    assert captured["request"].input_files == [image]
 
 
 def test_cli_dry_run_reports_plan_without_creating_output(monkeypatch, tmp_path, capsys):

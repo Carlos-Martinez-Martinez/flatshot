@@ -1,4 +1,5 @@
-from concurrent.futures import Future
+import shutil
+from pathlib import Path
 
 from PIL import Image
 
@@ -6,28 +7,7 @@ from flatshot.application.contracts import ExportJobRequest
 from flatshot.application.export_runner import ExportRunner
 from flatshot.core.models import CurveData, ExportConfig, ShadowSettings
 from flatshot.utils.render_cache import RenderCache
-
-
-class InlineExecutor:
-    def __init__(self, max_workers=1):
-        self.max_workers = max_workers
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        self.shutdown()
-
-    def submit(self, fn, arg):
-        future = Future()
-        try:
-            future.set_result(fn(arg))
-        except Exception as exc:
-            future.set_exception(exc)
-        return future
-
-    def shutdown(self, wait=True, cancel_futures=False):
-        return None
+from tests.helpers import InlineExecutor
 
 
 def _use_isolated_cache(monkeypatch, cache_dir):
@@ -122,3 +102,81 @@ def test_export_falls_back_to_normal_render_when_cache_copy_fails(monkeypatch, t
     assert output.exists()
     with Image.open(output) as img:
         assert img.getpixel((0, 0)) == (4, 5, 6, 255)
+
+
+def test_cache_copy_failure_after_partial_write_does_not_block_fallback_render(monkeypatch, tmp_path):
+    _use_isolated_cache(monkeypatch, tmp_path / "cache")
+    source = _source(tmp_path)
+    settings = ShadowSettings(opacity=0, blur=0, noise=0)
+    config = ExportConfig(format="PNG", output_width=8, output_height=8)
+    curve = _curve()
+    key = _cache_key(source, settings, config, curve)
+    cache_path = RenderCache().get_cached_path(key, "png")
+    Image.new("RGBA", (8, 8), (1, 2, 3, 255)).save(cache_path)
+    output = tmp_path / "_SALIDA_PRO" / "source_PRO.png"
+
+    def partial_copy(src, dest):
+        dest = Path(dest)
+        if dest.parent == output.parent:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(b"partial")
+            raise OSError("cache copy interrupted")
+        return shutil.copy2(src, dest)
+
+    def fake_process(args):
+        _img_path, save_path, _settings, _target_size, _fmt, _curve, _override, _display_name = args
+        if Path(save_path).exists():
+            return False, "source.png: already exists", None
+        Image.new("RGBA", (8, 8), (4, 5, 6, 255)).save(save_path)
+        return True, "source.png", None
+
+    result = ExportRunner(
+        executor_factory=InlineExecutor,
+        image_processor=fake_process,
+        copy_file=partial_copy,
+    ).run(
+        ExportJobRequest(
+            input_folder=tmp_path,
+            settings=settings,
+            export_config=config,
+            curve_data=curve,
+        )
+    )
+
+    assert result.success
+    with Image.open(output) as img:
+        assert img.getpixel((0, 0)) == (4, 5, 6, 255)
+
+
+def test_cache_hit_refuses_destination_created_after_preflight(monkeypatch, tmp_path):
+    _use_isolated_cache(monkeypatch, tmp_path / "cache")
+    source = _source(tmp_path)
+    settings = ShadowSettings(opacity=0, blur=0, noise=0)
+    config = ExportConfig(format="PNG", output_width=8, output_height=8)
+    curve = _curve()
+    key = _cache_key(source, settings, config, curve)
+    cache_path = RenderCache().get_cached_path(key, "png")
+    Image.new("RGBA", (8, 8), (1, 2, 3, 255)).save(cache_path)
+    output = tmp_path / "_SALIDA_PRO" / "source_PRO.png"
+
+    def concurrent_copy(src, dest):
+        dest = Path(dest)
+        result = shutil.copy2(src, dest)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(b"sentinel")
+        return result
+
+    result = ExportRunner(
+        executor_factory=InlineExecutor,
+        copy_file=concurrent_copy,
+    ).run(
+        ExportJobRequest(
+            input_folder=tmp_path,
+            settings=settings,
+            export_config=config,
+            curve_data=curve,
+        )
+    )
+
+    assert not result.success
+    assert output.read_bytes() == b"sentinel"

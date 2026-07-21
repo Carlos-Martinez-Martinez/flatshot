@@ -9,7 +9,9 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
 HELPER_PATH = FRONTEND_DIR / "scan-state.js"
+SCAN_RESULT_PAGES_PATH = FRONTEND_DIR / "scan-result-pages.js"
 INDEX_PATH = FRONTEND_DIR / "index.html"
+APP_BRIDGE_SCAN_CONTROLLER_PATH = FRONTEND_DIR / "app-bridge-scan-controller.js"
 
 
 def test_scan_state_helper_loads_before_app_script():
@@ -19,6 +21,79 @@ def test_scan_state_helper_loads_before_app_script():
     app_index = html.index("app.js")
 
     assert helper_index < app_index
+
+
+def test_bridge_scan_controller_collects_completed_scan_results_in_pages():
+    source = APP_BRIDGE_SCAN_CONTROLLER_PATH.read_text(encoding="utf-8")
+
+    assert "collectBridgeScanJobResultPages" in source
+    assert "scanResultPageHelpers.scanJobStatusUrl(jobId, 0)" in source
+    assert "scanResultPageHelpers.nextScanResultOffset(page)" in source
+    assert "scanResultPageHelpers.mergeBridgeScanResultPages" in source
+
+
+def test_scan_result_pages_helper_loads_before_app_script():
+    html = INDEX_PATH.read_text(encoding="utf-8")
+
+    helper_index = html.index("scan-result-pages.js")
+    app_index = html.index("app.js")
+
+    assert helper_index < app_index
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
+def test_scan_result_pages_helper_merges_pages_and_builds_urls():
+    script = f"""
+const assert = require("node:assert/strict");
+const helpers = require({json.dumps(str(SCAN_RESULT_PAGES_PATH))});
+
+assert.equal(
+  helpers.scanJobStatusUrl("job 1", 500),
+  "/folders/scan/jobs/job%201?imageOffset=500&imageLimit=500",
+);
+assert.equal(helpers.scanJobCancelUrl("job 1"), "/folders/scan/jobs/job%201/cancel");
+assert.deepEqual(helpers.scanJobPayload(["C:/a"], {{ imageOverrides: {{ one: true }}, scanRecursive: true }}), {{
+  folders: ["C:/a"],
+  imageOverrides: {{ one: true }},
+  recursive: true,
+  scanMode: "verified",
+}});
+assert.equal(helpers.isScanCancelledError(new Error("Escaneo cancelado.")), true);
+assert.equal(helpers.isScanJobUnsupportedError(new Error("HTTP 405")), true);
+assert.equal(helpers.nextScanResultOffset({{ imageOffset: 500, imageCount: 125 }}), 625);
+
+const merged = helpers.mergeBridgeScanResultPages(
+  {{
+    totalImages: 3,
+    folders: [
+      {{ path: "C:/a", images: [{{ name: "a-0.png" }}], validImages: 2 }},
+      {{ path: "C:/b", images: [], validImages: 1 }},
+    ],
+    page: {{ imageOffset: 0, imageLimit: 1, imageCount: 1, totalImages: 3, hasMore: true }},
+  }},
+  {{
+    totalImages: 3,
+    folders: [
+      {{ path: "C:/a", images: [{{ name: "a-1.png" }}], validImages: 2 }},
+      {{ path: "C:/b", images: [{{ name: "b-0.png" }}], validImages: 1 }},
+    ],
+    page: {{ imageOffset: 1, imageLimit: 2, imageCount: 2, totalImages: 3, hasMore: false }},
+  }},
+);
+
+assert.deepEqual(merged.page, {{ imageOffset: 1, imageLimit: 2, imageCount: 2, totalImages: 3, hasMore: false }});
+assert.deepEqual(merged.folders[0].images.map((image) => image.name), ["a-0.png", "a-1.png"]);
+assert.deepEqual(merged.folders[1].images.map((image) => image.name), ["b-0.png"]);
+"""
+    result = subprocess.run(
+        ["node", "-e", script],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
@@ -49,10 +124,10 @@ assert.deepEqual(helpers.folderPickCancelledState(), {{
 assert.deepEqual(helpers.folderPickSelectedState("C:/lote"), {{
   bridgeStatus: "connected",
   bridgeScanPath: "C:/lote",
-  bridgeMessage: "Carpeta seleccionada",
+  bridgeMessage: "Ruta lista",
   bridgeLastResponse: "folder pick OK",
-  scanStatus: "Carpeta seleccionada",
-  statusText: "Carpeta seleccionada",
+  scanStatus: "Ruta lista para escanear",
+  statusText: "Ruta lista para escanear",
 }});
 
 assert.deepEqual(helpers.folderPickErrorState("offline"), {{
@@ -68,7 +143,7 @@ assert.deepEqual(helpers.emptyScanPathState(true), {{
   bridgeStatus: "connected",
   bridgeMessage: "Ruta vacía",
   scanStatus: "Ruta vacía",
-  scanIssues: [{{ level: "warning", title: "Ruta vacía", detail: "Pega una carpeta para escanear." }}],
+  scanIssues: [{{ level: "warning", title: "Ruta vacía", detail: "Introduce o selecciona una carpeta para escanear." }}],
   statusText: "Ruta vacía",
 }});
 
@@ -84,6 +159,7 @@ assert.deepEqual(helpers.scanStartState(["C:/a", "C:/b"], {{ totalFiles: 0 }}, "
   exportStatus: "blocked",
   progress: 0,
   processed: 0,
+  scanJobId: null,
   exportJobId: null,
   exportDestinations: [],
   exportMessages: [],
@@ -102,7 +178,51 @@ assert.deepEqual(helpers.scanStartState(["C:/a", "C:/b"], {{ totalFiles: 0 }}, "
   scanDiagnostics: {{ totalFiles: 0 }},
   scanStatus: "Escaneando 2 rutas",
   statusText: "Escaneando ruta",
-  bridgeLastResponse: "Solicitando /folders/scan",
+  bridgeLastResponse: "Solicitando /folders/scan/jobs",
+}});
+
+assert.deepEqual(helpers.scanCancelledState({{ totalFiles: 0 }}), {{
+  batch: "none",
+  batchSource: "none",
+  selectedImageId: null,
+  previewStatus: "empty",
+  previewData: null,
+  previewError: "",
+  exportStatus: "blocked",
+  progress: 0,
+  processed: 0,
+  scanJobId: null,
+  scanDiagnostics: {{ totalFiles: 0 }},
+  bridgeStatus: "connected",
+  bridgeMessage: "Escaneo cancelado",
+  bridgeLastResponse: "scan cancelado",
+  scanStatus: "Escaneo cancelado",
+  scanIssues: [],
+  statusText: "Escaneo cancelado",
+}});
+
+assert.deepEqual(helpers.scanJobProgressState({{
+  jobId: "scan-1",
+  status: "running",
+  progress: {{ processed: 7, total: 20, percent: 35 }},
+}}), {{
+  progress: 35,
+  processed: 7,
+  scanStatus: "Escaneando 7/20",
+  statusText: "Escaneando 7/20",
+  bridgeLastResponse: "scan job scan-1 · running",
+}});
+
+assert.deepEqual(helpers.scanJobProgressState({{
+  jobId: "scan-1",
+  status: "cancelling",
+  progress: {{ processed: 7, total: 20, percent: 35 }},
+}}), {{
+  progress: 35,
+  processed: 7,
+  scanStatus: "Deteniendo escaneo...",
+  statusText: "Deteniendo escaneo...",
+  bridgeLastResponse: "scan job scan-1 · cancelling",
 }});
 
 assert.deepEqual(helpers.scanFailureState("timeout", {{ totalFiles: 0 }}), {{
@@ -253,7 +373,7 @@ assert.equal(helpers.sourceLabel({{ bridgeMode: "mock", devMode: true }}), "Demo
 assert.equal(helpers.sourceTitle({{ hasBatch: true, batch: "ready" }}), "Entrada");
 assert.equal(helpers.sourceTitle({{ hasBatch: false, batch: "none" }}), "Seleccionar carpeta");
 assert.equal(helpers.sourcePickButtonLabel({{ hasBatch: true, batch: "ready" }}), "Cambiar");
-assert.equal(helpers.sourcePickButtonLabel({{ hasBatch: false, batch: "none" }}), "Seleccionar carpeta");
+assert.equal(helpers.sourcePickButtonLabel({{ hasBatch: false, batch: "none" }}), "Buscar carpeta");
 assert.equal(helpers.sourceScanButtonLabel({{ hasBatch: true, batch: "ready" }}), "↻");
 assert.equal(helpers.sourceScanButtonLabel({{ hasBatch: false, batch: "none" }}), "Escanear");
 assert.equal(helpers.sourceScanButtonTitle({{ hasBatch: true, batch: "ready" }}), "Actualizar lote");
@@ -361,7 +481,7 @@ assert.deepEqual(helpers.sourcePanelViewState({{
   title: "Seleccionar carpeta",
   folderName: "Entrada",
   scanStatus: "Leyendo imágenes",
-  pickButtonLabel: "Seleccionar carpeta",
+  pickButtonLabel: "Buscar carpeta",
   scanButtonLabel: "Escanear",
   scanButtonTitle: "Escanear carpeta",
   controlsDisabled: true,

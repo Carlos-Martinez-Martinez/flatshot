@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import ctypes
-import hashlib
 import json
 import os
-import shutil
 import socket
 import sys
 import threading
@@ -22,6 +20,19 @@ from urllib.parse import urlencode, urlparse
 
 APP_NAME = "FlatShot"
 ROOT = Path(__file__).resolve().parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from manifest import (  # noqa: E402
+    PORTABLE_DEPENDENCIES,
+    dependency_manifest_hash,
+    dependency_sync_status,
+    frontend_manifest_hash,
+    runtime_manifest_hash,
+    source_manifest_hash,
+)
+from runtime_sync import sync_runtime_app  # noqa: E402
+
 APP_PARENT = ROOT / "app"
 APP_PACKAGE = APP_PARENT / "flatshot"
 FRONTEND_DIR = APP_PARENT / "frontend"
@@ -31,14 +42,13 @@ HOST = "127.0.0.1"
 DEFAULT_BRIDGE_PORT = 8765
 DEFAULT_FRONTEND_PORT = 4173
 LIVE_RELOAD_ENV_VAR = "FLATSHOT_LIVE_RELOAD"
+PORTABLE_DEV_ENV_VAR = "FLATSHOT_PORTABLE_DEV"
+DEVELOPMENT_FLAG = ROOT / "development.flag"
 LIVE_RELOAD_ENDPOINT = "/__flatshot_live_reload"
 LIVE_RELOAD_INTERVAL_MS = 700
-RUNTIME_SOURCE_DIRS = (
-    Path("src") / "flatshot",
-    Path("apps") / "flatshot-desktop" / "frontend",
-)
-DEPENDENCY_FILES = ("pyproject.toml", "requirements.txt")
-PORTABLE_DEPENDENCIES = ("pywebview>=6.0",)
+UI_PREFERENCES_SETTINGS_KEY = "desktop_ui_preferences"
+BOOT_PREFERENCES_SCRIPT_ID = "flatshot-boot-preferences"
+BOOT_PREFERENCE_KEYS = ("themePreference", "brandTone", "interfacePreferences")
 
 
 def configure_portable_environment() -> None:
@@ -49,6 +59,8 @@ def configure_portable_environment() -> None:
 
 
 def auto_sync_from_source(source_root: Path | None = None) -> None:
+    if not development_mode_enabled():
+        return
     source_root = source_root or find_source_root()
     if source_root is None:
         return
@@ -75,6 +87,8 @@ def auto_sync_from_source(source_root: Path | None = None) -> None:
 
 
 def find_source_root() -> Path | None:
+    if not development_mode_enabled():
+        return None
     candidates: list[Path] = []
     env_source = os.environ.get("FLATSHOT_SOURCE_ROOT")
     if env_source:
@@ -103,83 +117,6 @@ def is_valid_source_root(path: Path) -> bool:
     )
 
 
-def source_manifest_hash(source_root: Path) -> str:
-    return files_manifest_hash(iter_source_files(source_root), source_root)
-
-
-def runtime_manifest_hash(source_root: Path) -> str:
-    return files_manifest_hash(iter_runtime_source_files(source_root), source_root)
-
-
-def frontend_manifest_hash(frontend_dir: Path) -> str:
-    return files_manifest_hash(iter_frontend_files(frontend_dir), frontend_dir)
-
-
-def dependency_manifest_hash(source_root: Path) -> str:
-    digest = hashlib.sha256()
-    digest.update(files_manifest_hash(iter_dependency_files(source_root), source_root).encode("utf-8"))
-    for dependency in PORTABLE_DEPENDENCIES:
-        digest.update(f"\0portable:{dependency}\n".encode("utf-8"))
-    return digest.hexdigest()
-
-
-def files_manifest_hash(files, source_root: Path) -> str:
-    digest = hashlib.sha256()
-    for file in files:
-        stat = file.stat()
-        rel = file.relative_to(source_root).as_posix()
-        digest.update(f"{rel}\0{stat.st_size}\0{stat.st_mtime_ns}\n".encode("utf-8"))
-    return digest.hexdigest()
-
-
-def iter_source_files(source_root: Path):
-    yield from iter_runtime_source_files(source_root)
-    yield from iter_dependency_files(source_root)
-
-
-def iter_runtime_source_files(source_root: Path):
-    for source_dir in RUNTIME_SOURCE_DIRS:
-        root = source_root / source_dir
-        if not root.exists():
-            continue
-        for file in root.rglob("*"):
-            if should_skip_source_file(file):
-                continue
-            if file.is_file():
-                yield file
-
-
-def iter_frontend_files(frontend_dir: Path):
-    if not frontend_dir.exists():
-        return
-    for file in frontend_dir.rglob("*"):
-        if should_skip_source_file(file):
-            continue
-        if file.is_file():
-            yield file
-
-
-def iter_dependency_files(source_root: Path):
-    for file_name in DEPENDENCY_FILES:
-        file = source_root / file_name
-        if file.exists() and file.is_file():
-            yield file
-
-
-def should_skip_source_file(file: Path) -> bool:
-    parts = set(file.parts)
-    if {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "release", "venv", ".venv"} & parts:
-        return True
-    return file.suffix in {".pyc", ".pyo"} or file.name.endswith(".tsbuildinfo")
-
-
-def dependency_sync_status(stamp: dict[str, object], dependency_hash: str) -> str:
-    previous_hash = stamp.get("dependency_hash")
-    if previous_hash and previous_hash != dependency_hash:
-        return "needs_rebuild"
-    return "current"
-
-
 def should_sync(source_root: Path, runtime_hash: str, stamp: dict[str, object] | None = None) -> bool:
     if not APP_PACKAGE.exists() or not FRONTEND_DIR.exists():
         return True
@@ -205,6 +142,7 @@ def write_sync_stamp(source_root: Path, runtime_hash: str, dependency_hash: str,
                 "dependency_hash": dependency_hash,
                 "portable_dependencies": list(PORTABLE_DEPENDENCIES),
                 "dependency_status": dependency_status,
+                "python_version": sys.version.split()[0],
                 "synced_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             },
             indent=2,
@@ -214,20 +152,7 @@ def write_sync_stamp(source_root: Path, runtime_hash: str, dependency_hash: str,
 
 
 def sync_package(source_root: Path) -> None:
-    APP_PARENT.mkdir(parents=True, exist_ok=True)
-    copy_tree(source_root / "src" / "flatshot", APP_PACKAGE)
-    copy_tree(source_root / "apps" / "flatshot-desktop" / "frontend", FRONTEND_DIR)
-
-
-def copy_tree(source: Path, destination: Path) -> None:
-    if destination.exists():
-        shutil.rmtree(destination)
-    shutil.copytree(source, destination, ignore=ignore_generated)
-
-
-def ignore_generated(_directory: str, names: list[str]) -> set[str]:
-    ignored = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "node_modules", "build", "dist"}
-    return {name for name in names if name in ignored or name.endswith((".pyc", ".pyo", ".tsbuildinfo"))}
+    sync_runtime_app(source_root, APP_PARENT)
 
 
 def write_launcher_log(context: str, details: str) -> None:
@@ -242,8 +167,17 @@ def source_frontend_dir(source_root: Path) -> Path:
 
 
 def live_reload_enabled() -> bool:
+    if not development_mode_enabled():
+        return False
     configured = os.environ.get(LIVE_RELOAD_ENV_VAR, "").strip().lower()
     return configured not in {"0", "false", "no", "off"}
+
+
+def development_mode_enabled() -> bool:
+    configured = os.environ.get(PORTABLE_DEV_ENV_VAR, "").strip().lower()
+    if configured:
+        return configured not in {"0", "false", "no", "off"}
+    return DEVELOPMENT_FLAG.exists()
 
 
 def resolve_frontend_runtime(source_root: Path | None) -> tuple[Path, bool]:
@@ -267,6 +201,12 @@ class LocalServer:
         return f"http://{self.host}:{self.port}"
 
     def stop(self) -> None:
+        service = getattr(self.server, "service", None)
+        if service is not None:
+            try:
+                service.shutdown()
+            except Exception:
+                pass
         self.server.shutdown()
         self.server.server_close()
         self.thread.join(timeout=5)
@@ -285,8 +225,8 @@ class QuietStaticHandler(SimpleHTTPRequestHandler):
         if parsed.path == LIVE_RELOAD_ENDPOINT:
             self.serve_live_reload_status()
             return
-        if self.live_reload_dir is not None and parsed.path in {"", "/", "/index.html"}:
-            self.serve_live_reload_index()
+        if parsed.path in {"", "/", "/index.html"}:
+            self.serve_index()
             return
         super().do_GET()
 
@@ -313,19 +253,62 @@ class QuietStaticHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
-    def serve_live_reload_index(self) -> None:
+    def serve_index(self) -> None:
         index_path = Path(self.directory) / "index.html"
         try:
             html = index_path.read_text(encoding="utf-8")
         except OSError:
             self.send_error(404, "index.html no disponible")
             return
-        payload = inject_live_reload_script(html).encode("utf-8")
+        html = inject_boot_preferences_script(html, read_boot_preferences())
+        if self.live_reload_dir is not None:
+            html = inject_live_reload_script(html)
+        payload = html.encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
         self.wfile.write(payload)
+
+
+def read_boot_preferences() -> dict[str, object]:
+    return boot_preferences_from_settings(ROOT / "data" / "config" / "settings.json")
+
+
+def boot_preferences_from_settings(settings_path: Path) -> dict[str, object]:
+    try:
+        settings = json.loads(settings_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    if not isinstance(settings, dict):
+        return {}
+    raw_preferences = settings.get(UI_PREFERENCES_SETTINGS_KEY)
+    if not isinstance(raw_preferences, dict):
+        return {}
+    preferences: dict[str, object] = {}
+    for key in BOOT_PREFERENCE_KEYS:
+        value = raw_preferences.get(key)
+        if key == "interfacePreferences":
+            if isinstance(value, dict):
+                preferences[key] = value
+        elif isinstance(value, str):
+            preferences[key] = value
+    return preferences
+
+
+def inject_boot_preferences_script(html: str, preferences: dict[str, object]) -> str:
+    if not preferences or BOOT_PREFERENCES_SCRIPT_ID in html:
+        return html
+    payload = json.dumps(preferences, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
+    script = f'    <script id="{BOOT_PREFERENCES_SCRIPT_ID}" type="application/json">{payload}</script>\n'
+    marker = "    <script>\n      (() => {"
+    marker_index = html.find(marker)
+    if marker_index >= 0:
+        return html[:marker_index] + script + html[marker_index:]
+    head_index = html.lower().find("</head>")
+    if head_index >= 0:
+        return html[:head_index] + script + html[head_index:]
+    return script + html
 
 
 def inject_live_reload_script(html: str) -> str:
@@ -377,8 +360,8 @@ def main() -> int:
         source_root = find_source_root()
         auto_sync_from_source(source_root)
         ensure_runtime_paths()
-        bridge = start_bridge_server()
         frontend = start_frontend_server(source_root)
+        bridge = start_bridge_server(allowed_origins={frontend.url})
         app_url = frontend.url + "?" + urlencode({"bridge": bridge.url})
         open_desktop_window(app_url)
         return 0
@@ -409,11 +392,11 @@ def ensure_runtime_paths() -> None:
         sys.path.insert(0, str(APP_PARENT))
 
 
-def start_bridge_server() -> LocalServer:
+def start_bridge_server(allowed_origins: set[str] | None = None) -> LocalServer:
     from flatshot.bridge.http_server import create_server
 
     port = find_available_port(DEFAULT_BRIDGE_PORT)
-    server = create_server(HOST, port)
+    server = create_server(HOST, port, allowed_origins=allowed_origins)
     local = LocalServer("bridge", HOST, server.server_port, server, threading.Thread(target=server.serve_forever, daemon=True))
     local.thread.start()
     wait_until_ready(local.url + "/health")

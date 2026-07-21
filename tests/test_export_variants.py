@@ -1,40 +1,22 @@
 from pathlib import Path
-from concurrent.futures import Future
 
+import numpy as np
 import pytest
 from PIL import Image, ImageDraw
 from PIL.JpegImagePlugin import get_sampling
+from pydantic import ValidationError
 
 from flatshot.application.contracts import ExportJobRequest
 from flatshot.application.export_runner import (
     ExportRunner,
+    OutputPathValidationError,
     build_variant_output_path,
+    validate_export_requests_outputs,
     validate_output_path_collisions,
     variant_target_size,
 )
 from flatshot.core.models import CurveData, ExportConfig, ExportVariant, ShadowSettings, WEB_RGB230, WHITE_RGB255
-
-
-class InlineExecutor:
-    def __init__(self, max_workers=1):
-        self.max_workers = max_workers
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        self.shutdown()
-
-    def submit(self, fn, arg):
-        future = Future()
-        try:
-            future.set_result(fn(arg))
-        except Exception as exc:
-            future.set_exception(exc)
-        return future
-
-    def shutdown(self, wait=True, cancel_futures=False):
-        return None
+from tests.helpers import InlineExecutor
 
 
 def _curve():
@@ -59,6 +41,17 @@ def _source_with_dpi(folder: Path, dpi=(300, 300)):
     return source
 
 
+def _complex_source(folder: Path):
+    source = folder / "camiseta_complex.png"
+    rng = np.random.default_rng(42)
+    noise = rng.integers(0, 255, size=(220, 220, 3), dtype=np.uint8)
+    alpha = np.full((220, 220, 1), 255, dtype=np.uint8)
+    rgba = np.concatenate([noise, alpha], axis=2)
+    img = Image.fromarray(rgba, "RGBA")
+    img.save(source)
+    return source
+
+
 def _assert_dpi_close(actual, expected=(300, 300)):
     assert actual is not None
     assert actual[0] == pytest.approx(expected[0], abs=1)
@@ -67,20 +60,18 @@ def _assert_dpi_close(actual, expected=(300, 300)):
 
 def _has_grayscale_shadow(path: Path, bg: tuple[int, int, int]) -> bool:
     with Image.open(path) as img:
-        rgb = img.convert("RGB")
-        for pixel in rgb.getdata():
-            if pixel == bg:
-                continue
-            if not all(pixel[index] <= bg[index] for index in range(3)):
-                continue
-            if max(pixel) - min(pixel) <= 8:
-                return True
-    return False
+        arr = np.asarray(img.convert("RGB"), dtype=np.int16)
+    bg_arr = np.asarray(bg, dtype=np.int16)
+    differs_from_bg = np.any(arr != bg_arr, axis=2)
+    below_or_equal_bg = np.all(arr <= bg_arr, axis=2)
+    near_grayscale = (arr.max(axis=2) - arr.min(axis=2)) <= 8
+    return bool(np.any(differs_from_bg & below_or_equal_bg & near_grayscale))
 
 
 def _contains_background(path: Path, bg: tuple[int, int, int]) -> bool:
     with Image.open(path) as img:
-        return bg in set(img.convert("RGB").getdata())
+        arr = np.asarray(img.convert("RGB"), dtype=np.int16)
+    return bool(np.any(np.all(arr == np.asarray(bg, dtype=np.int16), axis=2)))
 
 
 def test_two_enabled_variants_with_different_suffixes_generate_distinct_paths(tmp_path):
@@ -126,6 +117,23 @@ def test_two_enabled_variants_with_same_suffix_detect_collision(tmp_path):
         )
 
 
+def test_export_validation_rejects_template_that_escapes_destination(tmp_path):
+    with pytest.raises(ValidationError, match="naming template"):
+        ExportConfig(
+            format="PNG",
+            naming_template="../escape_{original}{suffix}",
+        )
+
+
+def test_export_validation_rejects_suffix_with_path_separator_in_fallback_variant(tmp_path):
+    with pytest.raises(ValidationError, match="suffix"):
+        ExportConfig(
+            format="PNG",
+            suffix="../escape",
+            naming_template="{original}{suffix}",
+        )
+
+
 def test_export_runner_exports_two_variant_files_with_expected_backgrounds(tmp_path):
     _source(tmp_path)
     config = ExportConfig(
@@ -142,7 +150,7 @@ def test_export_runner_exports_two_variant_files_with_expected_backgrounds(tmp_p
         blur=4,
         distance=4,
         noise=0,
-        padding=80,
+        padding=30,
         shadow_engine="legacy",
     )
 
@@ -367,3 +375,49 @@ def test_export_runner_preserves_output_metadata_transparency_and_source_file(tm
         assert png.getpixel((0, 0))[3] == 0
         assert png.getchannel("A").getbbox() is not None
         _assert_dpi_close(png.info.get("dpi"))
+
+
+def test_jpg_variant_max_file_size_kb_limits_output_without_resizing(tmp_path):
+    _complex_source(tmp_path)
+    max_kb = 18
+    config = ExportConfig(
+        format="JPG",
+        output_width=220,
+        output_height=220,
+        variants=[
+            ExportVariant(
+                id="marketplace_jpg",
+                label="Marketplace JPG",
+                format="JPG",
+                suffix="_MK",
+                output_width=220,
+                output_height=220,
+                max_file_size_kb=max_kb,
+                transparent_bg=False,
+                bg_color=(230, 230, 230),
+            ),
+        ],
+    )
+    settings = ShadowSettings(
+        adaptive_zoom=False,
+        opacity=0,
+        blur=0,
+        noise=0,
+    )
+
+    result = ExportRunner(executor_factory=InlineExecutor).run(
+        ExportJobRequest(
+            input_folder=tmp_path,
+            settings=settings,
+            export_config=config,
+            curve_data=_curve(),
+        )
+    )
+
+    jpg_output = tmp_path / "_SALIDA_PRO" / "camiseta_complex_MK.jpg"
+    assert result.success
+    assert jpg_output.exists()
+    assert jpg_output.stat().st_size <= max_kb * 1024
+    with Image.open(jpg_output) as jpg:
+        assert jpg.format == "JPEG"
+        assert jpg.size == (220, 220)

@@ -6,8 +6,11 @@ from flatshot.core.models import (
     SHADOW_ENGINE_COMPAT,
     SHADOW_ENGINE_DEFAULT,
     SHADOW_ENGINE_STUDIO_2_5D,
+    SHADOW_SETTING_LIMITS,
     WEB_RGB230,
     WHITE_RGB255,
+    MAX_EXPORT_PIXELS,
+    MAX_EXPORT_SIDE,
     ExportVariant,
     LightingScene,
     ShadowSettings, ExportConfig, CurveData,
@@ -60,6 +63,29 @@ class TestShadowSettings:
         
         settings = ShadowSettings(angle=359)
         assert settings.angle == 359
+
+    def test_shadow_setting_ranges_are_enforced_by_model(self):
+        """Canonical adjustment ranges are enforced outside bridge payloads."""
+        valid = {
+            key: maximum
+            for key, (_minimum, maximum) in SHADOW_SETTING_LIMITS.items()
+        }
+        settings = ShadowSettings(**valid)
+
+        assert settings.distance == SHADOW_SETTING_LIMITS["distance"][1]
+        assert settings.padding == SHADOW_SETTING_LIMITS["padding"][1]
+        assert settings.scale_adjustment == SHADOW_SETTING_LIMITS["scale_adjustment"][1]
+
+        invalid = {
+            key: maximum + 1
+            for key, (_minimum, maximum) in SHADOW_SETTING_LIMITS.items()
+        }
+        for key, value in invalid.items():
+            with pytest.raises(ValueError, match=key):
+                ShadowSettings(**{key: value})
+
+        with pytest.raises(ValueError, match="scale_adjustment"):
+            ShadowSettings(scale_adjustment=SHADOW_SETTING_LIMITS["scale_adjustment"][0] - 1)
     
     def test_model_dump(self):
         """Test model serialization."""
@@ -128,6 +154,13 @@ class TestExportConfig:
         assert config.output_width == 1800
         assert config.output_height == 2400
         assert config.naming_template == "{original}{suffix}"
+
+    def test_export_dimensions_have_side_and_pixel_limits(self):
+        with pytest.raises(ValueError, match="output_width"):
+            ExportConfig(output_width=MAX_EXPORT_SIDE + 1)
+
+        with pytest.raises(ValueError, match="pixel"):
+            ExportConfig(output_width=MAX_EXPORT_SIDE, output_height=MAX_EXPORT_SIDE)
     
     def test_naming_template_custom(self):
         """Test custom naming template."""

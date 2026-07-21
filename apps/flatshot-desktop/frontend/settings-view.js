@@ -5,13 +5,9 @@
   }
   root.FlatShotSettingsView = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  const escapeHtml = globalThis.FlatShotFormatters?.escapeHtml || function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  };
+  const formatterHelpers = globalThis.FlatShotFormatters
+    || (typeof require === "function" ? require("./formatters.js") : null);
+  const escapeHtml = (value) => formatterHelpers.escapeHtml(value);
 
   function presetChipHtml(preset = {}, activePreset = "") {
     const active = preset.name === activePreset;
@@ -43,7 +39,7 @@
   }
 
   function localAdjustmentText(localActive) {
-    return localActive ? "Personalizado" : "Igual que el lote";
+    return localActive ? "Modificada respecto al lote" : "Usa el ajuste del lote";
   }
 
   function localSettingOutputText(value) {
@@ -60,6 +56,14 @@
     };
   }
 
+  function resetPresetButtonState(presetDirty) {
+    return {
+      disabled: !presetDirty,
+      label: "Restaurar recomendado",
+      title: presetDirty ? "Restaurar recomendado" : "Sin cambios que restaurar",
+    };
+  }
+
   function deletePresetButtonState(presetCount) {
     const canDelete = Number(presetCount) > 1;
     return {
@@ -70,7 +74,9 @@
 
   function advancedSummaryTitle(dirtyCount) {
     const count = Number(dirtyCount) || 0;
-    return count ? `Avanzado · ${count} cambio${count === 1 ? "" : "s"}` : "Avanzado";
+    return count
+      ? `Calibración del motor · ${count} cambio${count === 1 ? "" : "s"}`
+      : "Calibración del motor";
   }
 
   function advancedDirtyCount(options = {}) {
@@ -142,6 +148,7 @@
     presetDirtyLabel,
     presetListHtml,
     presetSourceLabel,
+    resetPresetButtonState,
     savePresetButtonState,
   };
 });

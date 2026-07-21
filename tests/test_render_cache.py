@@ -13,6 +13,10 @@ def test_render_cache_uses_configured_portable_cache_dir(tmp_path, monkeypatch):
     assert cache.cache_dir.exists()
 
 
+def test_render_cache_version_tracks_export_quality_pipeline():
+    assert RenderCache.CACHE_VERSION >= 5
+
+
 def test_render_cache_key_changes_with_local_override(tmp_path):
     source = tmp_path / "source.png"
     Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(source)
@@ -49,6 +53,25 @@ def test_render_cache_key_changes_when_source_changes(tmp_path):
     assert before_key != after_key
 
 
+def test_render_cache_key_changes_when_content_changes_with_same_size_and_mtime(tmp_path):
+    source = tmp_path / "source.bin"
+    source.write_bytes(b"A" * 32)
+    fixed_ns = 1_700_000_000_000_000_000
+    import os
+
+    os.utime(source, ns=(fixed_ns, fixed_ns))
+    cache = RenderCache()
+    settings = {"opacity": 20}
+    curve = {"xp": [0.0, 1.0], "fp": [1.0, 1.0]}
+
+    before_key = cache.get_cache_key(str(source), settings, curve, (1800, 2400))
+    source.write_bytes(b"B" * 32)
+    os.utime(source, ns=(fixed_ns, fixed_ns))
+    after_key = cache.get_cache_key(str(source), settings, curve, (1800, 2400))
+
+    assert before_key != after_key
+
+
 def test_render_cache_key_changes_with_format_size_settings_curve_and_override(tmp_path):
     source = tmp_path / "source.png"
     Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(source)
@@ -78,6 +101,28 @@ def test_render_cache_key_changes_with_format_size_settings_curve_and_override(t
         {"size_delta": 5},
         "jpg",
     )
+
+
+def test_render_cache_key_changes_with_jpg_size_limit(tmp_path):
+    source = tmp_path / "source.png"
+    Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(source)
+
+    cache = RenderCache()
+    settings = {"opacity": 20, "transparent_bg": False}
+    curve = {"xp": [0.0, 1.0], "fp": [1.0, 1.0]}
+
+    base_key = cache.get_cache_key(str(source), settings, curve, (1800, 2400), {}, "jpg")
+    limited_key = cache.get_cache_key(
+        str(source),
+        settings,
+        curve,
+        (1800, 2400),
+        {},
+        "jpg",
+        export_options={"max_file_size_kb": 120},
+    )
+
+    assert base_key != limited_key
 
 
 def test_render_cache_key_changes_with_export_variant_background_and_opacity(tmp_path):

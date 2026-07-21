@@ -5,10 +5,18 @@ from pathlib import Path
 
 import pytest
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-HELPER_PATH = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend" / "output-profiles.js"
-INDEX_PATH = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend" / "index.html"
+FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
+HELPER_PATH = FRONTEND_DIR / "output-profiles.js"
+INDEX_PATH = FRONTEND_DIR / "index.html"
+
+
+def app_domain_source():
+    return "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in [FRONTEND_DIR / "app.js", *sorted(FRONTEND_DIR.glob("app-*.js"))]
+        if path.name != "app-state.js"
+    )
 
 
 def test_output_profile_helper_loads_before_app_script():
@@ -21,17 +29,17 @@ def test_output_profile_helper_loads_before_app_script():
 
 
 def test_output_profiles_are_synced_with_bridge_ui_preferences():
-    app_js = (PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend" / "app.js").read_text(encoding="utf-8")
+    output_state = (FRONTEND_DIR / "app-output-profile-state.js").read_text(encoding="utf-8")
+    bridge_preferences = (FRONTEND_DIR / "app-bridge-ui-preferences.js").read_text(encoding="utf-8")
 
-    persist_start = app_js.index("function persistOutputProfiles()")
-    persist_end = app_js.index("function persistImageAdjustmentSelection()", persist_start)
-    persist_block = app_js[persist_start:persist_end]
-
-    assert "function applyBridgeUiPreferences(" in app_js
-    assert "function restoreBridgeUiPreferences(" in app_js
-    assert 'bridgeRequest("/ui/preferences")' in app_js
-    assert 'bridgeRequest("/ui/preferences", {' in app_js
-    assert "scheduleBridgeUiPreferencesSave(0);" in persist_block
+    assert "function applyBridgeUiPreferences(" in bridge_preferences
+    assert "function restoreBridgeUiPreferences(" in bridge_preferences
+    assert 'bridgeRequest("/ui/preferences", {' in bridge_preferences
+    assert bridge_preferences.count('bridgeRequest("/ui/preferences"') >= 2
+    assert "backgroundPresetHelpers.backgroundPresetsForStorage" in bridge_preferences
+    assert 'maxFileSizeKb: state.format === "JPG" ? state.maxFileSizeKb : null' in bridge_preferences
+    assert 'state.maxFileSizeKb = state.format === "JPG"' in bridge_preferences
+    assert "scheduleBridgeUiPreferencesSave(0);" in output_state
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
@@ -43,6 +51,8 @@ const helpers = require({json.dumps(str(HELPER_PATH))});
 assert.equal(helpers.normalizeExportFormat("jpeg"), "JPG");
 assert.equal(helpers.normalizeExportFormat(".png"), "PNG");
 assert.equal(helpers.normalizeExportFormat("gif"), "JPG");
+assert.equal(helpers.MAX_EXPORT_SIDE, 12000);
+assert.equal(helpers.MAX_EXPORT_PIXELS, 100000000);
 
 assert.deepEqual(helpers.parseOutputSize("1200 x 1600"), {{
   width: 1200,
@@ -73,6 +83,7 @@ const normalized = helpers.normalizeOutputProfile({{
   destinationValue: "",
   naming: "",
   suffix: null,
+  maxFileSizeKb: "140",
 }});
 assert.deepEqual(normalized, {{
   id: "main",
@@ -86,7 +97,17 @@ assert.deepEqual(normalized, {{
   destinationValue: "Salida",
   naming: "{{original}}{{suffix}}",
   suffix: "_PRO",
+  maxFileSizeKb: 140,
 }});
+
+const pngNormalized = helpers.normalizeOutputProfile({{
+  id: "png",
+  name: "PNG",
+  enabled: true,
+  format: "PNG",
+  maxFileSizeKb: "140",
+}});
+assert.equal(pngNormalized.maxFileSizeKb, null);
 
 const list = helpers.normalizeOutputProfileList([
   {{ id: "dup", name: "Uno", enabled: false }},
@@ -126,6 +147,48 @@ const incompatible = helpers.outputProfileValidation({{
 }});
 assert.equal(incompatible.errors.includes("JPG no admite transparencia. Selecciona fondo blanco, gris claro o cambia el tipo a PNG."), true);
 assert.equal(incompatible.fields.background, "error");
+
+const invalidSizeLimit = helpers.outputProfileValidation({{
+  name: "Canal",
+  format: "JPG",
+  background: "rgb230",
+  width: "1800",
+  height: "2400",
+  suffix: "_WEB",
+  naming: "{{original}}{{suffix}}",
+  destinationMode: "source",
+  destinationValue: "_WEB",
+  maxFileSizeKb: "0",
+}});
+assert.equal(invalidSizeLimit.fields.maxFileSizeKb, "error");
+assert.equal(invalidSizeLimit.errors.includes("El peso máximo debe ser un número mayor que 0 KB."), true);
+
+const oversized = helpers.outputProfileValidation({{
+  name: "Canal",
+  format: "PNG",
+  background: "transparent",
+  width: "12001",
+  height: "12000",
+  suffix: "_WEB",
+  naming: "{{original}}{{suffix}}",
+  destinationMode: "source",
+  destinationValue: "_WEB",
+}});
+assert.equal(oversized.fields.width, "error");
+assert.equal(oversized.errors.some((message) => message.includes("12000px")), true);
+
+const oversizedArea = helpers.outputProfileValidation({{
+  name: "Canal",
+  format: "PNG",
+  background: "transparent",
+  width: "10001",
+  height: "10000",
+  suffix: "_WEB",
+  naming: "{{original}}{{suffix}}",
+  destinationMode: "source",
+  destinationValue: "_WEB",
+}});
+assert.equal(oversizedArea.errors.some((message) => message.includes("100.000.000")), true);
 
 const customBackground = helpers.outputProfileValidation({{
   name: "Canal",
@@ -168,6 +231,7 @@ const primary = helpers.exportVariantPayloadFromProfile({{
   suffix: "_PRO",
   width: 1800,
   height: 2400,
+  maxFileSizeKb: 140,
 }}, 0, seen);
 const duplicate = helpers.exportVariantPayloadFromProfile({{
   id: "web_rgb230",
@@ -180,6 +244,7 @@ const duplicate = helpers.exportVariantPayloadFromProfile({{
   suffix: "_PNG",
   width: 1000,
   height: 1200,
+  maxFileSizeKb: 90,
 }}, 1, seen);
 const custom = helpers.exportVariantPayloadFromProfile({{
   id: "custom_rgb",
@@ -208,12 +273,14 @@ assert.deepEqual(primary, {{
   custom_output_path: null,
   output_width: 1800,
   output_height: 2400,
+  max_file_size_kb: 140,
 }});
 assert.equal(duplicate.id, "web_rgb230_2");
 assert.equal(duplicate.output_destination, "custom");
 assert.equal(duplicate.custom_output_path, "C:/salida");
 assert.equal(duplicate.transparent_bg, true);
 assert.deepEqual(duplicate.bg_color, [230, 230, 230]);
+assert.equal(duplicate.max_file_size_kb, null);
 assert.deepEqual(custom.bg_color, [245, 246, 247]);
 assert.equal(custom.transparent_bg, false);
 """

@@ -6,28 +6,22 @@
   top: calc(100% + 8px);
   right: 0;
   z-index: var(--z-popover);
-  width: min(460px, calc(100vw - 32px));
+  width: min(460px, calc(100vw - var(--popover-viewport-gutter)));
   display: grid;
-  gap: 10px;
-  border: 1px solid var(--border-subtle);
+  gap: var(--space-2-5);
+  border: var(--border-width) solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface);
   box-shadow: var(--shadow-popover);
   padding: var(--space-3);
-  max-width: min(760px, calc(100vw - 32px));
+  max-width: min(760px, calc(100vw - var(--popover-viewport-gutter)));
 }
 
 .debug-panel:not([open]) .debug-content {
   display: none;
 }
 
-html:not(.dev-mode) .debug-panel,
-html:not(.dev-mode) .review-panel,
-html:not(.dev-mode) .preview-debug,
-html:not(.dev-mode) [data-action="toggle-inspector"],
-html:not(.dev-mode) .bridge-chip,
-html:not(.dev-mode) [data-preview-mode="original"],
-html:not(.dev-mode) [data-preview-mode="compare"] {
+html:not(.dev-mode) :is(.debug-panel, .dev-only, .preview-debug, [data-action="toggle-inspector"], .bridge-chip, [data-preview-mode="original"], [data-preview-mode="compare"]) {
   display: none !important;
 }
 }

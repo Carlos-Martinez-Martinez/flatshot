@@ -3,7 +3,7 @@
 
 /* Inspector/export: presets, adjustment controls and local overrides. */
 
-.brand-copy span, .eyebrow, .text-field span, .form-grid span, .advanced-grid span, .search-field span, .status-grid span, small {
+.brand-copy span, .eyebrow, .text-field span, .form-grid span, .search-field span, small {
   color: var(--text-secondary);
 }
 
@@ -15,19 +15,12 @@
   padding: 10px var(--space-4) var(--space-3);
 }
 
-.settings-panel .advanced-block .advanced-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4) var(--space-4);
-}
-
 .settings-panel .control-stack {
-  gap: 6px;
+  gap: var(--space-1-5);
 }
 
 .settings-panel .control-row, .settings-panel .local-control-row {
-  min-height: 30px;
+  min-height: var(--control-height);
 }
 
 .preset-section[open] {
@@ -45,13 +38,6 @@
   padding: var(--space-3) var(--space-4) var(--space-4);
 }
 
-.advanced-block .advanced-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4) var(--space-4);
-}
-
 .local-adjustment__body {
   gap: var(--space-2);
 }
@@ -61,22 +47,28 @@
   display: grid;
   grid-template-columns: minmax(96px, 0.8fr) minmax(0, 1.4fr);
   gap: var(--space-2);
-  border-top: 1px solid var(--color-border);
+  border-top: var(--border-width) solid var(--color-border);
   padding-top: var(--space-3);
 }
 
 .local-adjustment__actions button {
   min-width: 0;
-  min-height: 32px;
+  min-height: var(--control-height);
   overflow: hidden;
   padding-inline: var(--space-3);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.advanced-grid label, .form-grid label, .text-field {
+.local-adjustment__actions .secondary-actions {
+  grid-column: 1 / -1;
+}
+
+.local-adjustment__actions .secondary-actions .button-row {
   display: grid;
-  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  padding-top: var(--space-2);
 }
 
 .local-adjustment__body span {
@@ -85,18 +77,18 @@
 }
 
 .local-adjustment.active {
-  border-color: #f0d59c;
+  border-color: var(--color-warning-border);
   background: var(--warning-soft);
 }
 
-.search-field input, .text-field input, .form-grid select, .advanced-grid input, .advanced-grid select {
+.settings-panel .search-field input, .settings-panel .text-field input, .settings-panel .form-grid select {
   border-color: var(--line-soft);
-  border-radius: var(--radius-8);
+  border-radius: var(--radius-sm);
   background: var(--bg-panel);
 }
 
 .control-row span {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 
 .advanced-block[open] {
@@ -106,21 +98,21 @@
 .preset-summary-card, .compact-panel, .warning-summary {
   display: grid;
   gap: 9px;
-  border: 1px solid var(--line-soft);
+  border: var(--border-width) solid var(--line-soft);
   border-radius: var(--radius-10);
   background: var(--bg-panel);
-  padding: 12px;
+  padding: var(--space-3);
 }
 
 .preset-summary-main span, .preset-summary-row span, .compact-panel span {
   color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
 }
 
 .preset-summary-main small, .compact-panel small {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .preset-summary-row strong, .compact-panel strong {
@@ -129,17 +121,17 @@
   color: var(--text-strong);
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 
 .preset-summary-row {
   min-width: 0;
   display: grid;
-  gap: 10px;
+  gap: var(--space-2-5);
   grid-template-columns: 76px minmax(0, 1fr);
 }
 
-.preset-list, .button-row, .inspector-actions {
+.preset-list, .button-row {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
@@ -148,7 +140,7 @@
 .preset-summary-card, .compact-panel {
   display: grid;
   gap: var(--space-3);
-  border: 1px solid var(--color-border);
+  border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-bg-soft);
   padding: var(--space-4);
@@ -172,7 +164,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-3);
   padding: var(--space-3);
-  border: 1px solid var(--color-border);
+  border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-bg-soft);
 }
@@ -184,13 +176,14 @@
 .preset-section {
   border-color: var(--color-accent-border);
   background: linear-gradient(180deg, var(--color-accent-soft), var(--color-bg-soft));
-  border: 1px solid var(--color-accent-border);
+  border: var(--border-width) solid var(--color-accent-border);
   border-radius: var(--radius-md);
   padding: var(--space-4);
 }
 
 .appearance-section {
-  border-top: 1px solid var(--color-border);
+  position: relative;
+  border-top: var(--border-width) solid var(--color-border);
   padding-top: var(--space-4);
 }
 
@@ -217,7 +210,7 @@
 
 .preset-empty {
   grid-column: 1 / -1;
-  border: 1px dashed var(--color-border);
+  border: var(--border-width) dashed var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-bg-soft);
   padding: var(--space-3);

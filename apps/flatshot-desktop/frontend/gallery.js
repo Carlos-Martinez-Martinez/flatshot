@@ -20,13 +20,9 @@
     return basename(name).replace(/\.[^.\\/]+$/, "") || basename(name) || "Imagen";
   }
 
-  const escapeHtml = globalThis.FlatShotFormatters?.escapeHtml || function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  };
+  const formatterHelpers = globalThis.FlatShotFormatters
+    || (typeof require === "function" ? require("./formatters.js") : null);
+  const escapeHtml = (value) => formatterHelpers.escapeHtml(value);
 
   function imageSearchText(image) {
     const name = String(image?.name || "");
@@ -113,6 +109,90 @@
     return galleryFilterVisible(filter, counts) ? filter : DEFAULT_FILTERS.all;
   }
 
+  function resolveGallerySelection(options = {}) {
+    const images = Array.isArray(options.images) ? options.images : [];
+    const imageIds = images.map((image) => image.id).filter(Boolean);
+    const targetId = String(options.targetId || "");
+    if (!targetId || !imageIds.includes(targetId)) {
+      return {
+        selectedImageId: options.primaryId || imageIds[0] || null,
+        selectedIds: sanitizeSelectedIds(options.selectedIds, imageIds),
+        anchorId: options.anchorId || options.primaryId || imageIds[0] || null,
+      };
+    }
+
+    const selectedIds = sanitizeSelectedIds(options.selectedIds, imageIds);
+    const anchorId = imageIds.includes(options.anchorId) ? options.anchorId : options.primaryId;
+    if (options.range && imageIds.includes(anchorId)) {
+      const start = imageIds.indexOf(anchorId);
+      const end = imageIds.indexOf(targetId);
+      const [from, to] = start <= end ? [start, end] : [end, start];
+      return {
+        selectedImageId: targetId,
+        selectedIds: imageIds.slice(from, to + 1),
+        anchorId,
+      };
+    }
+
+    if (options.additive) {
+      const next = selectedIds.includes(targetId)
+        ? selectedIds.filter((id) => id !== targetId)
+        : [...selectedIds, targetId];
+      const normalized = next.length ? next : [targetId];
+      return {
+        selectedImageId: normalized.includes(targetId) ? targetId : normalized[0],
+        selectedIds: normalized,
+        anchorId: targetId,
+      };
+    }
+
+    return {
+      selectedImageId: targetId,
+      selectedIds: [targetId],
+      anchorId: targetId,
+    };
+  }
+
+  function sanitizeSelectedIds(selectedIds = [], imageIds = []) {
+    const available = new Set(imageIds);
+    const seen = new Set();
+    return (Array.isArray(selectedIds) ? selectedIds : [])
+      .map((id) => String(id || ""))
+      .filter((id) => {
+        if (!id || !available.has(id) || seen.has(id)) {
+          return false;
+        }
+        seen.add(id);
+        return true;
+      });
+  }
+
+  function virtualGalleryWindow(options = {}) {
+    const total = Math.max(0, Number(options.total) || 0);
+    const threshold = Math.max(1, Number(options.threshold) || 80);
+    const rowHeight = Math.max(1, Number(options.rowHeight) || 0);
+    const columns = Math.max(1, Number(options.columns) || 1);
+    const viewportHeight = Math.max(0, Number(options.viewportHeight) || 0);
+    if (total <= threshold || !rowHeight || !viewportHeight) {
+      return { virtualized: false, start: 0, end: total, paddingTop: 0, paddingBottom: 0 };
+    }
+    const totalRows = Math.ceil(total / columns);
+    const firstRow = Math.min(totalRows - 1, Math.floor(Math.max(0, Number(options.scrollTop) || 0) / rowHeight));
+    const visibleRows = Math.max(1, Math.ceil(viewportHeight / rowHeight));
+    const overscanRows = Math.max(0, Number(options.overscanRows) || 0);
+    const startRow = Math.max(0, firstRow - overscanRows);
+    const endRow = Math.min(totalRows, firstRow + visibleRows + overscanRows - 1);
+    const start = Math.min(total, startRow * columns);
+    const end = Math.min(total, Math.max(start, endRow * columns));
+    return {
+      virtualized: true,
+      start,
+      end,
+      paddingTop: startRow * rowHeight,
+      paddingBottom: Math.max(0, (totalRows - endRow) * rowHeight),
+    };
+  }
+
   function galleryFilterButtonStates(options = {}) {
     const counts = options.counts || {};
     const activeFilter = options.activeFilter || DEFAULT_FILTERS.all;
@@ -194,13 +274,22 @@
 
   function emptyBatchNoteHtml(options = {}) {
     const ignored = Number(options.ignored) || 0;
+    const subfoldersOmitted = Number(options.subfoldersOmitted) || 0;
     const detail = ignored
       ? `Esta carpeta no contiene PNG válidos. ${options.ignoredSummary || ""}.`
       : options.scanStatus || "Esta carpeta no contiene imágenes compatibles.";
+    const subfolderAction = subfoldersOmitted
+      ? `<button type="button" data-action="include-subfolders">Incluir subcarpetas</button>`
+      : "";
+    const ignoredAction = ignored
+      ? `<button type="button" data-action="open-batch-detail">Ver ignorados</button>`
+      : "";
     return `
     <strong>No se encontraron imágenes compatibles</strong>
     <span>${escapeHtml(detail)}</span>
     <button type="button" class="primary" data-action="pick-bridge-folder">Elegir otra carpeta</button>
+    ${subfolderAction}
+    ${ignoredAction}
   `;
   }
 
@@ -300,7 +389,9 @@
 
   function imageItemHtml(options = {}) {
     const image = options.image || {};
-    const selected = options.selected ? "active" : "";
+    const isSelected = Boolean(options.selected);
+    const primarySelected = isSelected && options.primarySelected !== false;
+    const selected = primarySelected ? "active" : isSelected ? "selected" : "";
     const exportState = options.exportState || null;
     const imageStatus = options.imageStatus || image.status;
     const effectiveStatus = exportState?.status || imageStatus;
@@ -335,7 +426,7 @@
       </span>
     `;
     return `
-    <button type="button" class="image-item asset-row ${selected} ${chipClass}" data-image-id="${escapeHtml(image.id)}" title="${escapeHtml(title)}" aria-pressed="${selected ? "true" : "false"}" aria-label="${escapeHtml(`${image.name}${statusText}${outputText}`)}">
+    <button type="button" class="image-item asset-row ${selected} ${chipClass}" data-image-id="${escapeHtml(image.id)}" title="${escapeHtml(title)}" aria-pressed="${isSelected ? "true" : "false"}" aria-selected="${isSelected ? "true" : "false"}" aria-current="${primarySelected ? "true" : "false"}" aria-label="${escapeHtml(`${image.name}${statusText}${outputText}`)}">
       ${thumbnailHtml(image, thumbState, options.thumbnailSrc || "")}
       <span class="image-copy">
         <strong>${escapeHtml(displayName)}</strong>
@@ -369,7 +460,9 @@
     isValidImage,
     mockThumbnailDataUrl,
     resolveAvailableFilter,
+    resolveGallerySelection,
     thumbnailState,
     thumbnailHtml,
+    virtualGalleryWindow,
   };
 });

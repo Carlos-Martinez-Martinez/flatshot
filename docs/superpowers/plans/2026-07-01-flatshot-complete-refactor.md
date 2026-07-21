@@ -1,0 +1,243 @@
+# FlatShot Complete Refactor Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Close the remaining maintenance refactor so FlatShot has no known follow-up cleanup batch for the current architecture.
+
+**Architecture:** Keep `apps/flatshot-desktop/frontend/app.js` as a small bootstrap for initial state and DOM selectors. Move reusable helpers, browser wiring, workflow, bridge/export, rendering, output settings, actions, and startup wiring into bounded domain scripts, and enforce the boundary with tests so future work does not drift back into a monolith.
+
+**Tech Stack:** Python 3.14, pytest, ruff, vanilla browser JavaScript, Node-based frontend helper tests, PowerShell on Windows.
+
+---
+
+## Ideal State Contract
+
+- `app.js` is capped at 250 lines and owns only initial state/bootstrap data plus shared DOM selectors.
+- Domain scripts are capped at 1,800 lines each so the monolith cannot be recreated under a different filename.
+- Workflow orchestration, bridge/export, rendering, output settings, actions, and startup wiring live in `app-*.js` domain scripts loaded explicitly from `index.html`.
+- Reusable frontend helpers live in separate files loaded before `app.js`, expose browser globals, and are importable from Node tests.
+- Browser event/listener wiring lives outside `app.js` in `interaction-bindings.js`; `app.js` calls a single wiring function and passes explicit dependencies.
+- Session snapshot serialization and restoration normalization live in `session-snapshot.js`; `app.js` only applies live side effects such as selecting an image or requesting a preview.
+- Background preset and preview background normalization live in `background-presets.js`; `app.js` only reads DOM values and persists the resulting state.
+- Batch selection, export item state, validation issue construction, image dimensions, low-resolution checks, and compact UI state live in `app-state.js`; `app.js` keeps small state-bound wrappers for render readability.
+- Trivial helper passthrough wrappers in `app.js` are eliminated unless they bind several pieces of live state into a clearer domain concept.
+- Portable builder and launcher share common sync/manifest modules.
+- Export planning uses typed dataclasses instead of anonymous dict task objects.
+- Tests enforce the architecture boundary, not only individual behavior.
+- Completion requires: full pytest suite, ruff, CSS audit, portable build without venv, diff whitespace check, clean local tree, and `origin/main` matching `HEAD`.
+
+## Phase 1: Frontend Browser Wiring Extraction
+
+**Files:**
+- Create: `apps/flatshot-desktop/frontend/interaction-bindings.js`
+- Modify: `apps/flatshot-desktop/frontend/index.html`
+- Modify: `apps/flatshot-desktop/frontend/mock-data.js`
+- Modify: `apps/flatshot-desktop/frontend/app.js`
+- Test: `tests/test_frontend_interaction_bindings.py`
+- Test: `tests/test_frontend_app_cleanup.py`
+
+- [ ] **Step 1: Write failing tests**
+
+Add tests requiring `interaction-bindings.js` to load before `app.js`, expose `wireFlatShotInteractions`, and ensure `app.js` no longer registers top-level document/window/element listeners directly.
+
+- [ ] **Step 2: Verify red**
+
+Run:
+
+```powershell
+python -m pytest tests/test_frontend_interaction_bindings.py tests/test_frontend_app_cleanup.py -q
+```
+
+Expected: failure because `interaction-bindings.js` does not exist and listener wiring is still in `app.js`.
+
+- [ ] **Step 3: Implement extraction**
+
+Move browser event registration, lighting-stage wiring, viewer canvas navigation initialization, resize observer setup, and startup session restore into `interaction-bindings.js`. Keep state mutation behavior the same by passing explicit dependencies from `app.js`.
+
+- [ ] **Step 4: Verify green**
+
+Run:
+
+```powershell
+python -m pytest tests/test_frontend_interaction_bindings.py tests/test_frontend_app_cleanup.py tests/test_frontend_number_utils.py tests/test_frontend_storage_helpers.py -q
+```
+
+Expected: all selected tests pass.
+
+## Phase 2: Remaining Passthrough Wrapper Cleanup
+
+**Files:**
+- Modify: `apps/flatshot-desktop/frontend/app.js`
+- Test: `tests/test_frontend_app_cleanup.py`
+
+- [ ] **Step 1: Write or extend failing cleanup tests**
+
+Require that `app.js` has no simple helper passthrough wrappers of the form `return *Helpers.*` unless the wrapper binds live app state into a named domain state.
+
+- [ ] **Step 2: Verify red**
+
+Run:
+
+```powershell
+python -m pytest tests/test_frontend_app_cleanup.py -q
+```
+
+Expected: failure listing remaining pure passthrough wrappers.
+
+- [ ] **Step 3: Replace pure passthrough calls**
+
+Replace direct wrappers such as formatter/preflight/output label passthroughs with direct helper calls where the wrapper does not add app-specific context.
+
+- [ ] **Step 4: Verify green**
+
+Run:
+
+```powershell
+python -m pytest tests/test_frontend_app_cleanup.py tests/test_frontend_output_profile_view.py tests/test_frontend_export_payload.py -q
+```
+
+Expected: all selected tests pass.
+
+## Phase 3: Full `app.js` Decomposition
+
+**Files:**
+- Create: `apps/flatshot-desktop/frontend/session-snapshot.js`
+- Create: `apps/flatshot-desktop/frontend/background-presets.js`
+- Create: `apps/flatshot-desktop/frontend/app-state.js`
+- Modify: `apps/flatshot-desktop/frontend/index.html`
+- Modify: `apps/flatshot-desktop/frontend/mock-data.js`
+- Modify: `apps/flatshot-desktop/frontend/app.js`
+- Test: `tests/test_frontend_session_snapshot.py`
+- Test: `tests/test_frontend_background_presets.py`
+- Test: `tests/test_frontend_app_state.py`
+- Test: `tests/test_frontend_app_cleanup.py`
+
+- [ ] **Step 1: Write failing helper and cleanup tests**
+
+Require the three new helper scripts to load before `mock-data.js`/`app.js`, expose globals from `mock-data.js`, keep Node-tested behavior contracts, and ensure `app.js` delegates extracted algorithms.
+
+- [ ] **Step 2: Verify red**
+
+Run:
+
+```powershell
+python -m pytest tests\test_frontend_app_cleanup.py tests\test_frontend_background_presets.py tests\test_frontend_session_snapshot.py tests\test_frontend_app_state.py -q
+```
+
+Expected: failure because the helper files and script wiring do not exist yet and `app.js` still owns the extracted logic.
+
+- [ ] **Step 3: Implement the helper modules**
+
+Create `session-snapshot.js`, `background-presets.js`, and `app-state.js` using the existing UMD helper pattern. Keep them importable from Node tests and browser globals.
+
+- [ ] **Step 4: Thin `app.js` wrappers**
+
+Replace large pure/helper bodies in `app.js` with calls to `sessionSnapshotHelpers`, `backgroundPresetHelpers`, and `appStateHelpers`. Keep wrappers only where they bind live state, DOM values, timers, or render side effects.
+
+- [ ] **Step 5: Verify green**
+
+Run:
+
+```powershell
+python -m pytest tests\test_frontend_app_cleanup.py tests\test_frontend_background_presets.py tests\test_frontend_session_snapshot.py tests\test_frontend_app_state.py -q
+```
+
+Expected: all selected tests pass.
+
+## Phase 4: Full `app.js` File Split
+
+**Files:**
+- Create: `apps/flatshot-desktop/frontend/app-core.js`
+- Create: `apps/flatshot-desktop/frontend/app-workflow.js`
+- Create: `apps/flatshot-desktop/frontend/app-bridge-export.js`
+- Create: `apps/flatshot-desktop/frontend/app-render-shell-gallery.js`
+- Create: `apps/flatshot-desktop/frontend/app-render-preview-inspector.js`
+- Create: `apps/flatshot-desktop/frontend/app-render-export-settings.js`
+- Create: `apps/flatshot-desktop/frontend/app-actions.js`
+- Create: `apps/flatshot-desktop/frontend/app-startup.js`
+- Modify: `apps/flatshot-desktop/frontend/app.js`
+- Modify: `apps/flatshot-desktop/frontend/index.html`
+- Test: `tests/test_frontend_app_cleanup.py`
+- Test: existing frontend contract tests that reference app-domain code
+
+- [ ] **Step 1: Write failing architecture tests**
+
+Require `app.js` to stay at or below 250 lines, require domain scripts to load in order, and require each domain script to stay at or below 1,800 lines.
+
+- [ ] **Step 2: Verify red**
+
+Run:
+
+```powershell
+python -m pytest tests\test_frontend_app_cleanup.py -q
+```
+
+Expected: failure while `app.js` still contains the full domain implementation.
+
+- [ ] **Step 3: Split classic-script domains**
+
+Move contiguous, already-audited blocks from `app.js` into the `app-*.js` domain scripts without rewriting function bodies. Load `mock-data.js`, domain scripts, the small `app.js` bootstrap, and `app-startup.js` in that order.
+
+- [ ] **Step 4: Update tests that inspect app-domain code**
+
+Keep behavior assertions intact, but read app-domain code from `app.js` plus `app-*.js` instead of assuming every function lives in `app.js`.
+
+- [ ] **Step 5: Verify green**
+
+Run:
+
+```powershell
+$frontendTests = Get-ChildItem tests -Filter 'test_frontend_*.py' | ForEach-Object { $_.FullName }; python -m pytest @frontendTests tests\test_architecture_boundaries.py -q
+```
+
+Expected: all selected frontend and architecture tests pass.
+
+## Phase 5: Final Architecture Audit and Verification
+
+**Files:**
+- Modify only if the audit exposes a real gap.
+
+- [ ] **Step 1: Run architecture searches**
+
+Run:
+
+```powershell
+rg -n "function readPersistentValue|function writePersistentValue|function clampNumber|task\\[|cached\\[|outputProfileHelpers\\.outputProfileHelpers" apps src scripts tests
+rg -n "document\\.addEventListener|window\\.addEventListener|\\$\\([^\\n]+\\)\\.addEventListener" apps/flatshot-desktop/frontend/app*.js
+```
+
+Expected: no obsolete helper duplication and no top-level browser wiring left in app-domain scripts except the delegated call into `interaction-bindings.js` from `app-startup.js`.
+
+- [ ] **Step 2: Run complete verification**
+
+Run:
+
+```powershell
+python -m pytest
+python -m ruff check .
+python scripts\audit_css.py --check
+python scripts\build_portable.py --skip-venv
+git diff --check
+```
+
+Expected: every command exits 0.
+
+- [ ] **Step 3: Commit and push**
+
+Run:
+
+```powershell
+git add -A
+git commit -m "Finish frontend refactor boundaries"
+git push origin main
+git status --short --branch
+git rev-parse HEAD origin/main
+```
+
+Expected: clean tree and identical local/remote commit hashes.
+
+## Self-Review
+
+- Spec coverage: the plan defines a measurable ideal state, handles the remaining `app.js` monolith boundary, keeps backend/portable refactors intact, and requires full verification.
+- Placeholder scan: no TODO/TBD placeholders are present.
+- Type consistency: new frontend module name is consistently `interaction-bindings.js`; global helper is `FlatShotInteractionBindings`; app-level handle is `interactionBindingHelpers`.

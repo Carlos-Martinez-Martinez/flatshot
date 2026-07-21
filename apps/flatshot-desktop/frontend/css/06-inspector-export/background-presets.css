@@ -1,0 +1,79 @@
+@layer flatshot {
+/* Inspector/export: background preset actions and editor. */
+.background-preset-actions, .background-preset-editor-actions {
+  display: flex;
+  align-items: end;
+  gap: var(--space-2);
+}
+.background-preset-editor-actions button { min-width: 0; min-height: var(--control-size-md); padding-inline: 10px; }
+.background-preset-actions button { width: var(--control-size-md); min-width: var(--control-size-md); height: var(--control-size-md); min-height: var(--control-size-md); padding: 0; }
+.background-preset-actions button .button-icon, .background-preset-actions button .button-icon svg { width: 15px; height: 15px; }
+.background-preset-editor {
+  position: fixed;
+  width: min(390px, calc(100vw - var(--modal-viewport-gutter)));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-2);
+  z-index: 70;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-soft);
+  padding: var(--space-2);
+  box-shadow: var(--shadow-sm);
+}
+.background-preset-editor-fields {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--control-size-lg);
+  align-items: end;
+  gap: var(--space-2);
+}
+.background-preset-editor-fields > label:first-child {
+  grid-column: 1 / -1;
+}
+.background-preset-editor.is-transparent .background-preset-editor-fields {
+  grid-template-columns: minmax(0, 1fr);
+}
+.background-preset-editor-actions {
+  min-width: 0;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  margin-top: var(--space-1);
+}
+.background-preset-editor-actions button { white-space: nowrap; }
+.background-preset-editor label { gap: var(--space-0-5); }
+.background-preset-editor label > span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+  text-transform: uppercase;
+}
+.background-preset-editor input, .background-preset-editor select { height: var(--control-size-slim); }
+.background-preset-swatch.is-transparent {
+  background-color: var(--color-output-white);
+  background-image:
+    linear-gradient(45deg, var(--muted-alpha-24) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--muted-alpha-24) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--muted-alpha-24) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--muted-alpha-24) 75%);
+  background-position: 0 0, 0 var(--checker-step-sm), var(--checker-step-sm) calc(0px - var(--checker-step-sm)), calc(0px - var(--checker-step-sm)) 0;
+  background-size: var(--checker-tile-sm) var(--checker-tile-sm);
+}
+.background-preset-swatch.is-invalid {
+  background:
+    repeating-linear-gradient(
+      135deg,
+      var(--color-error-soft) 0,
+      var(--color-error-soft) 6px,
+      var(--color-bg-panel) 6px,
+      var(--color-bg-panel) 12px
+    );
+  border-color: var(--color-error-border);
+}
+.background-preset-editor > small {
+  grid-column: 1 / -1;
+}
+.background-preset-editor > small:empty { display: none; }
+}

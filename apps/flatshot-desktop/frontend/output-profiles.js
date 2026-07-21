@@ -5,6 +5,8 @@
   }
   root.FlatShotOutputProfiles = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  const MAX_EXPORT_SIDE = 12000;
+  const MAX_EXPORT_PIXELS = 100000000;
   function outputProfileNameForDisplay(name) {
     return String(name || "")
       .replace(/\bRGB\s*230\b/gi, "gris claro")
@@ -17,6 +19,18 @@
       return "JPG";
     }
     return text === "PNG" ? "PNG" : "JPG";
+  }
+
+  function normalizeMaxFileSizeKb(value) {
+    const text = String(value ?? "").trim();
+    if (!text) {
+      return null;
+    }
+    if (!/^\d+$/.test(text)) {
+      return null;
+    }
+    const parsed = Number.parseInt(text, 10);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
   }
 
   function clampRgbChannel(value) {
@@ -91,9 +105,12 @@
     const format = normalizeExportFormat(source.format);
     const background = normalizeBackgroundValue(source.background);
     const destinationMode = source.destinationMode === "custom" ? "custom" : "source";
+    const maxFileSizeKb = format === "JPG"
+      ? normalizeMaxFileSizeKb(source.maxFileSizeKb ?? source.max_file_size_kb)
+      : null;
     return {
       id: String(source.id || uniqueOutputProfileId("formato", index)).trim(),
-      name: outputProfileNameForDisplay(String(source.name || `Formato ${index + 1}`).trim()),
+      name: outputProfileNameForDisplay(String(source.name || `Salida ${index + 1}`).trim()),
       enabled: typeof source.enabled === "boolean" ? source.enabled : false,
       format,
       width,
@@ -103,6 +120,7 @@
       destinationValue: String(source.destinationValue || (destinationMode === "custom" ? "" : "Salida")),
       naming: String(source.naming || "{original}{suffix}"),
       suffix: source.suffix === undefined || source.suffix === null ? "_PRO" : String(source.suffix),
+      maxFileSizeKb,
     };
   }
 
@@ -186,6 +204,7 @@
       custom_output_path: profile.destinationMode === "custom" ? profile.destinationValue : null,
       output_width: size.width,
       output_height: size.height,
+      max_file_size_kb: profile.format === "JPG" ? normalizeMaxFileSizeKb(profile.maxFileSizeKb) : null,
     };
   }
 
@@ -196,6 +215,7 @@
     const fieldMessages = {};
     const width = Number.parseInt(raw.width, 10);
     const height = Number.parseInt(raw.height, 10);
+    const maxFileSizeText = String(raw.maxFileSizeKb ?? "").trim();
     const invalidFilenameChars = /[<>:"/\\|?*]/;
     const rememberFieldMessage = (field, message) => {
       if (!field) {
@@ -220,7 +240,7 @@
     };
 
     if (!String(raw.name || "").trim()) {
-      addError("name", "Pon un nombre al formato.");
+      addError("name", "Pon un nombre a la salida.");
     }
     if (!["JPG", "PNG"].includes(normalizeExportFormat(raw.format))) {
       addError("format", "Elige JPG o PNG como tipo de archivo.");
@@ -231,11 +251,24 @@
     if (normalizeExportFormat(raw.format) === "JPG" && raw.background === "transparent") {
       addError("background", "JPG no admite transparencia. Selecciona fondo blanco, gris claro o cambia el tipo a PNG.");
     }
+    if (normalizeExportFormat(raw.format) === "JPG" && maxFileSizeText && normalizeMaxFileSizeKb(maxFileSizeText) === null) {
+      addError("maxFileSizeKb", "El peso máximo debe ser un número mayor que 0 KB.");
+    }
     if (!String(raw.width || "").trim() || !Number.isInteger(width) || width <= 0) {
       addError("width", "La anchura debe ser un número mayor que 0.");
     }
     if (!String(raw.height || "").trim() || !Number.isInteger(height) || height <= 0) {
       addError("height", "La altura debe ser un número mayor que 0.");
+    }
+    if (Number.isInteger(width) && width > MAX_EXPORT_SIDE) {
+      addError("width", `La anchura no puede superar ${MAX_EXPORT_SIDE}px.`);
+    }
+    if (Number.isInteger(height) && height > MAX_EXPORT_SIDE) {
+      addError("height", `La altura no puede superar ${MAX_EXPORT_SIDE}px.`);
+    }
+    if (Number.isInteger(width) && Number.isInteger(height) && width > 0 && height > 0 && width * height > MAX_EXPORT_PIXELS) {
+      addError("width", `El área de exportación no puede superar ${MAX_EXPORT_PIXELS.toLocaleString("es-ES")} píxeles.`);
+      addError("height", `El área de exportación no puede superar ${MAX_EXPORT_PIXELS.toLocaleString("es-ES")} píxeles.`);
     }
     if (invalidFilenameChars.test(String(raw.suffix || ""))) {
       addError("suffix", "El sufijo contiene caracteres no válidos.");
@@ -277,6 +310,7 @@
     isValidBackgroundValue,
     normalizeBackgroundValue,
     normalizeExportFormat,
+    normalizeMaxFileSizeKb,
     normalizeOutputProfile,
     normalizeOutputProfileList,
     outputProfileNameForDisplay,
@@ -286,5 +320,7 @@
     parseRgbBackground,
     rgbBackgroundValue,
     uniqueOutputProfileId,
+    MAX_EXPORT_SIDE,
+    MAX_EXPORT_PIXELS,
   };
 });

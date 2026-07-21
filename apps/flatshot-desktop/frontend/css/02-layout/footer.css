@@ -1,10 +1,6 @@
 @layer flatshot {
 /* Layout: bottom status bar and export controls. */
 
-.status-grid div, .progress-block {
-  min-width: 0;
-}
-
 .bottom-actions button:hover:not(:disabled) {
   background: var(--surface-muted);
   color: var(--text-primary);
@@ -22,9 +18,9 @@
 .bottom-actions button {
   border-color: transparent;
   background: transparent;
-  padding: 0 8px;
+  padding: 0 var(--space-2);
   color: var(--text-secondary);
-  min-height: 26px;
+  min-height: var(--control-height);
 }
 
 .app-shell[data-ui-state="no_folder"] .bottom-bar, .app-shell[data-ui-state="batch_empty"] .bottom-bar, .app-shell[data-ui-state="scan_empty"] .bottom-bar {
@@ -35,13 +31,11 @@
   min-width: 0;
   overflow: hidden;
   border-top-color: var(--line-soft);
-  grid-template-columns: minmax(0, 1fr) auto;
-  padding-block: 2px;
   min-height: 0;
   display: none;
   align-items: center;
   gap: var(--space-4);
-  border-top: 1px solid var(--color-border);
+  border-top: var(--border-width) solid var(--color-border);
   background: var(--color-bg-panel);
   padding: 0 var(--space-4);
   color: var(--color-text-muted);
@@ -54,8 +48,8 @@
 
 .status-sentence {
   color: var(--text);
-  font-weight: 650;
-  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-xs);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -65,7 +59,7 @@
 
 .progress-block {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   display: grid;
   gap: var(--space-2);
   min-width: 220px;
@@ -80,7 +74,4 @@
   align-items: center;
 }
 
-.bottom-actions .primary {
-  display: none;
-}
 }

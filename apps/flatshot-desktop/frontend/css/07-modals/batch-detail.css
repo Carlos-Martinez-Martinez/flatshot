@@ -1,12 +1,20 @@
 @layer flatshot {
 /* Modals: batch detail dialog. */
 
-.batch-detail-dialog { width: min(900px, calc(100vw - 48px)); max-height: min(760px, calc(100vh - 48px)); }
+.batch-detail-dialog {
+  width: min(var(--modal-batch-detail-width), calc(100vw - var(--modal-viewport-gutter)));
+  max-height: min(var(--modal-max-height), calc(100vh - var(--modal-viewport-gutter)));
+}
 
 #batch-detail-modal .batch-detail-dialog {
-  max-width: none; width: min(900px, calc(100vw - 48px)); height: auto;
-  max-height: min(760px, calc(100vh - 48px)); margin: 0; display: grid;
-  grid-template-rows: auto minmax(0, auto) auto; overflow: hidden;
+  width: min(var(--modal-batch-detail-width), calc(100vw - var(--modal-viewport-gutter)));
+  max-width: none;
+  height: auto;
+  max-height: min(var(--modal-max-height), calc(100vh - var(--modal-viewport-gutter)));
+  margin: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, auto) auto;
+  overflow: hidden;
 }
 
 #batch-detail-modal .app-settings-header { padding: var(--space-3) var(--space-5); }
@@ -26,11 +34,11 @@
 .batch-detail-overview {
   grid-column: 1 / -1; min-width: 0; display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-2);
-  border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--color-border); border-radius: var(--radius-sm);
   background: var(--color-bg-panel); padding: var(--space-3);
 }
 
-.batch-detail-metric { min-width: 0; display: grid; gap: 2px; }
+.batch-detail-metric { min-width: 0; display: grid; gap: var(--space-0-5); }
 
 .batch-detail-metric span, .batch-detail-row span, .batch-detail-problem span, .batch-detail-muted {
   color: var(--color-text-muted); font-size: var(--font-size-sm);
@@ -44,7 +52,7 @@
 
 .batch-detail-section {
   min-width: 0; display: grid; align-content: start; gap: var(--space-2);
-  border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--color-border); border-radius: var(--radius-sm);
   background: var(--color-bg-panel); padding: var(--space-3);
 }
 
@@ -68,7 +76,7 @@
 .batch-detail-row strong { overflow-wrap: anywhere; }
 
 .batch-detail-problem {
-  border: 1px solid var(--color-warning-border); border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--color-warning-border); border-radius: var(--radius-sm);
   background: var(--color-warning-soft); padding: var(--space-2);
 }
 
@@ -78,7 +86,7 @@
 
 .batch-detail-output {
   min-width: 0; display: grid; grid-template-columns: minmax(180px, 0.88fr) minmax(0, 1.12fr);
-  align-items: start; gap: var(--space-3); border: 1px solid var(--color-border);
+  align-items: start; gap: var(--space-3); border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-sm); background: var(--color-bg-soft); padding: var(--space-3);
 }
 
@@ -104,7 +112,7 @@
 .batch-detail-secondary--single { grid-template-columns: minmax(0, 1fr); }
 
 .batch-detail-reasons {
-  display: grid; gap: var(--space-2); border-top: 1px solid var(--color-border);
+  display: grid; gap: var(--space-2); border-top: var(--border-width) solid var(--color-border);
   margin-top: var(--space-2); padding-top: var(--space-2);
 }
 

@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any
 
-from flatshot.core.models import ShadowSettings
+from flatshot.core.models import SHADOW_SETTING_LIMITS, ShadowSettings
 
 
 LOCAL_OVERRIDE_DEFAULTS = {
@@ -70,6 +70,7 @@ def apply_image_override(settings: ShadowSettings, override: dict | None) -> Sha
     if "shadow_delta" in normalized:
         updates["opacity"] = clamp_int(settings.opacity + normalized["shadow_delta"], 0, 100)
     if "blur_delta" in normalized:
-        updates["blur"] = clamp_int(settings.blur + normalized["blur_delta"], 0, 100)
+        minimum, maximum = SHADOW_SETTING_LIMITS["blur"]
+        updates["blur"] = clamp_int(settings.blur + normalized["blur_delta"], minimum, maximum)
 
     return settings.model_copy(update=updates)

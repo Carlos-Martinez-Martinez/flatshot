@@ -12,7 +12,7 @@ CONTROLLER_PATH = FRONTEND_DIR / "app-bridge-scan-controller.js"
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend flow checks")
-def test_folder_picker_updates_editable_path_without_scanning():
+def test_folder_picker_scans_the_selected_path_immediately():
     script = f"""
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -58,11 +58,9 @@ global.storageHelpers = {{
 global.STORAGE_KEYS = {{ bridgeScanPath: "bridgeScanPath" }};
 global.scheduleBridgeUiPreferencesSave = () => {{ global.savedPrefs = true; }};
 global.bridgeErrorMessage = (error) => error.message;
-global.scanBridgeFolder = () => {{
-  throw new Error("folder picker must not scan automatically");
-}};
-
 vm.runInThisContext(fs.readFileSync({json.dumps(str(CONTROLLER_PATH))}, "utf8"));
+let scanCalls = 0;
+global.scanBridgeFolder = async () => {{ scanCalls += 1; }};
 
 (async () => {{
   await pickBridgeFolder();
@@ -71,6 +69,7 @@ vm.runInThisContext(fs.readFileSync({json.dumps(str(CONTROLLER_PATH))}, "utf8"))
   assert.deepEqual(global.persisted, ["bridgeScanPath", "C:/new batch"]);
   assert.equal(global.savedPrefs, true);
   assert.equal(renderCalls, 2);
+  assert.equal(scanCalls, 1);
 }})().catch((error) => {{
   console.error(error);
   process.exitCode = 1;

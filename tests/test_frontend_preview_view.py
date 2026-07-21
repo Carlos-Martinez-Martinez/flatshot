@@ -13,6 +13,8 @@ INDEX_PATH = FRONTEND_DIR / "index.html"
 APP_PATH = FRONTEND_DIR / "app.js"
 VIEWER_TOOLBAR_CSS_PATH = FRONTEND_DIR / "css" / "05-viewer" / "viewer-toolbar.css"
 CANVAS_CSS_PATH = FRONTEND_DIR / "css" / "05-viewer" / "canvas.css"
+VIEWER_SHELL_CSS_PATH = FRONTEND_DIR / "css" / "05-viewer" / "viewer-shell.css"
+INSPECTOR_WORKFLOW_CSS_PATH = FRONTEND_DIR / "css" / "06-inspector-export" / "inspector-workflow.css"
 
 
 def app_domain_source():
@@ -92,12 +94,48 @@ def test_initial_canvas_uses_app_background_instead_of_preview_background():
     assert "--rgb-neutral-fallback" not in initial_rule
 
 
+def test_empty_batch_places_viewer_in_primary_column_with_a_neutral_canvas():
+    viewer_css = VIEWER_SHELL_CSS_PATH.read_text(encoding="utf-8")
+    canvas_css = CANVAS_CSS_PATH.read_text(encoding="utf-8")
+    inspector_css = INSPECTOR_WORKFLOW_CSS_PATH.read_text(encoding="utf-8")
+    empty_selector = '.app-shell:is([data-ui-state="batch_empty"], [data-ui-state="scan_empty"])'
+
+    panel_selector = f"{empty_selector} .preview-panel {{"
+    assert panel_selector in viewer_css
+    panel_rule = viewer_css.split(panel_selector, 1)[1].split("}", 1)[0]
+    assert "grid-column: 1;" in panel_rule
+
+    toolbar_selector = f"{empty_selector} .preview-toolbar {{"
+    assert toolbar_selector in viewer_css
+    toolbar_rule = viewer_css.split(toolbar_selector, 1)[1].split("}", 1)[0]
+    assert "display: none;" in toolbar_rule
+
+    canvas_selector = f"{empty_selector} .canvas-area {{"
+    assert canvas_selector in canvas_css
+    canvas_rule = canvas_css.split(canvas_selector, 1)[1].split("}", 1)[0]
+    assert "background: var(--color-bg-stage);" in canvas_rule
+
+    inspector_selector = f"{empty_selector} .settings-panel {{"
+    assert inspector_selector in inspector_css
+    inspector_rule = inspector_css.split(inspector_selector, 1)[1].split("}", 1)[0]
+    assert "grid-column: 2;" in inspector_rule
+
+
 def test_preview_render_preserves_onboarding_background_layer():
     source = (FRONTEND_DIR / "app-preview-controller.js").read_text(encoding="utf-8")
 
     assert "function setPreviewCanvasHtml(" in source
     assert 'canvas.querySelector("#onboarding-background")' in source
     assert "canvas.prepend(onboardingLayer);" in source
+
+
+def test_empty_batch_preview_offers_folder_recovery_action():
+    source = (FRONTEND_DIR / "app-preview-controller.js").read_text(encoding="utf-8")
+    empty_branch = source.split('if (state.batch === "empty") {', 1)[1].split("finishPreviewRender();", 1)[0]
+
+    assert 'variant: "batch-empty"' in empty_branch
+    assert 'actionLabel: "Elegir otra carpeta"' in empty_branch
+    assert 'action: "pick-bridge-folder"' in empty_branch
 
 
 def test_compare_mode_has_draggable_divider_wiring():

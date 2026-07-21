@@ -40,6 +40,10 @@
   background: var(--color-bg);
 }
 
+.app-shell:is([data-ui-state="batch_empty"], [data-ui-state="scan_empty"]) .canvas-area {
+  background: var(--color-bg-stage);
+}
+
 .preview-canvas {
   position: relative;
   z-index: 1;

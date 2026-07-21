@@ -68,7 +68,7 @@ def test_frontend_loads_only_modular_css_in_contract_order():
 
 
 def test_frontend_assets_share_css_module_cache_token():
-    assert audit_css.stylesheet_versions(FRONTEND_DIR / "index.html") == {"20260704-search-focus"}
+    assert audit_css.stylesheet_versions(FRONTEND_DIR / "index.html") == {"20260721-empty-folder-icon"}
 
 
 def test_css_modules_keep_cascade_contract():
@@ -477,12 +477,15 @@ def test_compact_indicators_use_size_tokens():
     assert offenders == []
 
 
-def test_onboarding_empty_icon_override_does_not_duplicate_hidden_tab_geometry():
+def test_folder_empty_icon_override_does_not_duplicate_hidden_tab_geometry():
     css = (FRONTEND_DIR / "css" / "03-components" / "empty-states.css").read_text(
         encoding="utf-8"
     )
-    match = re.search(r"\.empty-state\.onboarding\s+\.empty-icon::before\s*\{([^{}]*)\}", css)
-    assert match, "onboarding empty icon override not found"
+    match = re.search(
+        r"\.empty-state:is\(\.onboarding, \.batch-empty\)\s+\.empty-icon::before\s*\{([^{}]*)\}",
+        css,
+    )
+    assert match, "shared folder empty icon override not found"
 
     rule = match.group(1)
     assert "content: none" in rule

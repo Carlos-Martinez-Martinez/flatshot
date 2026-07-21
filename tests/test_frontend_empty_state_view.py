@@ -356,6 +356,19 @@ assert.equal(withAction.includes('data-action="pick-&quot;folder&quot;"'), true)
 assert.equal(withAction.includes('>Elegir &amp; abrir</button>'), true);
 assert.equal(withAction.includes('<small>PNG &amp; JPG</small>'), true);
 
+const batchEmpty = helpers.emptyStateHtml({{
+  variant: "batch-empty",
+  title: "No se encontraron imágenes compatibles",
+  detail: "Esta carpeta no contiene imágenes compatibles.",
+  actionLabel: "Elegir otra carpeta",
+  action: "pick-bridge-folder",
+}});
+assert.equal(batchEmpty.includes('class="empty-state batch-empty"'), true);
+assert.equal(batchEmpty.includes('<svg viewBox="0 0 24 24"'), true);
+assert.equal(batchEmpty.includes('M3 6.75A2.75 2.75'), true);
+assert.equal(batchEmpty.includes('class="primary" data-action="pick-bridge-folder"'), true);
+assert.equal(batchEmpty.includes('>Elegir otra carpeta</button>'), true);
+
 const initial = helpers.initialStateHtml({{ devMode: false }});
 assert.equal(initial.includes('class="empty-state onboarding initial-onboarding"'), true);
 assert.equal(initial.includes("<strong>Selecciona una carpeta</strong>"), true);
@@ -430,6 +443,20 @@ def test_initial_onboarding_card_uses_deliberate_stable_layout_styles():
     assert "display: inline-flex;" in actions_rule
     assert "min-width: 170px;" in action_button_rule
     assert "width: auto;" in action_button_rule
+
+
+def test_batch_empty_state_is_centered_without_a_floating_card():
+    css = EMPTY_CSS_PATH.read_text(encoding="utf-8")
+
+    state_rule = css.split(".empty-state.batch-empty {", 1)[1].split("}", 1)[0]
+    icon_rule = css.split(".empty-state.batch-empty .empty-icon {", 1)[1].split("}", 1)[0]
+
+    assert "align-content: center;" in state_rule
+    assert "background:" not in state_rule
+    assert "box-shadow:" not in state_rule
+    assert "background: var(--color-warning-soft);" in icon_rule
+    assert ".empty-state:is(.onboarding, .batch-empty) .empty-icon::before" in css
+    assert ".empty-state:is(.onboarding, .batch-empty) .empty-icon svg" in css
 
 
 def test_onboarding_background_styles_are_perceptible_without_blocking_controls():

@@ -17,14 +17,26 @@
     },
   };
 
+  function folderIconHtml() {
+    return `<span class="empty-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" focusable="false">
+        <path d="M3 6.75A2.75 2.75 0 0 1 5.75 4h4.08c.73 0 1.42.34 1.86.92l.82 1.08h5.74A2.75 2.75 0 0 1 21 8.75v.75H7.18a2.75 2.75 0 0 0-2.63 1.96L3 16.65Z"></path>
+        <path d="M4.1 18.9A2.75 2.75 0 0 0 6.72 21h10.74a2.75 2.75 0 0 0 2.66-2.05l1.63-6.15A1.75 1.75 0 0 0 20.06 10H7.18c-.79 0-1.48.52-1.69 1.28Z"></path>
+      </svg>
+    </span>`;
+  }
+
   function emptyStateHtml({ variant = "inline", title, detail, actionLabel = "", action = "", meta = "" }) {
     const actionHtml = actionLabel && action
       ? `<button type="button" class="primary" data-action="${escapeHtml(action)}">${escapeHtml(actionLabel)}</button>`
       : "";
     const metaHtml = meta ? `<small>${escapeHtml(meta)}</small>` : "";
+    const iconHtml = variant === "batch-empty"
+      ? folderIconHtml()
+      : `<span class="empty-icon" aria-hidden="true"></span>`;
     return `
     <div class="empty-state ${escapeHtml(variant)}">
-      <span class="empty-icon" aria-hidden="true"></span>
+      ${iconHtml}
       <strong>${escapeHtml(title)}</strong>
       <span>${escapeHtml(detail)}</span>
       ${actionHtml}
@@ -77,12 +89,7 @@
       : "";
     return `
     <div class="empty-state onboarding initial-onboarding${options.dropActive ? " is-drop-active" : ""}">
-      <span class="empty-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" focusable="false">
-          <path d="M3 6.75A2.75 2.75 0 0 1 5.75 4h4.08c.73 0 1.42.34 1.86.92l.82 1.08h5.74A2.75 2.75 0 0 1 21 8.75v.75H7.18a2.75 2.75 0 0 0-2.63 1.96L3 16.65Z"></path>
-          <path d="M4.1 18.9A2.75 2.75 0 0 0 6.72 21h10.74a2.75 2.75 0 0 0 2.66-2.05l1.63-6.15A1.75 1.75 0 0 0 20.06 10H7.18c-.79 0-1.48.52-1.69 1.28Z"></path>
-        </svg>
-      </span>
+      ${folderIconHtml()}
       <strong>Selecciona una carpeta</strong>
       <span>Carga un lote de imágenes PNG o JPG o arrastra una carpeta aquí.</span>
       ${folderEntryHtml}

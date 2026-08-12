@@ -158,7 +158,7 @@ input, textarea, select, .real-preview-placeholder .path-line, .result-path stro
   gap: 1px;
   border-top: var(--border-width) solid var(--dark-ink-alpha-12);
   pointer-events: none;
-  display: block;
+  display: none;
   padding: var(--space-2) var(--space-4);
   box-shadow: none;
   left: 0;

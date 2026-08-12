@@ -168,7 +168,7 @@ function renderBatch() {
 
   const visible = filteredImages();
   const imageList = $("#image-list");
-  const preservedScrollLeft = imageList.scrollLeft;
+  const preservedScrollTop = imageList.scrollTop;
   const virtualWindow = galleryVirtualWindow(visible);
   const renderedImages = visible.slice(virtualWindow.start, virtualWindow.end);
   setGalleryTitle(exportable);
@@ -180,7 +180,7 @@ function renderBatch() {
     ...renderedImages.map(imageItemHtml),
     galleryVirtualSpacerHtml(virtualWindow.paddingBottom),
   ].join("");
-  imageList.scrollLeft = preservedScrollLeft;
+  imageList.scrollTop = preservedScrollTop;
   queueThumbnailPreload(renderedImages);
   $("#batch-empty-note").innerHTML = visible.length ? "" : filteredEmptyHtml(images.length, valid, warnings, errors);
   if (filmstripCount) {
@@ -200,26 +200,29 @@ function galleryVirtualWindow(images = []) {
   const imageList = $("#image-list");
   const scrollTop = Number.isFinite(state.galleryScrollTop)
     ? state.galleryScrollTop
-    : imageList?.scrollLeft || 0;
+    : imageList?.scrollTop || 0;
+  const columns = state.galleryView === "list"
+    ? 1
+    : Math.max(1, Math.floor(((imageList?.clientWidth || 0) + 12) / 168));
   return galleryHelpers.virtualGalleryWindow({
     total: images.length,
     scrollTop,
-    viewportHeight: imageList?.clientWidth || 0,
-    rowHeight: state.galleryView === "list" ? 220 : galleryThumbnailColumnWidth(),
-    columns: 1,
+    viewportHeight: imageList?.clientHeight || 0,
+    rowHeight: state.galleryView === "list" ? 76 : galleryThumbnailRowHeight(),
+    columns,
     overscanRows: 3,
     threshold: 100,
   });
 }
 
-function galleryThumbnailColumnWidth() {
-  return { small: 132, medium: 160, large: 218 }[state.interfacePreferences.thumbnailSize] || 160;
+function galleryThumbnailRowHeight() {
+  return { small: 166, medium: 198, large: 252 }[state.interfacePreferences.thumbnailSize] || 198;
 }
 
 function galleryVirtualSpacerHtml(height) {
   const normalized = Math.max(0, Math.round(Number(height) || 0));
   return normalized
-    ? `<div class="gallery-virtual-spacer" style="width:${normalized}px" aria-hidden="true"></div>`
+    ? `<div class="gallery-virtual-spacer" style="height:${normalized}px" aria-hidden="true"></div>`
     : "";
 }
 

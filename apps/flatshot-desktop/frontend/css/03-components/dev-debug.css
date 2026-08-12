@@ -24,4 +24,8 @@
 html:not(.dev-mode) :is(.debug-panel, .dev-only, .preview-debug, [data-action="toggle-inspector"], .bridge-chip, [data-preview-mode="original"], [data-preview-mode="compare"]) {
   display: none !important;
 }
+
+html.dev-mode body .top-actions > :is(button.dev-only, details.debug-panel) {
+  display: none;
+}
 }

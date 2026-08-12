@@ -103,10 +103,10 @@
   min-height: 0;
   display: grid;
   background: var(--color-border);
-  grid-template-columns: minmax(0, 1fr) clamp(340px, 20vw, 392px);
+  grid-template-columns: clamp(300px, 17vw, 360px) minmax(560px, 1fr) clamp(320px, 19vw, 390px);
   overflow: hidden;
   gap: 1px;
-  grid-template-rows: minmax(0, 1fr) clamp(176px, 20vh, 224px);
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .app-shell[data-ui-state="no_folder"] .workspace, .app-shell[data-ui-state="scanning"] .workspace {
@@ -119,7 +119,7 @@
 }
 
 .app-shell[data-output-editing="true"] .workspace {
-  grid-template-columns: minmax(560px, 1fr) var(--fs-output-edit-col);
+  grid-template-columns: clamp(280px, 15vw, 320px) minmax(520px, 1fr) var(--fs-output-edit-col);
 }
 
 .app-shell[data-ui-state="scanning"] #top-primary-action {

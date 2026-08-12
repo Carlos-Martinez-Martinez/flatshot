@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -79,10 +80,22 @@ def test_preview_rgb230_swatch_uses_real_light_background_color():
 def test_preview_rgb230_canvas_uses_real_light_background_color():
     css = CANVAS_CSS_PATH.read_text(encoding="utf-8")
 
-    assert ".canvas-area.bg-rgb230" in css
-    rgb230_rule = css.split(".canvas-area.bg-rgb230 {", 1)[1].split("}", 1)[0]
+    assert ".canvas-area.bg-rgb230 .preview-canvas" in css
+    rgb230_rule = css.split(".canvas-area.bg-rgb230 .preview-canvas {", 1)[1].split("}", 1)[0]
     assert "background: var(--rgb-neutral-fallback);" in rgb230_rule
     assert "background: var(--color-bg-stage);" not in rgb230_rule
+
+
+def test_preview_background_and_guides_are_bounded_to_portrait_workspace():
+    css = CANVAS_CSS_PATH.read_text(encoding="utf-8")
+
+    canvas_rule = re.search(r"(?m)^\.preview-canvas\s*\{([^}]*)\}", css).group(1)
+    guide_rule = css.split(".guide-overlay {", 1)[1].split("}", 1)[0]
+
+    assert "width: min(100%, 920px);" in canvas_rule
+    assert "width: min(100%, 920px);" in guide_rule
+    assert "left: 50%;" in guide_rule
+    assert "transform: translateX(-50%);" in guide_rule
 
 
 def test_initial_canvas_uses_app_background_instead_of_preview_background():

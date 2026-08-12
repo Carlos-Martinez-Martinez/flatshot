@@ -283,16 +283,16 @@
   display: grid;
   border-bottom: var(--border-width) solid var(--rail-border);
   background: transparent;
-  grid-template-columns: auto minmax(110px, 0.4fr) minmax(300px, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: var(--space-2);
+  padding: var(--space-3);
 }
 
 .gallery-toolbar__top {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(90px, auto) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-3);
 }
@@ -306,7 +306,7 @@
 }
 
 .gallery-toolbar__fields {
-  display: flex;
+  display: grid;
   gap: var(--space-2);
   border-top: 0;
   padding-top: 0;
@@ -383,7 +383,7 @@
 
 .gallery-filter {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   border: 0;
   background: transparent;
   padding: 0;
@@ -409,14 +409,14 @@
   flex-direction: column;
   overflow: hidden;
   background: var(--rail-bg);
-  border-top: var(--border-width) solid var(--rail-border);
+  border-right: var(--border-width) solid var(--rail-border);
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 1;
   min-height: 0;
 }
 
 .app-shell[data-batch-context="true"] .gallery-column {
-  grid-row: 2;
+  grid-row: 1;
 }
 
 .gallery-header {
@@ -431,12 +431,12 @@
 }
 
 .gallery-view-switch {
-  width: auto;
-  min-width: 168px;
+  width: 140px;
+  min-width: 140px;
   border-color: var(--rail-border);
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--rail-bg) 82%, var(--color-primary) 18%);
-  justify-self: stretch;
+  justify-self: end;
 }
 
 .gallery-view-switch.segmented button:hover:not(:disabled) {

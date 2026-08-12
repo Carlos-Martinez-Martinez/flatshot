@@ -373,7 +373,7 @@ function handleGalleryScroll(event) {
   if (event.target?.id !== "image-list") {
     return;
   }
-  state.galleryScrollTop = event.target.scrollLeft;
+  state.galleryScrollTop = event.target.scrollTop;
   if (galleryScrollFrame) {
     return;
   }

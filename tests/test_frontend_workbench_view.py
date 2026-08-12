@@ -17,7 +17,7 @@ def test_workbench_view_loads_before_shell_controllers():
     assert html.index("workbench-view.js") < html.index("app-loader.js")
 
 
-def test_workbench_shell_prioritizes_preview_filmstrip_and_contextual_inspector():
+def test_workbench_shell_prioritizes_portrait_preview_vertical_gallery_and_contextual_inspector():
     html = (FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
     shell_css = (FRONTEND_DIR / "css" / "02-layout" / "shell-workspace.css").read_text(encoding="utf-8")
     gallery_css = (FRONTEND_DIR / "css" / "04-batch-gallery" / "image-grid.css").read_text(encoding="utf-8")
@@ -25,9 +25,9 @@ def test_workbench_shell_prioritizes_preview_filmstrip_and_contextual_inspector(
     responsive_css = (FRONTEND_DIR / "css" / "08-states-responsive" / "responsive.css").read_text(encoding="utf-8")
     app = (FRONTEND_DIR / "app.js").read_text(encoding="utf-8")
 
-    assert "grid-template-columns: minmax(0, 1fr) clamp(340px, 20vw, 392px);" in shell_css
-    assert "grid-template-rows: minmax(0, 1fr) clamp(176px, 20vh, 224px);" in shell_css
-    assert "grid-auto-flow: column;" in gallery_css
+    assert "grid-template-columns: clamp(300px, 17vw, 360px) minmax(560px, 1fr) clamp(320px, 19vw, 390px);" in shell_css
+    assert "grid-template-rows: minmax(0, 1fr);" in shell_css
+    assert "grid-auto-flow: row;" in gallery_css
     assert 'data-inspector-tab="review">Imagen</button>' in html
     assert 'data-inspector-tab="advanced">Aspecto</button>' in html
     assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in inspector_css
@@ -41,7 +41,7 @@ def test_running_job_keeps_progress_actions_out_of_header():
 
     assert 'topPrimary.hidden = state.exportStatus === "running";' in source
     assert 'workbenchContext.hidden = state.batch === "none" || state.batch === "scanning" || state.exportStatus === "running";' in source
-    assert 'preflight.hidden = state.batch === "none" || state.batch === "scanning" || state.exportStatus === "running";' in source
+    assert 'preflight.hidden = state.batch === "none" || state.batch === "scanning" || !headerStatus.showPreflight;' in source
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required")
@@ -80,6 +80,27 @@ assert.deepEqual(helpers.headerContexts({{}}), {{
   preset: {{ label: "Preset", value: "Sin preset", title: "Sin preset" }},
   output: {{ label: "Salida", value: "Sin configurar", title: "Sin configurar" }},
 }});
+
+assert.deepEqual(helpers.headerStatusVisibility({{
+  ready: true,
+  issueCount: 0,
+  processing: false,
+}}), {{ showSummary: false, showPreflight: false }});
+assert.deepEqual(helpers.headerStatusVisibility({{
+  ready: false,
+  issueCount: 2,
+  processing: false,
+}}), {{ showSummary: true, showPreflight: true }});
+assert.deepEqual(helpers.headerStatusVisibility({{
+  ready: true,
+  issueCount: 2,
+  processing: false,
+}}), {{ showSummary: true, showPreflight: false }});
+assert.deepEqual(helpers.headerStatusVisibility({{
+  ready: false,
+  issueCount: 0,
+  processing: true,
+}}), {{ showSummary: false, showPreflight: false }});
 """
     result = subprocess.run(
         ["node", "-e", script],

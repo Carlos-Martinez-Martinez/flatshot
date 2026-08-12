@@ -91,15 +91,25 @@ def test_gallery_auto_scroll_runs_only_when_selection_changes():
     assert "keepActiveThumbnailVisible();" not in rendering
 
 
-def test_virtual_gallery_render_restores_scroll_position_after_replacing_items():
+def test_virtual_gallery_render_restores_vertical_scroll_position_after_replacing_items():
     controller = APP_GALLERY_CONTROLLER_PATH.read_text(encoding="utf-8")
 
-    capture = "const preservedScrollLeft = imageList.scrollLeft;"
+    capture = "const preservedScrollTop = imageList.scrollTop;"
     replace = "imageList.innerHTML = ["
-    restore = "imageList.scrollLeft = preservedScrollLeft;"
+    restore = "imageList.scrollTop = preservedScrollTop;"
     assert capture in controller
     assert restore in controller
     assert controller.index(capture) < controller.index(replace) < controller.index(restore)
+
+
+def test_gallery_virtual_window_reads_vertical_viewport_geometry():
+    controller = APP_GALLERY_CONTROLLER_PATH.read_text(encoding="utf-8")
+    events = APP_DOCUMENT_EVENTS_PATH.read_text(encoding="utf-8")
+
+    assert "imageList?.scrollTop || 0" in controller
+    assert "viewportHeight: imageList?.clientHeight || 0" in controller
+    assert "state.galleryScrollTop = event.target.scrollTop;" in events
+    assert 'style="height:${normalized}px"' in controller
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")

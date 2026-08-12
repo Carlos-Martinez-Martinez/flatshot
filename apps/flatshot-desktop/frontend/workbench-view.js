@@ -53,8 +53,20 @@
     };
   }
 
+  function headerStatusVisibility(options = {}) {
+    if (options.processing) {
+      return { showSummary: false, showPreflight: false };
+    }
+    const hasIssues = Math.max(0, Number(options.issueCount) || 0) > 0;
+    return {
+      showSummary: !options.ready || hasIssues,
+      showPreflight: !options.ready,
+    };
+  }
+
   return {
     headerContexts,
+    headerStatusVisibility,
     semanticBatchItems,
     semanticBatchText,
   };

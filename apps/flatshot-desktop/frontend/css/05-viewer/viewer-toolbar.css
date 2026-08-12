@@ -48,7 +48,7 @@
   max-width: 100%;
   justify-content: flex-end;
   flex-wrap: nowrap;
-  column-gap: var(--space-8);
+  column-gap: var(--space-3);
   row-gap: var(--space-2);
 }
 
@@ -57,9 +57,48 @@
   max-width: 100%;
   justify-content: flex-end;
   flex-wrap: nowrap;
-  column-gap: var(--space-8);
+  column-gap: var(--space-3);
   row-gap: var(--space-2);
   background: transparent;
+}
+
+.viewer-options-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.viewer-options-menu > summary {
+  min-height: var(--control-size-slim);
+  display: inline-flex;
+  align-items: center;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-xs);
+  background: var(--color-bg-panel);
+  padding: 0 var(--space-3);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.viewer-options-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.viewer-options-popover {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: var(--z-popover);
+  min-width: 260px;
+  display: grid;
+  gap: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-panel);
+  padding: var(--space-3);
+  box-shadow: var(--shadow-popover);
 }
 
 .viewer-background-switch, .viewer-control-group {

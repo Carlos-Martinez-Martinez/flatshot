@@ -5,7 +5,6 @@ function renderDevelopmentStatus() {
   $("#dev-last-response").textContent = state.bridgeLastResponse;
   updatePreviewDebugPanel();
 }
-
 function updatePreviewDebugPanel() {
   const image = selectedImage();
   const previewImage = $("#preview-canvas .preview-image");
@@ -63,13 +62,14 @@ function renderTop() {
     outputName: activeOutputProfile()?.name,
     presetName: state.activePreset,
   });
+  const headerStatus = workbenchViewHelpers.headerStatusVisibility({ ready: isExportReady(), issueCount: counts.reviewIssues + counts.blockingErrors, processing: state.exportStatus === "running" });
   $("#bridge-url").value = state.bridgeUrl;
   $("#active-batch-label").textContent = "";
   const topStatus = $("#top-status-text");
   const topbarText = conciseTopbarStatusText();
   const topSummary = $(".top-summary");
   if (topSummary) {
-    topSummary.hidden = !topbarText;
+    topSummary.hidden = !topbarText || !headerStatus.showSummary;
   }
   topStatus.textContent = topbarText;
   topStatus.title = topbarText ? visible.subtitle || topbarText : "";
@@ -88,7 +88,7 @@ function renderTop() {
   if (preflight) {
     preflight.textContent = preflightStatusLabel();
     preflight.className = `preflight-chip ${preflightStatusClass()}`;
-    preflight.hidden = state.batch === "none" || state.batch === "scanning" || state.exportStatus === "running";
+    preflight.hidden = state.batch === "none" || state.batch === "scanning" || !headerStatus.showPreflight;
   }
   const workbenchContext = $("#top-workbench-context");
   if (workbenchContext) {

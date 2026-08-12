@@ -152,3 +152,16 @@ def test_dev_review_controls_are_hidden_outside_dev_mode():
     assert '<details class="review-panel dev-only">' not in html
     assert "html:not(.dev-mode) :is(" in debug_css
     assert ".dev-only" in debug_css
+    assert "html.dev-mode body .top-actions > :is(button.dev-only, details.debug-panel)" in debug_css
+
+
+def test_primary_view_chrome_uses_progressive_disclosure():
+    html = (FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
+
+    assert 'aria-label="Cambiar carpeta"' in html
+    assert 'aria-label="Configurar salida"' in html
+    assert '<details class="viewer-options-menu" id="viewer-options-menu">' in html
+    menu = html.split('<details class="viewer-options-menu" id="viewer-options-menu">', 1)[1].split("</details>", 1)[0]
+    assert '<summary aria-label="Opciones de vista">Vista</summary>' in menu
+    assert 'class="segmented compact viewer-background-switch background-switch"' in menu
+    assert 'class="viewer-control-group viewer-guides"' in menu

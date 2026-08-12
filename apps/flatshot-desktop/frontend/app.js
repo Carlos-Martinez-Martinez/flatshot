@@ -135,6 +135,7 @@ const state = {
   backgroundPresetEditor: null,
   outputProfileNotice: "",
   outputDeleteConfirmId: "",
+  outputProfileCloseConfirmOpen: false,
   activeOutputProfileId: initialEnabledOutputProfiles.length ? initialOutputProfile.id : "",
   outputProfileEditorId: initialOutputProfiles.length ? initialOutputProfile.id : "",
   outputProfileDraft: null,

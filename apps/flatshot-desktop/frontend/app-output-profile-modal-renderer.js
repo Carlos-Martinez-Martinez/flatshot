@@ -45,6 +45,9 @@ function renderOutputProfileModalState() {
   }
   const validation = outputProfileHelpers.outputProfileValidation(raw);
   const dirty = outputProfileHasUnsavedChanges();
+  if (!dirty) {
+    state.outputProfileCloseConfirmOpen = false;
+  }
   const heading = $("#output-profile-editor-heading");
   if (heading) {
     heading.innerHTML = outputProfileEditorHeadingHtml(profile, validation, dirty);
@@ -62,6 +65,18 @@ function renderOutputProfileModalState() {
   renderBackgroundPresetControls(raw);
   updateOutputProfileFooterState(validation, dirty);
   renderOutputProfileDeleteConfirm(profile);
+  renderOutputProfileCloseConfirm(dirty);
+}
+
+function renderOutputProfileCloseConfirm(dirty) {
+  const panel = $("#output-close-confirm");
+  if (!panel) {
+    return;
+  }
+  const isOpen = Boolean(dirty && state.outputProfileCloseConfirmOpen);
+  panel.hidden = !isOpen;
+  panel.setAttribute("aria-hidden", isOpen ? "false" : "true");
+  panel.closest(".app-settings-footer")?.classList.toggle("is-confirming-close", isOpen);
 }
 
 function updateOutputProfileFieldStates(validation, raw) {

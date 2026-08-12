@@ -1123,6 +1123,14 @@
           </div>
 
           <footer class="app-settings-footer">
+            <div class="output-delete-confirm output-close-confirm" id="output-close-confirm" hidden aria-live="polite">
+              <div class="output-delete-confirm-copy">
+                <strong>¿Descartar los cambios?</strong>
+                <small>Los cambios de esta salida no se guardarán.</small>
+              </div>
+              <button type="button" data-action="keep-editing-output-profile">Seguir editando</button>
+              <button type="button" class="danger" data-action="discard-output-profile-and-close">Descartar y cerrar</button>
+            </div>
             <div class="output-delete-confirm" id="output-delete-confirm" hidden aria-live="polite">
               <div class="output-delete-confirm-copy">
                 <strong id="output-delete-confirm-title">Eliminar salida</strong>

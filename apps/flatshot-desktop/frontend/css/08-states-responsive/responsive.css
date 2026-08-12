@@ -112,6 +112,10 @@
     display: none;
   }
 
+  .top-context-item__label {
+    display: none;
+  }
+
 }
 
 @media (max-width: 759px) {

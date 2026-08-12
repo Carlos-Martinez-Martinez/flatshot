@@ -302,7 +302,6 @@
   font-weight: var(--font-weight-bold);
   letter-spacing: var(--letter-spacing-caps);
   text-transform: uppercase;
-  display: none;
 }
 
 .top-context-item__value, .top-active-preset__value {

@@ -102,6 +102,18 @@ def test_topbar_active_preset_is_status_text_outside_action_group():
     assert "activePreset.replaceChildren" in topbar_js
 
 
+def test_desktop_work_context_keeps_folder_preset_and_output_labels_visible():
+    topbar_css = (FRONTEND_DIR / "css" / "02-layout" / "topbar.css").read_text(encoding="utf-8")
+    responsive_css = (FRONTEND_DIR / "css" / "08-states-responsive" / "responsive.css").read_text(encoding="utf-8")
+
+    label_rule = topbar_css.split(".top-context-item__label, .top-active-preset__label {", 1)[1].split("}", 1)[0]
+    compact = responsive_css.split("@media (max-width: 1119px) {", 1)[1].split("@media (max-width: 759px) {", 1)[0]
+
+    assert "display: none;" not in label_rule
+    assert ".top-context-item__label" in compact
+    assert "display: none;" in compact.split(".top-context-item__label", 1)[1].split("}", 1)[0]
+
+
 def test_topbar_export_status_actions_stay_in_header_row():
     topbar_css = (FRONTEND_DIR / "css" / "02-layout" / "topbar.css").read_text(encoding="utf-8")
     viewer_toolbar_css = (FRONTEND_DIR / "css" / "05-viewer" / "viewer-toolbar.css").read_text(encoding="utf-8")

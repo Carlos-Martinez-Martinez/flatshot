@@ -159,6 +159,16 @@
     return "square";
   }
 
+  function previewAspectRatio(previewData = {}, fallback = 0.75) {
+    const width = Number(previewData?.width);
+    const height = Number(previewData?.height);
+    const fallbackRatio = Number(fallback);
+    const ratio = width > 0 && height > 0 ? width / height : fallbackRatio;
+    return Number.isFinite(ratio) && ratio > 0
+      ? Math.min(2, Math.max(0.25, ratio))
+      : 0.75;
+  }
+
   function previewFooterLabel(options = {}) {
     const previewStatus = options.previewStatus;
     if (previewStatus === "loading") {
@@ -231,6 +241,7 @@
     previewImageStatusState,
     previewLoadingState,
     previewModeLabel,
+    previewAspectRatio,
     previewOrientation,
     previewSettingsLabel,
     previewSubtitle,

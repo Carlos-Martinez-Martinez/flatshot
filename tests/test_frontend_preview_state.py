@@ -135,6 +135,10 @@ assert.equal(helpers.previewOrientation(null), "portrait");
 assert.equal(helpers.previewOrientation({{ width: 1000, height: 1400 }}), "portrait");
 assert.equal(helpers.previewOrientation({{ width: 1400, height: 1000 }}), "landscape");
 assert.equal(helpers.previewOrientation({{ width: 1000, height: 1000 }}), "square");
+assert.equal(helpers.previewAspectRatio({{ width: 1800, height: 2400 }}), 0.75);
+assert.equal(helpers.previewAspectRatio({{ width: 2400, height: 1200 }}), 2);
+assert.equal(helpers.previewAspectRatio({{ width: 0, height: 2400 }}), 0.75);
+assert.equal(helpers.previewAspectRatio({{ width: "bad", height: 2400 }}), 0.75);
 
 assert.equal(helpers.previewFooterLabel({{ selectedImageSource: "bridge", previewStatus: "ready" }}), "Real");
 assert.equal(helpers.previewFooterLabel({{ selectedImageSource: "bridge", previewStatus: "empty" }}), "Pendiente");

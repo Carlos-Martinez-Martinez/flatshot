@@ -3,7 +3,7 @@
 
 @media (min-width: 1600px) {
   .workspace {
-    grid-template-columns: clamp(320px, 17vw, 360px) minmax(620px, 1fr) clamp(340px, 19vw, 400px);
+    grid-template-columns: minmax(420px, 1fr) minmax(760px, 920px) clamp(340px, 19vw, 400px);
   }
 }
 

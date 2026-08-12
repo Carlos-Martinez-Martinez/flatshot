@@ -88,14 +88,18 @@ def test_preview_rgb230_canvas_uses_real_light_background_color():
 
 def test_preview_background_and_guides_are_bounded_to_portrait_workspace():
     css = CANVAS_CSS_PATH.read_text(encoding="utf-8")
+    controller = (FRONTEND_DIR / "app-preview-controller.js").read_text(encoding="utf-8")
 
     canvas_rule = re.search(r"(?m)^\.preview-canvas\s*\{([^}]*)\}", css).group(1)
     guide_rule = css.split(".guide-overlay {", 1)[1].split("}", 1)[0]
 
-    assert "width: min(100%, 920px);" in canvas_rule
-    assert "width: min(100%, 920px);" in guide_rule
+    assert "aspect-ratio: var(--preview-aspect-ratio, 0.75);" in canvas_rule
+    assert "max-width: 920px;" in canvas_rule
+    assert "max-height: 100%;" in canvas_rule
+    assert "aspect-ratio: var(--preview-aspect-ratio, 0.75);" in guide_rule
     assert "left: 50%;" in guide_rule
-    assert "transform: translateX(-50%);" in guide_rule
+    assert "transform: translate(-50%, -50%);" in guide_rule
+    assert 'canvasArea.style.setProperty("--preview-aspect-ratio"' in controller
 
 
 def test_initial_canvas_uses_app_background_instead_of_preview_background():

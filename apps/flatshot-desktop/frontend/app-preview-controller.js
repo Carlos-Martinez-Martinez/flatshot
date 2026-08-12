@@ -45,6 +45,7 @@ function renderPreview() {
   const previewBackgroundColor = backgroundPresetHelpers.backgroundCssColor(state.previewBg, backgroundHelperOptions());
   const canvasArea = $("#canvas-area");
   canvasArea.className = `canvas-area bg-${previewBackgroundMode}`;
+  canvasArea.style.setProperty("--preview-aspect-ratio", String(previewStateHelpers.previewAspectRatio(state.previewData || image || {})));
   if (previewBackgroundColor) {
     canvasArea.style.setProperty("--custom-preview-bg", previewBackgroundColor);
   } else {

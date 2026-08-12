@@ -1314,7 +1314,8 @@ def test_desktop_workspace_uses_portrait_three_column_geometry():
     inspector_rule = re.search(r"(?m)^\.settings-panel\s*\{([^}]*)\}", inspector_css).group(1)
 
     assert "grid-template-rows: minmax(0, 1fr);" in workspace_rule
-    assert "clamp(300px, 17vw, 360px)" in workspace_rule
+    assert "minmax(360px, 1fr)" in workspace_rule
+    assert "minmax(720px, 920px)" in workspace_rule
     assert "clamp(320px, 19vw, 390px)" in workspace_rule
     assert "grid-column: 1;" in gallery_rule
     assert "grid-row: 1;" in gallery_rule
@@ -1331,12 +1332,24 @@ def test_portrait_workstation_breakpoints_keep_gallery_and_preview_reachable():
 
     tablet = responsive_css.split("@media (max-width: 1119px) {", 1)[1].split("@media (max-width: 759px) {", 1)[0]
     compact = responsive_css.split("@media (max-width: 759px) {", 1)[1]
+    wide = responsive_css.split("@media (min-width: 1600px) {", 1)[1].split("@media (max-width: 1599px) {", 1)[0]
 
+    assert "minmax(420px, 1fr) minmax(760px, 920px)" in wide
     assert "grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);" in tablet
     assert ".preview-panel" not in tablet or "grid-column: 2;" in tablet
     assert "grid-template-columns: minmax(0, 1fr);" in compact
     assert ".preview-panel" in compact and "grid-row: 1;" in compact
     assert ".gallery-column" in compact and "grid-row: 2;" in compact
+
+
+def test_wide_gallery_adds_thumbnail_columns_with_the_released_width():
+    image_grid_css = (
+        FRONTEND_DIR / "css" / "04-batch-gallery" / "image-grid.css"
+    ).read_text(encoding="utf-8")
+    wide = image_grid_css.split("@media (min-width: 1600px) {", 1)[1]
+
+    assert '.gallery-column[data-gallery-view="thumbs"] .image-list' in wide
+    assert "repeat(auto-fit, minmax(132px, 1fr))" in wide
 
 
 def test_medium_desktop_gives_the_preview_toolbar_the_full_header_width():

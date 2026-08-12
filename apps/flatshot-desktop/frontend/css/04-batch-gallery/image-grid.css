@@ -460,6 +460,12 @@
   transition: opacity var(--duration-quick) var(--ease-standard);
 }
 
+@media (min-width: 1600px) {
+  .gallery-column[data-gallery-view="thumbs"] .image-list {
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  }
+}
+
 .app-shell[data-file-name-display="hover"] .gallery-column[data-gallery-view="thumbs"] .image-item:is(:hover, :focus-visible, .active) .image-copy {
   opacity: 1;
 }

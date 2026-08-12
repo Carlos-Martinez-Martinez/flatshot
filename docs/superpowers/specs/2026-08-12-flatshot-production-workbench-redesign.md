@@ -2,7 +2,7 @@
 
 **Fecha:** 2026-08-12
 
-**Estado:** Diseño aprobado para implementación
+**Estado:** Corrección de composición aprobada para implementación
 
 **Superficie:** `apps/flatshot-desktop/frontend`
 
@@ -15,6 +15,34 @@ operativa. El rediseño debe hacer evidente el estado del lote, aumentar el
 aprovechamiento del visor y concentrar cada tarea sin cambiar el procesamiento
 de imagen, la configuración persistida ni el comportamiento de los archivos
 exportados.
+
+## Corrección aprobada tras validación en la aplicación real
+
+La captura maximizada de producción mostró tres defectos que invalidan la
+composición C original:
+
+- el visor absorbía todo el ancho libre aunque las imágenes habituales son
+  verticales;
+- la fila inferior no garantizaba la altura completa de miniaturas y texto;
+- cabecera, barra del visor, galería e inspector mostraban contexto repetido.
+
+La interfaz pasa a una **estación vertical de producto**:
+
+1. galería estrecha y desplazable a la izquierda;
+2. visor central contenido, dimensionado por la altura útil y no por todo el
+   ancho disponible;
+3. inspector compacto a la derecha;
+4. cabecera reducida a contexto esencial y acción de proceso;
+5. ausencia de galería inferior en escritorio.
+
+La galería conserva filtros, búsqueda, selección y todos los estados, pero los
+controles secundarios usan revelado progresivo. Las miniaturas nunca se
+recortan verticalmente: el panel desplaza la lista completa en su propio eje.
+
+El visor no modifica la preview ni su relación de aspecto. Solo limita la
+superficie que la contiene para que un producto vertical ocupe una proporción
+útil del monitor. Los laterales recuperados se destinan a navegación del lote
+y ajustes, no a fondo vacío.
 
 ## Invariantes
 
@@ -35,7 +63,7 @@ exportados.
 ## Dirección de producto y composición
 
 La interfaz se concibe como una **mesa de luz operativa**. El trabajo visual
-ocupa el centro; las miniaturas forman una tira horizontal inferior; un único
+ocupa el centro; las miniaturas forman un rail vertical izquierdo; un único
 inspector contextual presenta solo la tarea activa. La cabecera concentra el
 contexto estable y la acción principal. El proceso de exportación sustituye el
 pie normal por una barra de trabajo única.
@@ -43,9 +71,9 @@ pie normal por una barra de trabajo única.
 La composición principal en 2048 × 1152 es:
 
 1. Cabecera operativa compacta.
-2. Visor amplio con herramientas anexas y salida visible identificada.
-3. Inspector contextual derecho.
-4. Filmstrip inferior con filtros, búsqueda y selector de salida.
+2. Rail izquierdo del lote con miniaturas completas.
+3. Visor vertical contenido con herramientas esenciales.
+4. Inspector contextual derecho.
 5. Barra de proceso temporal, visible solo durante trabajos activos o recién
    terminados.
 
@@ -93,10 +121,9 @@ menú de preferencias o después de crear el lote. Los mensajes distinguen:
 
 ## Visor
 
-El visor recibe todo el espacio disponible entre cabecera, filmstrip e
-inspector. La imagen se escala dentro de esa área respetando la relación de
-aspecto y los modos actuales `Alto` y `Ancho`; no se altera el render de la
-preview.
+El visor recibe una columna central limitada entre rail e inspector. La imagen
+se escala dentro de esa área respetando la relación de aspecto y los modos
+actuales `Alto` y `Ancho`; no se altera el render de la preview.
 
 La barra del visor se divide en grupos estables:
 
@@ -111,16 +138,16 @@ franja informativa fija asociada al visor: nombre, formato, dimensiones y
 fondo. Los mensajes transitorios quedan reservados para carga, fallback,
 errores y confirmaciones breves.
 
-## Filmstrip del lote
+## Rail del lote
 
-La galería vertical permanente se sustituye en escritorio por una tira
-horizontal inferior. Su cabecera contiene:
+La galería se presenta en escritorio como un rail vertical estrecho. Su
+cabecera contiene:
 
 - `Lote` y el resumen semántico;
 - selector `Salida visible`;
 - búsqueda;
 - filtros `Todas`, `Listas`, `Avisos` y `Excluidas`;
-- alternancia entre `Tira` y `Lista`.
+- alternancia entre `Miniaturas` y `Lista`.
 
 Las miniaturas mantienen selección, multiselección, override local, aviso,
 error, dimensiones y nombre. La lista ampliada del lote reutiliza el detalle
@@ -154,13 +181,13 @@ servicios actuales. Sus contextos son:
 - nombre, estado y origen del ajuste;
 - acción `Personalizar imagen` o `Usar ajuste del lote`;
 - overrides locales existentes;
-- navegación entre imágenes mediante los controles del visor y el filmstrip.
+- navegación entre imágenes mediante los controles del visor y el rail.
 
 ### Revisión
 
 - resumen separado de avisos y exclusiones;
 - lista de incidencias con `Ir a imagen`;
-- filtro del filmstrip sincronizado con la categoría activa;
+- filtro del rail sincronizado con la categoría activa;
 - explicación explícita de qué se exportará y qué quedará fuera.
 
 No se introducen nuevas acciones de aprobación, corrección automática o
@@ -180,7 +207,7 @@ estado transitorio al modificar valores.
 
 ## Revisión y confirmación de exportación
 
-`Revisar incidencias` activa el contexto de revisión, filtra el filmstrip y
+`Revisar incidencias` activa el contexto de revisión, filtra el rail y
 selecciona la primera imagen afectada. El resumen usa categorías separadas y no
 afirma que una exclusión sea un aviso no bloqueante.
 
@@ -232,11 +259,11 @@ barra de progreso decorativa.
 
 ## Adaptación
 
-- **≥ 1600 px:** visor, inspector derecho y filmstrip inferior completos.
-- **1120–1599 px:** inspector más estrecho y filmstrip de menor altura; las
+- **≥ 1600 px:** rail izquierdo, visor central e inspector derecho completos.
+- **1120–1599 px:** rail e inspector más estrechos; las
   herramientas menos frecuentes pasan a menús existentes.
-- **760–1119 px:** inspector se abre como panel lateral; el filmstrip conserva
-  una fila horizontal.
+- **760–1119 px:** inspector se abre como panel lateral y la galería conserva
+  acceso vertical.
 - **< 760 px:** composición apilada para contingencia, no como uso principal;
   la acción de proceso y el estado permanecen siempre accesibles.
 
@@ -245,15 +272,14 @@ proceso.
 
 ## Dirección visual aprobada
 
-Se adopta la composición C, guardada en
-`.impeccable/mocks/flatshot-workbench-c.png`: sin rail izquierdo, visor
-dominante, filmstrip inferior e inspector contextual derecho. La referencia se
-usa para jerarquía y composición; la implementación conserva los componentes,
-tokens y controles reales de FlatShot.
+La composición C queda reemplazada por la estación vertical aprobada tras la
+captura real: rail izquierdo, visor central contenido e inspector derecho. La
+referencia anterior se conserva únicamente como evidencia histórica; no es la
+fuente de verdad del layout final.
 
 ## Accesibilidad
 
-- Orden de tabulación: cabecera, visor, filmstrip, inspector y barra de proceso.
+- Orden de tabulación: cabecera, rail, visor, inspector y barra de proceso.
 - Los modales conservan captura y restauración de foco.
 - Estados y categorías usan texto e icono además del color.
 - El progreso expone etiqueta, máximo, valor actual y estado textual.
@@ -293,7 +319,7 @@ componentes visuales.
 La implementación se realizará con pruebas de contrato escritas antes de cada
 cambio de comportamiento. La aceptación requiere:
 
-1. Tests de estructura para cabecera, visor, filmstrip, inspector y barra de
+1. Tests de estructura para cabecera, visor, rail, inspector y barra de
    proceso.
 2. Tests de resumen que diferencien listas, avisos, exclusiones y overrides.
 3. Tests de estados `ready`, revisión, confirmación, procesamiento, pausa,

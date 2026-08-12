@@ -5,6 +5,26 @@
   display: none;
 }
 
+.inspector-empty-state {
+  min-height: 88px;
+  align-content: center;
+  gap: var(--space-1);
+  border-color: var(--color-border);
+  background: var(--color-bg-soft);
+  padding: var(--space-4);
+}
+
+.inspector-empty-state strong {
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+}
+
+.inspector-empty-state span {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
 .issue-item span {
   color: var(--text-muted);
 }
@@ -167,7 +187,7 @@
   padding: var(--space-3);
 }
 
-.issue-list-summary--compact span {
+.issue-list-summary--compact:not(.inspector-empty-state) span {
   display: none;
 }
 

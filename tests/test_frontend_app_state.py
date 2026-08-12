@@ -28,7 +28,7 @@ def test_app_state_helper_loads_before_mock_data_and_app():
 def test_state_stores_es_module_is_loaded_without_replacing_classic_boot_contract():
     html = INDEX_PATH.read_text(encoding="utf-8")
 
-    module_marker = '<script src="./state-stores.mjs?v=20260812-gallery-density" type="module"></script>'
+    module_marker = '<script src="./state-stores.mjs?v=20260812-inspector-coherence-v2" type="module"></script>'
 
     assert STORE_ES_MODULE_PATH.exists()
     assert module_marker in html

@@ -138,10 +138,10 @@ const selectedCard = helpers.selectedImageInspectorCardHtml({{
   detail: 'Detalle "x"',
   hasLocal: true,
 }});
-assert.equal(selectedCard.includes("Imagen seleccionada"), true);
+assert.equal(selectedCard.includes("<h2>Imagen</h2>"), true);
 assert.equal(selectedCard.includes("camisa &lt;azul&gt;.png"), true);
 assert.equal(selectedCard.includes("Detalle &quot;x&quot;"), true);
-assert.equal(selectedCard.includes("Ajuste personalizado"), true);
+assert.equal(selectedCard.includes("Personalizada"), true);
 assert.equal(selectedCard.includes('data-action="open-image-adjustment"'), true);
 assert.equal(selectedCard.includes('data-action="reset-local-adjustment"'), true);
 assert.equal(selectedCard.includes("Restablecer"), true);

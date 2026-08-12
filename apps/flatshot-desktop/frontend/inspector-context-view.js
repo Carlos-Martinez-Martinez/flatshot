@@ -14,15 +14,17 @@
     const manageAction = options.showManageAction
       ? '<button type="button" data-action="open-preset-editor">Gestionar ajustes</button>'
       : "";
+    const backAction = options.showBackAction
+      ? `<button type="button" data-action="${escapeHtml(options.backAction || "close-inspector-subview")}">${escapeHtml(options.backLabel || "Volver")}</button>`
+      : "";
     return `
-    <section class="inspector-subview-head">
-      <div>
-        <span>${escapeHtml(options.title || "Detalle")}</span>
+    <section class="inspector-pane-head">
+      <div class="inspector-pane-head__copy">
+        <h2>${escapeHtml(options.title || "Detalle")}</h2>
         <strong>${escapeHtml(options.subtitle || "")}</strong>
         ${detail ? `<small>${escapeHtml(detail)}</small>` : ""}
       </div>
-      ${manageAction}
-      <button type="button" data-action="${escapeHtml(options.backAction || "close-inspector-subview")}">${escapeHtml(options.backLabel || "Volver")}</button>
+      ${manageAction || backAction ? `<div class="inspector-pane-head__actions">${manageAction}${backAction}</div>` : ""}
     </section>
   `;
   }
@@ -48,16 +50,24 @@
     const mode = options.mode || "summary";
     const isPresetManager = mode === "advanced" && Boolean(options.presetEditorOpen);
     const warningCount = Number(options.warningCount) || 0;
+    const ignoredCount = Number(options.ignoredCount) || 0;
     const labels = {
-      output: ["Exportación", options.outputEditMode ? "Editar salida" : options.outputLabel],
+      output: options.outputEditMode
+        ? ["Editar salida", options.outputLabel, "Los cambios afectan solo a esta salida."]
+        : ["Exportación", options.outputLabel, "Salidas y destino del lote"],
       advanced: [
-        isPresetManager ? "Gestionar ajustes" : "Editar ajuste",
+        isPresetManager ? "Gestionar ajustes" : "Aspecto",
         options.activePreset,
         options.presetSourceLabel,
       ],
       warnings: [
-        "Revisar",
-        warningCount ? `${warningCount} punto${warningCount === 1 ? "" : "s"}` : "Sin avisos",
+        "Avisos",
+        warningCount ? `${warningCount} por revisar` : "Todo listo",
+        warningCount
+          ? "No bloquean la exportación"
+          : ignoredCount
+            ? `${ignoredCount} archivo${ignoredCount === 1 ? "" : "s"} ignorado${ignoredCount === 1 ? "" : "s"}`
+            : "Sin incidencias",
       ],
     };
     const [title, subtitle, detail = ""] = labels[mode] || ["Detalle", ""];
@@ -72,6 +82,7 @@
           : "close-inspector-subview",
       backLabel: options.outputEditMode ? "Cancelar" : "Volver",
       showManageAction: mode === "advanced" && !isPresetManager,
+      showBackAction: Boolean(options.outputEditMode || isPresetManager),
     };
   }
 

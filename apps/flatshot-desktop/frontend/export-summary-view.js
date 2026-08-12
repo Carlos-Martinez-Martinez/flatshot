@@ -125,17 +125,26 @@
       </div>
     `;
     return `
-    <div class="preset-summary-card${hasMultipleOutputs ? " preset-summary-card--multi" : ""}">
-      <div class="preset-summary-main">
-        <span>${escapeHtml(hasMultipleOutputs ? "Salidas" : "Salida")}</span>
-        <strong>${escapeHtml(hasMultipleOutputs ? `${activeOutputCount} activas` : options.displayName || "")}</strong>
-        <small>${escapeHtml(hasMultipleOutputs ? `${outputCount} archivos previstos` : options.presetSummary || "")}</small>
+    <section class="inspector-content-group">
+      <header class="inspector-content-group__head">
+        <div>
+          <strong>${escapeHtml(hasMultipleOutputs ? "Salidas" : "Salida")}</strong>
+          <small>${escapeHtml(hasMultipleOutputs ? `${outputCount} archivos previstos` : options.presetSummary || "")}</small>
+        </div>
+        <span class="inspector-status-chip">${escapeHtml(hasMultipleOutputs ? `${activeOutputCount} activas` : options.displayName || "")}</span>
+      </header>
+      <div class="preset-summary-card${hasMultipleOutputs ? " preset-summary-card--multi" : ""}">
+        <span class="visually-hidden">${escapeHtml(hasMultipleOutputs ? "Salidas" : "Salida")}</span>
+        <div class="preset-summary-main visually-hidden">
+          <strong>${escapeHtml(hasMultipleOutputs ? `${activeOutputCount} activas` : options.displayName || "")}</strong>
+          <small>${escapeHtml(hasMultipleOutputs ? `${outputCount} archivos previstos` : options.presetSummary || "")}</small>
+        </div>
+        ${hasMultipleOutputs ? `<div class="preset-summary-outputs">${profileSummaryRowsHtml(profileRows, activeOutputCount)}</div>` : singleOutputRowsHtml}
       </div>
-      ${hasMultipleOutputs ? `<div class="preset-summary-outputs">${profileSummaryRowsHtml(profileRows, activeOutputCount)}</div>` : singleOutputRowsHtml}
-    </div>
+      ${exportPresetActionsHtml()}
+    </section>
     ${warningSummaryHtml}
     ${temporaryNoticeHtml}
-    ${exportPresetActionsHtml()}
   `;
   }
 

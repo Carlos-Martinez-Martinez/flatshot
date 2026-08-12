@@ -30,6 +30,7 @@ def test_workbench_shell_prioritizes_portrait_preview_vertical_gallery_and_conte
     assert "grid-template-rows: minmax(0, 1fr);" in shell_css
     assert "grid-auto-flow: row;" in gallery_css
     assert 'data-inspector-tab="review">Imagen</button>' in html
+    assert 'data-inspector-tab="warnings">Avisos</button>' in html
     assert 'data-inspector-tab="advanced">Aspecto</button>' in html
     assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in inspector_css
     assert 'inspectorTab: "advanced"' in app

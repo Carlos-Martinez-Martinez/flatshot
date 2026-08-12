@@ -80,18 +80,13 @@
   border-color: var(--border-emphasis);
 }
 
-.inspector-card__head, .inspector-subview-head {
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-}
-
-.inspector-card__head span, .inspector-subview-head span {
+.inspector-card__head span {
   color: var(--text-muted);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
 }
 
-.inspector-card__head strong, .inspector-subview-head strong {
+.inspector-card__head strong {
   min-width: 0;
   overflow: hidden;
   color: var(--text-primary);
@@ -108,10 +103,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--font-size-sm);
-}
-
-.inspector-subview-head button {
-  min-height: var(--control-height);
 }
 
 .settings-panel:not(.is-inspector-subview) [data-inspector-section] {

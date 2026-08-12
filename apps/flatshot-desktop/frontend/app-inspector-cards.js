@@ -127,6 +127,7 @@ function inspectorSubviewHeaderHtml(mode) {
       presetEditorOpen: state.presetEditorOpen,
       presetSourceLabel: presetSourceLabel(),
       warningCount: actionableIssueRows().length,
+      ignoredCount: ignoredOmissions().length,
     })
   );
 }

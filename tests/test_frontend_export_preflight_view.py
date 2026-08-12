@@ -140,6 +140,8 @@ const readyHtml = helpers.issueListHtml({{
   warningCount: 0,
 }});
 assert.equal(readyHtml.includes("Sin avisos"), true);
+assert.equal(readyHtml.includes("Todo listo para exportar"), true);
+assert.equal(readyHtml.includes("inspector-empty-state"), true);
 assert.equal(readyHtml.includes("issue-list-summary ready"), true);
 
 const warningHtml = helpers.issueListHtml({{

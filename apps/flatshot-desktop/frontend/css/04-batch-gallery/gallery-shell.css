@@ -369,7 +369,7 @@
 .gallery-output-control select {
   width: 100%;
   min-width: 0;
-  min-height: var(--control-size-lg);
+  min-height: var(--control-height);
   border-color: var(--rail-border);
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--rail-bg) 82%, var(--color-primary) 18%);
@@ -487,9 +487,16 @@
   border-radius: var(--radius-sm);
   padding: 0 var(--space-3);
   border-color: var(--rail-border);
-  min-height: var(--control-size-lg);
+  min-height: var(--control-height);
   background: color-mix(in srgb, var(--rail-bg) 82%, var(--color-primary) 18%);
   min-width: 0;
+}
+
+@media (min-width: 1600px) {
+  .gallery-toolbar__fields {
+    grid-template-columns: minmax(220px, 360px) minmax(200px, 280px);
+    justify-content: start;
+  }
 }
 
 }

@@ -18,6 +18,7 @@ APP_THUMBNAIL_CONTROLLER_PATH = FRONTEND_DIR / "app-thumbnail-controller.js"
 APP_JS_PATH = FRONTEND_DIR / "app.js"
 APP_EXPORT_VIEW_PATH = FRONTEND_DIR / "app-export-view.js"
 GALLERY_CSS_PATH = FRONTEND_DIR / "css" / "04-batch-gallery" / "image-grid.css"
+GALLERY_SHELL_CSS_PATH = FRONTEND_DIR / "css" / "04-batch-gallery" / "gallery-shell.css"
 THUMBNAILS_CSS_PATH = FRONTEND_DIR / "css" / "04-batch-gallery" / "thumbnails.css"
 
 
@@ -50,6 +51,23 @@ def test_gallery_thumbnail_view_keeps_file_metadata_visible():
     assert '.gallery-column[data-gallery-view="thumbs"] .image-copy small' in css
     assert '.gallery-column[data-gallery-view="thumbs"] .image-copy small {\n  display: none;' not in css
     assert '.gallery-column[data-gallery-view="thumbs"] .image-copy small, .gallery-filter[hidden]' not in css
+
+
+def test_gallery_list_and_toolbar_use_available_desktop_width_compactly():
+    grid_css = GALLERY_CSS_PATH.read_text(encoding="utf-8")
+    shell_css = GALLERY_SHELL_CSS_PATH.read_text(encoding="utf-8")
+
+    list_rule = grid_css.split('.gallery-column[data-gallery-view="list"] .image-list {', 1)[1].split("}", 1)[0]
+    wide_shell_css = shell_css.rsplit("@media (min-width: 1600px) {", 1)[1]
+    fields_rule = wide_shell_css.split(".gallery-toolbar__fields {", 1)[1].split("}", 1)[0]
+    output_rule = shell_css.split(".gallery-output-control select {", 1)[1].split("}", 1)[0]
+    search_rule = shell_css.rsplit(".batch-search__box {", 1)[1].split("}", 1)[0]
+
+    assert "repeat(auto-fit, minmax(280px, 1fr))" in list_rule
+    assert "grid-template-columns: minmax(220px, 360px) minmax(200px, 280px);" in fields_rule
+    assert "justify-content: start;" in fields_rule
+    assert "min-height: var(--control-height);" in output_rule
+    assert "min-height: var(--control-height);" in search_rule
 
 
 def test_gallery_rgb230_thumbnail_background_uses_resolved_output_color():
@@ -183,6 +201,10 @@ assert.deepEqual(helpers.virtualGalleryWindow({{
   paddingTop: 0,
   paddingBottom: 0,
 }});
+
+assert.equal(helpers.galleryColumnCount({{ view: "list", width: 720 }}), 2);
+assert.equal(helpers.galleryColumnCount({{ view: "list", width: 560 }}), 1);
+assert.equal(helpers.galleryColumnCount({{ view: "thumbs", width: 720 }}), 4);
 assert.deepEqual(helpers.virtualGalleryWindow({{
   total: 240,
   scrollTop: 360,

@@ -201,9 +201,10 @@ function galleryVirtualWindow(images = []) {
   const scrollTop = Number.isFinite(state.galleryScrollTop)
     ? state.galleryScrollTop
     : imageList?.scrollTop || 0;
-  const columns = state.galleryView === "list"
-    ? 1
-    : Math.max(1, Math.floor(((imageList?.clientWidth || 0) + 12) / 168));
+  const columns = galleryHelpers.galleryColumnCount({
+    view: state.galleryView,
+    width: imageList?.clientWidth || 0,
+  });
   return galleryHelpers.virtualGalleryWindow({
     total: images.length,
     scrollTop,

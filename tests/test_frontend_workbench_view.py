@@ -25,7 +25,8 @@ def test_workbench_shell_prioritizes_portrait_preview_vertical_gallery_and_conte
     responsive_css = (FRONTEND_DIR / "css" / "08-states-responsive" / "responsive.css").read_text(encoding="utf-8")
     app = (FRONTEND_DIR / "app.js").read_text(encoding="utf-8")
 
-    assert "grid-template-columns: clamp(300px, 17vw, 360px) minmax(560px, 1fr) clamp(320px, 19vw, 390px);" in shell_css
+    assert "grid-template-columns: minmax(360px, 1fr) minmax(720px, 920px) clamp(320px, 19vw, 390px);" in shell_css
+    assert "grid-template-columns: minmax(420px, 1fr) minmax(760px, 920px) clamp(340px, 19vw, 400px);" in responsive_css
     assert "grid-template-rows: minmax(0, 1fr);" in shell_css
     assert "grid-auto-flow: row;" in gallery_css
     assert 'data-inspector-tab="review">Imagen</button>' in html

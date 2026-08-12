@@ -169,6 +169,21 @@
       : 0.75;
   }
 
+  function previewCanvasGeometry(options = {}) {
+    const containerWidth = Number(options.containerWidth || 0);
+    const containerHeight = Number(options.containerHeight || 0);
+    const aspectRatio = Number(options.aspectRatio || 0);
+    const maxWidth = Number(options.maxWidth || 920);
+    if (!containerWidth || !containerHeight || !aspectRatio || !maxWidth) {
+      return { width: 0, height: 0 };
+    }
+    const width = Math.min(containerWidth, maxWidth, containerHeight * aspectRatio);
+    return {
+      width: Math.max(1, Math.round(width)),
+      height: Math.max(1, Math.round(width / aspectRatio)),
+    };
+  }
+
   function previewFooterLabel(options = {}) {
     const previewStatus = options.previewStatus;
     if (previewStatus === "loading") {
@@ -242,6 +257,7 @@
     previewLoadingState,
     previewModeLabel,
     previewAspectRatio,
+    previewCanvasGeometry,
     previewOrientation,
     previewSettingsLabel,
     previewSubtitle,

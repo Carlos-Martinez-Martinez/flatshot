@@ -49,8 +49,8 @@
   z-index: 1;
   min-width: 0;
   min-height: 0;
-  width: 100%;
-  height: auto;
+  width: var(--preview-canvas-width, min(100%, 920px));
+  height: var(--preview-canvas-height, 100%);
   max-width: 920px;
   max-height: 100%;
   aspect-ratio: var(--preview-aspect-ratio, 0.75);
@@ -219,7 +219,7 @@
   background: linear-gradient(180deg, var(--color-mock-body-original-start), var(--color-mock-body-original-end));
 }
 
-.guide-overlay { position: absolute; top: 50%; left: 50%; z-index: 2; width: 100%; height: auto; max-width: 920px; max-height: 100%; aspect-ratio: var(--preview-aspect-ratio, 0.75); overflow: hidden; pointer-events: none; transform: translate(-50%, -50%); }
+.guide-overlay { position: absolute; top: 50%; left: 50%; z-index: 2; width: var(--preview-canvas-width, min(100%, 920px)); height: var(--preview-canvas-height, 100%); max-width: 920px; max-height: 100%; overflow: hidden; pointer-events: none; transform: translate(-50%, -50%); }
 .guide-line { position: absolute; background: var(--guide-color); opacity: var(--guide-opacity); }
 .guide-line--x { top: 0; bottom: 0; left: calc(var(--guide-position) * 100%); width: var(--guide-thickness); transform: translateX(-50%); }
 .guide-line--y { right: 0; left: 0; top: calc(var(--guide-position) * 100%); height: var(--guide-thickness); transform: translateY(-50%); }

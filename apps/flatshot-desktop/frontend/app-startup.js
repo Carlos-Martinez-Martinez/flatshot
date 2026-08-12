@@ -1,10 +1,13 @@
 function initViewerResizeObserver() {
-  const canvas = $("#preview-canvas");
-  if (!canvas || !("ResizeObserver" in window)) {
+  const canvasArea = $("#canvas-area");
+  if (!canvasArea || !("ResizeObserver" in window)) {
     return;
   }
-  viewerResizeObserver = new ResizeObserver(() => updateFitZoomReadout());
-  viewerResizeObserver.observe(canvas);
+  viewerResizeObserver = new ResizeObserver(() => {
+    syncPreviewWorkspaceGeometry();
+    updateFitZoomReadout();
+  });
+  viewerResizeObserver.observe(canvasArea);
 }
 
 function markFlatShotBootReady() {

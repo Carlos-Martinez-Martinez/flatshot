@@ -3,6 +3,7 @@
 The primary screenshots use the detected monitor resolution of **2048 x 1152** with a maximized-equivalent viewport:
 
 - `flatshot-portrait-workstation-2048x1152.png`: corrected portrait workstation with the complete vertical gallery, bounded preview canvas and compact inspector.
+- `flatshot-viewer-clarity-2048x1152.png`: final viewer check with a true 3:4 canvas, direct background/guide controls and explicit folder, preset and output context.
 - `flatshot-workbench-2048x1152.png`: ready batch and default Aspecto inspector.
 - `flatshot-empty-2048x1152.png`: neutral first-run state.
 - `flatshot-processing-2048x1152.png`: single bottom processing bar.

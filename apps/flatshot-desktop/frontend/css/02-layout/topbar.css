@@ -267,8 +267,9 @@
 .top-workbench-context {
   grid-column: 2;
   min-width: 0;
+  max-width: min(560px, 100%);
   display: grid;
-  grid-template-columns: repeat(3, minmax(90px, max-content));
+  grid-template-columns: minmax(108px, max-content) minmax(132px, max-content) minmax(120px, max-content);
   justify-content: start;
   justify-self: start;
   align-items: center;
@@ -283,12 +284,12 @@
   min-height: var(--control-height);
   display: grid;
   align-content: center;
-  gap: 1px;
+  gap: var(--space-0-5);
   border: 0;
   border-right: var(--border-width) solid var(--color-border);
   border-radius: 0;
   background: transparent;
-  padding: 0 var(--space-3);
+  padding: 0 var(--space-4);
   text-align: left;
 }
 
@@ -306,6 +307,7 @@
 
 .top-context-item__value, .top-active-preset__value {
   min-width: 0;
+  max-width: 180px;
   overflow: hidden;
   color: var(--color-text);
   text-overflow: ellipsis;

@@ -434,9 +434,11 @@ def test_initial_onboarding_card_uses_deliberate_stable_layout_styles():
     actions_rule = css.split(".empty-state.onboarding.initial-onboarding .empty-state__actions {", 1)[1].split("}", 1)[0]
     action_button_rule = css.split(".empty-state.onboarding.initial-onboarding .empty-state__actions button {", 1)[1].split("}", 1)[0]
 
-    assert "width: min(680px, calc(100% - var(--modal-viewport-gutter)));" in card_rule
+    assert "width: min(560px, calc(100% - var(--modal-viewport-gutter)));" in card_rule
+    assert "min-height: 0;" in card_rule
     assert "z-index: 3;" in card_rule
-    assert "gap: var(--space-4);" in card_rule
+    assert "gap: var(--space-3);" in card_rule
+    assert "padding: var(--space-5);" in card_rule
     assert "width: auto;" in actions_rule
     assert "display: inline-flex;" in actions_rule
     assert "min-width: 170px;" in action_button_rule

@@ -2,10 +2,14 @@
 /* Viewer: loading, placeholder, warning and footer states. */
 
 .preview-state {
+  width: min(320px, calc(100% - var(--modal-viewport-gutter)));
   display: grid;
   place-items: center;
   gap: var(--space-2);
-  max-width: 280px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--surface-panel);
+  padding: var(--space-4);
   text-align: center;
   color: var(--text-secondary);
 }
@@ -108,9 +112,20 @@
 }
 
 .scanning-state {
-  border: 0;
-  background: transparent;
+  width: min(360px, calc(100% - var(--modal-viewport-gutter)));
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--surface-panel);
+  padding: var(--space-5);
   box-shadow: none;
+}
+
+.scanning-state strong {
+  color: var(--text-primary);
+}
+
+.scanning-state > span:last-child {
+  color: var(--text-secondary);
 }
 
 input, textarea, select, .real-preview-placeholder .path-line, .result-path strong {

@@ -114,6 +114,20 @@ def test_desktop_work_context_keeps_folder_preset_and_output_labels_visible():
     assert "display: none;" in compact.split(".top-context-item__label", 1)[1].split("}", 1)[0]
 
 
+def test_desktop_work_context_separates_values_and_truncates_safely():
+    topbar_css = (FRONTEND_DIR / "css" / "02-layout" / "topbar.css").read_text(encoding="utf-8")
+
+    context_rule = topbar_css.split("\n.top-workbench-context {", 1)[1].split("}", 1)[0]
+    item_rule = topbar_css.split("\n.top-context-item {", 1)[1].split("}", 1)[0]
+    value_rule = topbar_css.split(".top-context-item__value, .top-active-preset__value {", 1)[1].split("}", 1)[0]
+
+    assert "grid-template-columns: minmax(108px, max-content) minmax(132px, max-content) minmax(120px, max-content);" in context_rule
+    assert "max-width: min(560px, 100%);" in context_rule
+    assert "gap: var(--space-0-5);" in item_rule
+    assert "padding: 0 var(--space-4);" in item_rule
+    assert "max-width: 180px;" in value_rule
+
+
 def test_topbar_export_status_actions_stay_in_header_row():
     topbar_css = (FRONTEND_DIR / "css" / "02-layout" / "topbar.css").read_text(encoding="utf-8")
     viewer_toolbar_css = (FRONTEND_DIR / "css" / "05-viewer" / "viewer-toolbar.css").read_text(encoding="utf-8")

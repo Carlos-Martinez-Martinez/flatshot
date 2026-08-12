@@ -55,9 +55,9 @@
 .empty-state.batch-empty .empty-icon svg { stroke: var(--color-warning); }
 
 .empty-state.onboarding.initial-onboarding {
-  position: relative; z-index: 3; width: min(680px, calc(100% - var(--modal-viewport-gutter))); max-width: min(680px, calc(100% - var(--modal-viewport-gutter)));
-  gap: var(--space-4); border-color: var(--border-subtle); background: var(--surface-panel);
-  padding: var(--space-5) var(--space-8); box-shadow: none;
+  position: relative; z-index: 3; width: min(560px, calc(100% - var(--modal-viewport-gutter))); max-width: min(560px, calc(100% - var(--modal-viewport-gutter))); min-height: 0;
+  gap: var(--space-3); border-color: var(--border-subtle); background: var(--surface-panel);
+  padding: var(--space-5); box-shadow: none;
 }
 .app-shell.is-preferences-open .empty-state.onboarding.initial-onboarding { visibility: hidden; pointer-events: none; }
 .empty-state.onboarding.initial-onboarding.is-drop-active { border-color: var(--color-accent-border); background: var(--surface-alpha-96); box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 12%, transparent), var(--shadow-sm); }

@@ -58,6 +58,11 @@ function thumbnailStats() {
 function renderTop() {
   const visible = getVisibleAppState();
   const counts = batchCounts();
+  const contexts = workbenchViewHelpers.headerContexts({
+    folderPath: sourceFoldersForDisplay()[0]?.path || state.bridgeScanPath,
+    outputName: activeOutputProfile()?.name,
+    presetName: state.activePreset,
+  });
   $("#bridge-url").value = state.bridgeUrl;
   $("#active-batch-label").textContent = "";
   const topStatus = $("#top-status-text");
@@ -83,15 +88,24 @@ function renderTop() {
   if (preflight) {
     preflight.textContent = preflightStatusLabel();
     preflight.className = `preflight-chip ${preflightStatusClass()}`;
+    preflight.hidden = state.batch === "none" || state.batch === "scanning" || state.exportStatus === "running";
+  }
+  const workbenchContext = $("#top-workbench-context");
+  if (workbenchContext) {
+    workbenchContext.hidden = state.batch === "none" || state.batch === "scanning" || state.exportStatus === "running";
   }
   const secondary = $("#top-secondary-action");
   if (secondary) {
     const action = visible.secondaryAction;
-    secondary.hidden = !action;
+    secondary.hidden = !action || state.exportStatus === "running";
     secondary.disabled = !action?.enabled;
     secondary.textContent = action?.label || "";
     secondary.dataset.stateAction = action?.action || "";
     secondary.title = action?.label || "";
+  }
+  const topPrimary = $("#top-primary-action");
+  if (topPrimary) {
+    topPrimary.hidden = state.exportStatus === "running";
   }
   const canChangeBatch = state.batch !== "none" && state.batch !== "scanning" && state.exportStatus !== "running";
   const folderButton = $(".top-folder-action");
@@ -99,13 +113,22 @@ function renderTop() {
     folderButton.hidden = !canChangeBatch;
     folderButton.disabled = !canChangeBatch;
     folderButton.title = "Seleccionar otra carpeta";
+    const value = $("#top-folder-value");
+    if (value) {
+      value.textContent = contexts.folder.value;
+      folderButton.title = contexts.folder.title;
+    }
   }
   const formatButton = $(".top-format-action");
   if (formatButton) {
     const showFormat = state.batch !== "none" && state.batch !== "scanning";
     formatButton.hidden = !showFormat;
     formatButton.disabled = !showFormat || state.exportStatus === "running";
-    formatButton.title = "Salidas";
+    formatButton.title = contexts.output.title;
+    const value = $("#top-output-value");
+    if (value) {
+      value.textContent = contexts.output.value;
+    }
   }
   const inspectorButton = $(".top-inspector-action");
   if (inspectorButton) {
@@ -136,10 +159,10 @@ function renderTop() {
     if (showPreset) {
       const label = document.createElement("span");
       label.className = "top-active-preset__label";
-      label.textContent = "Ajuste";
+      label.textContent = contexts.preset.label;
       const value = document.createElement("strong");
       value.className = "top-active-preset__value";
-      value.textContent = state.activePreset;
+      value.textContent = contexts.preset.value;
       activePreset.append(label, value);
     }
   }
@@ -156,7 +179,8 @@ function renderTop() {
 }
 
 function conciseTopbarStatusText() {
-  if (["running", "completed", "partial", "failed"].includes(state.exportStatus)) {
+  if (state.exportStatus === "running") return "";
+  if (["completed", "partial", "failed"].includes(state.exportStatus)) {
     return compactHeaderStatusText();
   }
   if (state.batch === "scanning") {
@@ -164,6 +188,15 @@ function conciseTopbarStatusText() {
   }
   if (state.bridgeMode === "bridge" && state.bridgeStatus === "disconnected") {
     return "Bridge no disponible";
+  }
+  if (state.batch === "ready") {
+    const counts = batchCounts();
+    return workbenchViewHelpers.semanticBatchText({
+      ready: counts.readyImages,
+      warnings: counts.warningImages,
+      excluded: counts.nonExportableImages,
+      customized: imageAdjustmentOverrideCount(activeImages()),
+    });
   }
   return "";
 }

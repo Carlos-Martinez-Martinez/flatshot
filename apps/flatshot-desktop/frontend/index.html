@@ -195,15 +195,21 @@
             <span id="top-status-text">Sin lote</span>
             <span class="bridge-chip idle" id="bridge-status">Bridge pendiente</span>
           </div>
-          <span class="top-active-preset" id="top-active-preset" hidden></span>
+          <div class="top-workbench-context" id="top-workbench-context" aria-label="Contexto de trabajo" hidden>
+            <button type="button" class="top-folder-action top-context-item" data-action="pick-bridge-folder">
+              <span class="top-context-item__label">Carpeta</span>
+              <strong class="top-context-item__value" id="top-folder-value">Sin lote</strong>
+            </button>
+            <span class="top-active-preset top-context-item" id="top-active-preset" hidden></span>
+            <button type="button" class="top-format-action top-context-item" data-action="open-app-settings">
+              <span class="top-context-item__label">Salida</span>
+              <strong class="top-context-item__value" id="top-output-value">Sin configurar</strong>
+            </button>
+          </div>
 
           <div class="top-actions">
-            <span class="preflight-chip" id="top-preflight-status" hidden>Exportación bloqueada</span>
-            <div class="top-action-cluster top-action-cluster--batch" aria-label="Importación">
-              <button type="button" class="top-folder-action" data-action="pick-bridge-folder" data-icon="folder-open"><span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 6.5A2.5 2.5 0 0 1 5.5 4H10l2 2.5h6.5A2.5 2.5 0 0 1 21 9v8.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"></path><path d="M3 10h18"></path></svg></span>Carpeta</button>
-            </div>
             <div class="top-action-cluster top-action-cluster--config" aria-label="Exportación">
-              <button type="button" class="top-format-action" data-action="open-app-settings" data-icon="sliders"><span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h8M16 7h4M4 17h4M12 17h8"></path><path d="M12 5v4M8 15v4"></path></svg></span>Salidas</button>
+              <span class="preflight-chip" id="top-preflight-status" hidden>Exportación bloqueada</span>
               <button type="button" class="top-inspector-action" data-action="toggle-responsive-inspector" data-icon="sliders" hidden>Ajustes</button>
             </div>
             <div class="top-action-cluster top-action-cluster--run" aria-label="Procesamiento">
@@ -420,14 +426,14 @@
         </section>
 
         <aside class="settings-panel" aria-label="Resumen, exportación, avisos y ajustes">
-          <section class="inspector-start" id="inspector-start" aria-live="polite"></section>
-
           <div class="inspector-tabs segmented compact" aria-label="Panel derecho">
-            <button type="button" data-inspector-tab="review">Resumen</button>
+            <button type="button" data-inspector-tab="review">Imagen</button>
             <button type="button" data-inspector-tab="output">Exportación</button>
-            <button type="button" data-inspector-tab="warnings">Avisos</button>
-            <button type="button" data-inspector-tab="advanced">Avanzado</button>
+            <button type="button" data-inspector-tab="warnings">Revisión</button>
+            <button type="button" data-inspector-tab="advanced">Aspecto</button>
           </div>
+
+          <section class="inspector-start" id="inspector-start" aria-live="polite"></section>
 
           <section class="settings-section review-section" data-inspector-section="review">
             <div id="review-summary" aria-live="polite"></div>
@@ -469,7 +475,7 @@
 
           <small class="control-pending-status" id="numeric-pending-status" role="status" aria-live="polite" hidden></small>
 
-          <details class="settings-section inspector-disclosure appearance-section" data-inspector-section="advanced">
+          <details class="settings-section inspector-disclosure appearance-section" data-inspector-section="advanced" open>
             <summary>
               <span class="summary-copy">
                 <strong>Sombra</strong>
@@ -1190,6 +1196,7 @@
     <script src="./export-history.js?v=20260721-empty-folder-icon"></script>
     <script src="./export-preflight-view.js?v=20260721-empty-folder-icon"></script>
     <script src="./top-status-view.js?v=20260721-empty-folder-icon"></script>
+    <script src="./workbench-view.js?v=20260721-empty-folder-icon"></script>
     <script src="./preflight.js?v=20260721-empty-folder-icon"></script>
     <script src="./batch-view.js?v=20260721-empty-folder-icon"></script>
     <script src="./scan-state.js?v=20260721-empty-folder-icon"></script>

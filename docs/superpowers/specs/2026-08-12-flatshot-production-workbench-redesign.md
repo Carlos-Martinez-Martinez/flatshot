@@ -243,6 +243,14 @@ barra de progreso decorativa.
 Ningún breakpoint elimina acceso a preset, salida, incidencias, ajustes o
 proceso.
 
+## Dirección visual aprobada
+
+Se adopta la composición C, guardada en
+`.impeccable/mocks/flatshot-workbench-c.png`: sin rail izquierdo, visor
+dominante, filmstrip inferior e inspector contextual derecho. La referencia se
+usa para jerarquía y composición; la implementación conserva los componentes,
+tokens y controles reales de FlatShot.
+
 ## Accesibilidad
 
 - Orden de tabulación: cabecera, visor, filmstrip, inspector y barra de proceso.

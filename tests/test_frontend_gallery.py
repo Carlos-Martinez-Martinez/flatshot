@@ -94,9 +94,9 @@ def test_gallery_auto_scroll_runs_only_when_selection_changes():
 def test_virtual_gallery_render_restores_scroll_position_after_replacing_items():
     controller = APP_GALLERY_CONTROLLER_PATH.read_text(encoding="utf-8")
 
-    capture = "const preservedScrollTop = imageList.scrollTop;"
+    capture = "const preservedScrollLeft = imageList.scrollLeft;"
     replace = "imageList.innerHTML = ["
-    restore = "imageList.scrollTop = preservedScrollTop;"
+    restore = "imageList.scrollLeft = preservedScrollLeft;"
     assert capture in controller
     assert restore in controller
     assert controller.index(capture) < controller.index(replace) < controller.index(restore)

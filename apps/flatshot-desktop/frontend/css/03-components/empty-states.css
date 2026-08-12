@@ -57,7 +57,7 @@
 .empty-state.onboarding.initial-onboarding {
   position: relative; z-index: 3; width: min(680px, calc(100% - var(--modal-viewport-gutter))); max-width: min(680px, calc(100% - var(--modal-viewport-gutter)));
   gap: var(--space-4); border-color: var(--border-subtle); background: var(--surface-panel);
-  padding: var(--space-5) var(--space-8); box-shadow: var(--shadow-sm);
+  padding: var(--space-5) var(--space-8); box-shadow: none;
 }
 .app-shell.is-preferences-open .empty-state.onboarding.initial-onboarding { visibility: hidden; pointer-events: none; }
 .empty-state.onboarding.initial-onboarding.is-drop-active { border-color: var(--color-accent-border); background: var(--surface-alpha-96); box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 12%, transparent), var(--shadow-sm); }
@@ -73,7 +73,7 @@
 }
 .onboarding-background::before { content: ""; position: absolute; inset: -6%; opacity: 0.9; background: radial-gradient(circle at 12% 18%, color-mix(in srgb, var(--color-primary) 36%, transparent), transparent 22%), radial-gradient(circle at 48% 52%, color-mix(in srgb, var(--color-primary) 20%, transparent), transparent 28%), radial-gradient(circle at 84% 78%, var(--info-alpha-30), transparent 25%), repeating-linear-gradient(128deg, color-mix(in srgb, var(--color-primary) 28%, transparent) 0 1px, transparent 1px 46px); }
 .onboarding-background::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(128deg, color-mix(in srgb, var(--color-primary) 16%, transparent) 0 1px, transparent 1px 48px), repeating-linear-gradient(38deg, var(--info-alpha-10) 0 1px, transparent 1px 76px), linear-gradient(135deg, var(--surface-bg-alpha-12), var(--primary-soft-alpha-06)), radial-gradient(circle at 50% 50%, transparent 0, var(--surface-bg-alpha-12) 82%); }
-.app-shell[data-ui-state="no_folder"] .onboarding-background.is-visible { display: block; }
+.app-shell[data-ui-state="no_folder"] .onboarding-background.is-visible { display: none; }
 :root[data-onboarding-background="disabled"] .app-shell[data-ui-state="no_folder"] .onboarding-background.is-visible { display: none; }
 .onboarding-background.is-fallback::before { content: ""; position: absolute; inset: -5%; opacity: 0.72; background: radial-gradient(circle at 18% 22%, color-mix(in srgb, var(--color-primary) 32%, transparent), transparent 24%), radial-gradient(circle at 48% 52%, color-mix(in srgb, var(--color-primary) 18%, transparent), transparent 30%), radial-gradient(circle at 74% 68%, var(--info-alpha-26), transparent 26%), repeating-linear-gradient(128deg, color-mix(in srgb, var(--color-primary) 20%, transparent) 0 1px, transparent 1px 52px); }
 .onboarding-background__slide { position: absolute; inset: -4%; opacity: 0; background-color: color-mix(in srgb, var(--color-accent) 62%, var(--color-bg) 38%); background-position: center; background-size: cover; background-repeat: no-repeat; background-blend-mode: luminosity; filter: saturate(1.08) contrast(1.08) brightness(1.06); mix-blend-mode: normal; transform: scale(1.03); transition: opacity var(--duration-onboarding-fade) var(--ease-standard), transform var(--duration-onboarding-drift) var(--ease-standard), background-color var(--duration-onboarding-fade) var(--ease-standard), filter var(--duration-onboarding-fade) var(--ease-standard); }

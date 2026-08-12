@@ -76,13 +76,16 @@
       ? `<button type="button" class="ghost-action dev-only" data-action="open-qa-lab">QA Lab</button>`
       : "";
     const folderEntryHtml = `
-      <div class="folder-entry-inline" aria-label="Carpeta de entrada">
+      <details class="manual-path-inline">
+        <summary>Introducir ruta</summary>
+        <div class="folder-entry-inline" aria-label="Carpeta de entrada">
         <label class="text-field">
           <span>Carpeta de entrada</span>
           <input id="onboarding-scan-path" type="text" value="${escapeHtml(options.bridgeScanPath || "")}" placeholder="C:/ruta/lote" autocomplete="off" spellcheck="false" />
         </label>
         <button type="button" class="folder-entry-inline__scan primary" data-action="scan-bridge-folder" title="Escanear carpeta">Escanear</button>
-      </div>
+        </div>
+      </details>
   `;
     const dropMessage = options.dropMessage
       ? `<div class="folder-drop-message"><span>${escapeHtml(options.dropMessage)}</span><button type="button" data-action="clear-folder-drop-message" aria-label="Cerrar aviso">×</button></div>`
@@ -92,14 +95,13 @@
       ${folderIconHtml()}
       <strong>Selecciona una carpeta</strong>
       <span>Carga un lote de imágenes PNG o JPG o arrastra una carpeta aquí.</span>
-      ${folderEntryHtml}
       ${dropMessage}
       ${recentFoldersHtml(options.recentFolders)}
       <div class="empty-state__actions">
-        <button type="button" class="ghost-action" data-action="pick-bridge-folder">Buscar carpeta</button>
-        <button type="button" class="ghost-action" data-action="open-app-settings">Gestionar salidas</button>
+        <button type="button" class="primary" data-action="pick-bridge-folder">Seleccionar carpeta</button>
         ${qaLabActionHtml}
       </div>
+      ${folderEntryHtml}
     </div>
   `;
   }

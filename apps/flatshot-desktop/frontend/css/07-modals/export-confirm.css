@@ -158,6 +158,15 @@
   color: var(--color-warning);
 }
 
+.export-confirm-risk.excluded {
+  border-color: var(--color-error-border);
+  background: var(--color-error-soft);
+}
+
+.export-confirm-risk.excluded > span {
+  color: var(--color-error);
+}
+
 .export-confirm-risk.error {
   border-color: var(--color-error-border);
   background: var(--color-error-soft);

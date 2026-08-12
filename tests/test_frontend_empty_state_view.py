@@ -374,22 +374,20 @@ assert.equal(initial.includes('class="empty-state onboarding initial-onboarding"
 assert.equal(initial.includes("<strong>Selecciona una carpeta</strong>"), true);
 assert.equal(initial.includes("Carga un lote de imágenes PNG o JPG"), true);
 assert.equal(initial.includes('data-action="pick-bridge-folder"'), true);
-assert.equal(initial.includes('class="primary" data-action="pick-bridge-folder"'), false);
-assert.equal(initial.includes('class="ghost-action" data-action="pick-bridge-folder"'), true);
-assert.equal(initial.includes(">Buscar carpeta</button>"), true);
-assert.equal(initial.includes(">Seleccionar carpeta</button>"), false);
-assert.equal(initial.includes('data-action="open-app-settings"'), true);
-assert.equal(initial.includes("Gestionar salidas"), true);
+assert.equal(initial.includes('class="primary" data-action="pick-bridge-folder"'), true);
+assert.equal(initial.includes(">Seleccionar carpeta</button>"), true);
+assert.equal(initial.includes('data-action="open-app-settings"'), false);
+assert.equal(initial.includes("Gestionar salidas"), false);
 assert.equal(initial.includes('data-action="open-qa-lab"'), false);
 assert.equal(initial.includes('class="folder-entry-inline"'), true);
-assert.equal(initial.includes('class="manual-path-inline"'), false);
-assert.equal(initial.includes("Ruta manual"), false);
+assert.equal(initial.includes('class="manual-path-inline"'), true);
+assert.equal(initial.includes("Introducir ruta"), true);
 assert.equal(initial.includes("Carpeta de entrada"), true);
 assert.equal(initial.includes('id="onboarding-scan-path"'), true);
 assert.equal(initial.includes('class="folder-entry-inline__scan primary"'), true);
 assert.equal(initial.includes('data-action="scan-bridge-folder"'), true);
 assert.equal(initial.includes('title="Escanear carpeta"'), true);
-assert.ok(initial.indexOf('class="folder-entry-inline"') < initial.indexOf('class="empty-state__actions"'));
+assert.ok(initial.indexOf('class="empty-state__actions"') < initial.indexOf('class="folder-entry-inline"'));
 assert.equal(initial.includes("<svg"), true);
 
 const devInitial = helpers.initialStateHtml({{
@@ -397,8 +395,8 @@ const devInitial = helpers.initialStateHtml({{
   bridgeScanPath: 'C:/Entrada/"uno"&<dos>',
 }});
 assert.equal(devInitial.includes('class="folder-entry-inline"'), true);
-assert.equal(devInitial.includes('class="manual-path-inline"'), false);
-assert.equal(devInitial.includes("Ruta manual"), false);
+assert.equal(devInitial.includes('class="manual-path-inline"'), true);
+assert.equal(devInitial.includes("Introducir ruta"), true);
 assert.equal(devInitial.includes('id="onboarding-scan-path"'), true);
 assert.equal(devInitial.includes('value="C:/Entrada/&quot;uno&quot;&amp;&lt;dos&gt;"'), true);
 assert.equal(devInitial.includes('data-action="scan-bridge-folder"'), true);
@@ -443,6 +441,7 @@ def test_initial_onboarding_card_uses_deliberate_stable_layout_styles():
     assert "display: inline-flex;" in actions_rule
     assert "min-width: 170px;" in action_button_rule
     assert "width: auto;" in action_button_rule
+    assert "box-shadow: none;" in card_rule
 
 
 def test_batch_empty_state_is_centered_without_a_floating_card():
@@ -484,6 +483,10 @@ def test_onboarding_background_styles_are_perceptible_without_blocking_controls(
     assert "grayscale(" not in slide_rule
     assert "hue-rotate" not in slide_rule
     assert "background-color var(--duration-onboarding-fade)" in slide_rule
+
+    enabled_selector = '.app-shell[data-ui-state="no_folder"] .onboarding-background.is-visible {'
+    enabled_rule = css.split(enabled_selector, 1)[1].split("}", 1)[0]
+    assert "display: none;" in enabled_rule
 
     disabled_selector = ':root[data-onboarding-background="disabled"] .app-shell[data-ui-state="no_folder"] .onboarding-background.is-visible {'
     assert disabled_selector in css

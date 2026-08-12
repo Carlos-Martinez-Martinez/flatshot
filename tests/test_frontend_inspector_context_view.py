@@ -38,28 +38,16 @@ assert.equal(helpers.inspectorMode({{ outputEditMode: false, inspectorTab: "warn
 assert.equal(helpers.inspectorMode({{ outputEditMode: false, inspectorTab: "review" }}), "summary");
 assert.equal(helpers.inspectorMode({{ outputEditMode: false, inspectorTab: "unknown" }}), "summary");
 assert.deepEqual(helpers.inspectorSummaryCardKeys({{ complexityMode: "simple", hasIssues: false }}), [
-  "lot",
-  "aspect",
-  "output",
+  "selectedImage",
 ]);
 assert.deepEqual(helpers.inspectorSummaryCardKeys({{ complexityMode: "simple", hasIssues: true }}), [
-  "lot",
-  "aspect",
-  "output",
-  "issues",
+  "selectedImage",
 ]);
 assert.deepEqual(helpers.inspectorSummaryCardKeys({{ complexityMode: "advanced", hasIssues: true }}), [
-  "lot",
-  "aspect",
-  "output",
   "selectedImage",
-  "issues",
 ]);
 assert.deepEqual(helpers.inspectorSummaryCardKeys({{ complexityMode: "unknown", hasIssues: true }}), [
-  "lot",
-  "aspect",
-  "output",
-  "issues",
+  "selectedImage",
 ]);
 
 assert.deepEqual(helpers.inspectorSubviewHeaderState({{

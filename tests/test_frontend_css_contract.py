@@ -1102,14 +1102,10 @@ def test_responsive_module_consolidates_adjacent_media_blocks():
 
     assert media_queries == [
         "min-width: 1600px",
-        "max-width: 1360px",
-        "max-width: 1500px",
+        "max-width: 1599px",
         "max-width: 1240px",
-        "max-width: 1280px",
-        "max-width: 1180px",
-        "max-width: 1120px",
-        "max-width: 1080px",
-        "max-width: 720px",
+        "max-width: 1119px",
+        "max-width: 759px",
     ]
     assert all(
         current != following

@@ -33,6 +33,7 @@
   global.exportHistoryHelpers = window.FlatShotExportHistory;
   global.exportPreflightViewHelpers = window.FlatShotExportPreflightView;
   global.topStatusViewHelpers = window.FlatShotTopStatusView;
+  global.workbenchViewHelpers = window.FlatShotWorkbenchView;
   global.preflightHelpers = window.FlatShotPreflight;
   global.batchViewHelpers = window.FlatShotBatchView;
   global.scanStateHelpers = window.FlatShotScanState;

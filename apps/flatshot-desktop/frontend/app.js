@@ -96,7 +96,7 @@ const state = {
   search: "",
   galleryView: "thumbs",
   galleryScrollTop: 0,
-  inspectorTab: "review",
+  inspectorTab: "advanced",
   inspectorCollapsed: false,
   responsiveInspectorOpen: false,
   advancedDisclosureKey: "",

@@ -28,7 +28,7 @@
   padding-block: 2px;
 }
 
-.preview-title-block .eyebrow, #preview-subtitle, .preview-output-context, .preview-footer, .preview-mode-switch {
+.preview-title-block .eyebrow, #preview-subtitle, .preview-footer, .preview-mode-switch {
   display: none;
 }
 

@@ -41,14 +41,7 @@
   }
 
   function inspectorSummaryCardKeys(options = {}) {
-    const keys = ["lot", "aspect", "output"];
-    if (options.complexityMode === "advanced") {
-      keys.push("selectedImage");
-    }
-    if (options.hasIssues) {
-      keys.push("issues");
-    }
-    return keys;
+    return ["selectedImage"];
   }
 
   function inspectorSubviewHeaderState(options = {}) {

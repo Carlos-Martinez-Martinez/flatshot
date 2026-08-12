@@ -36,7 +36,7 @@ function setScenario(scenario) {
     zoom: 100,
     panX: 0,
     panY: 0,
-    inspectorTab: "review",
+    inspectorTab: "advanced",
     outputEditMode: false,
     presetEditorOpen: false,
     exportConfirmOpen: false,

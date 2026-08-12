@@ -38,8 +38,9 @@
   flex: 0 0 auto;
   display: block;
   overflow: hidden;
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
+  border: 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+  border-radius: 0;
   background: var(--color-bg-panel);
   padding: 0;
 }
@@ -65,8 +66,9 @@
   flex: 0 0 auto;
   display: block;
   overflow: hidden;
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
+  border: 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+  border-radius: 0;
   background: var(--color-bg-panel);
   padding: 0;
   box-shadow: none;

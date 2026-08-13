@@ -30,7 +30,13 @@ def make_portable_tree(root: Path) -> Path:
     (portable / "_internal" / "frontend").mkdir(parents=True)
     (portable / "_internal" / "frontend" / "index.html").write_text("FlatShot", encoding="utf-8")
     (portable / "FlatShot.exe").write_bytes(b"MZ-frozen")
-    for name in ("Abrir FlatShot.vbs", "Diagnostico FlatShot.bat", "README_PORTABLE.txt"):
+    for name in (
+        "Abrir FlatShot.vbs",
+        "Diagnostico FlatShot.bat",
+        "README_PORTABLE.txt",
+        "LICENSE.txt",
+        "THIRD_PARTY_NOTICES.txt",
+    ):
         (portable / name).write_text("FlatShot", encoding="utf-8")
     (portable / "data").mkdir()
     return portable

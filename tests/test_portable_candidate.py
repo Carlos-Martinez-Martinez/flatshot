@@ -38,6 +38,11 @@ def make_portable_tree(root: Path) -> Path:
         "THIRD_PARTY_NOTICES.txt",
     ):
         (portable / name).write_text("FlatShot", encoding="utf-8")
+    (portable / "THIRD_PARTY_LICENSES" / "CPython").mkdir(parents=True)
+    (portable / "THIRD_PARTY_LICENSES" / "CPython" / "LICENSE.txt").write_text(
+        "Python license",
+        encoding="utf-8",
+    )
     (portable / "data").mkdir()
     return portable
 

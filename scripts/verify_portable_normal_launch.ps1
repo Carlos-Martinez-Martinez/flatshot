@@ -13,6 +13,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.Windows.Forms
 Add-Type -TypeDefinition @"
 using System;
 using System.Runtime.InteropServices;
@@ -45,7 +46,10 @@ public static class FlatShotNativeWindow {
     public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
 
     [DllImport("user32.dll")]
-    public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdc, uint flags);
+    public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern bool ShowWindowAsync(IntPtr hWnd, int command);
 
     [DllImport("user32.dll")]
     public static extern bool PostMessage(IntPtr hWnd, uint message, IntPtr wParam, IntPtr lParam);
@@ -142,13 +146,18 @@ function Find-LocalEndpoints {
 }
 
 function Save-WindowScreenshot {
-    param([long]$Handle, [string]$Path)
+    param([long]$Handle, [string]$Path, [int]$RenderTimeoutSeconds = 15)
     $rect = [FlatShotNativeWindow+RECT]::new()
     if (-not [FlatShotNativeWindow]::GetWindowRect([IntPtr]$Handle, [ref]$rect)) {
         throw "GetWindowRect failed for handle $Handle."
     }
-    $width = $rect.Right - $rect.Left
-    $height = $rect.Bottom - $rect.Top
+    $virtualScreen = [System.Windows.Forms.SystemInformation]::VirtualScreen
+    $left = [Math]::Max($rect.Left, $virtualScreen.Left)
+    $top = [Math]::Max($rect.Top, $virtualScreen.Top)
+    $right = [Math]::Min($rect.Right, $virtualScreen.Right)
+    $bottom = [Math]::Min($rect.Bottom, $virtualScreen.Bottom)
+    $width = $right - $left
+    $height = $bottom - $top
     if ($width -lt 320 -or $height -lt 200) {
         throw "FlatShot window is unexpectedly small: ${width}x${height}."
     }
@@ -157,21 +166,22 @@ function Save-WindowScreenshot {
     if ($directory) {
         New-Item -ItemType Directory -Path $directory -Force | Out-Null
     }
-    $bitmap = [System.Drawing.Bitmap]::new($width, $height, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
-    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-    $hdc = $graphics.GetHdc()
-    try {
-        if (-not [FlatShotNativeWindow]::PrintWindow([IntPtr]$Handle, $hdc, 2)) {
-            throw "PrintWindow failed for FlatShot handle $Handle."
+    [void][FlatShotNativeWindow]::ShowWindowAsync([IntPtr]$Handle, 9)
+    [void][FlatShotNativeWindow]::SetForegroundWindow([IntPtr]$Handle)
+    $captureDeadline = (Get-Date).AddSeconds($RenderTimeoutSeconds)
+    $attempts = 0
+    do {
+        $attempts += 1
+        Start-Sleep -Milliseconds 750
+        $bitmap = [System.Drawing.Bitmap]::new($width, $height, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+        try {
+            $graphics.CopyFromScreen($left, $top, 0, 0, [System.Drawing.Size]::new($width, $height))
+            $bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
         }
-    }
-    finally {
-        $graphics.ReleaseHdc($hdc)
-        $graphics.Dispose()
-    }
-
-    try {
-        $bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
+        finally {
+            $graphics.Dispose()
+        }
         $colors = [System.Collections.Generic.HashSet[int]]::new()
         $minimumBrightness = 1.0
         $maximumBrightness = 0.0
@@ -186,18 +196,21 @@ function Save-WindowScreenshot {
                 $maximumBrightness = [Math]::Max($maximumBrightness, $brightness)
             }
         }
-        return [pscustomobject]@{
-            path = [IO.Path]::GetFullPath($Path)
-            sizeBytes = (Get-Item -LiteralPath $Path).Length
-            nonUniform = ($colors.Count -gt 8 -and ($maximumBrightness - $minimumBrightness) -gt 0.04)
-            width = $width
-            height = $height
-            sampledColors = $colors.Count
-        }
-    }
-    finally {
+        $nonUniform = $colors.Count -gt 8 -and ($maximumBrightness - $minimumBrightness) -gt 0.04
         $bitmap.Dispose()
-    }
+        if ($nonUniform -or (Get-Date) -ge $captureDeadline) {
+            return [pscustomobject]@{
+                path = [IO.Path]::GetFullPath($Path)
+                sizeBytes = (Get-Item -LiteralPath $Path).Length
+                nonUniform = $nonUniform
+                width = $width
+                height = $height
+                sampledColors = $colors.Count
+                captureMethod = "CopyFromScreen"
+                attempts = $attempts
+            }
+        }
+    } while ((Get-Date) -lt $captureDeadline)
 }
 
 function Read-NewLogContent {

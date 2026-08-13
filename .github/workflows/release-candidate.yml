@@ -71,7 +71,7 @@ jobs:
         with:
           name: FlatShot-candidate-${{ github.run_id }}
           path: |
-            release/FlatShotPortable-v${{ env.RELEASE_VERSION }}.zip
+            release/FlatShotPortable-v*.zip
             release/SHA256SUMS.txt
             dist/*
           if-no-files-found: error

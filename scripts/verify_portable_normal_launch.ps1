@@ -65,6 +65,17 @@ function Get-NamedProcessSnapshot {
     return @($items | Sort-Object Id -Unique)
 }
 
+function Get-FreeTcpPort {
+    $probe = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
+    $probe.Start()
+    try {
+        return ([Net.IPEndPoint]$probe.LocalEndpoint).Port
+    }
+    finally {
+        $probe.Stop()
+    }
+}
+
 function Get-VisibleWindows {
     param([int[]]$ProcessIds)
     $wanted = [System.Collections.Generic.HashSet[int]]::new()
@@ -203,6 +214,7 @@ function Save-WindowScreenshot {
                 path = [IO.Path]::GetFullPath($Path)
                 sizeBytes = (Get-Item -LiteralPath $Path).Length
                 nonUniform = $nonUniform
+                clientContentDetected = $false
                 width = $width
                 height = $height
                 sampledColors = $colors.Count
@@ -211,6 +223,132 @@ function Save-WindowScreenshot {
             }
         }
     } while ((Get-Date) -lt $captureDeadline)
+}
+
+function Test-ScreenshotContent {
+    param([string]$Path)
+    $bitmap = [System.Drawing.Bitmap]::FromFile($Path)
+    try {
+        $colors = [System.Collections.Generic.HashSet[int]]::new()
+        $minimumBrightness = 1.0
+        $maximumBrightness = 0.0
+        $stepX = [Math]::Max(1, [int]($bitmap.Width / 32))
+        $stepY = [Math]::Max(1, [int]($bitmap.Height / 24))
+        for ($y = 0; $y -lt $bitmap.Height; $y += $stepY) {
+            for ($x = 0; $x -lt $bitmap.Width; $x += $stepX) {
+                $color = $bitmap.GetPixel($x, $y)
+                [void]$colors.Add($color.ToArgb())
+                $brightness = [double]$color.GetBrightness()
+                $minimumBrightness = [Math]::Min($minimumBrightness, $brightness)
+                $maximumBrightness = [Math]::Max($maximumBrightness, $brightness)
+            }
+        }
+        return [pscustomobject]@{
+            width = $bitmap.Width
+            height = $bitmap.Height
+            sampledColors = $colors.Count
+            nonUniform = ($colors.Count -gt 16 -and ($maximumBrightness - $minimumBrightness) -gt 0.08)
+        }
+    }
+    finally {
+        $bitmap.Dispose()
+    }
+}
+
+function Invoke-DevToolsCommand {
+    param([string]$WebSocketUrl, [hashtable]$Message)
+    $socket = [Net.WebSockets.ClientWebSocket]::new()
+    $timeout = [Threading.CancellationTokenSource]::new(10000)
+    try {
+        $socket.ConnectAsync([Uri]$WebSocketUrl, $timeout.Token).GetAwaiter().GetResult()
+        $json = $Message | ConvertTo-Json -Depth 6 -Compress
+        $bytes = [Text.Encoding]::UTF8.GetBytes($json)
+        $socket.SendAsync(
+            [ArraySegment[byte]]::new($bytes),
+            [Net.WebSockets.WebSocketMessageType]::Text,
+            $true,
+            $timeout.Token
+        ).GetAwaiter().GetResult()
+
+        $buffer = [byte[]]::new(65536)
+        $stream = [IO.MemoryStream]::new()
+        try {
+            do {
+                $received = $socket.ReceiveAsync([ArraySegment[byte]]::new($buffer), $timeout.Token).GetAwaiter().GetResult()
+                $stream.Write($buffer, 0, $received.Count)
+            } while (-not $received.EndOfMessage)
+            return [Text.Encoding]::UTF8.GetString($stream.ToArray()) | ConvertFrom-Json
+        }
+        finally {
+            $stream.Dispose()
+        }
+    }
+    finally {
+        if ($socket.State -eq [Net.WebSockets.WebSocketState]::Open) {
+            $socket.CloseAsync(
+                [Net.WebSockets.WebSocketCloseStatus]::NormalClosure,
+                "FlatShot verification complete",
+                [Threading.CancellationToken]::None
+            ).GetAwaiter().GetResult()
+        }
+        $timeout.Dispose()
+        $socket.Dispose()
+    }
+}
+
+function Save-WebViewScreenshot {
+    param([int]$DebugPort, [string]$FrontendUrl, [string]$Path, [int]$RenderTimeoutSeconds = 15)
+    $deadline = (Get-Date).AddSeconds($RenderTimeoutSeconds)
+    $attempts = 0
+    $lastError = $null
+    do {
+        $attempts += 1
+        Start-Sleep -Milliseconds 750
+        try {
+            $targets = @(Invoke-RestMethod -Uri "http://127.0.0.1:$DebugPort/json/list" -TimeoutSec 2 -NoProxy)
+            $target = $targets | Where-Object {
+                $_.type -eq "page" -and [string]$_.url -like "$FrontendUrl*"
+            } | Select-Object -First 1
+            if ($null -eq $target) {
+                $target = $targets | Where-Object { $_.type -eq "page" } | Select-Object -First 1
+            }
+            if ($null -eq $target -or -not $target.webSocketDebuggerUrl) {
+                throw "No WebView2 page target is available on diagnostic port $DebugPort."
+            }
+            $response = Invoke-DevToolsCommand -WebSocketUrl $target.webSocketDebuggerUrl -Message @{
+                id = 1
+                method = "Page.captureScreenshot"
+                params = @{ format = "png"; fromSurface = $true; captureBeyondViewport = $false }
+            }
+            if (-not $response.result.data) {
+                throw "WebView2 did not return screenshot data."
+            }
+            $directory = Split-Path -Parent $Path
+            if ($directory) {
+                New-Item -ItemType Directory -Path $directory -Force | Out-Null
+            }
+            [IO.File]::WriteAllBytes($Path, [Convert]::FromBase64String([string]$response.result.data))
+            $analysis = Test-ScreenshotContent -Path $Path
+            if ($analysis.nonUniform -or (Get-Date) -ge $deadline) {
+                return [pscustomobject]@{
+                    path = [IO.Path]::GetFullPath($Path)
+                    sizeBytes = (Get-Item -LiteralPath $Path).Length
+                    nonUniform = $analysis.nonUniform
+                    clientContentDetected = $analysis.nonUniform
+                    width = $analysis.width
+                    height = $analysis.height
+                    sampledColors = $analysis.sampledColors
+                    captureMethod = "WebView2 DevTools Protocol"
+                    attempts = $attempts
+                    targetUrl = [string]$target.url
+                }
+            }
+        }
+        catch {
+            $lastError = $_.Exception.Message
+        }
+    } while ((Get-Date) -lt $deadline)
+    throw "Could not capture rendered WebView2 content: $lastError"
 }
 
 function Read-NewLogContent {
@@ -235,7 +373,8 @@ $window = $null
 $endpoints = [pscustomobject]@{ Frontend = $null; Bridge = $null }
 $webViewProcesses = @()
 $newPythonProcesses = @()
-$screenshot = [pscustomobject]@{ path = [IO.Path]::GetFullPath($ScreenshotPath); sizeBytes = 0; nonUniform = $false; width = 0; height = 0 }
+$screenshot = [pscustomobject]@{ path = [IO.Path]::GetFullPath($ScreenshotPath); sizeBytes = 0; nonUniform = $false; clientContentDetected = $false; width = 0; height = 0 }
+$desktopScreenshot = $null
 $stayedAlive = $false
 $exitCodeBeforeCleanup = $null
 $gracefulCloseRequested = $false
@@ -249,6 +388,7 @@ $logBeforeLength = if (Test-Path -LiteralPath $runtimeLog) { (Get-Item -LiteralP
 $launchTime = Get-Date
 $preexistingWebView = @(Get-NamedProcessSnapshot -Names @("msedgewebview2") | Select-Object -ExpandProperty Id)
 $preexistingPython = @(Get-NamedProcessSnapshot -Names @("python", "pythonw", "py") | Select-Object -ExpandProperty Id)
+$webViewDebugPort = Get-FreeTcpPort
 
 try {
     if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
@@ -256,7 +396,7 @@ try {
     }
 
     $savedEnvironment = @{}
-    foreach ($name in @("PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV", "PATH")) {
+    foreach ($name in @("PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV", "PATH", "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS")) {
         $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, "Process")
     }
     try {
@@ -264,6 +404,11 @@ try {
             [Environment]::SetEnvironmentVariable($name, $null, "Process")
         }
         [Environment]::SetEnvironmentVariable("PATH", $cleanPath, "Process")
+        [Environment]::SetEnvironmentVariable(
+            "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+            "--remote-debugging-port=$webViewDebugPort",
+            "Process"
+        )
         $process = Start-Process -FilePath $executable -WorkingDirectory $portable -PassThru
     }
     finally {
@@ -309,7 +454,14 @@ try {
     })
     if ($null -ne $window) {
         Start-Sleep -Seconds 3
-        $screenshot = Save-WindowScreenshot -Handle $window.Handle -Path $ScreenshotPath
+        $desktopPath = Join-Path (Split-Path -Parent $ScreenshotPath) "flatshot-normal-launch-desktop.png"
+        $desktopScreenshot = Save-WindowScreenshot -Handle $window.Handle -Path $desktopPath -RenderTimeoutSeconds 2
+        if ($null -ne $endpoints.Frontend) {
+            $screenshot = Save-WebViewScreenshot `
+                -DebugPort $webViewDebugPort `
+                -FrontendUrl $endpoints.Frontend.url.TrimEnd("/") `
+                -Path $ScreenshotPath
+        }
     }
 }
 catch {
@@ -400,6 +552,7 @@ $result = [ordered]@{
         newContent = $newLog
     }
     screenshot = $screenshot
+    desktopScreenshot = $desktopScreenshot
     cleanup = [ordered]@{
         gracefulCloseRequested = $gracefulCloseRequested
         forceKillUsed = $forceKillUsed

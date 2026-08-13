@@ -34,6 +34,7 @@ def valid_result() -> dict[str, object]:
             "nonUniform": True,
             "width": 1360,
             "height": 900,
+            "clientContentDetected": True,
         },
         "cleanup": {
             "gracefulCloseRequested": True,
@@ -60,6 +61,7 @@ def test_accepts_complete_native_edgechromium_launch_evidence():
         (lambda data: data.update(windowMode="browser fallback"), "native EdgeChromium window was not used"),
         (lambda data: data["runtimeLog"].update(startupErrors=["Traceback"]), "startup errors were logged"),
         (lambda data: data["screenshot"].update(nonUniform=False), "screenshot is empty or uniform"),
+        (lambda data: data["screenshot"].update(clientContentDetected=False), "WebView2 client content was not captured"),
         (lambda data: data["cleanup"].update(flatShotOrphans=[4321]), "FlatShot processes remained"),
         (lambda data: data["cleanup"].update(listenerPortsRemaining=[4173]), "listeners remained"),
         (lambda data: data["environment"].update(pathSanitized=False), "child PATH was not sanitized"),

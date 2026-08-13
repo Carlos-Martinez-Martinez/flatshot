@@ -54,6 +54,8 @@ def validate_result(payload: dict[str, Any]) -> None:
         failures.append("startup errors were logged")
     if not screenshot.get("nonUniform"):
         failures.append("screenshot is empty or uniform")
+    if not screenshot.get("clientContentDetected"):
+        failures.append("WebView2 client content was not captured")
     if not isinstance(screenshot.get("sizeBytes"), int) or screenshot["sizeBytes"] <= 0:
         failures.append("screenshot artifact is empty")
     if cleanup.get("flatShotOrphans"):

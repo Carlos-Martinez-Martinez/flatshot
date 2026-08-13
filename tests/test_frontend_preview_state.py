@@ -135,6 +135,25 @@ assert.equal(helpers.previewOrientation(null), "portrait");
 assert.equal(helpers.previewOrientation({{ width: 1000, height: 1400 }}), "portrait");
 assert.equal(helpers.previewOrientation({{ width: 1400, height: 1000 }}), "landscape");
 assert.equal(helpers.previewOrientation({{ width: 1000, height: 1000 }}), "square");
+assert.equal(helpers.previewAspectRatio({{ width: 1800, height: 2400 }}), 0.75);
+assert.equal(helpers.previewAspectRatio({{ width: 2400, height: 1200 }}), 2);
+assert.equal(helpers.previewAspectRatio({{ width: 0, height: 2400 }}), 0.75);
+assert.equal(helpers.previewAspectRatio({{ width: "bad", height: 2400 }}), 0.75);
+assert.deepEqual(helpers.previewCanvasGeometry({{
+  containerWidth: 920,
+  containerHeight: 1001,
+  aspectRatio: 0.75,
+}}), {{ width: 751, height: 1001 }});
+assert.deepEqual(helpers.previewCanvasGeometry({{
+  containerWidth: 920,
+  containerHeight: 1001,
+  aspectRatio: 2,
+}}), {{ width: 920, height: 460 }});
+assert.deepEqual(helpers.previewCanvasGeometry({{
+  containerWidth: 0,
+  containerHeight: 1001,
+  aspectRatio: 0.75,
+}}), {{ width: 0, height: 0 }});
 
 assert.equal(helpers.previewFooterLabel({{ selectedImageSource: "bridge", previewStatus: "ready" }}), "Real");
 assert.equal(helpers.previewFooterLabel({{ selectedImageSource: "bridge", previewStatus: "empty" }}), "Pendiente");

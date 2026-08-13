@@ -126,6 +126,26 @@
   text-align: left;
 }
 
+.manual-path-inline {
+  width: var(--workflow-inline-width);
+  border-top: var(--border-width) solid var(--color-border);
+  padding-top: var(--space-3);
+  color: var(--color-text-muted);
+}
+
+.manual-path-inline > summary {
+  width: max-content;
+  margin-inline: auto;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.manual-path-inline[open] > summary {
+  margin-bottom: var(--space-3);
+}
+
 .folder-entry-inline .text-field {
   min-width: 0;
 }

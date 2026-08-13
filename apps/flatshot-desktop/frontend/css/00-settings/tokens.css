@@ -171,11 +171,7 @@
   --font-weight-medium: 500;
   --font-weight-regular: 400;
   --font-weight-semibold: 600;
-  --fs-left-col: clamp(360px, 24vw, 430px);
-  --fs-left-top-row: clamp(190px, 26vh, 280px);
   --fs-output-edit-col: clamp(460px, 34vw, 520px);
-  --fs-right-col: clamp(380px, 24vw, 440px);
-  --fs-viewer-col: minmax(480px, 1fr);
   --modal-batch-detail-width: 900px;
   --modal-guide-manager-width: 1280px;
   --modal-max-height: 760px;
@@ -554,9 +550,6 @@
   :root {
     --column-gallery: clamp(360px, 30vw, 400px);
     --column-inspector: clamp(320px, 27vw, 360px);
-    --fs-left-col: clamp(360px, 30vw, 400px);
-    --fs-right-col: clamp(480px, 40vw, 560px);
-    --fs-viewer-col: minmax(360px, 1fr);
   }
 }
 }

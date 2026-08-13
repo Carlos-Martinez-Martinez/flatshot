@@ -114,25 +114,28 @@
     const image = options.image || null;
     if (!image) {
       return `
-      <section class="inspector-compact-row">
-        <div>
-          <span>Imagen</span>
+      <section class="inspector-pane-head inspector-pane-head--empty">
+        <div class="inspector-pane-head__copy">
+          <h2>Imagen</h2>
           <strong>Sin selección</strong>
+          <small>Selecciona una imagen para revisar sus ajustes.</small>
         </div>
-        <button type="button" data-action="select-first-image">Seleccionar primera</button>
+        <div class="inspector-pane-head__actions">
+          <button type="button" data-action="select-first-image">Seleccionar primera</button>
+        </div>
       </section>
     `;
     }
     const hasLocal = Boolean(options.hasLocal);
     return `
-      <section class="inspector-compact-row selected-image-card panel-summary-card">
-        <header class="panel-summary-card__head selected-image-card__head">
-          <div>
-            <span>Imagen seleccionada</span>
+      <section class="selected-image-card">
+        <header class="inspector-pane-head">
+          <div class="inspector-pane-head__copy">
+            <h2>Imagen</h2>
             <strong title="${escapeHtml(image.path || image.name)}">${escapeHtml(image.name)}</strong>
             <small>${escapeHtml(options.detail || "")}</small>
           </div>
-          <small class="selected-image-card__state">${escapeHtml(hasLocal ? "Ajuste personalizado" : "Ajuste del lote")}</small>
+          <span class="inspector-status-chip">${escapeHtml(hasLocal ? "Personalizada" : "Ajuste del lote")}</span>
         </header>
         <div class="selected-image-card__actions">
           <button type="button" data-action="open-image-adjustment">${escapeHtml(hasLocal ? "Editar ajuste" : "Personalizar imagen")}</button>

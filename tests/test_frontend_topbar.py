@@ -7,18 +7,18 @@ FRONTEND_DIR = Path(__file__).resolve().parents[1] / "apps" / "flatshot-desktop"
 def test_topbar_groups_mixed_actions_by_task_type():
     html = (FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
 
-    assert 'top-action-cluster top-action-cluster--batch" aria-label="Importación"' in html
+    assert 'class="top-workbench-context"' in html
+    assert 'class="top-folder-action top-context-item"' in html
+    assert 'id="top-active-preset"' in html
+    assert 'class="top-format-action top-context-item"' in html
     assert 'top-action-cluster top-action-cluster--config" aria-label="Exportación"' in html
     assert 'top-action-cluster top-action-cluster--run" aria-label="Procesamiento"' in html
 
     run_group = html.split('top-action-cluster top-action-cluster--run"', 1)[1].split("</div>", 1)[0]
-    batch_group = html.split('top-action-cluster top-action-cluster--batch"', 1)[1].split("</div>", 1)[0]
-    config_group = html.split('top-action-cluster top-action-cluster--config"', 1)[1].split("</div>", 1)[0]
 
     assert 'id="top-primary-action"' in run_group
-    assert 'data-action="pick-bridge-folder"' in batch_group
-    assert 'data-action="clear-batch"' not in batch_group
-    assert 'data-action="open-app-settings"' in config_group
+    visible_header = html.split('<header class="top-bar">', 1)[1].split('<button type="button" class="dev-only"', 1)[0]
+    assert 'data-action="clear-batch"' not in visible_header
 
 
 def test_topbar_preferences_menu_owns_interface_preferences():
@@ -40,7 +40,9 @@ def test_topbar_exposes_single_batch_entry_action():
 
     top_actions = html.split('<div class="top-actions">', 1)[1].split('data-action="toggle-inspector"', 1)[0]
 
-    assert top_actions.count('data-action="pick-bridge-folder"') == 1
+    header = html.split('<header class="top-bar">', 1)[1].split("</header>", 1)[0]
+    assert header.count('data-action="pick-bridge-folder"') == 1
+    assert top_actions.count('data-action="pick-bridge-folder"') == 0
     assert 'top-reset-action' not in top_actions
     assert 'Nuevo lote' not in top_actions
 
@@ -57,7 +59,7 @@ def test_product_html_uses_salidas_and_ajustes_language():
 def test_topbar_actions_follow_workflow_order():
     html = (FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
 
-    batch_index = html.index("top-action-cluster--batch")
+    batch_index = html.index("top-workbench-context")
     config_index = html.index("top-action-cluster--config")
     run_index = html.index("top-action-cluster--run")
 
@@ -86,9 +88,8 @@ def test_topbar_active_preset_is_status_text_outside_action_group():
 
     assert html.index('id="top-active-preset"') < html.index('<div class="top-actions">')
     assert 'id="top-active-preset"' not in actions_block
-    assert "grid-template-columns: auto auto auto;" in actions_rule
+    assert "grid-template-columns: auto auto;" in actions_rule
     assert "minmax(320px, 1fr)" not in actions_rule
-    assert "grid-column: 2;" in preset_rule
     assert "display: inline-grid;" in preset_rule
     assert "border:" not in preset_rule
     assert "background:" not in preset_rule
@@ -99,6 +100,32 @@ def test_topbar_active_preset_is_status_text_outside_action_group():
     assert ".top-active-preset__label" in topbar_css
     assert ".top-active-preset__value" in topbar_css
     assert "activePreset.replaceChildren" in topbar_js
+
+
+def test_desktop_work_context_keeps_folder_preset_and_output_labels_visible():
+    topbar_css = (FRONTEND_DIR / "css" / "02-layout" / "topbar.css").read_text(encoding="utf-8")
+    responsive_css = (FRONTEND_DIR / "css" / "08-states-responsive" / "responsive.css").read_text(encoding="utf-8")
+
+    label_rule = topbar_css.split(".top-context-item__label, .top-active-preset__label {", 1)[1].split("}", 1)[0]
+    compact = responsive_css.split("@media (max-width: 1119px) {", 1)[1].split("@media (max-width: 759px) {", 1)[0]
+
+    assert "display: none;" not in label_rule
+    assert ".top-context-item__label" in compact
+    assert "display: none;" in compact.split(".top-context-item__label", 1)[1].split("}", 1)[0]
+
+
+def test_desktop_work_context_separates_values_and_truncates_safely():
+    topbar_css = (FRONTEND_DIR / "css" / "02-layout" / "topbar.css").read_text(encoding="utf-8")
+
+    context_rule = topbar_css.split("\n.top-workbench-context {", 1)[1].split("}", 1)[0]
+    item_rule = topbar_css.split("\n.top-context-item {", 1)[1].split("}", 1)[0]
+    value_rule = topbar_css.split(".top-context-item__value, .top-active-preset__value {", 1)[1].split("}", 1)[0]
+
+    assert "grid-template-columns: minmax(108px, max-content) minmax(132px, max-content) minmax(120px, max-content);" in context_rule
+    assert "max-width: min(560px, 100%);" in context_rule
+    assert "gap: var(--space-0-5);" in item_rule
+    assert "padding: 0 var(--space-4);" in item_rule
+    assert "max-width: 180px;" in value_rule
 
 
 def test_topbar_export_status_actions_stay_in_header_row():
@@ -121,13 +148,12 @@ def test_primary_toolbar_controls_use_stable_icon_names():
     html = (FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
     buttons_css = (FRONTEND_DIR / "css" / "03-components" / "buttons.css").read_text(encoding="utf-8")
 
-    expected_icons = {
-        "sliders",
-        "folder-open",
-    }
+    expected_icons = {"sliders"}
 
     for icon in expected_icons:
         assert f'data-icon="{icon}"' in html
+
+    assert 'class="top-folder-action top-context-item"' in html
 
     assert "button[data-icon]::before" not in buttons_css
     assert ".button-icon svg" in buttons_css
@@ -152,3 +178,16 @@ def test_dev_review_controls_are_hidden_outside_dev_mode():
     assert '<details class="review-panel dev-only">' not in html
     assert "html:not(.dev-mode) :is(" in debug_css
     assert ".dev-only" in debug_css
+    assert "html.dev-mode body .top-actions > :is(button.dev-only, details.debug-panel)" in debug_css
+
+
+def test_primary_view_chrome_uses_progressive_disclosure():
+    html = (FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
+
+    assert 'aria-label="Cambiar carpeta"' in html
+    assert 'aria-label="Configurar salida"' in html
+    assert '<details class="viewer-options-menu" id="viewer-options-menu">' in html
+    menu = html.split('<details class="viewer-options-menu" id="viewer-options-menu">', 1)[1].split("</details>", 1)[0]
+    assert '<summary aria-label="Opciones de vista">Vista</summary>' in menu
+    assert 'class="segmented compact viewer-background-switch background-switch"' in menu
+    assert 'class="viewer-control-group viewer-guides"' in menu

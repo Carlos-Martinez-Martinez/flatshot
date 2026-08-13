@@ -10,9 +10,11 @@
   const escapeHtml = (value) => formatterHelpers.escapeHtml(value);
 
   function exportConfirmRiskHtml(risk) {
-    const icon = risk.blocking ? "!" : "⚠";
+    const excluded = risk.id === "non-exportable-images";
+    const icon = risk.blocking ? "!" : excluded ? "×" : "⚠";
+    const tone = risk.blocking ? "error" : excluded ? "excluded" : "warning";
     return `
-    <div class="export-confirm-risk ${risk.blocking ? "error" : "warning"}">
+    <div class="export-confirm-risk ${tone}">
       <span aria-hidden="true">${escapeHtml(icon)}</span>
       <div>
         <strong>${escapeHtml(risk.title)}</strong>

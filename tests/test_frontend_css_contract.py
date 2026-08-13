@@ -68,7 +68,7 @@ def test_frontend_loads_only_modular_css_in_contract_order():
 
 
 def test_frontend_assets_share_css_module_cache_token():
-    assert audit_css.stylesheet_versions(FRONTEND_DIR / "index.html") == {"20260721-empty-folder-icon"}
+    assert audit_css.stylesheet_versions(FRONTEND_DIR / "index.html") == {"20260812-inspector-coherence-v2"}
 
 
 def test_css_modules_keep_cascade_contract():
@@ -1102,14 +1102,10 @@ def test_responsive_module_consolidates_adjacent_media_blocks():
 
     assert media_queries == [
         "min-width: 1600px",
-        "max-width: 1360px",
-        "max-width: 1500px",
+        "max-width: 1599px",
         "max-width: 1240px",
-        "max-width: 1280px",
-        "max-width: 1180px",
-        "max-width: 1120px",
-        "max-width: 1080px",
-        "max-width: 720px",
+        "max-width: 1119px",
+        "max-width: 759px",
     ]
     assert all(
         current != following
@@ -1296,3 +1292,78 @@ def test_button_defaults_avoid_long_negative_selector_lists():
     assert "button:not(.image-item):not(.preset-chip)" not in css
     assert "button:not(.primary):not(.active)" not in css
     assert "[data-action]" in css
+
+
+def test_desktop_workspace_uses_portrait_three_column_geometry():
+    shell_css = (
+        FRONTEND_DIR / "css" / "02-layout" / "shell-workspace.css"
+    ).read_text(encoding="utf-8")
+    gallery_css = (
+        FRONTEND_DIR / "css" / "04-batch-gallery" / "gallery-shell.css"
+    ).read_text(encoding="utf-8")
+    viewer_css = (
+        FRONTEND_DIR / "css" / "05-viewer" / "viewer-shell.css"
+    ).read_text(encoding="utf-8")
+    inspector_css = (
+        FRONTEND_DIR / "css" / "06-inspector-export" / "inspector-workflow.css"
+    ).read_text(encoding="utf-8")
+
+    workspace_rule = shell_css.split(".workspace {", 1)[1].split("}", 1)[0]
+    gallery_rule = re.search(r"(?m)^\.gallery-column\s*\{([^}]*)\}", gallery_css).group(1)
+    preview_rule = re.search(r"(?m)^\.preview-panel\s*\{([^}]*)\}", viewer_css).group(1)
+    inspector_rule = re.search(r"(?m)^\.settings-panel\s*\{([^}]*)\}", inspector_css).group(1)
+
+    assert "grid-template-rows: minmax(0, 1fr);" in workspace_rule
+    assert "minmax(360px, 1fr)" in workspace_rule
+    assert "minmax(720px, 920px)" in workspace_rule
+    assert "clamp(320px, 19vw, 390px)" in workspace_rule
+    assert "grid-column: 1;" in gallery_rule
+    assert "grid-row: 1;" in gallery_rule
+    assert "grid-column: 2;" in preview_rule
+    assert "grid-row: 1;" in preview_rule
+    assert "grid-column: 3;" in inspector_rule
+    assert "grid-row: 1;" in inspector_rule
+
+
+def test_portrait_workstation_breakpoints_keep_gallery_and_preview_reachable():
+    responsive_css = (
+        FRONTEND_DIR / "css" / "08-states-responsive" / "responsive.css"
+    ).read_text(encoding="utf-8")
+
+    tablet = responsive_css.split("@media (max-width: 1119px) {", 1)[1].split("@media (max-width: 759px) {", 1)[0]
+    compact = responsive_css.split("@media (max-width: 759px) {", 1)[1]
+    wide = responsive_css.split("@media (min-width: 1600px) {", 1)[1].split("@media (max-width: 1599px) {", 1)[0]
+
+    assert "minmax(420px, 1fr) minmax(760px, 920px)" in wide
+    assert "grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);" in tablet
+    assert ".preview-panel" not in tablet or "grid-column: 2;" in tablet
+    assert "grid-template-columns: minmax(0, 1fr);" in compact
+    assert ".preview-panel" in compact and "grid-row: 1;" in compact
+    assert ".gallery-column" in compact and "grid-row: 2;" in compact
+
+
+def test_wide_gallery_adds_thumbnail_columns_with_the_released_width():
+    image_grid_css = (
+        FRONTEND_DIR / "css" / "04-batch-gallery" / "image-grid.css"
+    ).read_text(encoding="utf-8")
+    wide = image_grid_css.split("@media (min-width: 1600px) {", 1)[1]
+
+    assert '.gallery-column[data-gallery-view="thumbs"] .image-list' in wide
+    assert "repeat(auto-fit, minmax(132px, 1fr))" in wide
+
+
+def test_medium_desktop_gives_the_preview_toolbar_the_full_header_width():
+    responsive_css = (
+        FRONTEND_DIR / "css" / "08-states-responsive" / "responsive.css"
+    ).read_text(encoding="utf-8")
+    medium_desktop = responsive_css.split("@media (max-width: 1599px) {", 1)[1].split(
+        "@media (max-width: 1240px) {", 1
+    )[0]
+
+    title_rule = medium_desktop.split(".preview-title-block", 1)[1].split("}", 1)[0]
+    header_rule = medium_desktop.split(".preview-header", 1)[1].split("}", 1)[0]
+    toolbar_rule = medium_desktop.split(".preview-toolbar", 1)[1].split("}", 1)[0]
+
+    assert "display: none;" in title_rule
+    assert "grid-template-columns: minmax(0, 1fr);" in header_rule
+    assert "width: 100%;" in toolbar_rule

@@ -16,6 +16,7 @@ function openAppSettings() {
   state.outputProfileEditorId = profile.id;
   state.outputProfileDraft = { ...profile };
   state.outputDeleteConfirmId = "";
+  state.outputProfileCloseConfirmOpen = false;
   state.statusText = "Salidas";
   render();
   queueModalFocus("#app-settings-modal", "[data-action='close-app-settings']");
@@ -23,16 +24,34 @@ function openAppSettings() {
 
 function closeAppSettings() {
   if (state.appSettingsOpen && outputProfileHasUnsavedChanges()) {
-    showOutputProfileUnsavedNotice("Guarda o descarta los cambios antes de cerrar.");
+    state.outputProfileCloseConfirmOpen = true;
+    state.outputProfileNotice = "Confirma si quieres descartar los cambios.";
+    render();
     return;
   }
+  closeAppSettingsImmediately();
+}
+
+function closeAppSettingsImmediately() {
   releaseModalFocusBeforeHide();
   state.appSettingsOpen = false;
   state.outputProfileDraft = null;
   state.outputProfileNotice = "";
   state.outputDeleteConfirmId = "";
+  state.outputProfileCloseConfirmOpen = false;
   state.statusText = "Configuración cerrada";
   render();
+}
+
+function keepEditingOutputProfile() {
+  state.outputProfileCloseConfirmOpen = false;
+  state.outputProfileNotice = "";
+  render();
+}
+
+function discardOutputProfileAndClose() {
+  state.outputProfileCloseConfirmOpen = false;
+  cancelOutputProfileDraft();
 }
 
 function cancelOutputProfileDraft() {
@@ -45,6 +64,7 @@ function cancelOutputProfileDraft() {
   state.outputProfileEditorId = fallback?.id || "";
   state.outputProfileDraft = null;
   state.outputDeleteConfirmId = "";
+  state.outputProfileCloseConfirmOpen = false;
   state.statusText = "Salida descartada";
   render();
 }

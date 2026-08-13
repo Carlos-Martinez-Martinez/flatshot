@@ -1,152 +1,89 @@
 @layer flatshot {
-/* Responsive: viewport-specific layout overrides. */
+/* Responsive: production workbench breakpoints. */
 
 @media (min-width: 1600px) {
   .workspace {
-    grid-template-columns: clamp(390px, 22vw, 440px) minmax(0, 1fr) clamp(380px, 20vw, 440px);
+    grid-template-columns: minmax(420px, 1fr) minmax(760px, 920px) clamp(340px, 19vw, 400px);
   }
 }
 
-@media (max-width: 1360px) {
-  .top-actions {
-    gap: var(--space-1-5);
+@media (max-width: 1599px) {
+  .workspace {
+    grid-template-columns: 300px minmax(0, 1fr) 336px;
   }
 
-  .top-actions button {
-    padding-inline: 9px;
-  }
-
-  .preview-toolbar {
-    column-gap: var(--space-8);
-    row-gap: var(--space-2);
-  }
-
-  .zoom-controls button {
-    min-width: 28px;
-    padding-inline: 6px;
-  }
-
-  #viewer-position {
-    min-width: 68px;
-  }
-
-  .bottom-bar {
-    grid-template-columns: minmax(310px, 1fr) minmax(180px, 0.55fr) auto;
-    gap: var(--space-2);
-    padding-inline: var(--space-3);
+  .app-shell[data-inspector-editing="true"] .workspace {
+    grid-template-columns: 280px minmax(0, 1fr) minmax(380px, 440px);
   }
 
   .top-bar-main {
-    gap: var(--space-3);
-    padding-inline: var(--space-3);
-    grid-template-columns: minmax(190px, 0.8fr) minmax(230px, 1fr) auto;
+    grid-template-columns: auto minmax(360px, 1fr) auto;
   }
 
-  .top-export {
-    min-width: 128px;
-  }
-
-  .preflight-chip {
+  .top-summary {
     display: none;
   }
 
-  .preview-header h2, .preview-title-block span:last-child {
-    max-width: 38vw;
+  .top-actions {
+    grid-column: 3;
   }
 
-  .workspace {
-    grid-template-columns: clamp(370px, 30vw, 410px) minmax(0, 1fr) 300px;
+  .preview-title-block {
+    display: none;
   }
 
-  .image-list {
-    grid-auto-columns: 92px;
+  .preview-header {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .image-item {
-    width: 92px;
-    grid-template-rows: 62px minmax(0, auto);
+  .preview-toolbar {
+    width: 100%;
+    justify-self: stretch;
+    justify-content: space-between;
   }
 
-  .preview-panel {
-    grid-template-rows: auto minmax(0, 1fr) 0;
-  }
-}
-
-@media (max-width: 1500px) {
-  .gallery-column .image-list {
-    gap: var(--space-2);
-    padding: var(--space-3);
+  .preview-toolbar, .zoom-controls {
+    column-gap: var(--space-4);
   }
 }
 
 @media (max-width: 1240px) {
+  .top-workbench-context {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .top-workbench-context .top-format-action {
+    display: none;
+  }
+
   .preview-header {
     grid-template-columns: minmax(0, 1fr);
     align-items: start;
   }
 
-  .preview-output-context {
-    left: var(--space-3);
-    right: var(--space-3);
-    bottom: var(--space-3);
-    max-width: none;
-  }
-
-  .workspace {
-    grid-template-columns: minmax(360px, 0.5fr) minmax(360px, 1fr) minmax(300px, 0.5fr);
-  }
-
-  .gallery-column .image-list {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-}
-
-@media (max-width: 1280px) {
   .preview-toolbar {
-    flex-wrap: wrap;
-    justify-content: flex-end;
+    justify-self: start;
   }
 
-  .app-shell[data-output-editing="true"] .workspace {
-    grid-template-columns: minmax(280px, 340px) minmax(420px, 1fr) minmax(440px, 500px);
-  }
-}
-
-@media (max-width: 1180px) {
-  .app-settings-content {
-    grid-template-columns: 1fr;
-    overflow-y: auto;
-  }
-
-  .output-format-list {
-    border-right: 0;
-    border-bottom: var(--border-width) solid var(--color-border);
-  }
-
-  .format-section-preview {
-    grid-template-columns: 1fr;
-  }
-
-  .inspector-tabs {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .batch-detail-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 1120px) {
-  [data-action="toggle-inspector"] {
+  .gallery-toolbar__summary {
     display: none;
+  }
+}
+
+@media (max-width: 1119px) {
+  .top-bar-main {
+    grid-template-columns: auto minmax(160px, 1fr) auto;
   }
 
   html.dev-mode [data-action="toggle-inspector"], .top-actions .debug-panel {
     display: none;
   }
 
-  .settings-panel {
+  .workspace, .app-shell[data-output-editing="true"] .workspace, .app-shell[data-inspector-editing="true"] .workspace {
+    grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
+  }
+
+  .settings-panel, .settings-panel.is-editing-preset, .settings-panel.is-advanced-subview {
     display: none;
   }
 
@@ -156,8 +93,8 @@
     right: 0;
     bottom: 0;
     z-index: var(--z-popover);
-    width: min(460px, calc(100vw - 320px));
-    min-width: 390px;
+    width: min(440px, calc(100vw - 80px));
+    min-width: 360px;
     display: flex;
     border-left: var(--border-width) solid var(--color-border);
     box-shadow: -18px 0 36px var(--ink-alpha-12);
@@ -167,76 +104,23 @@
     display: inline-flex;
   }
 
-  .workspace {
-    grid-template-columns: minmax(350px, 390px) minmax(0, 1fr);
-  }
-
-  .app-shell[data-output-editing="true"] .workspace {
-    grid-template-columns: minmax(350px, 390px) minmax(0, 1fr);
-  }
-
-  .preview-panel {
-    grid-template-rows: auto minmax(0, 1fr) 0;
-  }
-}
-
-@media (max-width: 1080px) {
-  .app-shell[data-ui-state="no_folder"] .workspace, .app-shell[data-ui-state="batch_empty"] .workspace, .app-shell[data-ui-state="scan_empty"] .workspace, .app-shell[data-ui-state="scanning"] .workspace {
+  .top-workbench-context {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .settings-panel {
+  .top-active-preset, #top-secondary-action, #top-preflight-status {
     display: none;
   }
 
-  .format-form-section .form-grid, .settings-panel.is-editing-output .export-section .form-grid {
-    grid-template-columns: minmax(0, 1fr);
+  .top-context-item__label {
+    display: none;
   }
 
-  .format-editor-panel {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .format-section-file, .format-section-image, .format-section-destination {
-    grid-column: auto;
-    grid-row: auto;
-  }
-
-  .background-preset-editor-fields, .background-preset-editor.is-transparent .background-preset-editor-fields {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .background-preset-editor-actions { justify-content: flex-start; flex-wrap: wrap; }
-
-  .workspace {
-    grid-template-columns: minmax(350px, 390px) minmax(0, 1fr);
-    grid-template-rows: var(--fs-left-top-row) minmax(0, 1fr);
-  }
-
-  .preview-panel {
-    grid-column: 2;
-    grid-row: 1 / 3;
-  }
-
-  #app-settings-modal .app-settings-content, .batch-detail-grid--compact, .format-preview-flow, .settings-panel.is-editing-output .export-section .form-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
-@media (max-width: 720px) {
-  .export-confirm-summary {
-    grid-template-columns: 1fr;
-  }
-
-  .app-shell {
+@media (max-width: 759px) {
+  .app-shell, .app-shell[data-ui-state="no_folder"], .app-shell[data-ui-state="batch_empty"], .app-shell[data-ui-state="scan_empty"] {
     grid-template-rows: auto minmax(0, 1fr) var(--footer-height);
-  }
-
-  .app-shell[data-ui-state="no_folder"], .app-shell[data-ui-state="batch_empty"], .app-shell[data-ui-state="scan_empty"] {
-    grid-template-rows: auto minmax(0, 1fr) var(--footer-height);
-  }
-
-  .app-shell[data-ui-state="exporting"] {
-    grid-template-rows: auto minmax(0, 1fr) 96px;
   }
 
   .app-shell[data-status-footer="true"] {
@@ -247,48 +131,85 @@
     height: auto;
     min-height: var(--header-height);
     grid-template-columns: minmax(0, 1fr);
-    align-content: center;
     gap: var(--space-2);
     padding: var(--space-2);
   }
 
+  .brand-block, .top-workbench-context, .top-actions {
+    grid-column: 1;
+  }
+
   .brand-block {
-    min-width: 0;
+    grid-row: 1;
+  }
+
+  .top-workbench-context {
+    display: none;
   }
 
   .top-actions {
+    grid-row: 2;
     width: 100%;
-    max-width: 100%;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-column: 1;
-    justify-self: stretch;
+    grid-template-columns: auto minmax(0, 1fr);
     justify-content: stretch;
-    overflow: visible;
-    padding-bottom: 2px;
   }
 
-  .top-actions > * {
+  .top-action-cluster--run, #top-primary-action.top-export {
+    width: 100%;
     min-width: 0;
-  }
-
-  .top-active-preset {
-    grid-column: 1;
-    justify-self: start;
-  }
-
-  .top-action-cluster--run {
-    grid-column: 1 / -1;
-    margin-inline-start: 0;
   }
 
   .workspace {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(260px, 42%) minmax(360px, 1fr);
+    grid-template-rows: minmax(260px, 1fr) 300px;
     overflow-x: hidden;
   }
 
-  .app-shell[data-output-editing="true"] .workspace {
+  .gallery-header.gallery-toolbar {
     grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .preview-panel {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .gallery-column, .app-shell[data-batch-context="true"] .gallery-column {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .gallery-toolbar__top {
+    grid-column: 1 / -1;
+  }
+
+  .gallery-toolbar__fields {
+    grid-column: 1;
+  }
+
+  .gallery-toolbar__filters {
+    grid-column: 1;
+  }
+
+  .gallery-filter button {
+    padding-inline: var(--space-2);
+  }
+
+  .preview-toolbar, .zoom-controls {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    column-gap: var(--space-2);
+  }
+
+  .viewer-background-switch, .viewer-guides {
+    display: none;
+  }
+
+  .app-shell[data-output-editing="true"] .settings-panel, .app-shell[data-responsive-inspector="true"] .settings-panel {
+    left: 0;
+    width: 100%;
+    min-width: 0;
   }
 
   .bottom-bar {
@@ -314,60 +235,9 @@
     justify-content: flex-end;
   }
 
-  .gallery-column {
-    grid-column: 1;
-    grid-row: 1;
-    width: auto;
-    height: auto;
-    min-width: 0;
-    min-height: 0;
-    max-height: 100%;
-  }
-
-  .app-shell[data-batch-context="true"] .gallery-column {
-    grid-column: 1;
-    grid-row: 1;
-    height: auto;
-  }
-
-  .preview-panel {
-    grid-column: 1;
-    grid-row: 2;
-    width: auto;
-    height: auto;
-    min-width: 0;
-    min-height: 0;
-    max-height: 100%;
-  }
-
-  .app-shell[data-batch-context="true"] .preview-panel {
-    grid-column: 1;
-    grid-row: 2;
-    height: auto;
-  }
-
-  .settings-panel {
-    display: none;
-  }
-
-  .app-shell[data-output-editing="true"] .settings-panel, .app-shell[data-responsive-inspector="true"] .settings-panel {
-    left: 0;
-    width: 100%;
-    min-width: 0;
-  }
-
-  .app-shell[data-ui-state="no_folder"] .workspace, .app-shell[data-ui-state="scanning"] .workspace {
-    grid-template-rows: minmax(0, 1fr);
-  }
-
-  .app-shell[data-ui-state="no_folder"] .preview-panel, .app-shell[data-ui-state="scanning"] .preview-panel {
-    grid-row: 1;
-  }
-}
-
-@media (max-width: 1360px) and (min-width: 1121px) {
-  .app-shell[data-inspector-editing="true"] .workspace {
-    grid-template-columns: clamp(340px, 29vw, 390px) minmax(0, 1fr) minmax(380px, 440px);
+  .export-confirm-summary, .format-form-section .form-grid, .settings-panel.is-editing-output .export-section .form-grid,
+  .format-editor-panel, .background-preset-editor-fields, .background-preset-editor.is-transparent .background-preset-editor-fields {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 }

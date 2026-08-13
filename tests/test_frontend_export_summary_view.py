@@ -102,9 +102,11 @@ const presetHtml = helpers.exportSummaryHtml({{
   warningSummaryHtml: '<div class="warning-summary">Aviso</div>',
   temporaryNoticeHtml: '<div class="temporary-output-notice">Temporal</div>',
 }});
-assert.equal(presetHtml.includes("<span>Salidas</span>"), true);
+assert.equal(presetHtml.includes("<strong>Salidas</strong>"), true);
 assert.equal(presetHtml.includes("5 activas"), true);
 assert.equal(presetHtml.includes("25 archivos previstos"), true);
+assert.equal(presetHtml.includes('class="inspector-content-group"'), true);
+assert.equal(presetHtml.includes('class="inspector-content-group__head"'), true);
 assert.equal(presetHtml.includes("Formato"), false);
 assert.equal(presetHtml.includes("Nombre final"), false);
 assert.equal(presetHtml.includes("camisa &lt;azul&gt;.jpg"), false);

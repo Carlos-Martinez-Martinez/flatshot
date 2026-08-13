@@ -198,15 +198,18 @@ function galleryVisibleCountText(visibleCount, totalCount) {
 
 function galleryVirtualWindow(images = []) {
   const imageList = $("#image-list");
-  const columns = state.galleryView === "list" ? 1 : galleryGridColumnCount(imageList);
   const scrollTop = Number.isFinite(state.galleryScrollTop)
     ? state.galleryScrollTop
     : imageList?.scrollTop || 0;
+  const columns = galleryHelpers.galleryColumnCount({
+    view: state.galleryView,
+    width: imageList?.clientWidth || 0,
+  });
   return galleryHelpers.virtualGalleryWindow({
     total: images.length,
     scrollTop,
     viewportHeight: imageList?.clientHeight || 0,
-    rowHeight: state.galleryView === "list" ? 82 : galleryThumbnailRowHeight(),
+    rowHeight: state.galleryView === "list" ? 76 : galleryThumbnailRowHeight(),
     columns,
     overscanRows: 3,
     threshold: 100,
@@ -214,16 +217,7 @@ function galleryVirtualWindow(images = []) {
 }
 
 function galleryThumbnailRowHeight() {
-  return { small: 156, medium: 178, large: 240 }[state.interfacePreferences.thumbnailSize] || 178;
-}
-
-function galleryGridColumnCount(imageList) {
-  if (!imageList || typeof window.getComputedStyle !== "function") {
-    return 2;
-  }
-  const columns = window.getComputedStyle(imageList).gridTemplateColumns || "";
-  const count = columns.split(" ").filter(Boolean).length;
-  return Math.max(1, count || 2);
+  return { small: 166, medium: 198, large: 252 }[state.interfacePreferences.thumbnailSize] || 198;
 }
 
 function galleryVirtualSpacerHtml(height) {

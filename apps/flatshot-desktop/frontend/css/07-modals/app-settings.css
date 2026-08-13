@@ -225,6 +225,11 @@
   pointer-events: none;
 }
 
+#app-settings-modal .app-settings-footer.is-confirming-close > :not(.output-close-confirm) {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 #app-settings-modal .app-settings-content {
   min-height: 0;
   display: grid;

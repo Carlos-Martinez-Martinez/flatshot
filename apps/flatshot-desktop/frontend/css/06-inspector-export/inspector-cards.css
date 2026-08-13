@@ -129,7 +129,7 @@
   color: var(--color-text);
 }
 
-.inspector-processing-card, .selected-image-card {
+.inspector-processing-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
@@ -146,7 +146,7 @@
   padding: 14px;
 }
 
-.panel-summary-card__head, .selected-image-card__head, .inspector-output-card__head {
+.panel-summary-card__head, .inspector-output-card__head {
   min-width: 0;
   grid-column: 1 / -1;
   display: grid;
@@ -155,13 +155,13 @@
   gap: var(--space-2) var(--space-3);
 }
 
-.panel-summary-card__head > div, .selected-image-card__head > div, .inspector-output-card__head > div {
+.panel-summary-card__head > div, .inspector-output-card__head > div {
   min-width: 0;
   display: grid;
   gap: var(--space-0-5);
 }
 
-.panel-summary-card__head span, .selected-image-card__head span, .inspector-output-card__head span {
+.panel-summary-card__head span, .inspector-output-card__head span {
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
@@ -169,13 +169,13 @@
   text-transform: none;
 }
 
-.panel-summary-card__head strong, .selected-image-card__head strong, .inspector-output-card__head strong {
+.panel-summary-card__head strong, .inspector-output-card__head strong {
   color: var(--color-text);
   font-size: 15px;
   line-height: var(--line-height-snug);
 }
 
-.panel-summary-card__head small, .selected-image-card__head small, .panel-summary-card__meta, .inspector-output-card__head small {
+.panel-summary-card__head small, .panel-summary-card__meta, .inspector-output-card__head small {
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
   line-height: var(--line-height-compact);
@@ -233,16 +233,13 @@
 }
 
 .selected-image-card {
-  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  display: grid;
+  gap: var(--space-3);
 }
 
-.selected-image-card__state {
-  align-self: start;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-compact);
-  text-align: right;
+.selected-image-card .inspector-pane-head {
+  padding-top: var(--space-3);
 }
 
 .selected-image-card__actions {
@@ -250,6 +247,7 @@
   flex-wrap: wrap;
   justify-content: flex-start;
   gap: var(--space-1-5);
+  padding-inline: var(--space-1);
 }
 
 .selected-image-card__actions button {

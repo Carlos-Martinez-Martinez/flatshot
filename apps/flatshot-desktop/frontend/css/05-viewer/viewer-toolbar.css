@@ -28,7 +28,7 @@
   padding-block: 2px;
 }
 
-.preview-title-block .eyebrow, #preview-subtitle, .preview-output-context, .preview-footer, .preview-mode-switch {
+.preview-title-block .eyebrow, #preview-subtitle, .preview-footer, .preview-mode-switch {
   display: none;
 }
 
@@ -48,7 +48,7 @@
   max-width: 100%;
   justify-content: flex-end;
   flex-wrap: nowrap;
-  column-gap: var(--space-8);
+  column-gap: var(--space-3);
   row-gap: var(--space-2);
 }
 
@@ -57,9 +57,48 @@
   max-width: 100%;
   justify-content: flex-end;
   flex-wrap: nowrap;
-  column-gap: var(--space-8);
+  column-gap: var(--space-3);
   row-gap: var(--space-2);
   background: transparent;
+}
+
+.viewer-options-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.viewer-options-menu > summary {
+  min-height: var(--control-size-slim);
+  display: inline-flex;
+  align-items: center;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-xs);
+  background: var(--color-bg-panel);
+  padding: 0 var(--space-3);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.viewer-options-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.viewer-options-popover {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: var(--z-popover);
+  min-width: 260px;
+  display: grid;
+  gap: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-panel);
+  padding: var(--space-3);
+  box-shadow: var(--shadow-popover);
 }
 
 .viewer-background-switch, .viewer-control-group {
@@ -297,6 +336,50 @@
 
   .guide-add-row {
     grid-template-columns: minmax(120px, 1fr) 148px 124px 84px 150px;
+  }
+}
+
+@media (min-width: 1600px) {
+  .preview-header {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .preview-toolbar {
+    width: 100%;
+    justify-self: stretch;
+    justify-content: space-between;
+  }
+
+  .viewer-options-menu {
+    border-right: var(--border-width) solid var(--color-border);
+    padding-right: var(--space-2);
+  }
+
+  .viewer-options-menu > summary {
+    display: none;
+  }
+
+  .viewer-options-popover {
+    position: static;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  .zoom-controls {
+    gap: var(--space-2);
+  }
+
+  .zoom-controls .viewer-control-group + .viewer-control-group {
+    border-left: var(--border-width) solid var(--color-border);
+    padding-left: var(--space-1);
   }
 }
 

@@ -6,6 +6,40 @@ function setPreviewCanvasHtml(canvas, html) {
   }
 }
 
+function syncViewerOptionsDisclosure() {
+  const menu = $("#viewer-options-menu");
+  if (!menu) {
+    return;
+  }
+  const wide = window.matchMedia("(min-width: 1600px)").matches;
+  if (wide) {
+    menu.open = true;
+    menu.dataset.wideOpen = "true";
+  } else if (menu.dataset.wideOpen === "true") {
+    menu.open = false;
+    delete menu.dataset.wideOpen;
+  }
+}
+
+function syncPreviewWorkspaceGeometry() {
+  const canvasArea = $("#canvas-area");
+  if (!canvasArea) {
+    return;
+  }
+  const aspectRatio = previewStateHelpers.previewAspectRatio(state.previewData || selectedImage() || {});
+  const geometry = previewStateHelpers.previewCanvasGeometry({
+    aspectRatio,
+    containerHeight: canvasArea.clientHeight,
+    containerWidth: canvasArea.clientWidth,
+  });
+  canvasArea.style.setProperty("--preview-aspect-ratio", String(aspectRatio));
+  if (geometry.width && geometry.height) {
+    canvasArea.style.setProperty("--preview-canvas-width", `${geometry.width}px`);
+    canvasArea.style.setProperty("--preview-canvas-height", `${geometry.height}px`);
+  }
+  syncViewerOptionsDisclosure();
+}
+
 function renderPreview() {
   const image = selectedImage();
   const visibleImages = filteredImages();
@@ -45,6 +79,7 @@ function renderPreview() {
   const previewBackgroundColor = backgroundPresetHelpers.backgroundCssColor(state.previewBg, backgroundHelperOptions());
   const canvasArea = $("#canvas-area");
   canvasArea.className = `canvas-area bg-${previewBackgroundMode}`;
+  canvasArea.style.setProperty("--preview-aspect-ratio", String(previewStateHelpers.previewAspectRatio(state.previewData || image || {})));
   if (previewBackgroundColor) {
     canvasArea.style.setProperty("--custom-preview-bg", previewBackgroundColor);
   } else {
@@ -176,6 +211,7 @@ function renderPreview() {
 }
 
 function finishPreviewRender() {
+  syncPreviewWorkspaceGeometry();
   renderGuideOverlay();
   queueFitZoomRefresh();
 }

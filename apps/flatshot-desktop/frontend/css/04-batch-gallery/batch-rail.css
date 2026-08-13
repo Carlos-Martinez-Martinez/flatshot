@@ -121,7 +121,7 @@
   scrollbar-color: var(--ink-alpha-16) transparent;
   background: var(--rail-bg);
   width: auto;
-  display: flex;
+  display: none;
   flex-direction: column;
   border-right: var(--border-width) solid var(--rail-border);
   padding: 0;

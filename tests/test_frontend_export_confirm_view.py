@@ -84,6 +84,14 @@ assert.equal(riskHtml.includes('<span aria-hidden="true">!</span>'), true);
 assert.equal(riskHtml.includes('Destino &lt;bloqueado&gt;'), true);
 assert.equal(riskHtml.includes('Ruta &quot;ocupada&quot;'), true);
 
+const excludedHtml = helpers.exportConfirmRiskHtml({{
+  id: "non-exportable-images",
+  title: "2 imágenes excluidas",
+  detail: "No se exportarán.",
+}});
+assert.equal(excludedHtml.includes('class="export-confirm-risk excluded"'), true);
+assert.equal(excludedHtml.includes('<span aria-hidden="true">×</span>'), true);
+
 const blockingHtml = helpers.exportConfirmHtml({{
   risks: [
     {{

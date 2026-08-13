@@ -38,28 +38,16 @@ assert.equal(helpers.inspectorMode({{ outputEditMode: false, inspectorTab: "warn
 assert.equal(helpers.inspectorMode({{ outputEditMode: false, inspectorTab: "review" }}), "summary");
 assert.equal(helpers.inspectorMode({{ outputEditMode: false, inspectorTab: "unknown" }}), "summary");
 assert.deepEqual(helpers.inspectorSummaryCardKeys({{ complexityMode: "simple", hasIssues: false }}), [
-  "lot",
-  "aspect",
-  "output",
+  "selectedImage",
 ]);
 assert.deepEqual(helpers.inspectorSummaryCardKeys({{ complexityMode: "simple", hasIssues: true }}), [
-  "lot",
-  "aspect",
-  "output",
-  "issues",
+  "selectedImage",
 ]);
 assert.deepEqual(helpers.inspectorSummaryCardKeys({{ complexityMode: "advanced", hasIssues: true }}), [
-  "lot",
-  "aspect",
-  "output",
   "selectedImage",
-  "issues",
 ]);
 assert.deepEqual(helpers.inspectorSummaryCardKeys({{ complexityMode: "unknown", hasIssues: true }}), [
-  "lot",
-  "aspect",
-  "output",
-  "issues",
+  "selectedImage",
 ]);
 
 assert.deepEqual(helpers.inspectorSubviewHeaderState({{
@@ -67,24 +55,38 @@ assert.deepEqual(helpers.inspectorSubviewHeaderState({{
   outputEditMode: true,
   outputLabel: "JPG · 1800×2400",
 }}), {{
-  title: "Exportación",
-  subtitle: "Editar salida",
-  detail: "",
+  title: "Editar salida",
+  subtitle: "JPG · 1800×2400",
+  detail: "Los cambios afectan solo a esta salida.",
   backAction: "cancel-output-edit",
   backLabel: "Cancelar",
   showManageAction: false,
+  showBackAction: true,
+}});
+assert.deepEqual(helpers.inspectorSubviewHeaderState({{
+  mode: "output",
+  outputLabel: "JPG · 1800×2400 · gris claro",
+}}), {{
+  title: "Exportación",
+  subtitle: "JPG · 1800×2400 · gris claro",
+  detail: "Salidas y destino del lote",
+  backAction: "close-inspector-subview",
+  backLabel: "Volver",
+  showManageAction: false,
+  showBackAction: false,
 }});
 assert.deepEqual(helpers.inspectorSubviewHeaderState({{
   mode: "advanced",
   activePreset: "Luz cenital",
   presetSourceLabel: "Global · Modificado",
 }}), {{
-  title: "Editar ajuste",
+  title: "Aspecto",
   subtitle: "Luz cenital",
   detail: "Global · Modificado",
   backAction: "close-inspector-subview",
   backLabel: "Volver",
   showManageAction: true,
+  showBackAction: false,
 }});
 assert.deepEqual(helpers.inspectorSubviewHeaderState({{
   mode: "advanced",
@@ -98,17 +100,20 @@ assert.deepEqual(helpers.inspectorSubviewHeaderState({{
   backAction: "close-preset-editor",
   backLabel: "Volver",
   showManageAction: false,
+  showBackAction: true,
 }});
 assert.deepEqual(helpers.inspectorSubviewHeaderState({{
   mode: "warnings",
   warningCount: 2,
+  ignoredCount: 1,
 }}), {{
-  title: "Revisar",
-  subtitle: "2 puntos",
-  detail: "",
+  title: "Avisos",
+  subtitle: "2 por revisar",
+  detail: "No bloquean la exportación",
   backAction: "close-inspector-subview",
   backLabel: "Volver",
   showManageAction: false,
+  showBackAction: false,
 }});
 assert.deepEqual(helpers.inspectorSubviewHeaderState({{
   mode: "unknown",
@@ -119,6 +124,7 @@ assert.deepEqual(helpers.inspectorSubviewHeaderState({{
   backAction: "close-inspector-subview",
   backLabel: "Volver",
   showManageAction: false,
+  showBackAction: false,
 }});
 
 assert.deepEqual(helpers.contextualPreflightRows({{ batch: "scanning" }}), [
@@ -150,11 +156,13 @@ const header = helpers.inspectorSubviewHeaderHtml({{
   backAction: "close-inspector-subview",
   backLabel: "Volver",
   showManageAction: true,
+  showBackAction: false,
 }});
+assert.equal(header.includes('class="inspector-pane-head"'), true);
 assert.equal(header.includes("Editar &lt;ajuste&gt;"), true);
 assert.equal(header.includes("Luz &quot;cenital&quot;"), true);
 assert.equal(header.includes('data-action="open-preset-editor"'), true);
-assert.equal(header.includes('data-action="close-inspector-subview"'), true);
+assert.equal(header.includes('data-action="close-inspector-subview"'), false);
 
 const scanning = helpers.contextualInspectorHtml({{
   batch: "scanning",

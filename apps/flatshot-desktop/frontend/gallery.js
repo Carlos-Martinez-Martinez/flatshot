@@ -193,6 +193,14 @@
     };
   }
 
+  function galleryColumnCount(options = {}) {
+    const width = Math.max(0, Number(options.width) || 0);
+    if (options.view === "list") {
+      return Math.max(1, Math.floor((width + 8) / 288));
+    }
+    return Math.max(1, Math.floor((width + 12) / 168));
+  }
+
   function galleryFilterButtonStates(options = {}) {
     const counts = options.counts || {};
     const activeFilter = options.activeFilter || DEFAULT_FILTERS.all;
@@ -449,6 +457,7 @@
     galleryFilterCounts,
     galleryFilterButtonStates,
     galleryFilterVisible,
+    galleryColumnCount,
     basename,
     compactImageDetail,
     emptyBatchNoteHtml,

@@ -119,8 +119,9 @@
 
     if (!rows.length) {
       return `
-      <div class="issue-list-summary ready issue-list-summary--compact">
+      <div class="inspector-empty-state issue-list-summary ready issue-list-summary--compact">
         <strong>Sin avisos</strong>
+        <span>Todo listo para exportar.</span>
       </div>
     `;
     }

@@ -128,7 +128,7 @@ def test_active_accent_text_uses_accessible_selection_token():
     assert ".segmented button.active {\n  border-color: var(--color-accent-border);" not in states_css
     assert ".gallery-filter button.active" in gallery_css
     assert ".gallery-view-switch" in gallery_css
-    assert "min-width: calc(var(--control-height) * 6);" in gallery_css
+    assert "min-width: 140px;" in gallery_css
     assert not re.search(r"(?<!-)color:\s*var\(--color-accent-hover\);", all_css)
     assert "color: var(--color-primary);" not in gallery_css
     assert not re.search(r"(?<!-)color:\s*var\(--color-primary-hover\);", all_css)
@@ -156,7 +156,8 @@ def test_gallery_rail_uses_brand_tint_in_light_and_dark():
     ):
         rule = css_rule(css, selector)
         assert "background: var(--rail-bg);" in rule
-        assert "border-right: var(--border-width) solid var(--rail-border);" in rule
+        expected_border = "border-right"
+        assert f"{expected_border}: var(--border-width) solid var(--rail-border);" in rule
     for selector in (
         ".gallery-view-switch",
         ".gallery-output-control select",

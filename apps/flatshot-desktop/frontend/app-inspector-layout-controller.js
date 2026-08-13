@@ -44,7 +44,7 @@ function renderInspector() {
   } else {
     start.innerHTML = inspectorSubviewHeaderHtml(mode);
   }
-  $(".inspector-tabs").classList.add("is-hidden");
+  $(".inspector-tabs").classList.remove("is-hidden");
   $$(".settings-panel [data-inspector-tab]").forEach((button) => {
     const active = button.dataset.inspectorTab === state.inspectorTab;
     button.classList.toggle("active", active);

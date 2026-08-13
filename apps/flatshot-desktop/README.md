@@ -80,7 +80,12 @@ and writable `data`. It has no venv, source pointer, or repository dependency.
 Run `FlatShot.exe --smoke` after extraction to validate the bundled frontend and
 bridge without opening pywebview. Use `scripts\verify_portable_candidate.py` to
 verify checksum, archive contents, relocation, a sanitized Python environment,
-and the frozen smoke in one command.
+and the frozen smoke in one command. The Release Candidate and Release
+workflows then run the same extracted `FlatShot.exe` normally on a fresh Windows
+runner. They require a visible native EdgeChromium window, frontend and bridge
+HTTP 200 responses, a temporally related WebView2 process, a non-empty window
+screenshot, no startup traceback, and removal of listeners and FlatShot
+processes during cleanup.
 
 ## Options
 

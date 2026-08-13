@@ -119,8 +119,10 @@ python scripts/verify_portable_candidate.py `
 
 `FlatShot.exe --smoke` starts and checks both loopback servers, then shuts them
 down without opening a window or processing images. `Abrir FlatShot.vbs` runs
-`FlatShot.exe`; it never invokes `pythonw.exe`. The release workflow repeats the
-same verification on a fresh Windows runner before publication can begin.
+`FlatShot.exe`; it never invokes `pythonw.exe`. On a fresh Windows runner, both
+release workflows also launch the extracted executable without arguments and
+require the frontend, bridge health endpoint, visible native EdgeChromium
+window, WebView2 process, non-empty screenshot, and clean shutdown evidence.
 
 ## Safety and compatibility
 

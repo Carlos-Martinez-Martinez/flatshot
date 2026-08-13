@@ -111,7 +111,7 @@ jobs:
           name: FlatShot-release-${{ github.run_id }}
           path: release-artifacts
 
-      - name: Verify checksum, relocatability, and frozen smoke
+      - name: Verify checksum, relocatability, frozen smoke, and normal launch
         shell: pwsh
         run: |
           $archive = Get-ChildItem release-artifacts -Recurse -File -Filter "FlatShotPortable-*.zip" |
@@ -126,6 +126,37 @@ jobs:
             --extract-to $extractTo `
             --forbid-root $env:GITHUB_WORKSPACE `
             --forbid-root $env:RUNNER_WORKSPACE
+          if ($LASTEXITCODE -ne 0) {
+            throw "Structural or frozen smoke verification failed."
+          }
+
+          $evidence = Join-Path $env:RUNNER_TEMP "FlatShot normal launch evidence"
+          New-Item -ItemType Directory -Path $evidence -Force | Out-Null
+          "NORMAL_LAUNCH_EVIDENCE=$evidence" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $portableRoot = Join-Path $extractTo "FlatShotPortable"
+          $screenshot = Join-Path $evidence "flatshot-normal-launch.png"
+          $result = Join-Path $evidence "normal-launch-result.json"
+          & scripts/verify_portable_normal_launch.ps1 `
+            -PortableRoot $portableRoot `
+            -ScreenshotPath $screenshot `
+            -ResultPath $result
+          $runtimeLog = Join-Path $portableRoot "data\logs\runtime.log"
+          if (Test-Path -LiteralPath $runtimeLog) {
+            Copy-Item -LiteralPath $runtimeLog -Destination (Join-Path $evidence "runtime.log") -Force
+          }
+          python scripts/verify_normal_launch_result.py $result
+          if ($LASTEXITCODE -ne 0) {
+            throw "Normal frozen launch verification failed."
+          }
+
+      - name: Upload normal launch evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: FlatShot-normal-launch-${{ github.run_id }}
+          path: ${{ env.NORMAL_LAUNCH_EVIDENCE }}
+          if-no-files-found: warn
+          retention-days: 30
 
   publish:
     needs: portable-verification

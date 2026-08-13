@@ -57,6 +57,10 @@ def test_release_workflow_requires_fresh_runner_portable_verification_before_pub
     assert "needs: portable-verification" in text
     assert "actions/download-artifact@v8" in text
     assert "scripts/verify_portable_candidate.py" in text
+    assert "scripts/verify_portable_normal_launch.ps1" in text
+    assert "scripts/verify_normal_launch_result.py" in text
+    assert "flatshot-normal-launch.png" in text
+    assert "if: always()" in text
     assert "FlatShot.exe --smoke" not in text  # the shared verifier owns the executable contract
     assert text.index("portable-verification:") < text.index("publish:")
 
@@ -70,6 +74,10 @@ def test_release_candidate_workflow_builds_and_verifies_without_publishing():
     assert "portable-verification:" in text
     assert "scripts/package_release_candidate.py" in text
     assert "scripts/verify_portable_candidate.py" in text
+    assert "scripts/verify_portable_normal_launch.ps1" in text
+    assert "scripts/verify_normal_launch_result.py" in text
+    assert "flatshot-normal-launch.png" in text
+    assert "if: always()" in text
     assert "actions/upload-artifact@v7" in text
     assert "actions/download-artifact@v8" in text
     assert "gh release create" not in text

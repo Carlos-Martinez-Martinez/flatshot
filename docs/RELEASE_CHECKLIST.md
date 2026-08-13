@@ -59,6 +59,11 @@ or golden comparison that approved the change.
 - Extract to a different path containing spaces and non-ASCII characters.
 - Clear `PYTHONHOME`, `PYTHONPATH`, and `VIRTUAL_ENV`, reduce `PATH` to Windows
   system directories, and require `FlatShot.exe --smoke` to return zero.
+- On a fresh runner, launch the extracted `FlatShot.exe` without arguments and
+  require a live process, frontend and bridge HTTP 200 responses, a visible
+  FlatShot window with a nonzero handle, native EdgeChromium/WebView2, a
+  non-empty screenshot, no new startup errors, and clean process/listener
+  cleanup. Browser fallback is diagnostic evidence, not a passing release gate.
 - Launch diagnostics remain available through `Diagnostico FlatShot.bat` and
   `data\logs\runtime.log`.
 - Download and manually check the Release Candidate workflow artifact before

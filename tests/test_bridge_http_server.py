@@ -13,6 +13,7 @@ from time import sleep
 from types import SimpleNamespace
 from urllib.parse import quote
 
+import pytest
 from PIL import Image
 
 from flatshot.application.config_paths import ConfigPathResolver
@@ -196,6 +197,22 @@ def test_bridge_http_allows_configured_localhost_frontend_origin_on_custom_port(
 
     assert status == 200
     assert headers["Access-Control-Allow-Origin"] == origin
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "http://localhost:4173\r\nX-Injected: yes",
+        "http://localhost:4173/path",
+        "http://user@localhost:4173",
+        "javascript:alert(1)",
+    ],
+)
+def test_bridge_http_rejects_invalid_allowed_origin_configuration(tmp_path, origin):
+    service = FlatShotBridgeService(config_resolver=ConfigPathResolver(tmp_path / "config"))
+
+    with pytest.raises(ValueError, match="allowed origin"):
+        create_server("127.0.0.1", 0, service=service, allowed_origins={origin})
 
 
 def test_bridge_http_export_preflight_allows_idempotency_key(tmp_path):

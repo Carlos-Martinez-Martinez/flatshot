@@ -8,7 +8,7 @@ import logging
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlparse, urlsplit
 
 from flatshot.bridge.errors import (
     BridgeError,
@@ -31,6 +31,35 @@ DEFAULT_REQUEST_TIMEOUT_SECONDS = 10.0
 _logger = logging.getLogger(__name__)
 
 
+def _validated_allowed_origins(allowed_origins: set[str] | None) -> set[str]:
+    candidates = allowed_origins or DEFAULT_ALLOWED_ORIGINS
+    validated: set[str] = set()
+    for origin in candidates:
+        if not isinstance(origin, str) or not origin or any(
+            character.isspace() or ord(character) < 0x20 or ord(character) == 0x7F
+            for character in origin
+        ):
+            raise ValueError("Invalid allowed origin: expected an HTTP(S) origin without whitespace or control characters.")
+        try:
+            parsed = urlsplit(origin)
+            _ = parsed.port
+        except ValueError as exc:
+            raise ValueError("Invalid allowed origin: malformed host or port.") from exc
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.path
+            or parsed.query
+            or parsed.fragment
+            or origin != f"{parsed.scheme}://{parsed.netloc}"
+        ):
+            raise ValueError("Invalid allowed origin: expected scheme://host[:port] without credentials, path, query, or fragment.")
+        validated.add(origin)
+    return validated
+
+
 class FlatShotBridgeHTTPServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
@@ -46,9 +75,10 @@ class FlatShotBridgeHTTPServer(ThreadingHTTPServer):
         max_active_connections: int = DEFAULT_MAX_ACTIVE_CONNECTIONS,
         request_timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SECONDS,
     ) -> None:
+        validated_allowed_origins = _validated_allowed_origins(allowed_origins)
         super().__init__(server_address, handler_class)
         self.service = service or FlatShotBridgeService()
-        self.allowed_origins = allowed_origins or set(DEFAULT_ALLOWED_ORIGINS)
+        self.allowed_origins = validated_allowed_origins
         self.auth_token = str(auth_token or "").strip()
         self.max_active_connections = max(1, int(max_active_connections))
         self.request_timeout_seconds = max(0.1, float(request_timeout_seconds))
@@ -298,7 +328,7 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
 
     def _send_cors_headers(self) -> None:
         origin = self.headers.get("Origin")
-        if origin and origin in self.server.allowed_origins:
+        if origin and "\r" not in origin and "\n" not in origin and origin in self.server.allowed_origins:
             self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
@@ -316,7 +346,7 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
 
     def _require_origin(self) -> None:
         origin = self.headers.get("Origin")
-        if origin and origin not in self.server.allowed_origins:
+        if origin and ("\r" in origin or "\n" in origin or origin not in self.server.allowed_origins):
             raise BridgeError("origin_not_allowed", "Request origin is not allowed.", status=403)
 
 

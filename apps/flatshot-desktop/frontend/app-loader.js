@@ -1,4 +1,5 @@
 (function () {
+  const APP_SCRIPT_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*\.js$/;
   const errorBoundary = window.FlatShotErrorBoundary;
   errorBoundary?.installGlobalErrorBoundary?.(window, { document });
 
@@ -12,7 +13,10 @@
   function appScriptOrder() {
     const manifest = document.getElementById("flatshot-app-loader-manifest");
     const parsed = JSON.parse(manifest?.textContent || "[]");
-    if (!Array.isArray(parsed) || parsed.some((name) => typeof name !== "string" || !name.endsWith(".js"))) {
+    if (
+      !Array.isArray(parsed)
+      || parsed.some((name) => typeof name !== "string" || !APP_SCRIPT_NAME_PATTERN.test(name))
+    ) {
       throw new Error("Manifest de scripts de FlatShot no válido.");
     }
     return parsed;

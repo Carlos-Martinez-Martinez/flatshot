@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import ctypes
 import json
 import os
@@ -20,7 +21,22 @@ from urllib.parse import urlencode, urlparse
 
 
 APP_NAME = "FlatShot"
-ROOT = Path(__file__).resolve().parent
+
+
+def portable_root() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
+def resource_root() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys._MEIPASS).resolve()
+    return Path(__file__).resolve().parent
+
+
+ROOT = portable_root()
+RESOURCE_ROOT = resource_root()
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -36,7 +52,7 @@ from runtime_sync import sync_runtime_app  # noqa: E402
 
 APP_PARENT = ROOT / "app"
 APP_PACKAGE = APP_PARENT / "flatshot"
-FRONTEND_DIR = APP_PARENT / "frontend"
+FRONTEND_DIR = RESOURCE_ROOT / "frontend" if getattr(sys, "frozen", False) else APP_PARENT / "frontend"
 AUTOSYNC_STAMP = ROOT / ".autosync.json"
 SOURCE_POINTER = ROOT / "source_path.txt"
 HOST = "127.0.0.1"
@@ -353,7 +369,28 @@ def live_reload_script() -> str:
 """
 
 
-def main() -> int:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(prog="FlatShot")
+    parser.add_argument(
+        "--smoke",
+        action="store_true",
+        help="Valida el runtime portable sin abrir una ventana ni procesar imagenes.",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    if args.smoke:
+        try:
+            run_smoke()
+            return 0
+        except Exception as error:
+            details = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+            write_launcher_log("Portable smoke", details)
+            print(f"FlatShot portable smoke failed: {error}", file=sys.stderr)
+            return 1
+
     bridge = None
     frontend = None
     try:
@@ -391,13 +428,37 @@ def main() -> int:
                     pass
 
 
+def run_smoke() -> None:
+    bridge = None
+    frontend = None
+    try:
+        configure_portable_environment()
+        source_root = find_source_root()
+        auto_sync_from_source(source_root)
+        ensure_runtime_paths()
+        frontend = start_frontend_server(source_root)
+        bridge_token = secrets.token_urlsafe(24)
+        bridge = start_bridge_server(allowed_origins={frontend.url}, auth_token=bridge_token)
+        verify_http_endpoint(frontend.url + "/")
+        verify_http_endpoint(bridge.url + "/health")
+        print("FlatShot portable smoke OK")
+    finally:
+        for server in [bridge, frontend]:
+            if server is not None:
+                try:
+                    server.stop()
+                except Exception:
+                    pass
+
+
 def ensure_runtime_paths() -> None:
-    if not APP_PACKAGE.exists():
+    if not getattr(sys, "frozen", False) and not APP_PACKAGE.exists():
         raise RuntimeError(f"No existe el paquete portable: {APP_PACKAGE}")
     if not FRONTEND_DIR.exists():
         raise RuntimeError(f"No existe el frontend portable: {FRONTEND_DIR}")
-    if str(APP_PARENT) not in sys.path:
+    if not getattr(sys, "frozen", False) and str(APP_PARENT) not in sys.path:
         sys.path.insert(0, str(APP_PARENT))
+    __import__("flatshot.bridge.http_server")
 
 
 def start_bridge_server(allowed_origins: set[str] | None = None, auth_token: str = "") -> LocalServer:
@@ -456,6 +517,16 @@ def wait_until_ready(url: str, timeout_seconds: float = 20.0) -> None:
             last_error = error
             time.sleep(0.15)
     raise RuntimeError(f"El servidor local no respondio a tiempo: {last_error}")
+
+
+def verify_http_endpoint(url: str) -> None:
+    try:
+        with urllib.request.urlopen(url, timeout=5) as response:
+            if response.status != 200:
+                raise RuntimeError(f"{url} devolvio HTTP {response.status}.")
+            response.read()
+    except (OSError, urllib.error.URLError) as error:
+        raise RuntimeError(f"No se pudo validar {url}: {error}") from error
 
 
 def open_desktop_window(url: str) -> None:

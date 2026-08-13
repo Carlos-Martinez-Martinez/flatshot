@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import argparse
+import importlib.metadata
 import json
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import venv
 from pathlib import Path
@@ -30,6 +32,45 @@ DEFAULT_TARGET = PROJECT_ROOT / "release" / "FlatShotPortable"
 LAUNCHER_TEMPLATE = PROJECT_ROOT / "scripts" / "portable" / "FlatShot.pyw"
 MANIFEST_TEMPLATE = PROJECT_ROOT / "scripts" / "portable" / "manifest.py"
 RUNTIME_SYNC_TEMPLATE = PROJECT_ROOT / "scripts" / "portable" / "runtime_sync.py"
+PYINSTALLER_SPEC = PROJECT_ROOT / "scripts" / "portable" / "FlatShot.spec"
+TEXT_CONFIG_SUFFIXES = {
+    ".bat",
+    ".cfg",
+    ".cmd",
+    ".ini",
+    ".json",
+    ".ps1",
+    ".py",
+    ".pyw",
+    ".toml",
+    ".txt",
+    ".vbs",
+    ".xml",
+    ".yaml",
+    ".yml",
+}
+FROZEN_LICENSE_DISTRIBUTIONS = (
+    "altgraph",
+    "annotated-types",
+    "bottle",
+    "cffi",
+    "clr-loader",
+    "numpy",
+    "pefile",
+    "Pillow",
+    "proxy-tools",
+    "pycparser",
+    "pydantic",
+    "pydantic-core",
+    "PyInstaller",
+    "pyinstaller-hooks-contrib",
+    "pythonnet",
+    "pywebview",
+    "pywin32-ctypes",
+    "setuptools",
+    "typing-extensions",
+    "typing-inspection",
+)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -57,7 +98,7 @@ def main(argv: list[str] | None = None) -> int:
         development=not args.release,
     )
     print(f"Portable listo: {target}")
-    print(f"Launcher: {target / 'Abrir FlatShot.vbs'}")
+    print(f"Launcher: {target / ('FlatShot.exe' if args.release else 'Abrir FlatShot.vbs')}")
     return 0
 
 
@@ -68,27 +109,193 @@ def build_portable(
     install_dependencies: bool = True,
     development: bool = True,
 ) -> None:
+    if not development:
+        build_release_portable(source_root, target)
+        return
+
+    build_development_portable(
+        source_root,
+        target,
+        install_dependencies=install_dependencies,
+    )
+
+
+def build_development_portable(
+    source_root: Path,
+    target: Path,
+    *,
+    install_dependencies: bool = True,
+) -> None:
     validate_source_root(source_root)
     target.mkdir(parents=True, exist_ok=True)
     (target / "data").mkdir(exist_ok=True)
     (target / "portable.flag").write_text("portable\n", encoding="utf-8")
     source_pointer = target / "source_path.txt"
     development_flag = target / "development.flag"
-    if development:
-        source_pointer.write_text(str(source_root), encoding="utf-8")
-        development_flag.write_text("development\n", encoding="utf-8")
-        (target / "release.flag").unlink(missing_ok=True)
-    else:
-        source_pointer.unlink(missing_ok=True)
-        development_flag.unlink(missing_ok=True)
-        (target / "release.flag").write_text("release\n", encoding="utf-8")
+    source_pointer.write_text(str(source_root), encoding="utf-8")
+    development_flag.write_text("development\n", encoding="utf-8")
+    (target / "release.flag").unlink(missing_ok=True)
 
     sync_portable_app(source_root, target)
     copy_launcher_files(target)
-    write_sync_stamp(source_root, target, development=development)
+    write_sync_stamp(source_root, target, development=True)
 
     if install_dependencies:
         ensure_portable_venv(source_root, target / "venv")
+
+
+def build_release_portable(source_root: Path, target: Path) -> None:
+    validate_source_root(source_root)
+    if not sys.platform.startswith("win"):
+        raise RuntimeError("El portable frozen de release solo se construye en Windows.")
+    with tempfile.TemporaryDirectory(prefix="flatshot-release-build-") as temporary:
+        staging = Path(temporary)
+        dist_dir = staging / "dist"
+        work_dir = staging / "work"
+        run_command(
+            [
+                sys.executable,
+                "-m",
+                "PyInstaller",
+                "--noconfirm",
+                "--clean",
+                "--distpath",
+                str(dist_dir),
+                "--workpath",
+                str(work_dir),
+                str(PYINSTALLER_SPEC),
+            ],
+            source_root,
+            timeout=1200,
+        )
+        frozen_root = dist_dir / "FlatShot"
+        write_release_support_files(frozen_root)
+        validate_release_portable(frozen_root, forbidden_roots=[source_root, staging])
+        if target.exists():
+            shutil.rmtree(target)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(frozen_root, target)
+    validate_release_portable(target, forbidden_roots=[source_root])
+
+
+def write_release_support_files(target: Path, source_root: Path = PROJECT_ROOT) -> None:
+    target.mkdir(parents=True, exist_ok=True)
+    (target / "data").mkdir(exist_ok=True)
+    (target / "portable.flag").write_text("portable\n", encoding="utf-8")
+    (target / "release.flag").write_text("release\n", encoding="utf-8")
+    for forbidden in ("source_path.txt", "development.flag", ".autosync.json"):
+        (target / forbidden).unlink(missing_ok=True)
+    (target / "Abrir FlatShot.vbs").write_text(RELEASE_VBS_LAUNCHER, encoding="utf-8")
+    (target / "Diagnostico FlatShot.bat").write_text(RELEASE_DIAGNOSTIC_BAT, encoding="utf-8")
+    (target / "README_PORTABLE.txt").write_text(RELEASE_README_PORTABLE, encoding="utf-8")
+    shutil.copy2(source_root / "LICENSE", target / "LICENSE.txt")
+    shutil.copy2(source_root / "THIRD_PARTY_NOTICES.md", target / "THIRD_PARTY_NOTICES.txt")
+    copy_frozen_runtime_licenses(target)
+
+
+def copy_frozen_runtime_licenses(
+    target: Path,
+    *,
+    python_license: Path | None = None,
+    distribution_licenses: dict[str, list[Path]] | None = None,
+) -> int:
+    licenses_root = target / "THIRD_PARTY_LICENSES"
+    if licenses_root.exists():
+        shutil.rmtree(licenses_root)
+    licenses_root.mkdir(parents=True)
+    copied = 0
+
+    python_license = python_license or (Path(sys.base_prefix) / "LICENSE.txt")
+    if python_license.is_file():
+        destination = licenses_root / "CPython" / python_license.name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(python_license, destination)
+        copied += 1
+
+    distribution_licenses = distribution_licenses or find_distribution_license_files()
+    for distribution_name, license_files in sorted(distribution_licenses.items()):
+        destination_dir = licenses_root / distribution_name
+        for index, license_file in enumerate(license_files, start=1):
+            if not license_file.is_file():
+                continue
+            destination_dir.mkdir(parents=True, exist_ok=True)
+            destination_name = license_file.name
+            destination = destination_dir / destination_name
+            if destination.exists():
+                destination = destination_dir / f"{index}-{destination_name}"
+            shutil.copy2(license_file, destination)
+            copied += 1
+    if copied == 0:
+        raise RuntimeError("No se encontraron licencias para el runtime frozen.")
+    return copied
+
+
+def find_distribution_license_files() -> dict[str, list[Path]]:
+    result: dict[str, list[Path]] = {}
+    for requested_name in FROZEN_LICENSE_DISTRIBUTIONS:
+        try:
+            distribution = importlib.metadata.distribution(requested_name)
+        except importlib.metadata.PackageNotFoundError:
+            continue
+        name = distribution.metadata.get("Name", requested_name)
+        version = distribution.version
+        key = f"{name}-{version}".replace("/", "-").replace("\\", "-")
+        files: list[Path] = []
+        for entry in distribution.files or ():
+            filename = Path(str(entry)).name.casefold()
+            if not filename.startswith(("license", "copying", "notice", "authors")):
+                continue
+            located = Path(distribution.locate_file(entry)).resolve()
+            if located.is_file():
+                files.append(located)
+        if files:
+            result[key] = files
+    return result
+
+
+def validate_release_portable(target: Path, *, forbidden_roots: list[Path] | tuple[Path, ...] = ()) -> None:
+    required = [
+        target / "FlatShot.exe",
+        target / "_internal",
+        target / "_internal" / "frontend" / "index.html",
+        target / "Abrir FlatShot.vbs",
+        target / "Diagnostico FlatShot.bat",
+        target / "README_PORTABLE.txt",
+        target / "LICENSE.txt",
+        target / "THIRD_PARTY_NOTICES.txt",
+        target / "THIRD_PARTY_LICENSES",
+        target / "data",
+    ]
+    missing = [str(path) for path in required if not path.exists()]
+    if missing:
+        raise RuntimeError("Release portable incompleto:\n" + "\n".join(missing))
+
+    forbidden_names = {"pyvenv.cfg", "source_path.txt", "development.flag"}
+    for path in target.rglob("*"):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(target)
+        lowered_parts = [part.casefold() for part in relative.parts]
+        if path.name.casefold() in forbidden_names or (
+            "venv" in lowered_parts and path.name.casefold() in {"python.exe", "pythonw.exe"}
+        ):
+            raise RuntimeError(f"Release portable non-relocatable: {relative.as_posix()}")
+
+    markers = ["hostedtoolcache", "runner_workspace", "github_workspace"]
+    for root in forbidden_roots:
+        resolved = str(root.expanduser().resolve())
+        markers.extend([resolved, resolved.replace("\\", "/"), resolved.replace("\\", "\\\\")])
+    normalized_markers = [marker.casefold() for marker in markers if marker]
+    for path in target.rglob("*"):
+        if not path.is_file() or path.suffix.casefold() not in TEXT_CONFIG_SUFFIXES:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        lowered = text.casefold()
+        if any(marker in lowered for marker in normalized_markers):
+            raise RuntimeError(f"Release portable contiene builder path en {path.relative_to(target).as_posix()}")
 
 
 def validate_source_root(source_root: Path) -> None:
@@ -168,6 +375,66 @@ def write_sync_stamp(source_root: Path, target: Path, *, development: bool = Tru
         ),
         encoding="utf-8",
     )
+
+
+RELEASE_VBS_LAUNCHER = '''Option Explicit
+
+Dim shell, fso, appDir, executable
+Set shell = CreateObject("WScript.Shell")
+Set fso = CreateObject("Scripting.FileSystemObject")
+
+appDir = fso.GetParentFolderName(WScript.ScriptFullName)
+executable = fso.BuildPath(appDir, "FlatShot.exe")
+
+If Not fso.FileExists(executable) Then
+  MsgBox "No se encontro FlatShot.exe en:" & vbCrLf & executable, vbCritical, "FlatShot"
+  WScript.Quit 1
+End If
+
+shell.CurrentDirectory = appDir
+shell.Run """" & executable & """", 0, False
+'''
+
+
+RELEASE_DIAGNOSTIC_BAT = r"""@echo off
+setlocal
+set "APPDIR=%~dp0"
+pushd "%APPDIR%"
+echo Validando el runtime autocontenido de FlatShot...
+echo.
+"%APPDIR%FlatShot.exe" --smoke
+set "RESULT=%ERRORLEVEL%"
+echo.
+if exist "%APPDIR%data\logs\runtime.log" (
+  echo Ultimas entradas del log:
+  type "%APPDIR%data\logs\runtime.log"
+)
+echo.
+if not "%RESULT%"=="0" echo El diagnostico fallo con codigo %RESULT%.
+if "%RESULT%"=="0" echo Diagnostico completado correctamente.
+pause
+exit /b %RESULT%
+"""
+
+
+RELEASE_README_PORTABLE = r"""FlatShot Portable
+
+Ejecutar:
+  Abrir FlatShot.vbs
+
+Diagnostico sin abrir la interfaz:
+  Diagnostico FlatShot.bat
+  FlatShot.exe --smoke
+
+Datos locales del portable:
+  data\
+
+Este release incluye su propio runtime de Python y no requiere Python, PATH,
+un entorno virtual ni acceso al repositorio en el equipo de destino. Conserva
+toda la carpeta extraida, incluido _internal, junto a FlatShot.exe.
+
+Los errores de arranque se registran en data\logs\runtime.log.
+"""
 
 
 VBS_LAUNCHER = '''Option Explicit

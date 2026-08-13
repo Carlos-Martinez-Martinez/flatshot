@@ -43,8 +43,42 @@ def test_release_checklist_documents_required_quality_gates():
         "python -m ruff check .",
         "python scripts/audit_css.py --check",
         "python scripts/visual_regression_smoke.py",
-        "python scripts/build_portable.py --skip-venv --release",
+        "python scripts/package_release_candidate.py --version 1.0.1",
         "Exported image output changed",
     ]
     for item in required_items:
         assert item in text
+
+
+def test_release_workflow_requires_fresh_runner_portable_verification_before_publish():
+    text = (PROJECT_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+
+    assert "portable-verification:" in text
+    assert "needs: portable-verification" in text
+    assert "actions/download-artifact@v8" in text
+    assert "scripts/verify_portable_candidate.py" in text
+    assert "scripts/verify_portable_normal_launch.ps1" in text
+    assert "scripts/verify_normal_launch_result.py" in text
+    assert "flatshot-normal-launch.png" in text
+    assert "if: always()" in text
+    assert "FlatShot.exe --smoke" not in text  # the shared verifier owns the executable contract
+    assert text.index("portable-verification:") < text.index("publish:")
+
+
+def test_release_candidate_workflow_builds_and_verifies_without_publishing():
+    text = (PROJECT_ROOT / ".github" / "workflows" / "release-candidate.yml").read_text(encoding="utf-8")
+
+    assert "workflow_dispatch:" in text
+    assert "pull_request:" in text
+    assert "build:" in text
+    assert "portable-verification:" in text
+    assert "scripts/package_release_candidate.py" in text
+    assert "scripts/verify_portable_candidate.py" in text
+    assert "scripts/verify_portable_normal_launch.ps1" in text
+    assert "scripts/verify_normal_launch_result.py" in text
+    assert "flatshot-normal-launch.png" in text
+    assert "if: always()" in text
+    assert "actions/upload-artifact@v7" in text
+    assert "actions/download-artifact@v8" in text
+    assert "gh release create" not in text
+    assert "publish:" not in text

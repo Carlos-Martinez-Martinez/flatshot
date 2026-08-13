@@ -102,7 +102,7 @@ def test_release_version_checker_accepts_current_tree():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
 
-    assert module.validate_release_version(PROJECT_ROOT, "v1.0.0") == "1.0.0"
+    assert module.validate_release_version(PROJECT_ROOT, "v1.0.1") == "1.0.1"
 
 
 def test_release_workflow_separates_build_from_privileged_publication():

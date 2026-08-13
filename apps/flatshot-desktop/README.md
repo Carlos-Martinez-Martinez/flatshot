@@ -36,7 +36,7 @@ apps\flatshot-desktop\run_dev.bat
 
 Stop the environment with `Ctrl+C`.
 
-## Portable Run
+## Development Portable
 
 From the repository root, build or refresh the portable:
 
@@ -63,6 +63,32 @@ keeps a session snapshot so the current batch, selected image, filters, view
 mode, inspector tab and output controls come back after the reload. Set
 `FLATSHOT_LIVE_RELOAD=0` before launching to test the copied portable frontend
 instead. Python bridge/core edits still require restarting the app.
+
+This development folder contains a machine-local venv and `source_path.txt`.
+It is not redistributable.
+
+## Frozen Release Portable
+
+Build a release candidate from the repository root:
+
+```powershell
+python scripts\package_release_candidate.py --version 1.0.1
+```
+
+The versioned ZIP contains `FlatShot.exe`, `_internal`, launch helpers, notices,
+and writable `data`. It has no venv, source pointer, or repository dependency.
+Run `FlatShot.exe --smoke` after extraction to validate the bundled frontend and
+bridge without opening pywebview. Use `scripts\verify_portable_candidate.py` to
+verify checksum, archive contents, relocation, a sanitized Python environment,
+and the frozen smoke in one command. The Release Candidate and Release
+workflows then run the same extracted `FlatShot.exe` normally on a fresh Windows
+runner. They require a visible native EdgeChromium window, frontend and bridge
+HTTP 200 responses, a temporally related WebView2 process, a window screenshot
+artifact, no startup traceback, and removal of listeners and FlatShot processes
+during cleanup. The hosted runner's classic Win32 capture APIs do not expose the
+WebView2 DirectComposition surface, so the PNG may have a white client area.
+The content gate instead requires Windows UI Automation to expose the real
+`FlatShot Desktop - Web content` control inside the native window.
 
 ## Options
 

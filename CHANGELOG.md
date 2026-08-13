@@ -2,7 +2,18 @@
 
 All notable public changes to FlatShot will be documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.1] - Unreleased
+
+### Fixed
+
+- Replaced the non-relocatable Windows virtual environment from `v1.0.0` with
+  a PyInstaller one-folder bundle that includes its own CPython runtime and
+  native dependencies.
+- Added a frozen `--smoke` mode, archive/path-leak validation, checksum checks,
+  relocation testing, and a fresh-runner gate before GitHub release publication.
+- Preserved image processing and exported image output without changes.
+
+## [1.0.0] - 2026-08-13
 
 ### Added
 
@@ -17,9 +28,11 @@ All notable public changes to FlatShot will be documented here. The format follo
 - Export source enumeration rejects symlinked PNG inputs.
 - Render-cache ownership and cleanup are restricted to FlatShot-managed files.
 
-## [1.0.0] - Unreleased
+FlatShot's first public release. Its published Windows portable ZIP contained a
+conventional venv tied to the GitHub runner and cannot launch on a clean target
+machine. The immutable tag and artifacts remain available as release history;
+do not use `FlatShotPortable-v1.0.0.zip`. Version `1.0.1` replaces only the
+distribution mechanism.
 
-Planned first public baseline. The repository already uses version `1.0.0`; the release date will be added only when the signed-off tag is published.
-
-[Unreleased]: https://github.com/Carlos-Martinez-Martinez/flatshot/compare/v1.0.0...HEAD
+[1.0.1]: https://github.com/Carlos-Martinez-Martinez/flatshot/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/Carlos-Martinez-Martinez/flatshot/releases/tag/v1.0.0

@@ -122,7 +122,11 @@ down without opening a window or processing images. `Abrir FlatShot.vbs` runs
 `FlatShot.exe`; it never invokes `pythonw.exe`. On a fresh Windows runner, both
 release workflows also launch the extracted executable without arguments and
 require the frontend, bridge health endpoint, visible native EdgeChromium
-window, WebView2 process, non-empty screenshot, and clean shutdown evidence.
+window, WebView2 process, UI Automation evidence from the rendered FlatShot
+document, a window screenshot artifact, and clean shutdown evidence. GitHub's
+hosted runner does not expose WebView2's DirectComposition surface to classic
+Win32 capture, so the screenshot can show a white client area even though the
+window accessibility tree proves the application document loaded.
 
 ## Safety and compatibility
 

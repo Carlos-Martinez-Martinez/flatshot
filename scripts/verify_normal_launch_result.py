@@ -28,6 +28,7 @@ def validate_result(payload: dict[str, Any]) -> None:
     webview = _mapping(payload, "webView2")
     runtime_log = _mapping(payload, "runtimeLog")
     screenshot = _mapping(payload, "screenshot")
+    ui_automation = _mapping(payload, "uiAutomation")
     cleanup = _mapping(payload, "cleanup")
 
     if payload.get("schemaVersion") != 1:
@@ -52,12 +53,10 @@ def validate_result(payload: dict[str, Any]) -> None:
         failures.append("native EdgeChromium window was not used")
     if runtime_log.get("startupErrors"):
         failures.append("startup errors were logged")
-    if not screenshot.get("nonUniform"):
-        failures.append("screenshot is empty or uniform")
-    if not screenshot.get("clientContentDetected"):
-        failures.append("WebView2 client content was not captured")
     if not isinstance(screenshot.get("sizeBytes"), int) or screenshot["sizeBytes"] <= 0:
         failures.append("screenshot artifact is empty")
+    if not ui_automation.get("contentDetected"):
+        failures.append("WebView2 client content was not exposed through UI Automation")
     if cleanup.get("flatShotOrphans"):
         failures.append("FlatShot processes remained after cleanup")
     if cleanup.get("listenerPortsRemaining"):

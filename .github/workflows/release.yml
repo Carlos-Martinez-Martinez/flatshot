@@ -4,12 +4,18 @@ on:
   push:
     tags:
       - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Existing release tag to rebuild and publish"
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 env:
-  RELEASE_TAG: ${{ github.ref_name }}
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
 
 concurrency:
   group: release-${{ github.ref }}
@@ -23,6 +29,7 @@ jobs:
       - name: Check out tagged revision
         uses: actions/checkout@v6
         with:
+          ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -30,7 +37,11 @@ jobs:
         shell: pwsh
         run: |
           git fetch --no-tags origin main
-          git merge-base --is-ancestor "$env:GITHUB_SHA" "origin/main"
+          $taggedCommit = git rev-parse "$env:RELEASE_TAG^{commit}"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Release tag does not resolve to a commit."
+          }
+          git merge-base --is-ancestor "$taggedCommit" "origin/main"
           if ($LASTEXITCODE -ne 0) {
             throw "Release tags must point to a commit reachable from origin/main."
           }
@@ -109,6 +120,7 @@ jobs:
             throw "No release artifacts were downloaded."
           }
           & gh release create $env:RELEASE_TAG @assets `
+            --repo $env:GITHUB_REPOSITORY `
             --verify-tag `
             --generate-notes `
             --title "FlatShot $env:RELEASE_TAG"

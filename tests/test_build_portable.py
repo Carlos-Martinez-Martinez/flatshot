@@ -4,6 +4,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+import pytest
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BUILD_PORTABLE_PATH = PROJECT_ROOT / "scripts" / "build_portable.py"
@@ -51,19 +53,14 @@ def test_build_portable_sync_stamp_separates_runtime_and_dependencies(tmp_path):
 def test_release_portable_does_not_embed_development_source_pointer(tmp_path):
     target = tmp_path / "FlatShotPortable"
 
-    build_portable.build_portable(
-        PROJECT_ROOT,
-        target,
-        install_dependencies=False,
-        development=False,
-    )
+    build_portable.write_release_support_files(target)
 
     assert not (target / "source_path.txt").exists()
     assert not (target / "development.flag").exists()
     assert (target / "release.flag").read_text(encoding="utf-8") == "release\n"
-    stamp = json.loads((target / ".autosync.json").read_text(encoding="utf-8"))
-    assert stamp["source_root"] is None
-    assert stamp["portable_mode"] == "release"
+    assert not (target / ".autosync.json").exists()
+    assert "FlatShot.exe" in (target / "Abrir FlatShot.vbs").read_text(encoding="utf-8")
+    assert "pythonw.exe" not in (target / "Abrir FlatShot.vbs").read_text(encoding="utf-8")
 
 
 def test_source_manifest_tracks_backend_and_frontend_files():
@@ -98,3 +95,58 @@ def test_portable_runtime_lock_is_present_and_constrained():
     assert "numpy==" in lock
     assert "pydantic==" in lock
     assert not any(line.startswith(("Pillow>=", "numpy>=", "pydantic>=")) for line in lock.splitlines())
+
+
+def make_frozen_layout(root: Path) -> None:
+    (root / "_internal" / "frontend").mkdir(parents=True)
+    (root / "_internal" / "frontend" / "index.html").write_text("<title>FlatShot</title>", encoding="utf-8")
+    (root / "FlatShot.exe").write_bytes(b"MZ")
+    build_portable.write_release_support_files(root)
+
+
+def test_release_validation_accepts_frozen_one_folder_layout(tmp_path):
+    target = tmp_path / "FlatShotPortable"
+    make_frozen_layout(target)
+
+    build_portable.validate_release_portable(target, forbidden_roots=[PROJECT_ROOT])
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "pyvenv.cfg",
+        "venv/Scripts/python.exe",
+        "venv/Scripts/pythonw.exe",
+        "source_path.txt",
+        "development.flag",
+    ],
+)
+def test_release_validation_rejects_non_relocatable_development_entries(tmp_path, relative_path):
+    target = tmp_path / "FlatShotPortable"
+    make_frozen_layout(target)
+    bad_file = target / relative_path
+    bad_file.parent.mkdir(parents=True, exist_ok=True)
+    bad_file.write_text("builder state", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="non-relocatable"):
+        build_portable.validate_release_portable(target)
+
+
+@pytest.mark.parametrize("marker", ["hostedtoolcache", "RUNNER_WORKSPACE", "GITHUB_WORKSPACE"])
+def test_release_validation_rejects_ci_builder_markers_in_text_configuration(tmp_path, marker):
+    target = tmp_path / "FlatShotPortable"
+    make_frozen_layout(target)
+    (target / "runtime.cfg").write_text(f"home=C:/build/{marker}/python.exe", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="builder path"):
+        build_portable.validate_release_portable(target)
+
+
+def test_release_validation_rejects_known_checkout_path_in_text_configuration(tmp_path):
+    target = tmp_path / "FlatShotPortable"
+    make_frozen_layout(target)
+    checkout = tmp_path / "checkout with spaces"
+    (target / "runtime.json").write_text(json.dumps({"root": str(checkout)}), encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="builder path"):
+        build_portable.validate_release_portable(target, forbidden_roots=[checkout])

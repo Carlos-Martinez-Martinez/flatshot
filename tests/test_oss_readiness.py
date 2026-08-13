@@ -123,5 +123,17 @@ def test_release_workflow_never_interpolates_tag_name_into_shell_source():
         encoding="utf-8"
     )
 
-    assert workflow.count("${{ github.ref_name }}") == 1
-    assert "RELEASE_TAG: ${{ github.ref_name }}" in workflow
+    assert workflow.count("github.ref_name") == 1
+    assert "RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}" in workflow
+
+
+def test_release_workflow_can_recover_an_existing_tag_without_moving_it():
+    workflow = (PROJECT_ROOT / ".github" / "workflows" / "release.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "workflow_dispatch:" in workflow
+    assert "release_tag:" in workflow
+    assert "ref: ${{ env.RELEASE_TAG }}" in workflow
+    assert 'git rev-parse "$env:RELEASE_TAG^{commit}"' in workflow
+    assert "--repo $env:GITHUB_REPOSITORY" in workflow

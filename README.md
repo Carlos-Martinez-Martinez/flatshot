@@ -1,131 +1,116 @@
 # FlatShot
 
-FlatShot prepara imágenes de producto por lotes desde tu propio equipo. Importa
-una carpeta, aplica un ajuste de aspecto y exporta copias finales sin modificar
-las imágenes originales.
+FlatShot is a local-first desktop tool for preparing batches of product images for e-commerce. It scans folders of PNG files, previews configurable product presentation and shadows, and exports production-ready copies without modifying source images.
 
-## Cómo funciona
+> Status: the codebase is mature and versioned as `1.0.0`, but no public GitHub release has been published yet. The first `v1.0.0` tag is intended to establish the public baseline after the release checklist is complete.
 
-1. Eliges una carpeta con imágenes PNG.
-2. FlatShot crea el lote y muestra una vista previa.
-3. Seleccionas un ajuste de aspecto.
-4. Revisas la imagen seleccionada y posibles avisos del lote.
-5. Configuras la carpeta de destino.
-6. Procesas el lote y FlatShot guarda los archivos finales.
+## Highlights
 
-## Instalar
+- Batch folder import with verified PNG scanning.
+- Presets, per-image adjustments, previews, and exception review.
+- PNG and JPG export profiles with explicit destination and naming controls.
+- Pause, resume, stop, progress, and export manifests for long-running jobs.
+- A local web frontend and loopback-only Python bridge.
+- A portable Windows build plus source-based development on Python 3.10+.
+- Source images are never overwritten, moved, or deleted.
 
-### Si tienes la versión portátil
+## Quick start
 
-No necesitas instalar nada. Abre:
-
-```text
-release\FlatShotPortable\Abrir FlatShot.vbs
-```
-
-FlatShot se abrirá en una ventana local. Si esa ventana no puede iniciarse, se
-abrirá en el navegador.
-
-### Si partes del proyecto
-
-Necesitas Python 3.10 o superior.
-
-En Windows:
-
-```bat
-scripts\install.bat
-```
-
-En macOS o Linux:
+Clone the repository, create a virtual environment, and install the runtime and development dependencies:
 
 ```bash
-./scripts/install.sh
+python -m venv venv
 ```
 
-Cuando termine la instalación, abre FlatShot con:
-
-```bat
-scripts\run.bat
-```
-
-En macOS o Linux:
-
-```bash
-./scripts/run.sh
-```
-
-## Crear la versión portátil
-
-Desde la carpeta del proyecto:
+Windows PowerShell:
 
 ```powershell
-python scripts\build_portable.py
+.\venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.lock -r requirements-dev.txt
+python apps/flatshot-desktop/run_dev.py --open
 ```
 
-La versión portátil se genera en:
+macOS or Linux:
 
-```text
-release\FlatShotPortable
+```bash
+source venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.lock -r requirements-dev.txt
+python apps/flatshot-desktop/run_dev.py --open
 ```
 
-## Configuración local
+The bridge and frontend bind to loopback. The development launcher generates a per-run token and passes it to the page in a URL fragment that is removed after startup.
 
-FlatShot guarda ajustes, presets y manifests de exportación en la carpeta de
-configuración local de la aplicación:
+## Production workflow
+
+1. Import a folder containing PNG images.
+2. Choose a preset and adjust the look.
+3. Review the selected image and batch exceptions.
+4. Configure format, naming, and output destination.
+5. Process the batch and inspect the export summary.
+
+Local configuration is stored outside the repository:
 
 - Windows: `%LOCALAPPDATA%\FlatShot`
 - macOS: `~/Library/Preferences/FlatShot`
-- Linux: `$XDG_CONFIG_HOME/flatshot` o `~/.config/flatshot`
+- Linux: `$XDG_CONFIG_HOME/flatshot` or `~/.config/flatshot`
 
-Si existe configuración antigua en la raíz de configuración del sistema,
-FlatShot la copia a la carpeta namespaced al arrancar sin borrar los archivos
-anteriores.
+## Architecture
 
-## Uso básico
-
-- Importa una carpeta con imágenes PNG.
-- Elige un ajuste de aspecto.
-- Ajusta el resultado si hace falta.
-- Revisa la vista previa y los avisos.
-- Elige la carpeta de destino.
-- Procesa el lote.
-
-## Qué conserva FlatShot
-
-- Las imágenes originales no se sobrescriben.
-- Los archivos exportados se guardan en la carpeta de destino configurada.
-- La exportación mantiene el comportamiento definido por la aplicación para
-  tamaño, formato, transparencia, calidad y nombre de archivo.
-
-## Comprobar el proyecto
-
-Instala también las dependencias de desarrollo si vas a ejecutar la batería
-local completa:
-
-```bash
-python -m pip install -r requirements-dev.txt
+```text
+Desktop frontend
+  -> localhost HTTP bridge
+    -> application services and job runners
+      -> image-processing core and models
+        -> local configuration, cache, and export filesystem
 ```
+
+Business and image-processing rules stay outside the UI. Long-running scan, preview, and export work is coordinated by application runners rather than the browser event loop. See [Architecture](docs/ARCHITECTURE.md) and [Product](PRODUCT.md).
+
+## Validation
+
+Run the complete local quality suite:
 
 ```bash
 python scripts/check_all.py
-python scripts/build_portable.py --skip-venv
-```
-
-`check_all.py` ejecuta la suite de pytest, ruff, la auditoría CSS, el smoke E2E
-estático del frontend y el smoke de regresión visual/asset. Para comprobar solo
-el smoke visual/asset del frontend:
-
-```bash
-python scripts/e2e_smoke.py
-python scripts/visual_regression_smoke.py
-```
-
-Para una comprobación rápida del benchmark de render sin lanzar el benchmark
-completo:
-
-```bash
 python scripts/benchmark_shadow_v2.py --smoke --runs 1
+python scripts/build_portable.py --skip-venv --release
 ```
 
-Si cambia la interfaz o la exportación, abre FlatShot y revisa al menos una
-carpeta vacía y una carpeta con imágenes PNG.
+The checks cover pytest, Ruff, the CSS contract audit, a frontend E2E asset smoke test, visual landmark regression checks, and a small render benchmark. For CSS changes, both commands below must stay clean:
+
+```bash
+python scripts/audit_css.py --check
+python -m pytest tests/test_frontend_css_contract.py
+```
+
+The automated visual smoke test validates frontend structure and assets; it is not a substitute for manually reviewing representative product images and exported pixels.
+
+## Portable Windows build
+
+```powershell
+python scripts/build_portable.py --release
+```
+
+The self-contained folder is created at `release/FlatShotPortable`. Launch it with `Abrir FlatShot.vbs`. Release automation builds this folder from a `vX.Y.Z` tag after verifying that the tag, package metadata, and runtime version agree.
+
+## Safety and compatibility
+
+- FlatShot creates new output files and refuses collisions; source files are not mutated.
+- The bridge binds to `127.0.0.1` and portable/development launchers use a per-run authorization token.
+- User-selected and configured paths are validated before filesystem operations.
+- Configuration changes must remain backward-compatible and tolerate missing or malformed optional values.
+- Output-sensitive changes require focused regression tests and a representative manual export check.
+
+Please report vulnerabilities privately as described in [Security](SECURITY.md).
+
+## Contributing
+
+Read [Contributing](CONTRIBUTING.md), the [Code of Conduct](CODE_OF_CONDUCT.md), and [Governance](GOVERNANCE.md) before opening a pull request. Good first contributions include focused tests, documentation improvements, and small maintainability fixes that preserve output.
+
+Project direction is tracked in the [Roadmap](ROADMAP.md), and notable public changes are recorded in the [Changelog](CHANGELOG.md).
+
+## License
+
+FlatShot is released under the [MIT License](LICENSE). Runtime dependencies remain under their respective licenses; see [Third-party notices](THIRD_PARTY_NOTICES.md).

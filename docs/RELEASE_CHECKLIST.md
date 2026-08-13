@@ -1,6 +1,8 @@
-# FlatShot Release Checklist
+# FlatShot release checklist
 
-Use this checklist before publishing a local build or portable package.
+Use this checklist before creating a release tag. Pushing a matching `vX.Y.Z`
+tag publishes artifacts, so do not create or push the tag until every required
+gate and manual check is signed off.
 
 ## Required Gates
 
@@ -14,6 +16,8 @@ python scripts/e2e_smoke.py
 python scripts/visual_regression_smoke.py
 python scripts/benchmark_shadow_v2.py --smoke --runs 1
 python scripts/build_portable.py --skip-venv --release
+python -m build
+python scripts/check_release_version.py v1.0.0
 ```
 
 ## Manual Workflow Checks
@@ -47,7 +51,25 @@ or golden comparison that approved the change.
 
 ## Portable
 
-- `python scripts/build_portable.py --skip-venv --release` completes without embedding `source_path.txt` or development autosync markers.
+- `python scripts/build_portable.py --skip-venv --release` completes without
+  embedding `source_path.txt`; `.autosync.json` must report release mode with
+  `source_root: null` and contain no development checkout path.
 - Portable runtime includes frontend, bridge and launcher files.
 - If dependencies changed, run the full portable build without `--skip-venv`.
 - Launch diagnostics remain available through `Diagnostico FlatShot.bat`.
+
+## Tag and GitHub release
+
+- Update `CHANGELOG.md` with the release date and move relevant entries from
+  `Unreleased`.
+- Confirm the version in `pyproject.toml` and `src/flatshot/__init__.py`.
+- Run `python scripts/check_release_version.py vX.Y.Z` with the intended tag.
+- Merge the reviewed release pull request into `main`.
+- Create the tag from the exact reviewed `main` commit only after approval.
+- Confirm the GitHub `release` environment and release-tag protections are active.
+- The workflow independently verifies that the tagged commit is reachable from
+  `origin/main`; do not bypass this provenance gate.
+- Let `.github/workflows/release.yml` build and publish the portable ZIP,
+  Python distributions, and SHA-256 checksum.
+- Download the published artifact, verify its checksum, launch it on Windows,
+  and complete one representative export before announcing the release.

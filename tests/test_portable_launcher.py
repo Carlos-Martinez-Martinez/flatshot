@@ -74,8 +74,8 @@ def test_boot_preferences_reads_only_first_paint_preferences(tmp_path):
                     "themePreference": "dark",
                     "brandTone": "violet",
                     "interfacePreferences": {"density": "comfortable", "thumbnailSize": "large"},
-                    "bridgeScanPath": "C:/Users/Carlos/Images",
-                    "lastOutputFolder": "C:/Users/Carlos/Exports",
+                    "bridgeScanPath": "C:/Users/Example/Images",
+                    "lastOutputFolder": "C:/Users/Example/Exports",
                 }
             }
         ),

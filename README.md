@@ -2,7 +2,9 @@
 
 FlatShot is a local-first desktop tool for preparing batches of product images for e-commerce. It scans folders of PNG files, previews configurable product presentation and shadows, and exports production-ready copies without modifying source images.
 
-> Status: the codebase is mature and versioned as `1.0.0`, but no public GitHub release has been published yet. The first `v1.0.0` tag is intended to establish the public baseline after the release checklist is complete.
+> Status: `v1.0.0` is the first public release, but its Windows portable ZIP is
+> non-relocatable and must not be used. Version `1.0.1` is the corrective
+> release candidate; it changes packaging only, not image output.
 
 ## Highlights
 
@@ -75,7 +77,7 @@ Run the complete local quality suite:
 ```bash
 python scripts/check_all.py
 python scripts/benchmark_shadow_v2.py --smoke --runs 1
-python scripts/build_portable.py --skip-venv --release
+python scripts/build_portable.py --skip-venv
 ```
 
 The checks cover pytest, Ruff, the CSS contract audit, a frontend E2E asset smoke test, visual landmark regression checks, and a small render benchmark. For CSS changes, both commands below must stay clean:
@@ -87,13 +89,38 @@ python -m pytest tests/test_frontend_css_contract.py
 
 The automated visual smoke test validates frontend structure and assets; it is not a substitute for manually reviewing representative product images and exported pixels.
 
-## Portable Windows build
+## Portable Windows builds
+
+The development portable keeps a local venv, copied sources, autosync, and live
+reload. It belongs only to the machine where it was created and is not a
+redistributable artifact:
 
 ```powershell
-python scripts/build_portable.py --release
+python scripts/build_portable.py --skip-venv
 ```
 
-The self-contained folder is created at `release/FlatShotPortable`. Launch it with `Abrir FlatShot.vbs`. Release automation builds this folder from a `vX.Y.Z` tag after verifying that the tag, package metadata, and runtime version agree.
+The release portable is a PyInstaller one-folder bundle with its own CPython
+runtime and dependencies. Build the exact pre-tag candidate with:
+
+```powershell
+python scripts/package_release_candidate.py --version 1.0.1
+```
+
+This creates `release/FlatShotPortable-v1.0.1.zip` and
+`release/SHA256SUMS.txt`. Extract the ZIP to a new path and verify the actual
+frozen executable, not a repository Python launcher:
+
+```powershell
+python scripts/verify_portable_candidate.py `
+  release/FlatShotPortable-v1.0.1.zip `
+  release/SHA256SUMS.txt `
+  --extract-to "$env:TEMP\FlatShot candidate á"
+```
+
+`FlatShot.exe --smoke` starts and checks both loopback servers, then shuts them
+down without opening a window or processing images. `Abrir FlatShot.vbs` runs
+`FlatShot.exe`; it never invokes `pythonw.exe`. The release workflow repeats the
+same verification on a fresh Windows runner before publication can begin.
 
 ## Safety and compatibility
 

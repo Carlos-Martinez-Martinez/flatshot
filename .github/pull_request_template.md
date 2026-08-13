@@ -7,7 +7,7 @@ Describe the problem and the smallest coherent change that solves it.
 - [ ] Relevant tests were added or updated.
 - [ ] `python scripts/check_all.py`
 - [ ] `python scripts/benchmark_shadow_v2.py --smoke --runs 1` when processing is affected.
-- [ ] `python scripts/build_portable.py --skip-venv --release` when packaging is affected.
+- [ ] `python scripts/package_release_candidate.py --version X.Y.Z` and frozen candidate verification when packaging is affected.
 - [ ] Manual checks are described below, or marked not applicable.
 
 ## Safety and compatibility

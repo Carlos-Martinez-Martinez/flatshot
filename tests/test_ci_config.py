@@ -43,7 +43,7 @@ def test_release_checklist_documents_required_quality_gates():
         "python -m ruff check .",
         "python scripts/audit_css.py --check",
         "python scripts/visual_regression_smoke.py",
-        "python scripts/build_portable.py --skip-venv --release",
+        "python scripts/package_release_candidate.py --version 1.0.1",
         "Exported image output changed",
     ]
     for item in required_items:

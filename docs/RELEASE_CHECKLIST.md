@@ -15,9 +15,10 @@ python scripts/audit_css.py --check
 python scripts/e2e_smoke.py
 python scripts/visual_regression_smoke.py
 python scripts/benchmark_shadow_v2.py --smoke --runs 1
-python scripts/build_portable.py --skip-venv --release
+python scripts/package_release_candidate.py --version 1.0.1
+python scripts/verify_portable_candidate.py release/FlatShotPortable-v1.0.1.zip release/SHA256SUMS.txt --extract-to "C:\Temp\FlatShot candidate á"
 python -m build
-python scripts/check_release_version.py v1.0.0
+python scripts/check_release_version.py v1.0.1
 ```
 
 ## Manual Workflow Checks
@@ -51,12 +52,17 @@ or golden comparison that approved the change.
 
 ## Portable
 
-- `python scripts/build_portable.py --skip-venv --release` completes without
-  embedding `source_path.txt`; `.autosync.json` must report release mode with
-  `source_root: null` and contain no development checkout path.
-- Portable runtime includes frontend, bridge and launcher files.
-- If dependencies changed, run the full portable build without `--skip-venv`.
-- Launch diagnostics remain available through `Diagnostico FlatShot.bat`.
+- The candidate ZIP contains `FlatShot.exe`, `_internal`, frontend, bridge,
+  launchers, notices, and writable `data`, but no venv, `pyvenv.cfg`, source
+  pointer, development flag, repository path, or CI-builder path.
+- Verify the SHA-256 checksum before extraction.
+- Extract to a different path containing spaces and non-ASCII characters.
+- Clear `PYTHONHOME`, `PYTHONPATH`, and `VIRTUAL_ENV`, reduce `PATH` to Windows
+  system directories, and require `FlatShot.exe --smoke` to return zero.
+- Launch diagnostics remain available through `Diagnostico FlatShot.bat` and
+  `data\logs\runtime.log`.
+- Download and manually check the Release Candidate workflow artifact before
+  creating the tag. Do not tag if its fresh-runner verification is not green.
 
 ## Tag and GitHub release
 
@@ -71,5 +77,6 @@ or golden comparison that approved the change.
   `origin/main`; do not bypass this provenance gate.
 - Let `.github/workflows/release.yml` build and publish the portable ZIP,
   Python distributions, and SHA-256 checksum.
+- Confirm `publish` depends on fresh-runner `portable-verification`.
 - Download the published artifact, verify its checksum, launch it on Windows,
   and complete one representative export before announcing the release.

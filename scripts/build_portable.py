@@ -155,7 +155,7 @@ def build_release_portable(source_root: Path, target: Path) -> None:
     validate_release_portable(target, forbidden_roots=[source_root])
 
 
-def write_release_support_files(target: Path) -> None:
+def write_release_support_files(target: Path, source_root: Path = PROJECT_ROOT) -> None:
     target.mkdir(parents=True, exist_ok=True)
     (target / "data").mkdir(exist_ok=True)
     (target / "portable.flag").write_text("portable\n", encoding="utf-8")
@@ -165,6 +165,8 @@ def write_release_support_files(target: Path) -> None:
     (target / "Abrir FlatShot.vbs").write_text(RELEASE_VBS_LAUNCHER, encoding="utf-8")
     (target / "Diagnostico FlatShot.bat").write_text(RELEASE_DIAGNOSTIC_BAT, encoding="utf-8")
     (target / "README_PORTABLE.txt").write_text(RELEASE_README_PORTABLE, encoding="utf-8")
+    shutil.copy2(source_root / "LICENSE", target / "LICENSE.txt")
+    shutil.copy2(source_root / "THIRD_PARTY_NOTICES.md", target / "THIRD_PARTY_NOTICES.txt")
 
 
 def validate_release_portable(target: Path, *, forbidden_roots: list[Path] | tuple[Path, ...] = ()) -> None:
@@ -175,6 +177,8 @@ def validate_release_portable(target: Path, *, forbidden_roots: list[Path] | tup
         target / "Abrir FlatShot.vbs",
         target / "Diagnostico FlatShot.bat",
         target / "README_PORTABLE.txt",
+        target / "LICENSE.txt",
+        target / "THIRD_PARTY_NOTICES.txt",
         target / "data",
     ]
     missing = [str(path) for path in required if not path.exists()]

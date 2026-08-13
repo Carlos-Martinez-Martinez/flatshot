@@ -61,6 +61,8 @@ def test_release_portable_does_not_embed_development_source_pointer(tmp_path):
     assert not (target / ".autosync.json").exists()
     assert "FlatShot.exe" in (target / "Abrir FlatShot.vbs").read_text(encoding="utf-8")
     assert "pythonw.exe" not in (target / "Abrir FlatShot.vbs").read_text(encoding="utf-8")
+    assert (target / "LICENSE.txt").read_text(encoding="utf-8").startswith("MIT License")
+    assert "PyInstaller" in (target / "THIRD_PARTY_NOTICES.txt").read_text(encoding="utf-8")
 
 
 def test_source_manifest_tracks_backend_and_frontend_files():

@@ -65,6 +65,25 @@ def test_release_portable_does_not_embed_development_source_pointer(tmp_path):
     assert "PyInstaller" in (target / "THIRD_PARTY_NOTICES.txt").read_text(encoding="utf-8")
 
 
+def test_copy_frozen_runtime_licenses_includes_python_and_distribution_terms(tmp_path):
+    python_license = tmp_path / "python" / "LICENSE.txt"
+    python_license.parent.mkdir()
+    python_license.write_text("PYTHON SOFTWARE FOUNDATION LICENSE", encoding="utf-8")
+    package_license = tmp_path / "site" / "pywebview" / "LICENSE"
+    package_license.parent.mkdir(parents=True)
+    package_license.write_text("BSD 3-Clause License", encoding="utf-8")
+
+    copied = build_portable.copy_frozen_runtime_licenses(
+        tmp_path / "portable",
+        python_license=python_license,
+        distribution_licenses={"pywebview-6.2.1": [package_license]},
+    )
+
+    assert copied == 2
+    assert (tmp_path / "portable" / "THIRD_PARTY_LICENSES" / "CPython" / "LICENSE.txt").exists()
+    assert (tmp_path / "portable" / "THIRD_PARTY_LICENSES" / "pywebview-6.2.1" / "LICENSE").exists()
+
+
 def test_source_manifest_tracks_backend_and_frontend_files():
     files = {path.relative_to(PROJECT_ROOT).as_posix() for path in build_portable.iter_source_files(PROJECT_ROOT)}
 

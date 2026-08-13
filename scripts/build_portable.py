@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.metadata
 import json
 import shutil
 import subprocess
@@ -48,6 +49,28 @@ TEXT_CONFIG_SUFFIXES = {
     ".yaml",
     ".yml",
 }
+FROZEN_LICENSE_DISTRIBUTIONS = (
+    "altgraph",
+    "annotated-types",
+    "bottle",
+    "cffi",
+    "clr-loader",
+    "numpy",
+    "pefile",
+    "Pillow",
+    "proxy-tools",
+    "pycparser",
+    "pydantic",
+    "pydantic-core",
+    "PyInstaller",
+    "pyinstaller-hooks-contrib",
+    "pythonnet",
+    "pywebview",
+    "pywin32-ctypes",
+    "setuptools",
+    "typing-extensions",
+    "typing-inspection",
+)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -167,6 +190,67 @@ def write_release_support_files(target: Path, source_root: Path = PROJECT_ROOT) 
     (target / "README_PORTABLE.txt").write_text(RELEASE_README_PORTABLE, encoding="utf-8")
     shutil.copy2(source_root / "LICENSE", target / "LICENSE.txt")
     shutil.copy2(source_root / "THIRD_PARTY_NOTICES.md", target / "THIRD_PARTY_NOTICES.txt")
+    copy_frozen_runtime_licenses(target)
+
+
+def copy_frozen_runtime_licenses(
+    target: Path,
+    *,
+    python_license: Path | None = None,
+    distribution_licenses: dict[str, list[Path]] | None = None,
+) -> int:
+    licenses_root = target / "THIRD_PARTY_LICENSES"
+    if licenses_root.exists():
+        shutil.rmtree(licenses_root)
+    licenses_root.mkdir(parents=True)
+    copied = 0
+
+    python_license = python_license or (Path(sys.base_prefix) / "LICENSE.txt")
+    if python_license.is_file():
+        destination = licenses_root / "CPython" / python_license.name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(python_license, destination)
+        copied += 1
+
+    distribution_licenses = distribution_licenses or find_distribution_license_files()
+    for distribution_name, license_files in sorted(distribution_licenses.items()):
+        destination_dir = licenses_root / distribution_name
+        for index, license_file in enumerate(license_files, start=1):
+            if not license_file.is_file():
+                continue
+            destination_dir.mkdir(parents=True, exist_ok=True)
+            destination_name = license_file.name
+            destination = destination_dir / destination_name
+            if destination.exists():
+                destination = destination_dir / f"{index}-{destination_name}"
+            shutil.copy2(license_file, destination)
+            copied += 1
+    if copied == 0:
+        raise RuntimeError("No se encontraron licencias para el runtime frozen.")
+    return copied
+
+
+def find_distribution_license_files() -> dict[str, list[Path]]:
+    result: dict[str, list[Path]] = {}
+    for requested_name in FROZEN_LICENSE_DISTRIBUTIONS:
+        try:
+            distribution = importlib.metadata.distribution(requested_name)
+        except importlib.metadata.PackageNotFoundError:
+            continue
+        name = distribution.metadata.get("Name", requested_name)
+        version = distribution.version
+        key = f"{name}-{version}".replace("/", "-").replace("\\", "-")
+        files: list[Path] = []
+        for entry in distribution.files or ():
+            filename = Path(str(entry)).name.casefold()
+            if not filename.startswith(("license", "copying", "notice", "authors")):
+                continue
+            located = Path(distribution.locate_file(entry)).resolve()
+            if located.is_file():
+                files.append(located)
+        if files:
+            result[key] = files
+    return result
 
 
 def validate_release_portable(target: Path, *, forbidden_roots: list[Path] | tuple[Path, ...] = ()) -> None:
@@ -179,6 +263,7 @@ def validate_release_portable(target: Path, *, forbidden_roots: list[Path] | tup
         target / "README_PORTABLE.txt",
         target / "LICENSE.txt",
         target / "THIRD_PARTY_NOTICES.txt",
+        target / "THIRD_PARTY_LICENSES",
         target / "data",
     ]
     missing = [str(path) for path in required if not path.exists()]

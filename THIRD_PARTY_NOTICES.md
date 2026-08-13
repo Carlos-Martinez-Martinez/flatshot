@@ -17,8 +17,9 @@ FlatShot's Python runtime uses the following direct dependencies. They are not r
 | CFFI 2.1.1 / pycparser 3.0 | Native interface support used transitively | MIT-0 / BSD-3-Clause | https://cffi.readthedocs.io/ |
 
 Frozen portable builds reproduce this notice and FlatShot's MIT license at the
-archive root. Package metadata and license files included by upstream projects
-remain authoritative. Maintainers should review the resolved dependency set
-before each public release.
+archive root. They also collect the resolved CPython and package license texts
+under `THIRD_PARTY_LICENSES/`; those upstream texts remain authoritative.
+Maintainers should review the resolved dependency set before each public
+release.
 
 Unless a file states otherwise, repository-authored source code, documentation, and visual assets are provided under the repository's MIT License. No customer product images or third-party stock media should be committed.

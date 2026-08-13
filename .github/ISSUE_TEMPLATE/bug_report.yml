@@ -1,0 +1,60 @@
+name: Bug report
+description: Report a reproducible FlatShot problem or regression.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not attach private product images, customer data, local configuration, or credentials.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      placeholder: "1. Import ...\n2. Select ...\n3. Process ..."
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: FlatShot version or commit
+      placeholder: v1.0.0 or commit SHA
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: Windows 11, Python 3.13, portable or source
+    validations:
+      required: true
+  - type: dropdown
+    id: output
+    attributes:
+      label: Did exported image output change?
+      options:
+        - "No"
+        - "Yes"
+        - "Unknown"
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs or non-sensitive evidence
+      description: Redact user names, paths, image content, and other private data.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety checks
+      options:
+        - label: I removed private images, credentials, and personal paths.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true

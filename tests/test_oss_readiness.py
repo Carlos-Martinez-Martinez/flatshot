@@ -39,6 +39,28 @@ def test_public_repository_files_are_present():
     assert missing == []
 
 
+def test_codeowners_assigns_the_repository_maintainer():
+    codeowners = (PROJECT_ROOT / ".github" / "CODEOWNERS").read_text(encoding="utf-8")
+    owners = {
+        token
+        for line in codeowners.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+        for token in line.split()[1:]
+    }
+
+    assert owners == {"@carlosmartinezfyd"}
+
+
+def test_codeql_analyzes_python_and_javascript_typescript_in_parallel():
+    workflow = (PROJECT_ROOT / ".github" / "workflows" / "codeql.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "fail-fast: false" in workflow
+    assert "language: [python, javascript-typescript]" in workflow
+    assert "languages: ${{ matrix.language }}" in workflow
+
+
 def test_package_metadata_declares_mit_and_public_urls():
     metadata = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
 

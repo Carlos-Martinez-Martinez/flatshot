@@ -31,6 +31,19 @@
     }
   }
 
+  function initialBridgeTokenFromHash(hash) {
+    try {
+      const value = String(hash || "").replace(/^#/, "");
+      return String(new URLSearchParams(value).get("bridgeToken") || "").trim();
+    } catch (error) {
+      return "";
+    }
+  }
+
+  function initialBridgeToken(search, hash) {
+    return initialBridgeTokenFromHash(hash) || initialBridgeTokenFromSearch(search);
+  }
+
   function resolveRuntimeBridgeUrl(options = {}) {
     return normalizeBridgeUrl(
       options.currentBridgeUrl,
@@ -39,6 +52,8 @@
   }
 
   return {
+    initialBridgeToken,
+    initialBridgeTokenFromHash,
     initialBridgeTokenFromSearch,
     initialBridgeUrlFromSearch,
     normalizeBridgeUrl,

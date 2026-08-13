@@ -67,7 +67,7 @@ instead. Python bridge/core edits still require restarting the app.
 ## Options
 
 ```bash
-python apps/flatshot-desktop/run_dev.py
+python apps/flatshot-desktop/run_dev.py --open
 python apps/flatshot-desktop/run_dev.py --open
 python apps/flatshot-desktop/run_dev.py --bridge-port 8765 --frontend-port 4173
 python apps/flatshot-desktop/run_dev.py --no-bridge

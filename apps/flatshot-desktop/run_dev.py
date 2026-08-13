@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import secrets
 import socket
 import subprocess
@@ -30,6 +31,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         description="Arranca el bridge local y el frontend estatico de la nueva app FlatShot.",
     )
     parser.add_argument("--open", action="store_true", help="Abre el navegador en el frontend.")
+    parser.add_argument(
+        "--print-auth-url",
+        action="store_true",
+        help="Muestra la URL autenticada temporal para abrirla manualmente.",
+    )
     parser.add_argument("--no-bridge", action="store_true", help="Arranca solo el frontend estatico.")
     parser.add_argument(
         "--bridge-port",
@@ -90,11 +96,9 @@ def build_frontend_app_url(frontend_url: str, bridge_url: str | None, *, bridge_
     params = {}
     if bridge_url and bridge_url != f"http://{HOST}:{DEFAULT_BRIDGE_PORT}":
         params["bridge"] = bridge_url
-    if bridge_token:
-        params["bridgeToken"] = bridge_token
-    if not params:
-        return frontend_url
-    return f"{frontend_url}?{urlencode(params)}"
+    query = f"?{urlencode(params)}" if params else ""
+    fragment = f"#{urlencode({'bridgeToken': bridge_token})}" if bridge_token else ""
+    return f"{frontend_url}{query}{fragment}"
 
 
 def wait_for_url(url: str, *, timeout: float = 10.0) -> bool:
@@ -109,9 +113,22 @@ def wait_for_url(url: str, *, timeout: float = 10.0) -> bool:
     return False
 
 
-def start_process(label: str, args: list[str]) -> subprocess.Popen:
-    print(f"[dev] arrancando {label}: {' '.join(args)}", flush=True)
-    return subprocess.Popen(args, cwd=PROJECT_ROOT)
+def display_args(args: list[str]) -> str:
+    displayed = list(args)
+    for index, argument in enumerate(displayed[:-1]):
+        if argument == "--auth-token":
+            displayed[index + 1] = "[redacted]"
+    return " ".join(displayed)
+
+
+def start_process(
+    label: str,
+    args: list[str],
+    *,
+    environment: dict[str, str] | None = None,
+) -> subprocess.Popen:
+    print(f"[dev] arrancando {label}: {display_args(args)}", flush=True)
+    return subprocess.Popen(args, cwd=PROJECT_ROOT, env=environment)
 
 
 def stop_processes(processes: list[tuple[str, subprocess.Popen]]) -> None:
@@ -149,6 +166,8 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if bridge_port is not None and bridge_url is not None:
+            bridge_environment = os.environ.copy()
+            bridge_environment["FLATSHOT_BRIDGE_AUTH_TOKEN"] = bridge_token
             bridge_process = start_process(
                 "bridge",
                 [
@@ -160,9 +179,8 @@ def main(argv: list[str] | None = None) -> int:
                     str(bridge_port),
                     "--allowed-origin",
                     frontend_url,
-                    "--auth-token",
-                    bridge_token,
                 ],
+                environment=bridge_environment,
             )
             processes.append(("bridge", bridge_process))
             health_url = f"{bridge_url}/health"
@@ -188,7 +206,12 @@ def main(argv: list[str] | None = None) -> int:
 
         print("", flush=True)
         print("FlatShot nueva app - entorno local", flush=True)
-        print(f"Frontend: {frontend_app_url}", flush=True)
+        print(f"Frontend: {frontend_url}", flush=True)
+        if bridge_url is not None and args.print_auth_url:
+            print("URL autenticada temporal (no compartir):", flush=True)
+            print(frontend_app_url, flush=True)
+        elif bridge_url is not None and not args.open:
+            print("Usa --open o --print-auth-url para iniciar una sesión autenticada.", flush=True)
         if bridge_url is None:
             print("Bridge: desactivado (--no-bridge)", flush=True)
         else:

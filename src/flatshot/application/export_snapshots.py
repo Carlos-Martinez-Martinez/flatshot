@@ -12,6 +12,7 @@ from flatshot.application.contracts import ExportJobRequest
 from flatshot.application.events import ExportImageCompletedEvent, ExportLogEvent
 from flatshot.application.export_planning import ExportRenderTask
 from flatshot.application.export_workers import copy_stable
+from flatshot.application.source_files import regular_png_files
 from flatshot.core.overrides import override_key
 
 
@@ -26,11 +27,7 @@ def source_image_items(request: ExportJobRequest) -> list[tuple[Path, str, Path]
         source_files = [Path(p) for p in request.input_files]
     else:
         source_files = list(request.input_folder.iterdir())
-    return [
-        (path, override_key(path), path)
-        for path in source_files
-        if path.is_file() and path.suffix.lower() == ".png"
-    ]
+    return [(path, override_key(path), path) for path in regular_png_files(source_files)]
 
 
 def snapshot_root(current: Path | None) -> Path:

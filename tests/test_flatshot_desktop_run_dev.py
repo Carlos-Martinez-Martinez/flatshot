@@ -61,7 +61,7 @@ def test_build_frontend_app_url_includes_bridge_token():
 
     assert app_url == (
         "http://127.0.0.1:4174?"
-        "bridge=http%3A%2F%2F127.0.0.1%3A8766&bridgeToken=secret"
+        "bridge=http%3A%2F%2F127.0.0.1%3A8766#bridgeToken=secret"
     )
 
 
@@ -72,3 +72,25 @@ def test_build_frontend_app_url_keeps_default_bridge_url_clean():
     app_url = run_dev.build_frontend_app_url(frontend_url, bridge_url)
 
     assert app_url == frontend_url
+
+
+def test_display_args_redacts_bridge_token():
+    args = ["python", "run_bridge.py", "--auth-token", "session-secret", "--port", "8765"]
+
+    displayed = run_dev.display_args(args)
+
+    assert "session-secret" not in displayed
+    assert "--auth-token [redacted]" in displayed
+
+
+def test_launcher_passes_bridge_token_outside_process_arguments():
+    source = RUN_DEV_PATH.read_text(encoding="utf-8")
+
+    assert '"FLATSHOT_BRIDGE_AUTH_TOKEN"' in source
+    assert '"--auth-token",\n                    bridge_token' not in source
+
+
+def test_parse_args_supports_explicit_authenticated_url_output():
+    args = run_dev.parse_args(["--print-auth-url"])
+
+    assert args.print_auth_url is True

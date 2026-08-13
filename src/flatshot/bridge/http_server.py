@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import logging
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -24,6 +26,8 @@ DEFAULT_ALLOWED_ORIGINS = {
 }
 CLIENT_DISCONNECT_ERRORS = (BrokenPipeError, ConnectionAbortedError, ConnectionResetError)
 MAX_JSON_BODY_BYTES = 1_000_000
+DEFAULT_MAX_ACTIVE_CONNECTIONS = 16
+DEFAULT_REQUEST_TIMEOUT_SECONDS = 10.0
 _logger = logging.getLogger(__name__)
 
 
@@ -39,23 +43,54 @@ class FlatShotBridgeHTTPServer(ThreadingHTTPServer):
         service: FlatShotBridgeService | None = None,
         allowed_origins: set[str] | None = None,
         auth_token: str | None = None,
+        max_active_connections: int = DEFAULT_MAX_ACTIVE_CONNECTIONS,
+        request_timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SECONDS,
     ) -> None:
         super().__init__(server_address, handler_class)
         self.service = service or FlatShotBridgeService()
         self.allowed_origins = allowed_origins or set(DEFAULT_ALLOWED_ORIGINS)
         self.auth_token = str(auth_token or "").strip()
+        self.max_active_connections = max(1, int(max_active_connections))
+        self.request_timeout_seconds = max(0.1, float(request_timeout_seconds))
+        self._connection_slots = threading.BoundedSemaphore(self.max_active_connections)
+
+    def get_request(self):
+        request, client_address = super().get_request()
+        request.settimeout(self.request_timeout_seconds)
+        return request, client_address
+
+    def process_request(self, request, client_address) -> None:
+        if not self._connection_slots.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except Exception:
+            self._connection_slots.release()
+            raise
+
+    def process_request_thread(self, request, client_address) -> None:
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._connection_slots.release()
 
 
 class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
     server: FlatShotBridgeHTTPServer
 
     def do_OPTIONS(self) -> None:
-        self._send_json({}, status=204)
+        try:
+            self._require_origin()
+            self._send_json({}, status=204)
+        except Exception as exc:
+            self._send_error(exc)
 
     def do_GET(self) -> None:
         try:
             parsed = urlparse(self.path)
             path = parsed.path
+            self._require_origin()
             self._require_auth(path, query=parse_qs(parsed.query))
             if path == "/health":
                 self._send_json(self.server.service.health())
@@ -117,6 +152,7 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         try:
             path = urlparse(self.path).path
+            self._require_origin()
             self._require_auth(path)
             if path == "/folders/scan":
                 self._send_json(self.server.service.scan_folders(self._read_json_body()))
@@ -183,10 +219,6 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
         return
 
     def _read_json_body(self) -> dict[str, Any]:
-        content_type = self.headers.get("Content-Type", "")
-        if content_type and "application/json" not in content_type:
-            raise BridgeError("unsupported_media_type", "Content-Type must be application/json.", status=415)
-
         raw_length = self.headers.get("Content-Length", "0")
         try:
             length = int(raw_length)
@@ -194,6 +226,9 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
             raise BridgeError("invalid_request", "Invalid Content-Length.", status=400) from exc
         if length < 0:
             raise BridgeError("invalid_request", "Invalid Content-Length.", status=400)
+        content_type = self.headers.get("Content-Type", "")
+        if length and "application/json" not in content_type.lower():
+            raise BridgeError("unsupported_media_type", "Content-Type must be application/json.", status=415)
         if length > MAX_JSON_BODY_BYTES:
             self.rfile.read(min(length, MAX_JSON_BODY_BYTES + 1))
             raise BridgeError("payload_too_large", "Request body is too large.", status=413)
@@ -279,6 +314,11 @@ class FlatShotBridgeRequestHandler(BaseHTTPRequestHandler):
         if supplied != token:
             raise BridgeError("unauthorized", "Token local de FlatShot no válido.", status=401)
 
+    def _require_origin(self) -> None:
+        origin = self.headers.get("Origin")
+        if origin and origin not in self.server.allowed_origins:
+            raise BridgeError("origin_not_allowed", "Request origin is not allowed.", status=403)
+
 
 def create_server(
     host: str = DEFAULT_HOST,
@@ -287,6 +327,8 @@ def create_server(
     service: FlatShotBridgeService | None = None,
     allowed_origins: set[str] | None = None,
     auth_token: str | None = None,
+    max_active_connections: int = DEFAULT_MAX_ACTIVE_CONNECTIONS,
+    request_timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SECONDS,
 ) -> FlatShotBridgeHTTPServer:
     return FlatShotBridgeHTTPServer(
         (host, port),
@@ -294,6 +336,8 @@ def create_server(
         service=service,
         allowed_origins=allowed_origins,
         auth_token=auth_token,
+        max_active_connections=max_active_connections,
+        request_timeout_seconds=request_timeout_seconds,
     )
 
 
@@ -366,7 +410,11 @@ def main(argv: list[str] | None = None) -> int:
         default=[],
         help="Frontend origin allowed to call the local bridge. Can be passed multiple times.",
     )
-    parser.add_argument("--auth-token", default="", help="Optional local token required for sensitive endpoints.")
+    parser.add_argument(
+        "--auth-token",
+        default=os.environ.get("FLATSHOT_BRIDGE_AUTH_TOKEN", ""),
+        help="Optional local token required for sensitive endpoints.",
+    )
     args = parser.parse_args(argv)
 
     if args.host not in {"127.0.0.1", "localhost"}:

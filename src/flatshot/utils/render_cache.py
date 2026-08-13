@@ -2,8 +2,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import tempfile
-import shutil
 from typing import Any, Iterable, Mapping
 
 from PIL import Image, UnidentifiedImageError
@@ -13,6 +13,14 @@ class RenderCache:
 
     CACHE_VERSION = 6
     CACHE_DIR_ENV_VAR = "FLATSHOT_RENDER_CACHE_DIR"
+    OWNER_MARKER = ".flatshot-cache"
+    OWNER_MARKER_CONTENT = "flatshot-render-cache-v1\n"
+    _CACHE_FILE_RE = re.compile(r"^[0-9a-f]{64}\.(?:jpg|png)$", re.IGNORECASE)
+    _TEMP_SIDECAR_RE = re.compile(
+        r"^\.[0-9a-f]{64}\.(?:jpg|png)\.[A-Za-z0-9_-]+\.tmp$",
+        re.IGNORECASE,
+    )
+    _MARKER_TEMP_RE = re.compile(r"^\.flatshot-cache\.[A-Za-z0-9_-]+\.tmp$")
     
     def __init__(self):
         configured_cache = os.environ.get(self.CACHE_DIR_ENV_VAR, "").strip()
@@ -22,7 +30,84 @@ class RenderCache:
             else Path(tempfile.gettempdir()) / "flatshot_render_cache"
         )
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self._claim_cache_directory()
         self._prune_temp_sidecars()
+
+    def _claim_cache_directory(self) -> None:
+        marker = self.cache_dir / self.OWNER_MARKER
+        if marker.exists() or marker.is_symlink():
+            try:
+                marker_is_valid = (
+                    not marker.is_symlink()
+                    and marker.is_file()
+                    and marker.read_text(encoding="utf-8") == self.OWNER_MARKER_CONTENT
+                )
+            except OSError:
+                marker_is_valid = False
+            if not marker_is_valid:
+                raise ValueError("Render cache path is not a dedicated FlatShot cache directory.")
+            self._prune_marker_temps()
+            return
+        unmanaged = [
+            path.name
+            for path in self.cache_dir.iterdir()
+            if not self._is_managed_cache_entry(path)
+        ]
+        if unmanaged:
+            raise ValueError("Render cache path must be a dedicated FlatShot cache directory.")
+        temporary_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                newline="",
+                prefix=f"{self.OWNER_MARKER}.",
+                suffix=".tmp",
+                dir=self.cache_dir,
+                delete=False,
+            ) as marker_file:
+                marker_file.write(self.OWNER_MARKER_CONTENT)
+                marker_file.flush()
+                os.fsync(marker_file.fileno())
+                temporary_path = Path(marker_file.name)
+            os.replace(temporary_path, marker)
+        except OSError as exc:
+            if not self._is_valid_owner_marker(marker):
+                raise ValueError(
+                    "Render cache path is not a dedicated FlatShot cache directory."
+                ) from exc
+        finally:
+            if temporary_path is not None:
+                temporary_path.unlink(missing_ok=True)
+        if not self._is_valid_owner_marker(marker):
+            raise ValueError("Render cache path is not a dedicated FlatShot cache directory.")
+        self._prune_marker_temps()
+
+    def _is_valid_owner_marker(self, marker: Path) -> bool:
+        try:
+            return (
+                not marker.is_symlink()
+                and marker.is_file()
+                and marker.read_text(encoding="utf-8") == self.OWNER_MARKER_CONTENT
+            )
+        except OSError:
+            return False
+
+    def _is_managed_cache_entry(self, path: Path) -> bool:
+        return not path.is_symlink() and path.is_file() and bool(
+            self._CACHE_FILE_RE.fullmatch(path.name)
+            or self._TEMP_SIDECAR_RE.fullmatch(path.name)
+            or self._MARKER_TEMP_RE.fullmatch(path.name)
+        )
+
+    def _prune_marker_temps(self) -> None:
+        for path in self.cache_dir.iterdir():
+            if path.is_symlink() or not path.is_file() or not self._MARKER_TEMP_RE.fullmatch(path.name):
+                continue
+            try:
+                path.unlink()
+            except OSError:
+                pass
         
     def _file_fingerprint(self, image_path: str) -> dict:
         path = Path(image_path)
@@ -126,22 +211,34 @@ class RenderCache:
         
     def clear(self):
         """Clear all cached renders."""
-        if self.cache_dir.exists():
-            shutil.rmtree(self.cache_dir)
-            self.cache_dir.mkdir(parents=True, exist_ok=True)
+        for path in list(self._cache_files()) + list(self._temp_sidecars()):
+            try:
+                path.unlink()
+            except OSError:
+                pass
 
     def _prune_temp_sidecars(self) -> None:
-        for pattern in ("*.tmp", ".*.tmp"):
-            for temp_file in self.cache_dir.glob(pattern):
-                try:
-                    temp_file.unlink()
-                except OSError:
-                    pass
+        for temp_file in self._temp_sidecars():
+            try:
+                temp_file.unlink()
+            except OSError:
+                pass
+
+    def _temp_sidecars(self) -> Iterable[Path]:
+        return (
+            path
+            for path in self.cache_dir.iterdir()
+            if not path.is_symlink()
+            and path.is_file()
+            and self._TEMP_SIDECAR_RE.fullmatch(path.name)
+        )
 
     def _cache_files(self) -> Iterable[Path]:
         return (
             path for path in self.cache_dir.glob("*.*")
-            if path.is_file() and not path.name.startswith(".") and path.suffix.lower() in {".jpg", ".png"}
+            if not path.is_symlink()
+            and path.is_file()
+            and self._CACHE_FILE_RE.fullmatch(path.name)
         )
 
     def prune(self, max_files=1000, max_bytes: int | None = 2 * 1024 * 1024 * 1024):

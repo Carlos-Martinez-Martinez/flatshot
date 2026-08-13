@@ -5,18 +5,36 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "flatshot"
 version = "1.0.0"
-description = "Procesa imágenes de producto por lotes, aplica sombras realistas y prepara salidas listas para e-commerce."
+description = "Local-first batch product-image preparation for e-commerce workflows."
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "Proprietary"}
+license = "MIT"
 authors = [
-    {name = "FlatShot Team"}
+    {name = "Carlos Martínez Martínez"}
+]
+keywords = ["batch-processing", "ecommerce", "image-processing", "product-photography"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Win32 (MS Windows)",
+    "Intended Audience :: End Users/Desktop",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Graphics",
 ]
 dependencies = [
     "Pillow>=9.5.0",
     "numpy>=1.24.0",
     "pydantic>=2.0.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Carlos-Martinez-Martinez/flatshot"
+Repository = "https://github.com/Carlos-Martinez-Martinez/flatshot"
+Issues = "https://github.com/Carlos-Martinez-Martinez/flatshot/issues"
+Changelog = "https://github.com/Carlos-Martinez-Martinez/flatshot/blob/main/CHANGELOG.md"
 
 [project.scripts]
 flatshot = "flatshot.cli:main"

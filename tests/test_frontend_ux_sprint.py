@@ -138,7 +138,7 @@ def test_folder_drop_helper_resolves_supported_paths_and_rejects_files():
 const assert = require("node:assert/strict");
 const helpers = require({json.dumps(str(FOLDER_DROP_PATH))});
 
-assert.equal(helpers.fileUrlToLocalPath("file:///C:/Users/Carlos/Batch"), "C:/Users/Carlos/Batch");
+assert.equal(helpers.fileUrlToLocalPath("file:///C:/Users/Example/Batch"), "C:/Users/Example/Batch");
 assert.equal(helpers.fileUrlToLocalPath("file://server/share/Batch"), "//server/share/Batch");
 
 const folderDrop = helpers.resolveDroppedFolderPath({{

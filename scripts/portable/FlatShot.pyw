@@ -3,6 +3,7 @@ from __future__ import annotations
 import ctypes
 import json
 import os
+import secrets
 import socket
 import sys
 import threading
@@ -361,8 +362,15 @@ def main() -> int:
         auto_sync_from_source(source_root)
         ensure_runtime_paths()
         frontend = start_frontend_server(source_root)
-        bridge = start_bridge_server(allowed_origins={frontend.url})
-        app_url = frontend.url + "?" + urlencode({"bridge": bridge.url})
+        bridge_token = secrets.token_urlsafe(24)
+        bridge = start_bridge_server(allowed_origins={frontend.url}, auth_token=bridge_token)
+        app_url = (
+            frontend.url
+            + "?"
+            + urlencode({"bridge": bridge.url})
+            + "#"
+            + urlencode({"bridgeToken": bridge_token})
+        )
         open_desktop_window(app_url)
         return 0
     except Exception as error:
@@ -392,11 +400,11 @@ def ensure_runtime_paths() -> None:
         sys.path.insert(0, str(APP_PARENT))
 
 
-def start_bridge_server(allowed_origins: set[str] | None = None) -> LocalServer:
+def start_bridge_server(allowed_origins: set[str] | None = None, auth_token: str = "") -> LocalServer:
     from flatshot.bridge.http_server import create_server
 
     port = find_available_port(DEFAULT_BRIDGE_PORT)
-    server = create_server(HOST, port, allowed_origins=allowed_origins)
+    server = create_server(HOST, port, allowed_origins=allowed_origins, auth_token=auth_token)
     local = LocalServer("bridge", HOST, server.server_port, server, threading.Thread(target=server.serve_forever, daemon=True))
     local.thread.start()
     wait_until_ready(local.url + "/health")

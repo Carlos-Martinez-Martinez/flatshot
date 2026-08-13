@@ -229,8 +229,37 @@ def test_bridge_http_rejects_unconfigured_localhost_frontend_origin(tmp_path):
             {"Origin": "http://127.0.0.1:4174"},
         )
 
-    assert status == 200
+    assert status == 403
     assert "Access-Control-Allow-Origin" not in headers
+
+
+def test_bridge_http_rejects_state_change_without_json_content_type(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    payload = json.dumps({"folders": [str(source)]}).encode("utf-8")
+
+    with running_bridge(tmp_path / "config") as port:
+        connection = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        try:
+            connection.request("POST", "/folders/scan", body=payload)
+            response = connection.getresponse()
+            data = json.loads(response.read().decode("utf-8"))
+        finally:
+            connection.close()
+
+    assert response.status == 415
+    assert data["error"]["code"] == "unsupported_media_type"
+
+
+def test_bridge_http_server_bounds_connections_and_sets_socket_timeout(tmp_path):
+    service = FlatShotBridgeService(config_resolver=ConfigPathResolver(tmp_path / "config"))
+    server = create_server("127.0.0.1", 0, service=service)
+    try:
+        assert server.max_active_connections == 16
+        assert server.request_timeout_seconds == 10.0
+        assert server._connection_slots._value == 16
+    finally:
+        server.server_close()
 
 
 def test_bridge_http_presets_include_settings(tmp_path):

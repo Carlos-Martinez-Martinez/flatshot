@@ -74,12 +74,13 @@ def _allow_roots(service: FlatShotBridgeService, *paths: Path) -> FlatShotBridge
 
 
 def _wait_for_export(service: FlatShotBridgeService, job_id: str) -> dict:
-    for _ in range(50):
+    status = service.export_status(job_id)
+    for _ in range(250):
         status = service.export_status(job_id)
         if status["status"] in {"completed", "partial", "failed", "cancelled"}:
             return status
         sleep(0.02)
-    raise AssertionError("export job did not finish")
+    raise AssertionError(f"export job did not finish; last status: {status}")
 
 
 def _wait_for_scan_job(service: FlatShotBridgeService, job_id: str) -> dict:

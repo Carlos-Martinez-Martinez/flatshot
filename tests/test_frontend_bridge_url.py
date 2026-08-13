@@ -39,6 +39,16 @@ assert.equal(
 );
 
 assert.equal(
+  helpers.initialBridgeTokenFromHash("#bridgeToken=abc123"),
+  "abc123"
+);
+
+assert.equal(
+  helpers.initialBridgeToken("?bridgeToken=legacy", "#bridgeToken=launcher"),
+  "launcher"
+);
+
+assert.equal(
   helpers.resolveRuntimeBridgeUrl({{
     currentBridgeUrl: "http://127.0.0.1:8765",
     restoredBridgeUrl: "http://127.0.0.1:8766",

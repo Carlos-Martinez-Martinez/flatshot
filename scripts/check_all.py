@@ -11,6 +11,7 @@ CHECKS = (
     (sys.executable, "-m", "pytest"),
     (sys.executable, "-m", "ruff", "check", "."),
     (sys.executable, "scripts/audit_css.py", "--check"),
+    (sys.executable, "scripts/check_application_answers.py"),
     (sys.executable, "scripts/e2e_smoke.py"),
     (sys.executable, "scripts/visual_regression_smoke.py"),
 )

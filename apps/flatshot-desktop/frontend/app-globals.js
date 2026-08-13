@@ -19,7 +19,10 @@
   global.guideViewHelpers = window.FlatShotCanvasGuideView;
   global.appStateHelpers = window.FlatShotAppState;
   global.initialBridgeUrl = global.bridgeUrlHelpers.initialBridgeUrlFromSearch(window.location.search, global.defaultBridgeUrl);
-  global.initialBridgeToken = global.bridgeUrlHelpers.initialBridgeTokenFromSearch(window.location.search);
+  global.initialBridgeToken = global.bridgeUrlHelpers.initialBridgeToken(window.location.search, window.location.hash);
+  if (global.initialBridgeToken && window.location.hash) {
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+  }
   global.devMode = global.urlParams.get("dev") === "1";
   global.SOFT_BLACK_PREVIEW_BG = "soft-black";
   global.DEFAULT_PREVIEW_CUSTOM_RGB = [230, 230, 230];

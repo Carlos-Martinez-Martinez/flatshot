@@ -16,6 +16,7 @@ from flatshot.application.export_runner import ExportRunner
 from flatshot.application.log_service import ActivityLogService
 from flatshot.application.preset_service import PresetService
 from flatshot.application.settings_service import SettingsService
+from flatshot.application.source_files import regular_png_files
 from flatshot.core.models import (
     SHADOW_ENGINE_COMPAT,
     SHADOW_ENGINE_LEGACY,
@@ -167,11 +168,7 @@ def process_folder(args):
         sys.exit(1)
 
     # Find images
-    images = sorted(
-        path
-        for path in input_folder.iterdir()
-        if path.is_file() and path.suffix.lower() == ".png"
-    )
+    images = sorted(regular_png_files(input_folder.iterdir()))
     total = len(images)
     
     if total == 0:

@@ -1,4 +1,8 @@
+import os
+from pathlib import Path
+
 from PIL import Image
+import pytest
 
 from flatshot.utils.render_cache import RenderCache
 
@@ -11,6 +15,86 @@ def test_render_cache_uses_configured_portable_cache_dir(tmp_path, monkeypatch):
 
     assert cache.cache_dir == cache_dir
     assert cache.cache_dir.exists()
+    assert (cache.cache_dir / RenderCache.OWNER_MARKER).is_file()
+
+
+def test_render_cache_rejects_configured_directory_with_unrelated_files(tmp_path, monkeypatch):
+    cache_dir = tmp_path / "shared"
+    cache_dir.mkdir()
+    unrelated = cache_dir / "notes.tmp"
+    unrelated.write_text("keep", encoding="utf-8")
+    monkeypatch.setenv(RenderCache.CACHE_DIR_ENV_VAR, str(cache_dir))
+
+    with pytest.raises(ValueError, match="dedicated FlatShot cache"):
+        RenderCache()
+
+    assert unrelated.read_text(encoding="utf-8") == "keep"
+
+
+def test_render_cache_rejects_invalid_owner_marker(tmp_path, monkeypatch):
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    marker = cache_dir / RenderCache.OWNER_MARKER
+    marker.write_text("not-flatshot\n", encoding="utf-8")
+    monkeypatch.setenv(RenderCache.CACHE_DIR_ENV_VAR, str(cache_dir))
+
+    with pytest.raises(ValueError, match="dedicated FlatShot cache"):
+        RenderCache()
+
+    assert marker.read_text(encoding="utf-8") == "not-flatshot\n"
+
+
+def test_render_cache_rejects_owner_marker_symlink_without_touching_target(tmp_path, monkeypatch):
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    target = tmp_path / "outside.txt"
+    target.write_text("keep", encoding="utf-8")
+    marker = cache_dir / RenderCache.OWNER_MARKER
+    try:
+        marker.symlink_to(target)
+    except OSError as exc:
+        pytest.skip(f"Symlinks are unavailable: {exc}")
+    monkeypatch.setenv(RenderCache.CACHE_DIR_ENV_VAR, str(cache_dir))
+
+    with pytest.raises(ValueError, match="dedicated FlatShot cache"):
+        RenderCache()
+
+    assert target.read_text(encoding="utf-8") == "keep"
+
+
+def test_render_cache_publishes_only_a_complete_owner_marker(tmp_path, monkeypatch):
+    cache_dir = tmp_path / "cache"
+    marker = cache_dir / RenderCache.OWNER_MARKER
+    original_replace = os.replace
+    observed_content = []
+
+    def inspect_replace(source, destination):
+        observed_content.append(Path(source).read_text(encoding="utf-8"))
+        original_replace(source, destination)
+
+    monkeypatch.setenv(RenderCache.CACHE_DIR_ENV_VAR, str(cache_dir))
+    monkeypatch.setattr("flatshot.utils.render_cache.os.replace", inspect_replace)
+
+    RenderCache()
+
+    assert observed_content == [RenderCache.OWNER_MARKER_CONTENT]
+    assert marker.read_text(encoding="utf-8") == RenderCache.OWNER_MARKER_CONTENT
+
+
+def test_render_cache_cleanup_never_deletes_generic_temp_files(tmp_path, monkeypatch):
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    (cache_dir / RenderCache.OWNER_MARKER).write_text("flatshot-render-cache-v1\n", encoding="utf-8")
+    unrelated = cache_dir / "notes.tmp"
+    unrelated.write_text("keep", encoding="utf-8")
+    sidecar = cache_dir / f".{('a' * 64)}.png.job.tmp"
+    sidecar.write_bytes(b"partial")
+    monkeypatch.setenv(RenderCache.CACHE_DIR_ENV_VAR, str(cache_dir))
+
+    RenderCache()
+
+    assert unrelated.read_text(encoding="utf-8") == "keep"
+    assert not sidecar.exists()
 
 
 def test_render_cache_version_tracks_export_quality_pipeline():
@@ -201,9 +285,9 @@ def test_render_cache_prune_removes_oldest_files_and_temp_sidecars(tmp_path):
     cache.cache_dir = tmp_path / "cache"
     cache.cache_dir.mkdir()
 
-    old_file = cache.cache_dir / "old.png"
-    new_file = cache.cache_dir / "new.png"
-    temp_file = cache.cache_dir / ".new.png.job.tmp"
+    old_file = cache.cache_dir / f"{('a' * 64)}.png"
+    new_file = cache.cache_dir / f"{('b' * 64)}.png"
+    temp_file = cache.cache_dir / f".{('c' * 64)}.png.job.tmp"
     old_file.write_bytes(b"old")
     new_file.write_bytes(b"new")
     temp_file.write_bytes(b"partial")

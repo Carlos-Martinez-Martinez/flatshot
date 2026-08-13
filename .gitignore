@@ -54,7 +54,6 @@ htmlcov/
 # =========================
 .worktrees/
 .playwright-cli/
-.worktrees/
 playwright-report/
 test-results/
 output/playwright/

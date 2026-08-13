@@ -1,0 +1,114 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+env:
+  RELEASE_TAG: ${{ github.ref_name }}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out tagged revision
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify tagged commit is on main
+        shell: pwsh
+        run: |
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$env:GITHUB_SHA" "origin/main"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Release tags must point to a commit reachable from origin/main."
+          }
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            requirements.lock
+            requirements-dev.txt
+
+      - name: Install build and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.lock -r requirements-dev.txt
+
+      - name: Verify tag and package versions
+        run: python scripts/check_release_version.py "$env:RELEASE_TAG"
+
+      - name: Run quality suite
+        run: python scripts/check_all.py
+
+      - name: Run render benchmark smoke test
+        run: python scripts/benchmark_shadow_v2.py --smoke --runs 1
+
+      - name: Build Python distributions
+        run: python -m build
+
+      - name: Build self-contained portable folder
+        run: python scripts/build_portable.py --release
+
+      - name: Package portable folder and checksums
+        shell: pwsh
+        run: |
+          $archive = "release/FlatShotPortable-$env:RELEASE_TAG.zip"
+          Compress-Archive -LiteralPath "release/FlatShotPortable" -DestinationPath $archive
+          Get-FileHash -Algorithm SHA256 -LiteralPath $archive |
+            ForEach-Object { "$($_.Hash.ToLower())  FlatShotPortable-$env:RELEASE_TAG.zip" } |
+            Set-Content -Encoding ascii "release/SHA256SUMS.txt"
+
+      - name: Upload release candidate artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: FlatShot-release-${{ github.run_id }}
+          path: |
+            release/FlatShotPortable-${{ env.RELEASE_TAG }}.zip
+            release/SHA256SUMS.txt
+            dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 10
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified release candidate
+        uses: actions/download-artifact@v8
+        with:
+          name: FlatShot-release-${{ github.run_id }}
+          path: release-artifacts
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $assets = Get-ChildItem -LiteralPath "release-artifacts" -File -Recurse |
+            ForEach-Object { $_.FullName }
+          if (-not $assets) {
+            throw "No release artifacts were downloaded."
+          }
+          & gh release create $env:RELEASE_TAG @assets `
+            --verify-tag `
+            --generate-notes `
+            --title "FlatShot $env:RELEASE_TAG"

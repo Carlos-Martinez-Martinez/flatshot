@@ -1,29 +1,29 @@
-# Codex for Open Source application draft
+# Codex for Open Source application
 
 These answers are prepared for the [official Codex for Open Source application](https://openai.com/form/codex-for-oss/). Recheck the live form before submitting. The three free-text answers are validated at 500 characters or fewer by `python scripts/check_application_answers.py`.
 
 ## 1. Maintainer role
 
-Primary maintainer — creator and sole current maintainer of FlatShot.
+Primary maintainer
 
 I define the product and architecture, implement and review changes, maintain the image pipeline and desktop UI, investigate regressions, run releases, handle security reports, and support contributors.
 
 ## 2. Why is this repository eligible?
 
 <!-- answer-1-start -->
-FlatShot is an open-source, local-first desktop tool for consistent batch processing and export of product photography. It grew from a real e-commerce production workflow and combines scanning, presets, per-image review, previews, safe destination planning, progress controls, and portable packaging. It is entering public adoption with an established test suite, CI, security policy, contributor guidance, and a strict promise never to modify source images.
+FlatShot is an active open-source, local-first desktop tool built from a real e-commerce product-photography workflow. It provides safe batch scanning, presets, per-image review, previews and deterministic exports without modifying source files. It has 789 automated tests, Python 3.10–3.13 CI, Python/JS CodeQL, security reporting and a fresh-runner-verified Windows portable release. Public adoption is early; it fills a focused gap underserved by general image tools.
 <!-- answer-1-end -->
 
 ## 3. How would you use API credits for your project?
 
 <!-- answer-2-start -->
-API credits would support carefully scoped maintainer automation: issue triage and duplicate detection, PR and CI-failure summaries, regression-test suggestions, documentation maintenance, release-note preparation, and security-finding triage. Product photographs would not be sent to external services by default. Every proposed code change, merge, security decision, and release would remain human-reviewed and least-privileged.
+API credits would support maintainer automation: issue triage and duplicate detection, PR and CI-failure summaries, regression-test suggestions, documentation maintenance, release-note preparation and security-finding triage. Product photographs would not be sent to external services by default. Every proposed code change, merge, security decision and release would remain human-reviewed and least-privileged.
 <!-- answer-2-end -->
 
 ## 4. Anything else we should consider?
 
 <!-- answer-3-start -->
-FlatShot has substantial engineering and more than 700 automated tests, but its public adoption is still at an early stage; I am not claiming users, downloads, or community scale that do not yet exist. Codex support would help one maintainer review cross-layer changes, protect filesystem and image-output invariants, improve contributor onboarding, and turn real production lessons into a dependable public tool for studios, photographers, small brands, and e-commerce teams.
+FlatShot is early in public adoption, so I am not claiming users, downloads or community scale that do not yet exist. I am the sole current maintainer. When v1.0.0 exposed a packaging defect, I preserved the release history, added a corrective v1.0.1, fresh-runner GUI verification and regression gates. Codex support would help sustain this kind of maintenance and make a production-derived tool useful to studios, photographers, small brands and e-commerce teams.
 <!-- answer-3-end -->
 
 ## 5. Recommended “I'm interested in...” options

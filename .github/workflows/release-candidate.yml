@@ -1,0 +1,115 @@
+name: Release Candidate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/release.yml"
+      - ".github/workflows/release-candidate.yml"
+      - "requirements-dev.txt"
+      - "requirements.lock"
+      - "scripts/build_portable.py"
+      - "scripts/package_release_candidate.py"
+      - "scripts/verify_portable_candidate.py"
+      - "scripts/portable/**"
+      - "src/**"
+      - "apps/flatshot-desktop/frontend/**"
+      - "pyproject.toml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-candidate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out candidate revision
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            requirements.lock
+            requirements-dev.txt
+
+      - name: Install build and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.lock -r requirements-dev.txt
+
+      - name: Read and verify candidate version
+        shell: pwsh
+        run: |
+          $version = python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])"
+          "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          python scripts/check_release_version.py "v$version"
+
+      - name: Run quality suite
+        run: python scripts/check_all.py
+
+      - name: Run render benchmark smoke test
+        run: python scripts/benchmark_shadow_v2.py --smoke --runs 1
+
+      - name: Build Python distributions
+        run: python -m build
+
+      - name: Build and package frozen portable candidate
+        run: python scripts/package_release_candidate.py --version $env:RELEASE_VERSION
+
+      - name: Upload candidate artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: FlatShot-candidate-${{ github.run_id }}
+          path: |
+            release/FlatShotPortable-v${{ env.RELEASE_VERSION }}.zip
+            release/SHA256SUMS.txt
+            dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+  portable-verification:
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out candidate verifier
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up verification Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Download candidate artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: FlatShot-candidate-${{ github.run_id }}
+          path: candidate-artifacts
+
+      - name: Verify checksum, relocatability, and frozen smoke
+        shell: pwsh
+        run: |
+          $archive = Get-ChildItem candidate-artifacts -Recurse -File -Filter "FlatShotPortable-*.zip" |
+            Select-Object -First 1 -ExpandProperty FullName
+          $checksums = Get-ChildItem candidate-artifacts -Recurse -File -Filter "SHA256SUMS.txt" |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $archive -or -not $checksums) {
+            throw "Portable archive or checksum file is missing."
+          }
+          $extractTo = Join-Path $env:RUNNER_TEMP "FlatShot candidate á $env:GITHUB_RUN_ID"
+          python scripts/verify_portable_candidate.py $archive $checksums `
+            --extract-to $extractTo `
+            --forbid-root $env:GITHUB_WORKSPACE `
+            --forbid-root $env:RUNNER_WORKSPACE

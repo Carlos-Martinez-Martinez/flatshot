@@ -66,9 +66,9 @@ jobs:
         if: matrix.python-version == '3.13'
         run: python scripts/benchmark_shadow_v2.py --smoke --runs 1
 
-      - name: Build portable smoke test
+      - name: Build development portable smoke test
         if: matrix.python-version == '3.13'
-        run: python scripts/build_portable.py --skip-venv --release
+        run: python scripts/build_portable.py --skip-venv
 
       - name: Build Python package
         if: matrix.python-version == '3.13'

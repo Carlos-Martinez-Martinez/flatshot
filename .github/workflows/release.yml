@@ -72,17 +72,11 @@ jobs:
       - name: Build Python distributions
         run: python -m build
 
-      - name: Build self-contained portable folder
-        run: python scripts/build_portable.py --release
-
-      - name: Package portable folder and checksums
+      - name: Build and package frozen portable candidate
         shell: pwsh
         run: |
-          $archive = "release/FlatShotPortable-$env:RELEASE_TAG.zip"
-          Compress-Archive -LiteralPath "release/FlatShotPortable" -DestinationPath $archive
-          Get-FileHash -Algorithm SHA256 -LiteralPath $archive |
-            ForEach-Object { "$($_.Hash.ToLower())  FlatShotPortable-$env:RELEASE_TAG.zip" } |
-            Set-Content -Encoding ascii "release/SHA256SUMS.txt"
+          $version = $env:RELEASE_TAG.TrimStart("v")
+          python scripts/package_release_candidate.py --version $version
 
       - name: Upload release candidate artifact
         uses: actions/upload-artifact@v7
@@ -95,8 +89,46 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  publish:
+  portable-verification:
     needs: build
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out tagged verifier
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          persist-credentials: false
+
+      - name: Set up verification Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Download release candidate
+        uses: actions/download-artifact@v8
+        with:
+          name: FlatShot-release-${{ github.run_id }}
+          path: release-artifacts
+
+      - name: Verify checksum, relocatability, and frozen smoke
+        shell: pwsh
+        run: |
+          $archive = Get-ChildItem release-artifacts -Recurse -File -Filter "FlatShotPortable-*.zip" |
+            Select-Object -First 1 -ExpandProperty FullName
+          $checksums = Get-ChildItem release-artifacts -Recurse -File -Filter "SHA256SUMS.txt" |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $archive -or -not $checksums) {
+            throw "Portable archive or checksum file is missing."
+          }
+          $extractTo = Join-Path $env:RUNNER_TEMP "FlatShot verification á $env:GITHUB_RUN_ID"
+          python scripts/verify_portable_candidate.py $archive $checksums `
+            --extract-to $extractTo `
+            --forbid-root $env:GITHUB_WORKSPACE `
+            --forbid-root $env:RUNNER_WORKSPACE
+
+  publish:
+    needs: portable-verification
     runs-on: windows-latest
     timeout-minutes: 10
     environment: release

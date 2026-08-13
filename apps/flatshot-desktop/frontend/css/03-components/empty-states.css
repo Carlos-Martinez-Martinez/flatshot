@@ -18,6 +18,19 @@
 .empty-state span:not(.empty-icon), .empty-state small { max-width: 420px; color: var(--text-secondary); font-size: var(--font-size-sm); }
 .empty-note, .empty-state { color: var(--text-secondary); }
 
+.empty-state.batch-empty {
+  align-content: center;
+  gap: var(--space-3);
+  padding: var(--space-5);
+}
+.empty-state.batch-empty .empty-icon {
+  display: grid;
+  place-items: center;
+  border-color: var(--color-warning-border);
+  background: var(--color-warning-soft);
+}
+.empty-state.batch-empty .primary { margin-top: var(--space-2); }
+
 .empty-state.onboarding {
   margin: auto; max-width: min(520px, calc(100% - var(--modal-viewport-gutter))); gap: var(--space-3);
   background: var(--surface-alpha-62); justify-items: center; align-content: center;
@@ -31,14 +44,15 @@
   width: 72px; height: 72px; border: var(--border-width) solid var(--color-accent-border);
   border-radius: var(--radius-md); display: grid; place-items: center;
 }
-.empty-state.onboarding .empty-icon::before {
+.empty-state:is(.onboarding, .batch-empty) .empty-icon::before {
   content: none;
   display: none;
 }
-.empty-state.onboarding .empty-icon svg {
+.empty-state:is(.onboarding, .batch-empty) .empty-icon svg {
   width: var(--icon-size-lg); height: var(--icon-size-lg); fill: none; stroke: var(--semantic-selection);
   stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
 }
+.empty-state.batch-empty .empty-icon svg { stroke: var(--color-warning); }
 
 .empty-state.onboarding.initial-onboarding {
   position: relative; z-index: 3; width: min(680px, calc(100% - var(--modal-viewport-gutter))); max-width: min(680px, calc(100% - var(--modal-viewport-gutter)));

@@ -48,6 +48,14 @@
   grid-row: 1;
 }
 
+.app-shell:is([data-ui-state="batch_empty"], [data-ui-state="scan_empty"]) .preview-panel {
+  grid-column: 1;
+}
+
+.app-shell:is([data-ui-state="batch_empty"], [data-ui-state="scan_empty"]) .preview-toolbar {
+  display: none;
+}
+
 .preview-panel {
   min-height: 0;
   border-left: 0;

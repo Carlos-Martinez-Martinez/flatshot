@@ -148,6 +148,10 @@
   padding: 14px;
 }
 
+.app-shell:is([data-ui-state="batch_empty"], [data-ui-state="scan_empty"]) .settings-panel {
+  grid-column: 2;
+}
+
 .inspector-processing-card {
   grid-template-columns: minmax(0, 1fr);
 }

@@ -112,13 +112,13 @@ function renderPreview() {
 
   if (state.batch === "empty") {
     setPreviewCanvasHtml(canvas, emptyStateViewHelpers.emptyStateHtml({
-      variant: "warning",
+      variant: "batch-empty",
       title: "No se encontraron imágenes compatibles",
       detail: state.scanDiagnostics.totalOmitted
         ? ignoredSummaryText()
         : "Esta carpeta no contiene imágenes compatibles.",
-      actionLabel: "",
-      action: "",
+      actionLabel: "Elegir otra carpeta",
+      action: "pick-bridge-folder",
       meta: state.scanStatus || "",
     }));
     finishPreviewRender();

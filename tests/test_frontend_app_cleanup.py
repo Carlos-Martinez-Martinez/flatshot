@@ -1,8 +1,11 @@
 import json
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend" / "app.js"
@@ -159,6 +162,60 @@ def test_app_loader_uses_html_manifest_as_single_script_order_source():
     assert "app-loader.js" not in manifest
     assert "flatshot-app-loader-manifest" in loader_source
     assert not re.search(r"APP_SCRIPT_ORDER\s*=\s*\[", loader_source)
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend loader checks")
+def test_app_loader_accepts_bare_file_names_and_rejects_url_like_manifest_entries():
+    loader_path = FRONTEND_DIR / "app-loader.js"
+    script = f"""
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const vm = require("node:vm");
+const loaderSource = fs.readFileSync({json.dumps(str(loader_path))}, "utf8");
+
+function runLoader(manifest) {{
+  const appended = [];
+  const document = {{
+    currentScript: {{ src: "http://127.0.0.1:4173/app-loader.js?v=release" }},
+    getElementById() {{ return {{ textContent: JSON.stringify(manifest) }}; }},
+    createElement() {{ return {{}}; }},
+    head: {{
+      appendChild(element) {{
+        appended.push(element.src);
+        queueMicrotask(() => element.onload());
+      }},
+    }},
+  }};
+  const context = {{ document, Promise, queueMicrotask, URL, window: {{}} }};
+  vm.runInNewContext(loaderSource, context);
+  return appended;
+}}
+
+const legitimate = runLoader(["app-globals.js", "app-startup.js"]);
+assert.equal(legitimate[0], "http://127.0.0.1:4173/app-globals.js?v=release");
+
+for (const unsafeName of [
+  "https://attacker.example/payload.js",
+  "javascript:payload.js",
+  "data:text/javascript,payload.js",
+  "file:///tmp/payload.js",
+  "/absolute.js",
+  "../escape.js",
+  "nested/payload.js",
+]) {{
+  assert.throws(() => runLoader([unsafeName]), /Manifest de scripts de FlatShot no válido/);
+}}
+"""
+    result = subprocess.run(
+        ["node", "-e", script],
+        cwd=PROJECT_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
 
 
 def test_app_domain_scripts_are_loaded_through_loader_only():

@@ -4,6 +4,7 @@ import importlib.machinery
 import importlib.util
 import json
 import sys
+from types import SimpleNamespace
 from pathlib import Path
 
 
@@ -145,3 +146,60 @@ def test_frontend_manifest_hash_changes_with_frontend_file_content(tmp_path):
     index.write_text("<html>two and more</html>", encoding="utf-8")
 
     assert launcher.frontend_manifest_hash(tmp_path) != first_hash
+
+
+def test_frozen_roots_separate_writable_executable_and_bundled_resources(monkeypatch, tmp_path):
+    launcher = load_launcher()
+    portable_dir = tmp_path / "FlatShot Portable"
+    resource_dir = tmp_path / "bundle resources"
+    monkeypatch.setattr(launcher.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(launcher.sys, "executable", str(portable_dir / "FlatShot.exe"))
+    monkeypatch.setattr(launcher.sys, "_MEIPASS", str(resource_dir), raising=False)
+
+    assert launcher.portable_root() == portable_dir.resolve()
+    assert launcher.resource_root() == resource_dir.resolve()
+
+
+def test_non_frozen_roots_use_launcher_directory(monkeypatch):
+    launcher = load_launcher()
+    monkeypatch.delattr(launcher.sys, "frozen", raising=False)
+    monkeypatch.delattr(launcher.sys, "_MEIPASS", raising=False)
+
+    expected = launcher.Path(launcher.__file__).resolve().parent
+    assert launcher.portable_root() == expected
+    assert launcher.resource_root() == expected
+
+
+def test_run_smoke_checks_real_routes_and_stops_both_servers(monkeypatch):
+    launcher = load_launcher()
+    stopped: list[str] = []
+    checked: list[str] = []
+    frontend = SimpleNamespace(url="http://127.0.0.1:4173", stop=lambda: stopped.append("frontend"))
+    bridge = SimpleNamespace(url="http://127.0.0.1:8765", stop=lambda: stopped.append("bridge"))
+
+    monkeypatch.setattr(launcher, "configure_portable_environment", lambda: None)
+    monkeypatch.setattr(launcher, "find_source_root", lambda: None)
+    monkeypatch.setattr(launcher, "auto_sync_from_source", lambda _source_root: None)
+    monkeypatch.setattr(launcher, "ensure_runtime_paths", lambda: None)
+    monkeypatch.setattr(launcher, "start_frontend_server", lambda source_root=None: frontend)
+    monkeypatch.setattr(
+        launcher,
+        "start_bridge_server",
+        lambda allowed_origins=None, auth_token="": bridge,
+    )
+    monkeypatch.setattr(launcher, "verify_http_endpoint", checked.append)
+
+    launcher.run_smoke()
+
+    assert checked == [frontend.url + "/", bridge.url + "/health"]
+    assert stopped == ["bridge", "frontend"]
+
+
+def test_main_smoke_never_opens_desktop_window(monkeypatch):
+    launcher = load_launcher()
+    calls: list[str] = []
+    monkeypatch.setattr(launcher, "run_smoke", lambda: calls.append("smoke"))
+    monkeypatch.setattr(launcher, "open_desktop_window", lambda _url: calls.append("window"))
+
+    assert launcher.main(["--smoke"]) == 0
+    assert calls == ["smoke"]

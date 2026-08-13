@@ -2,7 +2,9 @@
 
 All notable public changes to FlatShot will be documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.1] - Unreleased
+## [Unreleased]
+
+## [1.0.1] - 2026-08-13
 
 ### Fixed
 
@@ -34,5 +36,5 @@ machine. The immutable tag and artifacts remain available as release history;
 do not use `FlatShotPortable-v1.0.0.zip`. Version `1.0.1` replaces only the
 distribution mechanism.
 
-[1.0.1]: https://github.com/Carlos-Martinez-Martinez/flatshot/compare/v1.0.0...HEAD
+[1.0.1]: https://github.com/Carlos-Martinez-Martinez/flatshot/releases/tag/v1.0.1
 [1.0.0]: https://github.com/Carlos-Martinez-Martinez/flatshot/releases/tag/v1.0.0

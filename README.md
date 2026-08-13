@@ -2,9 +2,9 @@
 
 FlatShot is a local-first desktop tool for preparing batches of product images for e-commerce. It scans folders of PNG files, previews configurable product presentation and shadows, and exports production-ready copies without modifying source images.
 
-> Status: `v1.0.0` is the first public release, but its Windows portable ZIP is
-> non-relocatable and must not be used. Version `1.0.1` is the corrective
-> release candidate; it changes packaging only, not image output.
+> Status: `v1.0.1` is the current stable Windows release. It replaces the non-relocatable
+> `v1.0.0` portable with a fresh-runner-verified PyInstaller bundle. Image
+> processing and exported image output are unchanged.
 
 ## Highlights
 

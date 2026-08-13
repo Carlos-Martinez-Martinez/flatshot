@@ -64,10 +64,11 @@ or golden comparison that approved the change.
   FlatShot window with a nonzero handle, native EdgeChromium/WebView2, a
   screenshot artifact, no new startup errors, and clean process/listener
   cleanup. The hosted runner cannot expose WebView2's DirectComposition surface
-  through classic Win32 capture and may expose only the top-level HWND through
-  UI Automation; record that limitation explicitly and apply the documented
-  minimum process/HTTP/HWND/WebView2/log gate. Browser fallback is diagnostic
-  evidence, not a passing release gate.
+  through classic Win32 capture, so the PNG may have a white client area. Record
+  that limitation explicitly and require UI Automation to expose the real
+  `FlatShot Desktop - Web content` control alongside the documented
+  process/HTTP/HWND/WebView2/log gate. Browser fallback is diagnostic evidence,
+  not a passing release gate.
 - Launch diagnostics remain available through `Diagnostico FlatShot.bat` and
   `data\logs\runtime.log`.
 - Download and manually check the Release Candidate workflow artifact before

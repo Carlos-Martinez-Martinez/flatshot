@@ -124,9 +124,10 @@ release workflows also launch the extracted executable without arguments and
 require the frontend, bridge health endpoint, visible native EdgeChromium
 window, WebView2 process, a window screenshot artifact, and clean shutdown
 evidence. GitHub's hosted runner does not expose WebView2's DirectComposition
-surface to classic Win32 capture and may expose only the top-level window to UI
-Automation. The workflow records that limitation explicitly and relies on the
-normal process, HTTP, HWND, WebView2, log, and cleanup gates in that environment.
+surface to classic Win32 capture, so the PNG can have a white client area. The
+workflow records that limitation and requires UI Automation to expose the real
+`FlatShot Desktop - Web content` control in addition to the process, HTTP, HWND,
+WebView2, log, and cleanup gates.
 
 ## Safety and compatibility
 

@@ -245,11 +245,13 @@ function Get-UiAutomationEvidence {
         $expected = $_
         @($names | Where-Object { $_ -match [regex]::Escape($expected) }).Count -gt 0
     })
+    $webContentNames = @($names | Where-Object { $_ -match "(?i)FlatShot.*Web content" })
     return [pscustomobject]@{
-        contentDetected = ($documentCount -gt 0 -and $matchedLabels.Count -ge 2)
+        contentDetected = ($webContentNames.Count -gt 0)
         elementCount = $elements.Count
         documentCount = $documentCount
         matchedLabels = $matchedLabels
+        webContentNames = $webContentNames
         names = @($names | Select-Object -First 100)
     }
 }
@@ -282,6 +284,7 @@ $uiAutomation = [pscustomobject]@{
     elementCount = 0
     documentCount = 0
     matchedLabels = @()
+    webContentNames = @()
     names = @()
     inspectionLimitation = "hosted runner UI Automation did not expose WebView2 descendants"
 }

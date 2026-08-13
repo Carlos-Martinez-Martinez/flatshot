@@ -55,8 +55,8 @@ def validate_result(payload: dict[str, Any]) -> None:
         failures.append("startup errors were logged")
     if not isinstance(screenshot.get("sizeBytes"), int) or screenshot["sizeBytes"] <= 0:
         failures.append("screenshot artifact is empty")
-    if not ui_automation.get("contentDetected") and not ui_automation.get("inspectionLimitation"):
-        failures.append("UI Automation limitation was not documented")
+    if not ui_automation.get("contentDetected"):
+        failures.append("FlatShot WebView2 content control was not detected")
     if cleanup.get("flatShotOrphans"):
         failures.append("FlatShot processes remained after cleanup")
     if cleanup.get("listenerPortsRemaining"):

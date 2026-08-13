@@ -86,9 +86,9 @@ runner. They require a visible native EdgeChromium window, frontend and bridge
 HTTP 200 responses, a temporally related WebView2 process, a window screenshot
 artifact, no startup traceback, and removal of listeners and FlatShot processes
 during cleanup. The hosted runner's classic Win32 capture APIs do not expose the
-WebView2 DirectComposition surface, and UI Automation may expose only the
-top-level window. The result records those limitations instead of inventing
-rendered-content evidence.
+WebView2 DirectComposition surface, so the PNG may have a white client area.
+The content gate instead requires Windows UI Automation to expose the real
+`FlatShot Desktop - Web content` control inside the native window.
 
 ## Options
 

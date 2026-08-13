@@ -37,10 +37,10 @@ def valid_result() -> dict[str, object]:
             "captureLimitation": "WebView2 DirectComposition surface unavailable to hosted-runner screen capture",
         },
         "uiAutomation": {
-            "contentDetected": False,
-            "elementCount": 1,
-            "matchedLabels": [],
-            "inspectionLimitation": "hosted runner exposes only the top-level window",
+            "contentDetected": True,
+            "elementCount": 16,
+            "matchedLabels": ["FlatShot"],
+            "webContentNames": ["FlatShot Desktop - Web content (InPrivate)"],
         },
         "cleanup": {
             "gracefulCloseRequested": True,
@@ -67,7 +67,7 @@ def test_accepts_complete_native_edgechromium_launch_evidence():
         (lambda data: data.update(windowMode="browser fallback"), "native EdgeChromium window was not used"),
         (lambda data: data["runtimeLog"].update(startupErrors=["Traceback"]), "startup errors were logged"),
         (lambda data: data["screenshot"].update(sizeBytes=0), "screenshot artifact is empty"),
-        (lambda data: data["uiAutomation"].update(inspectionLimitation=""), "UI Automation limitation was not documented"),
+        (lambda data: data["uiAutomation"].update(contentDetected=False), "FlatShot WebView2 content control was not detected"),
         (lambda data: data["cleanup"].update(flatShotOrphans=[4321]), "FlatShot processes remained"),
         (lambda data: data["cleanup"].update(listenerPortsRemaining=[4173]), "listeners remained"),
         (lambda data: data["environment"].update(pathSanitized=False), "child PATH was not sanitized"),

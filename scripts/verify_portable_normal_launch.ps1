@@ -277,7 +277,14 @@ $endpoints = [pscustomobject]@{ Frontend = $null; Bridge = $null }
 $webViewProcesses = @()
 $newPythonProcesses = @()
 $screenshot = [pscustomobject]@{ path = [IO.Path]::GetFullPath($ScreenshotPath); sizeBytes = 0; nonUniform = $false; width = 0; height = 0 }
-$uiAutomation = [pscustomobject]@{ contentDetected = $false; elementCount = 0; documentCount = 0; matchedLabels = @(); names = @() }
+$uiAutomation = [pscustomobject]@{
+    contentDetected = $false
+    elementCount = 0
+    documentCount = 0
+    matchedLabels = @()
+    names = @()
+    inspectionLimitation = "hosted runner UI Automation did not expose WebView2 descendants"
+}
 $stayedAlive = $false
 $exitCodeBeforeCleanup = $null
 $gracefulCloseRequested = $false
@@ -356,6 +363,11 @@ try {
             "WebView2 DirectComposition surface is unavailable to PrintWindow/CopyFromScreen on the hosted runner"
         )
         $uiAutomation = Get-UiAutomationEvidence -Handle $window.Handle
+        if (-not $uiAutomation.contentDetected) {
+            $uiAutomation | Add-Member -NotePropertyName inspectionLimitation -NotePropertyValue (
+                "hosted runner UI Automation exposed only $($uiAutomation.elementCount) descendant elements and $($uiAutomation.documentCount) documents"
+            )
+        }
     }
 }
 catch {

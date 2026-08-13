@@ -83,12 +83,12 @@ verify checksum, archive contents, relocation, a sanitized Python environment,
 and the frozen smoke in one command. The Release Candidate and Release
 workflows then run the same extracted `FlatShot.exe` normally on a fresh Windows
 runner. They require a visible native EdgeChromium window, frontend and bridge
-HTTP 200 responses, a temporally related WebView2 process, FlatShot document
-labels exposed through Windows UI Automation, a window screenshot artifact, no
-startup traceback, and removal of listeners and FlatShot processes during
-cleanup. The hosted runner's classic Win32 screenshot APIs do not capture the
-WebView2 DirectComposition surface; UI Automation is therefore the content gate
-and the PNG documents that capture limitation.
+HTTP 200 responses, a temporally related WebView2 process, a window screenshot
+artifact, no startup traceback, and removal of listeners and FlatShot processes
+during cleanup. The hosted runner's classic Win32 capture APIs do not expose the
+WebView2 DirectComposition surface, and UI Automation may expose only the
+top-level window. The result records those limitations instead of inventing
+rendered-content evidence.
 
 ## Options
 

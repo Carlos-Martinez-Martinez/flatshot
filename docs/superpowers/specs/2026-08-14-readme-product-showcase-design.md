@@ -78,8 +78,10 @@ The final root README will use this order:
    `Folder -> Adjust -> Preview -> Review -> Export` and no more than six
    bullets. Do not introduce an approval action that the current application
    does not expose.
-7. Three interface screenshots: full workspace, visual comparison, and batch
-   review/export.
+7. Three interface screenshots: full workspace, selected-image adjustments,
+   and batch review/export. The source/output comparison remains an editorial
+   before/after section because FlatShot's in-app comparison controls are not
+   exposed in production mode.
 8. `Built for a real production workflow` with a concise origin statement and
    a note that the public demo uses synthetic sample garments to avoid exposing
    client assets.
@@ -194,7 +196,8 @@ than committing an oversized file.
 Exactly three supporting screenshots are planned:
 
 1. **Workspace:** batch rail, selected product, preview, and active context.
-2. **Comparison:** source/processed inspection focused on one garment.
+2. **Selected image:** processed preview and the real local/global adjustment
+   context focused on one garment.
 3. **Batch review and export:** readiness, exceptions if present, output
    configuration, and process action.
 
@@ -214,7 +217,7 @@ docs/readme-assets/
   source-output-denim.webp
   source-output-texture.webp
   ui-workspace.webp
-  ui-comparison.webp
+  ui-selected-adjustment.webp
   ui-batch-review.webp
 ```
 

@@ -1,20 +1,70 @@
 # FlatShot
 
-FlatShot is a local-first desktop tool for preparing batches of product images for e-commerce. It scans folders of PNG files, previews configurable product presentation and shadows, and exports production-ready copies without modifying source images.
+[![Release](https://img.shields.io/github/v/release/Carlos-Martinez-Martinez/flatshot)](https://github.com/Carlos-Martinez-Martinez/flatshot/releases/latest)
+[![Windows](https://img.shields.io/badge/Windows-portable-0078D4)](https://github.com/Carlos-Martinez-Martinez/flatshot/releases/latest)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+Local-first production workbench for turning transparent fashion product images into consistent, e-commerce-ready assets.
+
+![FlatShot workspace with a twelve-item fashion batch loaded](docs/readme-assets/hero-workbench.webp)
+
+## See the workflow
+
+Open a folder, adjust the presentation, review the batch, and export production-ready copies without modifying the source images.
+
+![FlatShot workflow from folder selection to completed export](docs/readme-assets/workflow-demo.gif)
+
+## Source PNG to e-commerce output
+
+Every result below was exported by FlatShot from the sample source PNG shown beside it. No manual retouching was applied after export.
+
+| Light garment | Dark garment |
+| --- | --- |
+| ![White T-shirt source PNG and FlatShot output](docs/readme-assets/source-output-light.webp) | ![Black hoodie source PNG and FlatShot output](docs/readme-assets/source-output-dark.webp) |
+
+| Denim silhouette | Textured knit |
+| --- | --- |
+| ![Light-wash jeans source PNG and FlatShot output](docs/readme-assets/source-output-denim.webp) | ![Cable-knit sweater source PNG and FlatShot output](docs/readme-assets/source-output-texture.webp) |
+
+## What it actually does
+
+`Folder -> Adjust -> Preview -> Review -> Export`
+
+- Imports local folders of PNG product images into a reviewable batch.
+- Applies reusable presentation presets globally or to an individual image.
+- Previews background, placement, and shadow without changing the source file.
+- Surfaces invalid files, exclusions, and per-image exceptions before export.
+- Configures format, naming, destination, and reusable output profiles explicitly.
+- Processes long batches with progress, pause, stop, manifests, and safe non-overwriting output.
+
+## Inside FlatShot
+
+### Production workspace
+
+![FlatShot batch rail, processed preview, and inspector](docs/readme-assets/ui-workspace.webp)
+
+### Per-image control
+
+![FlatShot selected-image adjustment workflow](docs/readme-assets/ui-selected-adjustment.webp)
+
+### Review and export readiness
+
+![FlatShot batch review and export configuration](docs/readme-assets/ui-batch-review.webp)
+
+## Built for a real production workflow
+
+FlatShot originated inside a fashion e-commerce photography workflow, where large product-image batches need to be reviewed, prepared, and delivered consistently.
+
+The public demo uses synthetic, brand-neutral sample garments so the workflow can be shown without publishing client assets.
+
+## Download for Windows
+
+[Download the latest portable Windows release](https://github.com/Carlos-Martinez-Martinez/flatshot/releases/latest). Extract the ZIP and run `FlatShot.exe` or `Abrir FlatShot.vbs`; no system-wide Python installation is required.
 
 > Status: `v1.0.1` is the current stable Windows release. It replaces the non-relocatable
 > `v1.0.0` portable with a fresh-runner-verified PyInstaller bundle. Image
 > processing and exported image output are unchanged.
-
-## Highlights
-
-- Batch folder import with verified PNG scanning.
-- Presets, per-image adjustments, previews, and exception review.
-- PNG and JPG export profiles with explicit destination and naming controls.
-- Pause, resume, stop, progress, and export manifests for long-running jobs.
-- A local web frontend and loopback-only Python bridge.
-- A portable Windows build plus source-based development on Python 3.10+.
-- Source images are never overwritten, moved, or deleted.
 
 ## Quick start
 
@@ -126,8 +176,8 @@ window, WebView2 process, a window screenshot artifact, and clean shutdown
 evidence. GitHub's hosted runner does not expose WebView2's DirectComposition
 surface to classic Win32 capture, so the PNG can have a white client area. The
 workflow records that limitation and requires UI Automation to expose the real
-`FlatShot Desktop - Web content` control in addition to the process, HTTP, HWND,
-WebView2, log, and cleanup gates.
+`FlatShot Desktop - Web content` control in addition to the process, HTTP,
+HWND, WebView2, log, and cleanup gates.
 
 ## Safety and compatibility
 

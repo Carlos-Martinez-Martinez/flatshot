@@ -31,7 +31,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Check out candidate revision
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -85,7 +85,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Check out candidate verifier
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 

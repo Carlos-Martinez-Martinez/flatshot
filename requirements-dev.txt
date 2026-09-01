@@ -1,5 +1,5 @@
 pytest==9.1.1
-ruff==0.16.2
+ruff==0.16.5
 build==1.5.0
 PyInstaller==6.22.0
 pywebview==6.2.1

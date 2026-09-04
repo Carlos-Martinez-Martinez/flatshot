@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import secrets
 import socket
 import subprocess
 import sys
@@ -12,6 +11,7 @@ import urllib.error
 import urllib.request
 import webbrowser
 from pathlib import Path
+from typing import Mapping
 from urllib.parse import urlencode
 
 
@@ -101,6 +101,18 @@ def build_frontend_app_url(frontend_url: str, bridge_url: str | None, *, bridge_
     return f"{frontend_url}{query}{fragment}"
 
 
+def resolve_bridge_auth_token(environment: Mapping[str, str] | None = None) -> str:
+    """Return an explicitly configured token, without creating a per-launch token.
+
+    The desktop launcher may reuse an existing browser tab. A random token per
+    process then leaves that tab unable to authenticate after a restart. Local
+    development is intentionally open by default; callers can opt into auth by
+    setting FLATSHOT_BRIDGE_AUTH_TOKEN.
+    """
+    source = os.environ if environment is None else environment
+    return str(source.get("FLATSHOT_BRIDGE_AUTH_TOKEN", "")).strip()
+
+
 def wait_for_url(url: str, *, timeout: float = 10.0) -> bool:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -154,7 +166,7 @@ def main(argv: list[str] | None = None) -> int:
     bridge_port = None if args.no_bridge else resolve_port(args.bridge_port, DEFAULT_BRIDGE_PORT, "bridge")
     frontend_port = resolve_port(args.frontend_port, DEFAULT_FRONTEND_PORT, "frontend")
     bridge_url = f"http://{HOST}:{bridge_port}" if bridge_port is not None else None
-    bridge_token = secrets.token_urlsafe(24) if bridge_url is not None else ""
+    bridge_token = resolve_bridge_auth_token() if bridge_url is not None else ""
     frontend_url = f"http://{HOST}:{frontend_port}"
     frontend_app_url = build_frontend_app_url(frontend_url, bridge_url, bridge_token=bridge_token)
     processes: list[tuple[str, subprocess.Popen]] = []

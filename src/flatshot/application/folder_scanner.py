@@ -54,10 +54,9 @@ class FolderScanner:
                 verify_images=verify_images,
                 recursive=recursive,
                 cancellation_token=cancellation_token,
+                progress_callback=cb,
             )
             folder_results.append(result)
-            if cb is not None:
-                cb(idx + 1, total)
         errors = [error for result in folder_results for error in result.errors]
         total_images = sum(len(result.images) for result in folder_results)
         total_files = sum(result.files_found for result in folder_results)
@@ -94,6 +93,7 @@ class FolderScanner:
         verify_images: bool = True,
         recursive: bool = False,
         cancellation_token=None,
+        progress_callback: Callable[[int, int], None] | None = None,
     ) -> FolderScanResult:
         exists = folder.exists()
         is_dir = folder.is_dir()
@@ -128,72 +128,81 @@ class FolderScanner:
         files_found = 0
         image_paths: list[Path] = []
         omitted: list[OmittedScanItem] = []
+        progress_total = max(1, len(entries))
+        processed_entries = 0
+        if progress_callback is not None:
+            progress_callback(0, progress_total)
 
         for entry in entries:
             if _is_cancelled(cancellation_token):
                 break
 
-            if entry.is_symlink() and entry.is_dir():
-                omitted.append(
-                    OmittedScanItem(
-                        path=entry,
-                        name=entry.name,
-                        reason="symlink_not_scanned",
-                        detail="Enlace de carpeta no escaneado",
-                        category="ignored",
-                        severity="ignored",
+            try:
+                if entry.is_symlink() and entry.is_dir():
+                    omitted.append(
+                        OmittedScanItem(
+                            path=entry,
+                            name=entry.name,
+                            reason="symlink_not_scanned",
+                            detail="Enlace de carpeta no escaneado",
+                            category="ignored",
+                            severity="ignored",
+                        )
                     )
-                )
-                continue
+                    continue
 
-            if entry.is_dir():
-                omitted.append(
-                    OmittedScanItem(
-                        path=entry,
-                        name=entry.name,
-                        reason="subfolder_not_scanned",
-                        detail="Subcarpeta no escaneada",
-                        category="ignored",
-                        severity="ignored",
+                if entry.is_dir():
+                    omitted.append(
+                        OmittedScanItem(
+                            path=entry,
+                            name=entry.name,
+                            reason="subfolder_not_scanned",
+                            detail="Subcarpeta no escaneada",
+                            category="ignored",
+                            severity="ignored",
+                        )
                     )
-                )
-                continue
+                    continue
 
-            if not entry.is_file():
-                continue
+                if not entry.is_file():
+                    continue
 
-            files_found += 1
-            suffix = entry.suffix.lower()
-            if suffix not in SUPPORTED_IMAGE_SUFFIXES:
-                reason, detail = self._unsupported_file_reason(entry)
-                omitted.append(
-                    OmittedScanItem(
-                        path=entry,
-                        name=entry.name,
-                        suffix=entry.suffix,
-                        reason=reason,
-                        detail=detail,
-                        category="ignored",
-                        severity="ignored",
+                files_found += 1
+                suffix = entry.suffix.lower()
+                if suffix not in SUPPORTED_IMAGE_SUFFIXES:
+                    reason, detail = self._unsupported_file_reason(entry)
+                    omitted.append(
+                        OmittedScanItem(
+                            path=entry,
+                            name=entry.name,
+                            suffix=entry.suffix,
+                            reason=reason,
+                            detail=detail,
+                            category="ignored",
+                            severity="ignored",
+                        )
                     )
-                )
-                continue
+                    continue
 
-            if verify_images and not self._is_readable_png(entry):
-                omitted.append(
-                    OmittedScanItem(
-                        path=entry,
-                        name=entry.name,
-                        suffix=entry.suffix,
-                        reason="read_error",
-                        detail="No se pudo leer como PNG válido",
-                        category="warning",
-                        severity="warning",
+                if verify_images and not self._is_readable_png(entry):
+                    omitted.append(
+                        OmittedScanItem(
+                            path=entry,
+                            name=entry.name,
+                            suffix=entry.suffix,
+                            reason="read_error",
+                            detail="No se pudo leer como PNG válido",
+                            category="warning",
+                            severity="warning",
+                        )
                     )
-                )
-                continue
+                    continue
 
-            image_paths.append(entry)
+                image_paths.append(entry)
+            finally:
+                processed_entries += 1
+                if progress_callback is not None:
+                    progress_callback(processed_entries, progress_total)
 
         images = [self._image_info(path, image_overrides, errors) for path in image_paths]
         return FolderScanResult(

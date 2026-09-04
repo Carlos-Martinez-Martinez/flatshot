@@ -74,6 +74,14 @@ def test_build_frontend_app_url_keeps_default_bridge_url_clean():
     assert app_url == frontend_url
 
 
+def test_resolve_bridge_auth_token_is_empty_by_default():
+    assert run_dev.resolve_bridge_auth_token({}) == ""
+
+
+def test_resolve_bridge_auth_token_honors_explicit_environment_value():
+    assert run_dev.resolve_bridge_auth_token({"FLATSHOT_BRIDGE_AUTH_TOKEN": " session-secret "}) == "session-secret"
+
+
 def test_display_args_redacts_bridge_token():
     args = ["python", "run_bridge.py", "--auth-token", "session-secret", "--port", "8765"]
 

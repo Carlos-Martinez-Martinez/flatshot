@@ -110,6 +110,22 @@ def test_scan_fast_mode_handles_large_flat_batches(tmp_path):
     assert result.folders[0].images[-1].name == "item-0999.png"
 
 
+def test_scan_reports_progress_while_processing_folder_entries(tmp_path):
+    _png(tmp_path / "b.png")
+    _png(tmp_path / "a.png")
+    (tmp_path / "notes.txt").write_text("ignore", encoding="utf-8")
+    progress = []
+
+    FolderScanner().scan_folders(
+        [tmp_path],
+        progress_callback=lambda processed, total: progress.append((processed, total)),
+    )
+
+    assert progress[0] == (0, 3)
+    assert progress[-1] == (3, 3)
+    assert [processed for processed, _ in progress] == [0, 1, 2, 3]
+
+
 def test_scan_recursive_mode_includes_nested_images(tmp_path):
     root_png = _png(tmp_path / "root.png")
     nested = tmp_path / "nested"

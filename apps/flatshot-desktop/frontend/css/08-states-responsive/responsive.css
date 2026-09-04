@@ -12,7 +12,8 @@
     grid-template-columns: 300px minmax(0, 1fr) 336px;
   }
 
-  .app-shell[data-inspector-editing="true"] .workspace {
+  /* Editing preferences must not override the initial/scanning state grid. */
+  .app-shell:where([data-inspector-editing="true"]) .workspace {
     grid-template-columns: 280px minmax(0, 1fr) minmax(380px, 440px);
   }
 
@@ -79,7 +80,7 @@
     display: none;
   }
 
-  .workspace, .app-shell[data-output-editing="true"] .workspace, .app-shell[data-inspector-editing="true"] .workspace {
+  .workspace, .app-shell:where([data-output-editing="true"]) .workspace, .app-shell:where([data-inspector-editing="true"]) .workspace {
     grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
   }
 
@@ -159,7 +160,7 @@
     min-width: 0;
   }
 
-  .workspace {
+  .app-shell .workspace {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(260px, 1fr) 300px;
     overflow-x: hidden;

@@ -118,7 +118,7 @@
   grid-template-columns: minmax(0, 1fr) var(--column-inspector);
 }
 
-.app-shell[data-output-editing="true"] .workspace {
+.app-shell:where([data-output-editing="true"]) .workspace {
   grid-template-columns: clamp(280px, 15vw, 320px) minmax(520px, 1fr) var(--fs-output-edit-col);
 }
 

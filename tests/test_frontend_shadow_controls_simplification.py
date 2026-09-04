@@ -80,7 +80,7 @@ def test_dynamic_control_names_share_the_visible_label_for_accessibility():
 def test_editing_inspector_gets_a_wider_responsive_column_without_changing_the_shell():
     css = RESPONSIVE_CSS_PATH.read_text(encoding="utf-8")
 
-    assert '.app-shell[data-inspector-editing="true"] .workspace' in css
+    assert '.app-shell:where([data-inspector-editing="true"]) .workspace' in css
     assert "minmax(380px, 440px)" in css
 
 

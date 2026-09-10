@@ -420,7 +420,58 @@
   border-radius: var(--radius-sm);
 }
 
+@media (max-width: 1100px) {
+  #app-settings-modal .format-editor-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #app-settings-modal .format-editor-panel > section {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  #app-settings-modal .format-section-file {
+    border-right: 0;
+    padding-right: 0;
+  }
+
+  #app-settings-modal .format-editor-title,
+  #app-settings-modal .format-section-preview,
+  #app-settings-modal .format-preview-flow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #app-settings-modal .format-editor-title > .format-editor-controls {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
 @media (max-width: 760px) {
+  #app-settings-modal .app-settings-content {
+    grid-template-columns: minmax(0, 1fr);
+    overflow-y: auto;
+  }
+
+  #app-settings-modal .output-format-list {
+    min-height: 160px;
+    max-height: 200px;
+    border-right: 0;
+    border-bottom: var(--border-width) solid var(--color-border);
+  }
+
+  #app-settings-modal .output-format-form {
+    overflow: visible;
+  }
+
+  #app-settings-modal .app-settings-footer {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  #app-settings-modal .settings-footer-note {
+    grid-column: 1 / -1;
+  }
+
   #preferences-modal .app-settings-content {
     padding: 0 var(--space-4);
   }

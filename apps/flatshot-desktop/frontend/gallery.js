@@ -193,6 +193,19 @@
     };
   }
 
+  function prioritizedThumbnailImages(images = [], selectedImageId = "", limit = 4) {
+    const candidates = Array.isArray(images) ? images : [];
+    const selected = candidates.find((image) => image.id === selectedImageId);
+    const ordered = selected
+      ? [selected, ...candidates.filter((image) => image !== selected)]
+      : candidates;
+    return ordered.slice(0, Math.max(0, Number(limit) || 0));
+  }
+
+  function shouldDeferThumbnail(options = {}) {
+    return options.previewStatus === "loading" && options.thumbnailStatus !== "loaded";
+  }
+
   function galleryColumnCount(options = {}) {
     const width = Math.max(0, Number(options.width) || 0);
     if (options.view === "list") {
@@ -468,8 +481,10 @@
     isExcludedImage,
     isValidImage,
     mockThumbnailDataUrl,
+    prioritizedThumbnailImages,
     resolveAvailableFilter,
     resolveGallerySelection,
+    shouldDeferThumbnail,
     thumbnailState,
     thumbnailHtml,
     virtualGalleryWindow,

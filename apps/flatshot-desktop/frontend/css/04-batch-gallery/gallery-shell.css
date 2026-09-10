@@ -291,8 +291,8 @@
 
 .gallery-toolbar__top {
   min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
 }
@@ -319,6 +319,7 @@
 
 .gallery-heading {
   min-width: 0;
+  flex: 1 1 180px;
   display: grid;
   gap: var(--space-0-5);
 }
@@ -328,7 +329,7 @@
   overflow: hidden;
   color: var(--color-text-muted);
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
 }
@@ -431,6 +432,7 @@
 }
 
 .gallery-view-switch {
+  margin-left: auto;
   width: 140px;
   min-width: 140px;
   border-color: var(--rail-border);

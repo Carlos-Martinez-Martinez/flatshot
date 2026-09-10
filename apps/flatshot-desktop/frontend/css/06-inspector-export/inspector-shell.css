@@ -180,7 +180,7 @@
   display: grid;
 }
 
-.app-shell[data-ui-state="batch_empty"] .settings-panel, .app-shell[data-ui-state="scan_empty"] .settings-panel {
+.app-shell:where([data-ui-state="batch_empty"], [data-ui-state="scan_empty"]) .settings-panel {
   display: flex;
 }
 

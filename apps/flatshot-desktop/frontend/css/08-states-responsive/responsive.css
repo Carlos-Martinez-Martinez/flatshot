@@ -5,6 +5,10 @@
   .workspace {
     grid-template-columns: minmax(420px, 1fr) minmax(760px, 920px) clamp(340px, 19vw, 400px);
   }
+
+  .app-shell:where([data-inspector-editing="true"]) .workspace {
+    grid-template-columns: minmax(360px, 1fr) minmax(0, 920px) 440px;
+  }
 }
 
 @media (max-width: 1599px) {
@@ -84,13 +88,17 @@
     grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
   }
 
-  .settings-panel, .settings-panel.is-editing-preset, .settings-panel.is-advanced-subview {
+  .app-shell .settings-panel, .settings-panel.is-editing-preset, .settings-panel.is-advanced-subview {
     display: none;
   }
 
+  .app-shell:is([data-ui-state="batch_empty"], [data-ui-state="scan_empty"]) .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .app-shell[data-output-editing="true"] .settings-panel, .app-shell[data-responsive-inspector="true"] .settings-panel {
-    position: fixed;
-    top: var(--header-height);
+    position: absolute;
+    top: 0;
     right: 0;
     bottom: 0;
     z-index: var(--z-popover);

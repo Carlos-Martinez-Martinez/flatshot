@@ -20,7 +20,7 @@
       folders,
       imageOverrides: state.imageOverrides,
       recursive: Boolean(state.scanRecursive),
-      scanMode: "verified",
+      scanMode: "fast",
     };
   }
 

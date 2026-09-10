@@ -3,9 +3,17 @@ function initViewerResizeObserver() {
   if (!canvasArea || !("ResizeObserver" in window)) {
     return;
   }
+  let resizeFrame = null;
   viewerResizeObserver = new ResizeObserver(() => {
-    syncPreviewWorkspaceGeometry();
-    updateFitZoomReadout();
+    if (resizeFrame !== null) {
+      return;
+    }
+    // Geometry can change the observed area; write it after observer delivery.
+    resizeFrame = requestAnimationFrame(() => {
+      resizeFrame = null;
+      syncPreviewWorkspaceGeometry();
+      updateFitZoomReadout();
+    });
   });
   viewerResizeObserver.observe(canvasArea);
 }

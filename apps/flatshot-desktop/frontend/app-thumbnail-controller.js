@@ -10,11 +10,16 @@ function imageThumbnailSrc(image) {
 }
 
 function thumbnailState(image, src) {
+  const stored = state.thumbnailStatus[image.id];
+  const deferred = galleryHelpers.shouldDeferThumbnail({
+    previewStatus: state.previewStatus,
+    thumbnailStatus: stored?.status || "",
+  });
   return galleryHelpers.thumbnailState({
-    displaySrc: src,
-    renderedOnly: false,
+    displaySrc: deferred ? "" : src,
+    renderedOnly: deferred,
     src,
-    stored: state.thumbnailStatus[image.id],
+    stored,
   });
 }
 
@@ -46,7 +51,7 @@ function thumbnailTargetSize(maxSide = 180) {
 }
 
 function queueThumbnailPreload(images = null) {
-  if (!hasBatch() || state.exportStatus === "running") {
+  if (!hasBatch() || state.exportStatus === "running" || state.previewStatus === "loading") {
     return;
   }
   window.requestAnimationFrame(() => preloadBatchThumbnails(images));
@@ -56,7 +61,11 @@ function preloadBatchThumbnails(images = null) {
   if (state.exportStatus === "running") {
     return;
   }
-  (Array.isArray(images) ? images : activeImages()).forEach((image) => {
+  galleryHelpers.prioritizedThumbnailImages(
+    Array.isArray(images) ? images : activeImages(),
+    state.selectedImageId,
+    4,
+  ).forEach((image) => {
     const src = imageThumbnailSrc(image);
     const current = state.thumbnailStatus[image.id];
     const key = `${image.id}|${src}`;

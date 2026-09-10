@@ -56,7 +56,7 @@ assert.deepEqual(helpers.scanJobPayload(["C:/a"], {{ imageOverrides: {{ one: tru
   folders: ["C:/a"],
   imageOverrides: {{ one: true }},
   recursive: true,
-  scanMode: "verified",
+  scanMode: "fast",
 }});
 assert.equal(helpers.isScanCancelledError(new Error("Escaneo cancelado.")), true);
 assert.equal(helpers.isScanJobUnsupportedError(new Error("HTTP 405")), true);

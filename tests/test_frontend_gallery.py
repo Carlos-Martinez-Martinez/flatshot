@@ -221,6 +221,14 @@ assert.deepEqual(helpers.virtualGalleryWindow({{
   paddingBottom: 6480,
 }});
 
+assert.deepEqual(
+  helpers.prioritizedThumbnailImages(images, "c", 3).map((image) => image.id),
+  ["c", "a", "b"],
+);
+assert.equal(helpers.shouldDeferThumbnail({{ previewStatus: "loading", thumbnailStatus: "loading" }}), true);
+assert.equal(helpers.shouldDeferThumbnail({{ previewStatus: "loading", thumbnailStatus: "loaded" }}), false);
+assert.equal(helpers.shouldDeferThumbnail({{ previewStatus: "ready", thumbnailStatus: "loading" }}), false);
+
 assert.equal(helpers.imageFileStem("C:/lote/Zapato-Verde 01.png"), "Zapato-Verde 01");
 assert.equal(helpers.imageFileStem(""), "Imagen");
 

@@ -6,12 +6,9 @@ async function requestBridgePreview(image) {
   Object.assign(state, previewStateHelpers.previewLoadingState({ clearData: false }));
   render();
 
-  const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), 20000);
-
   try {
     const previewImage = await bridgeClientHelpers.requestPreviewImage(normalizedBridgeUrl(), {
-      signal: controller.signal,
+      timeoutMs: 20000,
       imageId: image.bridgeImageId || image.imageId || "",
       imagePath: image.path,
       targetSize: previewTargetSize(),
@@ -20,8 +17,6 @@ async function requestBridgePreview(image) {
       curveData: state.curveData || state.scaleCurve || null,
       authToken: state.bridgeToken,
     });
-    window.clearTimeout(timer);
-
     if (isStalePreviewResponse(requestId, image)) {
       return;
     }
@@ -43,7 +38,6 @@ async function requestBridgePreview(image) {
 
     Object.assign(state, previewStateHelpers.previewBridgeResultState(previewData, previewData.warning));
   } catch (error) {
-    window.clearTimeout(timer);
     if (isStalePreviewResponse(requestId, image)) {
       return;
     }

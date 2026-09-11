@@ -9,6 +9,7 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = PROJECT_ROOT / "apps" / "flatshot-desktop" / "frontend"
 HELPER_PATH = FRONTEND_DIR / "bridge-client.js"
+PREVIEW_CONTROLLER_PATH = FRONTEND_DIR / "app-bridge-preview-controller.js"
 INDEX_PATH = FRONTEND_DIR / "index.html"
 
 
@@ -201,3 +202,57 @@ assert.equal(getCalls, 2);
     )
 
     assert result.returncode == 0, result.stderr or result.stdout
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is required for frontend helper checks")
+def test_bridge_preview_controller_allows_slow_local_preview_requests():
+    script = f"""
+import {{ strict as assert }} from "node:assert";
+import fs from "node:fs";
+import vm from "node:vm";
+
+let helperTimeout = null;
+let renderCalls = 0;
+const context = {{
+  console,
+  URL,
+  window: {{
+  }},
+  state: {{ previewRequestId: 0, selectedImageId: "img-1", bridgeToken: "token" }},
+  previewStateHelpers: {{
+    previewLoadingState: () => ({{}}),
+    previewBridgeResultState: () => ({{}}),
+    previewErrorState: () => ({{}}),
+  }},
+  bridgeClientHelpers: {{
+    requestPreviewImage: async (_url, options) => {{
+      helperTimeout = options.timeoutMs;
+      return {{ blob: "blob", width: 320, height: 240, warning: "" }};
+    }},
+  }},
+  normalizedBridgeUrl: () => "http://127.0.0.1:8765",
+  normalizeSettings: () => ({{}}),
+  outputProfileHelpers: {{ backgroundColorTuple: () => [230, 230, 230] }},
+  previewTargetSize: () => ({{ targetWidth: 320, targetHeight: 240 }}),
+  bridgePreviewSettings: () => ({{}}),
+  currentImageOverride: () => ({{}}),
+  isStalePreviewResponse: () => false,
+  bridgeErrorMessage: () => "error",
+  render: () => {{ renderCalls += 1; }},
+  selectedImage: () => null,
+}};
+vm.createContext(context);
+vm.runInContext(fs.readFileSync({json.dumps(str(PREVIEW_CONTROLLER_PATH))}, "utf8"), context);
+await context.requestBridgePreview({{ id: "img-1", name: "foto.png", path: "C:/foto.png", imageId: "img-1" }});
+assert.equal(helperTimeout, 20000);
+assert.equal(renderCalls, 2);
+"""
+    result = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+
+    assert result.returncode == 0, result.stderr + result.stdout

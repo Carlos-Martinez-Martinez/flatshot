@@ -1,4 +1,4 @@
-pytest==9.1.1
+pytest==9.2.0
 ruff==0.16.2
 build==1.5.0
 PyInstaller==6.22.0
